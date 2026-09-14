@@ -50,6 +50,87 @@ interface Props {
     dimmed: boolean,
     setDimmed: Dispatch<SetStateAction<boolean>>,
     selectedElements: (Node | Link)[],
+    /** Off when the zoom group is rendered on its own, as it is on the mobile canvas. */
+    showZoom?: boolean,
+}
+
+interface ZoomControlsProps {
+    canvasRef: GraphRef,
+    disabled: boolean,
+    selectedElements: (Node | Link)[],
+    className?: string,
+}
+
+export function ZoomControls({
+    canvasRef,
+    disabled,
+    selectedElements,
+    className,
+}: ZoomControlsProps) {
+
+    const { indicator } = useContext(IndicatorContext);
+
+    const handleZoomClick = (changeFactor: number) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        // If elements are selected, pan to their centroid first, then zoom.
+        if (selectedElements.length > 0) {
+            const graphData = canvas.getGraphData();
+            const selectedNodeIds = new Set<number>();
+            for (const el of selectedElements) {
+                if ('source' in el) {
+                    selectedNodeIds.add(el.source as number);
+                    selectedNodeIds.add(el.target as number);
+                } else {
+                    selectedNodeIds.add(el.id);
+                }
+            }
+            const focusedNodes = graphData.nodes.filter(n => selectedNodeIds.has(n.id));
+            if (focusedNodes.length > 0) {
+                const cx = focusedNodes.reduce((s, n) => s + (n.x ?? 0), 0) / focusedNodes.length;
+                const cy = focusedNodes.reduce((s, n) => s + (n.y ?? 0), 0) / focusedNodes.length;
+                canvas.centerAt(cx, cy, 300);
+            }
+        }
+
+        canvas.zoom(canvas.getZoom() * changeFactor);
+    };
+
+    return (
+        <div data-testid="zoomControls" className={cn("flex items-center gap-1", className)}>
+            <Button
+                data-testid="zoomInControl"
+                className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                disabled={disabled}
+                indicator={indicator}
+                title="Zoom in"
+                onClick={() => handleZoomClick(1.1)}
+            >
+                <ZoomIn size={18} />
+            </Button>
+            <Button
+                data-testid="centerControl"
+                className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                disabled={disabled}
+                indicator={indicator}
+                title="Fit graph to screen"
+                onClick={() => canvasRef.current?.zoomToFit()}
+            >
+                <Shrink size={18} />
+            </Button>
+            <Button
+                data-testid="zoomOutControl"
+                className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                disabled={disabled}
+                indicator={indicator}
+                title="Zoom out"
+                onClick={() => handleZoomClick(0.9)}
+            >
+                <ZoomOut size={18} />
+            </Button>
+        </div>
+    );
 }
 
 export default function Controls({
@@ -59,6 +140,7 @@ export default function Controls({
     dimmed,
     setDimmed,
     selectedElements,
+    showZoom = true,
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -94,37 +176,6 @@ export default function Controls({
         if (isDirectionValidForLayout(layout, contextDirection)) return contextDirection;
         return directionsRef.current[layout] || getDefaultDirection(layout);
     })();
-
-    const handleZoomClick = (changeFactor: number) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        // If elements are selected, pan to their centroid first, then zoom.
-        if (selectedElements.length > 0) {
-            const graphData = canvas.getGraphData();
-            const selectedNodeIds = new Set<number>();
-            for (const el of selectedElements) {
-                if ('source' in el) {
-                    selectedNodeIds.add(el.source as number);
-                    selectedNodeIds.add(el.target as number);
-                } else {
-                    selectedNodeIds.add(el.id);
-                }
-            }
-            const focusedNodes = graphData.nodes.filter(n => selectedNodeIds.has(n.id));
-            if (focusedNodes.length > 0) {
-                const cx = focusedNodes.reduce((s, n) => s + (n.x ?? 0), 0) / focusedNodes.length;
-                const cy = focusedNodes.reduce((s, n) => s + (n.y ?? 0), 0) / focusedNodes.length;
-                canvas.centerAt(cx, cy, 300);
-            }
-        }
-
-        canvas.zoom(canvas.getZoom() * changeFactor);
-    };
-
-    const handleCenterClick = () => {
-        canvasRef.current?.zoomToFit();
-    };
 
     // The canvas follows these through ForceGraphContext, so the handlers only
     // move the state the active tab owns.
@@ -179,11 +230,13 @@ export default function Controls({
     const animationDisabled = pinned || layout !== 'force';
 
     return (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mobile:flex-wrap">
             {
                 graph.getElements().length > 0 &&
                 <>
-                    <div className="h-4 w-px bg-border rounded-full" />
+                    {/* Divides the controls from the tabs beside them; in the mobile
+                        sheet there is nothing to its left. */}
+                    <div className="h-4 w-px bg-border rounded-full mobile:hidden" />
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div data-testid="animationContainer" className="flex items-center gap-2">
@@ -262,7 +315,9 @@ export default function Controls({
                         <p>Layout</p>
                     </TooltipContent>
                 </Tooltip>
-                <DropdownMenuContent align="center" data-testid="layoutDropdownContent" preventOutsideClose={tutorialOpen}>
+                {/* Radix copies this z-index onto its popper wrapper, whose transform makes
+                    it the only value that counts. On mobile it opens inside the tools sheet. */}
+                <DropdownMenuContent className="mobile:z-50" align="center" data-testid="layoutDropdownContent" preventOutsideClose={tutorialOpen}>
                     <DropdownMenuRadioGroup value={layout} onValueChange={handleLayoutChange}>
                         <DropdownMenuRadioItem value="force">Force</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
@@ -338,39 +393,17 @@ export default function Controls({
                     </DropdownMenuSub>
                 </DropdownMenuContent>
             </DropdownMenu>
-            <div className="h-4 w-px bg-border rounded-full" />
-            <div data-testid="zoomControls" className="flex items-center gap-1">
-                <Button
-                    data-testid="zoomInControl"
-                    className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
-                    disabled={disabled}
-                    indicator={indicator}
-                    title="Zoom in"
-                    onClick={() => handleZoomClick(1.1)}
-                >
-                    <ZoomIn size={18} />
-                </Button>
-                <Button
-                    data-testid="zoomOutControl"
-                    className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
-                    disabled={disabled}
-                    indicator={indicator}
-                    title="Zoom out"
-                    onClick={() => handleZoomClick(0.9)}
-                >
-                    <ZoomOut size={18} />
-                </Button>
-                <Button
-                    data-testid="centerControl"
-                    className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
-                    disabled={disabled}
-                    indicator={indicator}
-                    title="Fit graph to screen"
-                    onClick={() => handleCenterClick()}
-                >
-                    <Shrink size={18} />
-                </Button>
-            </div>
+            {
+                showZoom &&
+                <>
+                    <div className="h-4 w-px bg-border rounded-full" />
+                    <ZoomControls
+                        canvasRef={canvasRef}
+                        disabled={disabled}
+                        selectedElements={selectedElements}
+                    />
+                </>
+            }
         </div>
     );
 }

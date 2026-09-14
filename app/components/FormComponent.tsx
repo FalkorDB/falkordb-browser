@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import Button from "./ui/Button";
+import HelpTip from "./ui/HelpTip";
 import Combobox from "./ui/combobox";
 import Input from "./ui/Input";
 
@@ -204,14 +205,9 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 <label className={cn(errors[field.label] && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
                                 {
                                     field.info &&
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <InfoIcon size={20} />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            {field.info}
-                                        </TooltipContent>
-                                    </Tooltip>
+                                    <HelpTip trigger={<InfoIcon size={20} />}>
+                                        {field.info}
+                                    </HelpTip>
                                 }
                             </div>
                             <div className="relative flex flex-col gap-1">

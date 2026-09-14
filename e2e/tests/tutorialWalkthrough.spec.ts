@@ -173,11 +173,11 @@ test.describe("Tutorial Walkthrough", () => {
         expect((await tutorial.getNodesScreenPositions()).length).toBeGreaterThan(0);
         await tutorial.clickNextButton();
 
-        // Step 25: "View Node / Edge Details" — advanceOn: "contextmenu", with advanceCondition
-        // Right-click on an actual node so the DataPanel opens reliably.
+        // Step 25: "View Node / Edge Details" — advanceOn: "click", with advanceCondition
+        // Click on an actual node so the DataPanel opens reliably.
         await tutorial.waitForStep("View Node / Edge Details");
-        const hit = await tutorial.rightClickCanvasUntilDataPanel();
-        expect(hit, "Right-click fallback: DataPanel never appeared after exhausting all canvas node positions").toBeTruthy();
+        const hit = await tutorial.clickCanvasUntilDataPanel();
+        expect(hit, "Click fallback: DataPanel never appeared after exhausting all canvas node positions").toBeTruthy();
 
         // Step 26: "Data Panel" — no advanceOn, has Next button
         await tutorial.waitForStep("Data Panel");

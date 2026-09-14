@@ -2,11 +2,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "./ui/Button";
 import { BrowserSettingsContext, ConnectionContext, GraphContext, IndicatorContext } from "./provider";
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { useSession } from "next-auth/react";
-import { Copy, Loader2 } from "lucide-react";
+import { Copy, Database, Ellipsis, GitGraph, Loader2, MemoryStick, Server, User } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, securedFetch } from "@/lib/utils";
+import useIsMobile from "@/lib/useIsMobile";
 import ConnectionManager from "./ConnectionManager";
 
 /**
@@ -29,13 +30,27 @@ function formatVersion(version: string | undefined): string {
     return version;
 }
 
-export default function Header() {
+interface Props {
+    /** Mobile only: route-level nav controls, shown before the connection picker. */
+    mobileLeading?: ReactNode;
+}
+
+/** Mobile overflow rows pair the existing label:value block with an icon. */
+const detailRow = (icon: ReactNode, content: ReactNode) => (
+    <div className="flex items-center gap-2">
+        <span className="shrink-0 text-muted-foreground">{icon}</span>
+        {content}
+    </div>
+);
+
+export default function Header({ mobileLeading = null }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { graphNames } = useContext(GraphContext);
     const { settings: { userExperienceSettings: { refreshInterval } } } = useContext(BrowserSettingsContext);
     const { connectionType, connectionInfo, dbVersion, supportsOffload, offloadedGraphs } = useContext(ConnectionContext);
     const { status, data: session } = useSession();
     const { toast } = useToast();
+    const isMobile = useIsMobile();
 
     const [usedMemory, setUsedMemory] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
@@ -99,164 +114,205 @@ export default function Header() {
             .catch(() => toast({ title: "Failed to copy", variant: "destructive" }));
     }, [toast]);
 
-    return (
-        <header className="flex gap-4 w-full border-b border-border/50 px-3 py-1.5 items-center text-sm">
-            <ConnectionManager />
+    const versionInfo = mounted && formatVersion(dbVersion) ? (
+        <div className="flex gap-1 items-center">
+            <span className="font-bold">FalkorDB:</span>
+            <h2>v{formatVersion(dbVersion)}</h2>
+        </div>
+    ) : null;
+
+    const memoryInfo = (
+        <div className="flex gap-1 items-center">
+            <Tooltip>
+                <TooltipTrigger>
+                    <span className="font-bold">Memory:</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Used Memory</p>
+                </TooltipContent>
+            </Tooltip>
             {
-                mounted && formatVersion(dbVersion) &&
+                usedMemory !== null ?
+                    <h2>{usedMemory}</h2>
+                    : <Loader2 className="animate-spin" size={16} />
+            }
+        </div>
+    );
+
+    const graphsInfo = (
+        <div className="flex gap-1 items-center">
+            <Tooltip>
+                <TooltipTrigger>
+                    <span className="font-bold">Graphs:</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Graphs Count</p>
+                </TooltipContent>
+            </Tooltip>
+            {
+                graphNames === undefined
+                    ? <Loader2 data-testid="graphsCountLoader" className="animate-spin" size={16} />
+                    : <h2 data-testid="graphsCountValue">{totalCount}</h2>
+            }
+            {
+                supportsOffload && graphNames !== undefined &&
                 <div className="flex gap-1 items-center">
-                    <span className="font-bold">FalkorDB:</span>
-                    <h2>v{formatVersion(dbVersion)}</h2>
+                    <span>[</span>
+                    <Tooltip>
+                        <TooltipTrigger>
+                            <span className="text-green" data-testid="graphsOnLoadCountValue">{loadedCount}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Loaded</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <span>,</span>
+                    <Tooltip>
+                        <TooltipTrigger>
+                            <span className="text-yellow" data-testid="graphsOffLoadCountValue">{offloadedCount}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Offloaded</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <span>]</span>
                 </div>
             }
-            <div className="flex gap-1 items-center">
-                <Tooltip>
-                    <TooltipTrigger>
-                        <span className="font-bold">Memory:</span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Used Memory</p>
-                    </TooltipContent>
-                </Tooltip>
-                {
-                    usedMemory !== null ?
-                        <h2>{usedMemory}</h2>
-                        : <Loader2 className="animate-spin" size={16} />
-                }
-            </div>
-            <div className="flex gap-1 items-center">
-                <Tooltip>
-                    <TooltipTrigger>
-                        <span className="font-bold">Graphs:</span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Graphs Count</p>
-                    </TooltipContent>
-                </Tooltip>
-                {
-                    graphNames === undefined
-                        ? <Loader2 data-testid="graphsCountLoader" className="animate-spin" size={16} />
-                        : <h2 data-testid="graphsCountValue">{totalCount}</h2>
-                }
-                {
-                    supportsOffload && graphNames !== undefined &&
-                    <div className="flex gap-1 items-center">
-                        <span>[</span>
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <span className="text-green" data-testid="graphsOnLoadCountValue">{loadedCount}</span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Loaded</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <span>,</span>
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <span className="text-yellow" data-testid="graphsOffLoadCountValue">{offloadedCount}</span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Offloaded</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <span>]</span>
+        </div>
+    );
+
+    const statusInfo = (
+        <div className="flex gap-1 items-center">
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <div
+                        tabIndex={0}
+                        role="status"
+                        aria-label={`Deployment type: ${connectionType}, Status: ${indicator}`}
+                        className={cn(
+                            indicator === "offline" ? "text-destructive border-destructive bg-destructive/10" : "text-green border-green bg-green/10",
+                            "h-6 px-2 rounded-full flex items-center gap-1.5 text-xs font-medium border",
+                        )}>
+                        <span className={cn(
+                            indicator === "offline" ? "bg-destructive" : "bg-green",
+                            "h-2 w-2 rounded-full",
+                        )} />
+                        {connectionType === "Standalone" && "Single"}
+                        {connectionType === "Sentinel" && "Sentinel"}
+                        {connectionType === "Cluster" && "Cluster"}
                     </div>
-                }
-            </div>
-            <div className="flex gap-1 items-center">
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <div
-                            tabIndex={0}
-                            role="status"
-                            aria-label={`Deployment type: ${connectionType}, Status: ${indicator}`}
-                            className={cn(
-                                indicator === "offline" ? "text-destructive border-destructive bg-destructive/10" : "text-green border-green bg-green/10",
-                                "h-6 px-2 rounded-full flex items-center gap-1.5 text-xs font-medium border",
-                            )}>
-                            <span className={cn(
-                                indicator === "offline" ? "bg-destructive" : "bg-green",
-                                "h-2 w-2 rounded-full",
-                            )} />
-                            {connectionType === "Standalone" && "Single"}
-                            {connectionType === "Sentinel" && "Sentinel"}
-                            {connectionType === "Cluster" && "Cluster"}
-                        </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <div className="flex flex-col gap-1">
-                            <p>Deployment type: {connectionType}</p>
-                            <p className={cn(
-                                indicator === "offline" ? "text-destructive" : "text-green",
-                            )}>Status: {indicator}</p>
-                        </div>
-                    </TooltipContent>
-                </Tooltip>
-            </div>
-            <div className="flex gap-1 items-center">
-                <span className="font-bold">User:</span>
-                <h2>{session?.user?.username || session?.user?.name || "default"}</h2>
-            </div>
-            {
-                mounted && session?.user &&
-                <div className="flex gap-1 items-center">
-                    <Button
-                        title="Copy deployment info"
-                        className="p-0.5 shrink-0"
-                        onClick={() => {
-                            let text = `${session.user.host}:${session.user.port}`;
-                            if (connectionType === "Sentinel") {
-                                if (connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined) text += `\nRole: Master (${connectionInfo.sentinelReplicas} replicas)`;
-                                if (connectionInfo.sentinelRole === "replica" && connectionInfo.sentinelMasterHost) text += `\nRole: Replica (master: ${connectionInfo.sentinelMasterHost}:${connectionInfo.sentinelMasterPort})`;
-                            }
-                            if (connectionType === "Cluster" && connectionInfo.clusterNodes) {
-                                text += `\nNodes: ${connectionInfo.clusterNodes.length}\n${connectionInfo.clusterNodes.map((node) => `${node.host}:${node.port} (${node.role}${node.slots ? ` ${node.slots}` : ""})`).join("\n")}`;
-                            }
-                            handleCopy(text);
-                        }}
-                    >
-                        <Copy size={12} />
-                    </Button>
-                    {connectionType !== "Standalone" ? (
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    label={`${session.user.host}:${session.user.port}`}
-                                />
-                            </PopoverTrigger>
-                            <PopoverContent className="w-fit max-w-full mt-2 border-foreground">
-                                <div className="flex flex-col gap-1.5 text-sm">
-                                    <p className="font-medium">{session.user.host}:{session.user.port}</p>
-                                    {connectionType === "Sentinel" && (
-                                        <>
-                                            {connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined && (
-                                                <p>Role: Master ({connectionInfo.sentinelReplicas} replicas)</p>
-                                            )}
-                                            {connectionInfo.sentinelRole === "replica" && connectionInfo.sentinelMasterHost && (
-                                                <p>Role: Replica (master: {connectionInfo.sentinelMasterHost}:{connectionInfo.sentinelMasterPort})</p>
-                                            )}
-                                        </>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <div className="flex flex-col gap-1">
+                        <p>Deployment type: {connectionType}</p>
+                        <p className={cn(
+                            indicator === "offline" ? "text-destructive" : "text-green",
+                        )}>Status: {indicator}</p>
+                    </div>
+                </TooltipContent>
+            </Tooltip>
+        </div>
+    );
+
+    const userInfo = (
+        <div className="flex gap-1 items-center">
+            <span className="font-bold">User:</span>
+            <h2>{session?.user?.username || session?.user?.name || "default"}</h2>
+        </div>
+    );
+
+    const deploymentInfo = mounted && session?.user ? (
+        <div className="flex gap-1 items-center">
+            {connectionType !== "Standalone" ? (
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                            label={`${session.user.host}:${session.user.port}`}
+                        />
+                    </PopoverTrigger>
+                    <PopoverContent className="w-fit max-w-full mt-2 border-foreground">
+                        <div className="flex flex-col gap-1.5 text-sm">
+                            <p className="font-medium">{session.user.host}:{session.user.port}</p>
+                            {connectionType === "Sentinel" && (
+                                <>
+                                    {connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined && (
+                                        <p>Role: Master ({connectionInfo.sentinelReplicas} replicas)</p>
                                     )}
-                                    {connectionType === "Cluster" && connectionInfo.clusterNodes && (
-                                        <>
-                                            <p className="font-medium">{connectionInfo.clusterNodes.length} nodes</p>
-                                            <div className="flex flex-col gap-0.5 text-xs">
-                                                {connectionInfo.clusterNodes.map((node) => (
-                                                    <p key={`${node.host}:${node.port}`}>
-                                                        {node.host}:{node.port} ({node.role}{node.slots ? ` ${node.slots}` : ""})
-                                                    </p>
-                                                ))}
-                                            </div>
-                                        </>
+                                    {connectionInfo.sentinelRole === "replica" && connectionInfo.sentinelMasterHost && (
+                                        <p>Role: Replica (master: {connectionInfo.sentinelMasterHost}:{connectionInfo.sentinelMasterPort})</p>
                                     )}
-                                </div>
-                            </PopoverContent>
-                        </Popover>
-                    ) : (
-                        <p className="grow basis-0 truncate">{session.user.host}:{session.user.port}</p>
-                    )}
-                </div>
-            }
+                                </>
+                            )}
+                            {connectionType === "Cluster" && connectionInfo.clusterNodes && (
+                                <>
+                                    <p className="font-medium">{connectionInfo.clusterNodes.length} nodes</p>
+                                    <div className="flex flex-col gap-0.5 text-xs">
+                                        {connectionInfo.clusterNodes.map((node) => (
+                                            <p key={`${node.host}:${node.port}`}>
+                                                {node.host}:{node.port} ({node.role}{node.slots ? ` ${node.slots}` : ""})
+                                            </p>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            ) : (
+                <p className="grow basis-0 truncate">{session.user.host}:{session.user.port}</p>
+            )}
+            <Button
+                title="Copy deployment info"
+                className="p-0.5 shrink-0"
+                onClick={() => {
+                    let text = `${session.user.host}:${session.user.port}`;
+                    if (connectionType === "Sentinel") {
+                        if (connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined) text += `\nRole: Master (${connectionInfo.sentinelReplicas} replicas)`;
+                        if (connectionInfo.sentinelRole === "replica" && connectionInfo.sentinelMasterHost) text += `\nRole: Replica (master: ${connectionInfo.sentinelMasterHost}:${connectionInfo.sentinelMasterPort})`;
+                    }
+                    if (connectionType === "Cluster" && connectionInfo.clusterNodes) {
+                        text += `\nNodes: ${connectionInfo.clusterNodes.length}\n${connectionInfo.clusterNodes.map((node) => `${node.host}:${node.port} (${node.role}${node.slots ? ` ${node.slots}` : ""})`).join("\n")}`;
+                    }
+                    handleCopy(text);
+                }}
+            >
+                <Copy size={12} />
+            </Button>
+        </div>
+    ) : null;
+
+    return (
+        <header className="flex gap-4 w-full border-b border-border/50 px-3 py-1.5 items-center text-sm mobile:gap-2 mobile:px-2">
+            {mobileLeading}
+            <ConnectionManager />
+            {!isMobile && versionInfo}
+            {!isMobile && memoryInfo}
+            {!isMobile && graphsInfo}
+            {statusInfo}
+            {!isMobile && userInfo}
+            {!isMobile && deploymentInfo}
+            {isMobile && (
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                            title="Connection details"
+                            data-testid="headerDetails"
+                            className="ml-auto shrink-0 p-1 rounded-lg hover:bg-secondary"
+                        >
+                            <Ellipsis size={18} />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-fit max-w-[85vw] mt-2 border-foreground">
+                        <div className="flex flex-col gap-2 text-sm">
+                            {versionInfo && detailRow(<Database size={16} />, versionInfo)}
+                            {detailRow(<MemoryStick size={16} />, memoryInfo)}
+                            {detailRow(<GitGraph size={16} />, graphsInfo)}
+                            {detailRow(<User size={16} />, userInfo)}
+                            {deploymentInfo && detailRow(<Server size={16} />, deploymentInfo)}
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            )}
         </header>
     );
 }

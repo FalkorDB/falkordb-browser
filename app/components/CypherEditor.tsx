@@ -8,8 +8,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Monaco } from "@monaco-editor/react";
 import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo, useCallback } from "react";
 import * as monaco from "monaco-editor";
-import { Info, Maximize2, Minimize2, X } from "lucide-react";
+import { History, Info, Maximize2, Minimize2, MoreHorizontal, Play, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import useIsMobile from "@/lib/useIsMobile";
 import { cn, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS, FALLBACK_PROCEDURE_NAMES, udfFunctionNames } from "@/lib/cypherLang";
 import { codeActionEditsForMarkers, analyzeSchemaWarnings, type EditorDiagnostic } from "@/lib/cypherDiagnostics";
@@ -159,6 +161,8 @@ function registerUniversalEditorBindings(e: monaco.editor.IStandaloneCodeEditor)
 
 export default function CypherEditor({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading, onLanguageConfig }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const isMobile = useIsMobile();
+    const [actionsOpen, setActionsOpen] = useState(false);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
     const { isReadOnly } = useContext(ConnectionContext);
@@ -1247,65 +1251,136 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     </span>
                 </div>
                 <div style={{ height: LINE_HEIGHT }} className={cn("flex gap-2 items-center px-2", historyQuery.query ? "bg-background" : "bg-transparent")} data-testid="editorToolbar">
-                    {historyQuery.counter > 0 && (
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                    [ {historyQuery.queries.length - historyQuery.counter + 1}/{historyQuery.queries.length} ]
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                Query History Index: {historyQuery.queries.length - historyQuery.counter + 1}
-                            </TooltipContent>
-                        </Tooltip>
+                    {isMobile ? (
+                        <>
+                            <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
+                                <DropdownMenuTrigger asChild>
+                                    <Button data-testid="editorMore" title="Query actions">
+                                        <MoreHorizontal size={20} />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="mobile:z-50 w-[80vw] max-w-[320px] bg-background p-1">
+                                    {
+                                        historyQuery.query &&
+                                        <Button
+                                            data-testid="clearEditor"
+                                            className="w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-secondary"
+                                            title=""
+                                            label="Clear"
+                                            onClick={() => {
+                                                setActionsOpen(false);
+                                                setHistoryQuery(prev => ({
+                                                    ...prev,
+                                                    query: "",
+                                                }));
+                                            }}
+                                        >
+                                            <X size={18} />
+                                        </Button>
+                                    }
+                                    <Button
+                                        data-testid="editorMaximize"
+                                        className="w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-secondary"
+                                        title=""
+                                        label="Maximize"
+                                        onClick={() => {
+                                            setActionsOpen(false);
+                                            setMaximize(true);
+                                        }}
+                                    >
+                                        <Maximize2 size={18} />
+                                    </Button>
+                                    {historyQuery.counter > 0 && (
+                                        <div className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground">
+                                            <History size={18} className="shrink-0" />
+                                            <span>History {historyQuery.queries.length - historyQuery.counter + 1}/{historyQuery.queries.length}</span>
+                                        </div>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    {/* Desktop reveals these on hover; a phone has nowhere else to read them. */}
+                                    <div className="flex items-start gap-3 px-3 py-2 text-xs text-muted-foreground">
+                                        <Info size={18} className="shrink-0" />
+                                        <span>Run (Enter) · History (Arrow Up/Down) · New line (Shift + Enter)</span>
+                                    </div>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            <Button
+                                className="py-0.5"
+                                data-testid="editorRun"
+                                ref={submitQuery}
+                                indicator={indicator}
+                                disabled={!historyQuery.query || !graphName}
+                                variant="Primary"
+                                title={getLabel()}
+                                onClick={handleSubmit}
+                                isLoading={isQueryLoading}
+                            >
+                                <Play size={18} />
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            {historyQuery.counter > 0 && (
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                            [ {historyQuery.queries.length - historyQuery.counter + 1}/{historyQuery.queries.length} ]
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        Query History Index: {historyQuery.queries.length - historyQuery.counter + 1}
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
+                            {
+                                historyQuery.query &&
+                                <Button
+                                    data-testid="clearEditor"
+                                    title="Clear"
+                                    onClick={() => {
+                                        setHistoryQuery(prev => ({
+                                            ...prev,
+                                            query: "",
+                                        }));
+                                        editorRef.current?.focus();
+                                    }}
+                                >
+                                    <X />
+                                </Button>
+                            }
+                            <Button
+                                data-testid="editorMaximize"
+                                title="Maximize"
+                                onClick={() => setMaximize(true)}
+                            >
+                                <Maximize2 size={20} />
+                            </Button>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="flex items-center cursor-default" aria-label="Keyboard shortcuts" tabIndex={-1}>
+                                            <Info />
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        {"Run (Enter) | History (Arrow Up/Down) | Insert new line (Shift + Enter)"}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                            <Button
+                                className="text-xs py-0.5"
+                                data-testid="editorRun"
+                                ref={submitQuery}
+                                indicator={indicator}
+                                disabled={!historyQuery.query || !graphName}
+                                variant="Primary"
+                                label="RUN"
+                                title={getLabel()}
+                                onClick={handleSubmit}
+                                isLoading={isQueryLoading}
+                            />
+                        </>
                     )}
-                    {
-                        historyQuery.query &&
-                        <Button
-                            data-testid="clearEditor"
-                            title="Clear"
-                            onClick={() => {
-                                setHistoryQuery(prev => ({
-                                    ...prev,
-                                    query: "",
-                                }));
-                                editorRef.current?.focus();
-                            }}
-                        >
-                            <X />
-                        </Button>
-                    }
-                    <Button
-                        data-testid="editorMaximize"
-                        title="Maximize"
-                        onClick={() => setMaximize(true)}
-                    >
-                        <Maximize2 size={20} />
-                    </Button>
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className="flex items-center cursor-default" aria-label="Keyboard shortcuts" tabIndex={-1}>
-                                    <Info />
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                {"Run (Enter) | History (Arrow Up/Down) | Insert new line (Shift + Enter)"}
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    <Button
-                        className="text-xs py-0.5"
-                        data-testid="editorRun"
-                        ref={submitQuery}
-                        indicator={indicator}
-                        disabled={!historyQuery.query || !graphName}
-                        variant="Primary"
-                        label="RUN"
-                        title={getLabel()}
-                        onClick={handleSubmit}
-                        isLoading={isQueryLoading}
-                    />
                 </div>
             </div>
             <Dialog open={maximize} onOpenChange={setMaximize}>

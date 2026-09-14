@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ArrowUpRight, FileCode, LogOut, Monitor, Moon, Sun, Settings, FunctionSquare, GitGraph } from "lucide-react";
+import { ArrowUpRight, FileCode, Info, LogOut, Menu, Monitor, Moon, Sun, Settings, FunctionSquare, GitGraph } from "lucide-react";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme } from "@/lib/utils";
@@ -15,6 +15,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import useIsMobile from "@/lib/useIsMobile";
 import Button from "./ui/Button";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
@@ -39,9 +40,12 @@ export default function Navbar({ showUDF }: Props) {
     const pathname = usePathname();
     const router = useRouter();
     const { toast } = useToast();
+    const isMobile = useIsMobile();
 
     const [mounted, setMounted] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
     const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+    const [aboutOpen, setAboutOpen] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
 
     const handleConfirmLogout = async () => {
@@ -64,6 +68,182 @@ export default function Navbar({ showUDF }: Props) {
     }, []);
 
     const separator = <div className="h-px w-[80%] bg-border/50 rounded-full" />;
+
+    const aboutContent = (
+        <div className="h-full flex flex-col gap-8 max-w-[30rem] p-4 mobile:gap-6 mobile:overflow-y-auto">
+            <div className="h-1 grow flex flex-col gap-8 items-center justify-center mobile:gap-6">
+                {mounted && currentTheme && <Image style={{ width: 'auto', height: '50px' }} priority src={`/icons/Falkordb-${currentTheme}.svg`} alt="" width={0} height={0} />}
+                <h1 className="text-3xl font-bold mobile:text-2xl mobile:text-center">We Make AI Reliable</h1>
+                <p className="text-xl text-center mobile:text-base">
+                    Delivering a scalable,
+                    low-latency graph database designed for development teams managing
+                    structured and unstructured interconnected data in real-time or interactive environments.
+                </p>
+            </div>
+            <div className="flex flex-col gap-8 items-center mobile:gap-4">
+                <p>Version: {`{${pkg.version}}`}</p>
+                {/* Too wide for a phone in one line, and forcing it there scrolls the drawer sideways. */}
+                <p className="text-sm text-nowrap mobile:text-wrap mobile:text-center">All Rights Reserved © 2024 - {new Date().getFullYear()} falkordb.com</p>
+            </div>
+        </div>
+    );
+
+    if (isMobile) {
+        const item = "w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-secondary";
+        const go = (href: string) => {
+            setMenuOpen(false);
+            router.push(href);
+        };
+
+        return (
+            <>
+                <Drawer direction="left" open={menuOpen} onOpenChange={setMenuOpen}>
+                    <DrawerTrigger asChild>
+                        <Button
+                            data-testid="mobileNavToggle"
+                            title="Menu"
+                            className="shrink-0 text-foreground p-1 rounded-lg hover:bg-secondary"
+                        >
+                            <Menu size={22} />
+                        </Button>
+                    </DrawerTrigger>
+                    <DrawerContent side="left" className="w-[80vw] max-w-[320px] bg-background text-foreground">
+                        <VisuallyHidden>
+                            <DrawerTitle>Navigation</DrawerTitle>
+                            <DrawerDescription />
+                        </VisuallyHidden>
+                        <div className="h-full w-full flex flex-col gap-1 overflow-y-auto p-3">
+                            {mounted && currentTheme && (
+                                <Link
+                                    className="mb-2 ml-3 h-12 w-12 shrink-0 overflow-hidden rounded-full"
+                                    aria-label="FalkorDB"
+                                    href="https://www.falkordb.com"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    <Image style={{ width: 'auto', height: '48px' }} priority src={`/icons/F-${currentTheme}.svg`} alt="FalkorDB Logo" width={0} height={0} />
+                                </Link>
+                            )}
+                            <div data-testid="NavigationButtons" className="flex flex-col gap-1">
+                                <button type="button" className={cn(item, type === "Graph" && "text-primary")} onClick={() => go("/graph")} data-testid="GraphsButton">
+                                    <GitGraph size={20} />
+                                    <span>Graphs</span>
+                                </button>
+                                {showUDF && (
+                                    <button type="button" className={cn(item, type === "UDF" && "text-primary")} onClick={() => go("/udf")} data-testid="UdfButton">
+                                        <FunctionSquare size={20} />
+                                        <span>Functions</span>
+                                    </button>
+                                )}
+                                <button type="button" className={cn(item, type === "Settings" && "text-primary")} onClick={() => go("/settings")} data-testid="settings">
+                                    <Settings size={20} />
+                                    <span>Settings</span>
+                                </button>
+                            </div>
+                            {/* Help, theme and logout sit at the bottom, away from the navigation. */}
+                            <div className="mt-auto flex shrink-0 flex-col gap-1 pt-4">
+                                <a className={item} href="https://docs.falkordb.com/" target="_blank" rel="noreferrer">
+                                    <FileCode size={20} />
+                                    <span>Documentation</span>
+                                    <ArrowUpRight size={15} className="ml-auto" />
+                                </a>
+                                <Link className={item} href="/docs" onClick={() => setMenuOpen(false)}>
+                                    <FileCode size={20} />
+                                    <span>API Documentation</span>
+                                    <ArrowUpRight size={15} className="ml-auto" />
+                                </Link>
+                                <a className={item} href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer">
+                                    <Image className="shrink-0" style={{ width: 'auto', height: '18px' }} src={`/icons/Discord-${currentTheme}.svg`} alt="" width={0} height={0} />
+                                    <span>Get Support</span>
+                                    <ArrowUpRight size={15} className="ml-auto" />
+                                </a>
+                                {/* Opened after the nav drawer closes: two drawers at once would
+                                    fight over focus and leave two scrims stacked. */}
+                                <button
+                                    type="button"
+                                    className={item}
+                                    data-testid="mobileAboutButton"
+                                    onClick={() => {
+                                        setMenuOpen(false);
+                                        setAboutOpen(true);
+                                    }}
+                                >
+                                    <Info size={20} />
+                                    <span>About</span>
+                                </button>
+                                <div className="my-2 h-px bg-border/50" />
+                                {mounted && (
+                                    <button
+                                        type="button"
+                                        className={item}
+                                        data-testid="themeToggle"
+                                        onClick={() => {
+                                            let newTheme = "";
+                                            if (theme === "dark") newTheme = "light";
+                                            else if (theme === "light") newTheme = "system";
+                                            else newTheme = "dark";
+                                            setTheme(newTheme);
+                                        }}
+                                    >
+                                        {theme === "dark" && <Sun size={20} />}
+                                        {theme === "light" && <Monitor size={20} />}
+                                        {theme === "system" && <Moon size={20} />}
+                                        <span>Theme: {theme}</span>
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    className={cn(item, "text-destructive")}
+                                    data-testid="mobileLogoutButton"
+                                    onClick={() => {
+                                        setMenuOpen(false);
+                                        setLogoutDialogOpen(true);
+                                    }}
+                                >
+                                    <LogOut size={20} />
+                                    <span>Logout All</span>
+                                </button>
+                                <p className="pt-2 text-center text-xs text-muted-foreground">
+                                    Version {pkg.version} · © 2024 - {new Date().getFullYear()} falkordb.com
+                                </p>
+                            </div>
+                        </div>
+                    </DrawerContent>
+                </Drawer>
+                <Drawer direction="right" open={aboutOpen} onOpenChange={setAboutOpen}>
+                    <DrawerContent side="right" className="w-[92vw] max-w-[400px] bg-background items-center text-foreground overflow-hidden" id="about" data-testid="mobileAboutPanel">
+                        <VisuallyHidden>
+                            <DrawerTitle>About</DrawerTitle>
+                            <DrawerDescription />
+                        </VisuallyHidden>
+                        {aboutContent}
+                    </DrawerContent>
+                </Drawer>
+                <DialogComponent
+                    open={logoutDialogOpen}
+                    onOpenChange={(open) => { if (!loggingOut) setLogoutDialogOpen(open); }}
+                    title="Logout All?"
+                    description="In addition to logging out of every connection, this will end your FalkorDB Browser session, remove all stored connection credentials from this session, and require you to log in again to reconnect."
+                    trigger={<span className="hidden" />}
+                >
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            data-testid="logoutConfirm"
+                            variant="Delete"
+                            label="Logout All"
+                            onClick={handleConfirmLogout}
+                            isLoading={loggingOut}
+                        />
+                        <CloseDialog
+                            data-testid="logoutCancel"
+                            label="Cancel"
+                            disabled={loggingOut}
+                        />
+                    </div>
+                </DialogComponent>
+            </>
+        );
+    }
 
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border/50">
@@ -173,21 +353,7 @@ export default function Navbar({ showUDF }: Props) {
                             <DrawerTitle />
                             <DrawerDescription />
                         </VisuallyHidden>
-                        <div className="h-full flex flex-col gap-8 max-w-[30rem] p-4">
-                            <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
-                                {mounted && currentTheme && <Image style={{ width: 'auto', height: '50px' }} priority src={`/icons/Falkordb-${currentTheme}.svg`} alt="" width={0} height={0} />}
-                                <h1 className="text-3xl font-bold">We Make AI Reliable</h1>
-                                <p className="text-xl text-center">
-                                    Delivering a scalable,
-                                    low-latency graph database designed for development teams managing
-                                    structured and unstructured interconnected data in real-time or interactive environments.
-                                </p>
-                            </div>
-                            <div className="flex flex-col gap-8 items-center">
-                                <p>Version: {`{${pkg.version}}`}</p>
-                                <p className="text-sm text-nowrap">All Rights Reserved © 2024 - {new Date().getFullYear()} falkordb.com</p>
-                            </div>
-                        </div>
+                        {aboutContent}
                     </DrawerContent>
                 </Drawer>
                 {

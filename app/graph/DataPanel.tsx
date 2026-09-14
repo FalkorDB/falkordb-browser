@@ -4,11 +4,13 @@ import { getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, p
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
 import { IndicatorContext, GraphContext, ConnectionContext } from "../components/provider";
 import DataTable, { elementKey } from "./DataTable";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
+import DeleteElement from "./DeleteElement";
 
 interface Props {
     object: Node | Link;
@@ -17,12 +19,16 @@ interface Props {
     canvasRef: GraphRef;
     /** Describes a label or a relationship type instead of a single element. */
     schema?: boolean;
+    /** Mobile only: the toolbar that normally holds delete lives in a sheet that
+     *  cannot be open at the same time as this panel. */
+    onDeleteElement?: () => Promise<void>;
 }
 
-export default function DataPanel({ object, onClose, setLabels, canvasRef, schema }: Props) {
+export default function DataPanel({ object, onClose, setLabels, canvasRef, schema, onDeleteElement }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graph, setGraphInfo } = useContext(GraphContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const isMobile = useIsMobile();
 
     // A schema element is derived, so it is read-only whatever the connection is.
     const readOnly = isReadOnly || !!schema;
@@ -33,6 +39,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
     const { toast } = useToast();
 
     const [labelsHover, setLabelsHover] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
     const [label, setLabel] = useState<string[]>([]);
     const type = !("source" in object);
 
@@ -174,18 +181,28 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
 
     return (
         <div data-testid="DataPanel" className="DataPanel gap-2 p-3 relative">
-            <Button
-                className="absolute top-2 right-2"
-                data-testid="DataPanelClose"
-                title="Close"
-                onClick={() => onClose()}
-            >
-                <X size={16} />
-            </Button>
+            <div className="absolute top-2 right-2 flex items-center gap-1">
+                {
+                    isMobile && onDeleteElement && !readOnly &&
+                    <DeleteElement
+                        description="Are you sure you want to delete this element(s)?"
+                        open={deleteOpen}
+                        setOpen={setDeleteOpen}
+                        onDeleteElement={onDeleteElement}
+                    />
+                }
+                <Button
+                    data-testid="DataPanelClose"
+                    title="Close"
+                    onClick={() => onClose()}
+                >
+                    <X size={16} />
+                </Button>
+            </div>
             <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between pr-5">
+                <div className="flex items-center justify-between pr-5 mobile:pr-16">
                     <h1 className="text-lg font-semibold">{schema ? `${type ? "Label" : "Relationship"} Schema` : `${type ? "Node" : "Edge"} Data`}</h1>
-                    <TableProperties size={20} className="text-foreground/50" />
+                    <TableProperties size={20} className="text-foreground/50 mobile:hidden" />
                 </div>
                 <div className="flex flex-col gap-1 text-sm text-nowrap">
                     {!schema && <p>ID: <span className="Gradient text-transparent bg-clip-text font-semibold">{object.id}</span></p>}
@@ -256,5 +273,6 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
 }
 
 DataPanel.defaultProps = {
-    schema: false
+    schema: false,
+    onDeleteElement: undefined
 };

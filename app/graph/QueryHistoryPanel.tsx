@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
+import HelpTip from "../components/ui/HelpTip";
 import EditorComponent from "../components/EditorComponent";
 import { LanguageConfig } from "../components/EditorComponent";
 import { CYPHER_LANGUAGE_NAME, STATIC_SUGGESTIONS } from "../components/CypherEditor";
@@ -528,23 +529,24 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedSet.has(q.timestamp));
 
     return (
-        <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background">
-            <div className="relative h-full w-full flex flex-col rounded-lg p-3 overflow-y-auto">
+        <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background mobile:border-none mobile:rounded-none">
+            <div className="relative h-full w-full flex flex-col rounded-lg p-3 overflow-y-auto mobile:p-0">
+                {/* On mobile the panel fills a dialog that already has a title and close. */}
                 <Button
                     data-testid="queryHistoryCloseButton"
-                    className="absolute top-2 right-2"
+                    className="absolute top-2 right-2 mobile:hidden"
                     title="Close"
                     onClick={onClose}
                 >
                     <X className="h-4 w-4" />
                 </Button>
-                <div className="w-full flex justify-between items-center pr-8">
+                <div className="w-full flex justify-between items-center pr-8 mobile:hidden">
                     <h1 className="text-lg font-semibold">Query History</h1>
                     <History size={20} className="text-foreground/50" />
                 </div>
                 <PaginationList
                     label="Query"
-                    className="overflow-hidden h-[313px] max-h-[393px] p-1 border-b border-border"
+                    className="overflow-hidden h-[313px] max-h-[393px] mobile:h-[30dvh] mobile:max-h-[30dvh] p-1 border-b border-border"
                     isSelected={(item) => selectedSet.has(item.timestamp)}
                     afterSearchCallback={afterSearchCallback}
                     onToggleFav={handleToggleFav}
@@ -596,18 +598,21 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                         : <ListX size={16} />
                                 }
                             </Button>
-                            <Tooltip>
-                                <TooltipTrigger data-testid="queryHistorySelectInfo" className="flex items-center gap-1 text-foreground/60">
-                                    <Info size={16} />
-                                    {/* Fixed two-digit slot keeps the row from shifting; longer counts are clipped */}
-                                    <span data-testid="queryHistorySelectedCount" className="text-xs tabular-nums w-[2ch] text-left overflow-hidden whitespace-nowrap">
-                                        {selectedQueries.length || ""}
-                                    </span>
-                                </TooltipTrigger>
-                                <TooltipContent className="whitespace-pre-line">
-                                    {`${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl/Cmd + Left Click) for multi select`}
-                                </TooltipContent>
-                            </Tooltip>
+                            <HelpTip
+                                data-testid="queryHistorySelectInfo"
+                                contentClassName="whitespace-pre-line"
+                                trigger={
+                                    <>
+                                        <Info size={16} />
+                                        {/* Fixed two-digit slot keeps the row from shifting; longer counts are clipped */}
+                                        <span data-testid="queryHistorySelectedCount" className="text-xs tabular-nums w-[2ch] text-left overflow-hidden whitespace-nowrap">
+                                            {selectedQueries.length || ""}
+                                        </span>
+                                    </>
+                                }
+                            >
+                                {`${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl/Cmd + Left Click) for multi select`}
+                            </HelpTip>
                         </div>
                     }
                     onClick={(item, evt) => {
@@ -652,16 +657,11 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                 >
                     <ul className="w-full flex flex-wrap  items-center gap-2 overflow-y-auto max-h-[80px] p-1">
                         <li key="info" className="flex flex-col items-center">
-                            <Tooltip>
-                                <TooltipTrigger className="flex items-center text-foreground/60">
-                                    <Info size={16} />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    Press graph name to see history of that graph
-                                    <br />
-                                    (show all queries if no graph name is selected).
-                                </TooltipContent>
-                            </Tooltip>
+                            <HelpTip>
+                                Press graph name to see history of that graph
+                                <br />
+                                (show all queries if no graph name is selected).
+                            </HelpTip>
                         </li>
                         <li key="fav-filter" className="max-w-full">
                             <Button

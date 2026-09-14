@@ -27,6 +27,7 @@ import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } f
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+import { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -319,6 +320,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [model, setModel] = useState("");
   const [newModel, setNewModel] = useState("");
   const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
+  const viewportResolved = useViewportResolved();
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
@@ -1739,7 +1741,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLastLimit(l);
       setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined));
       setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false");
-      setTutorialOpen(localStorage.getItem("tutorial") !== "false");
+      // The tour drives desktop-only chrome (side panels, hover targets, right-click),
+      // so it never runs on a phone. Read the width rather than `useIsMobile` — this
+      // effect fires before the hook has corrected its server-rendered `false`.
+      setTutorialOpen(window.innerWidth >= MOBILE_BREAKPOINT && localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
       setMaxTabs(loadedMaxTabs);
@@ -2158,18 +2163,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                               <CypherLanguageContext.Provider value={cypherLanguageContext}>
                                 <AiFixContext.Provider value={aiFixContext}>
                                   <GraphTabsContext.Provider value={graphTabsContext}>
-                                    <ProviderLayout
-                                      panelRef={panelRef}
-                                      customizingLabel={customizingLabel}
-                                      setCustomizingLabel={setCustomizingLabel}
-                                      tutorialOpen={tutorialOpen}
-                                      onCloseTutorial={handleCloseTutorial}
-                                      onLoadDemoGraphs={handleLoadDemoGraphs}
-                                      onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                      showUDF={showUDF}
-                                    >
-                                      {children}
-                                    </ProviderLayout>
+                                    {
+                                      viewportResolved
+                                        ? <ProviderLayout
+                                          panelRef={panelRef}
+                                          customizingLabel={customizingLabel}
+                                          setCustomizingLabel={setCustomizingLabel}
+                                          tutorialOpen={tutorialOpen}
+                                          onCloseTutorial={handleCloseTutorial}
+                                          onLoadDemoGraphs={handleLoadDemoGraphs}
+                                          onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                          showUDF={showUDF}
+                                        >
+                                          {children}
+                                        </ProviderLayout>
+                                        : <div className="h-full w-full bg-background" />
+                                    }
                                   </GraphTabsContext.Provider>
                                   <AiFixDialogs />
                                 </AiFixContext.Provider>

@@ -5,6 +5,7 @@ import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from
 import { Check, Circle, Loader2, Star, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import useIsMobile from "@/lib/useIsMobile";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 
@@ -39,8 +40,9 @@ const getItemClassName = (selected: boolean, hover: boolean, prefix: "text" | "b
 };
 
 const getSeparator = () => (
+    // Meaningless once the chips wrap onto two lines, and its 2/3 height stretches them.
     <div
-        className={cn("h-2/3 w-px rounded-full bg-foreground/60")}
+        className={cn("h-2/3 w-px rounded-full bg-foreground/60 mobile:hidden")}
     />
 );
 
@@ -109,12 +111,14 @@ const getQueryElement = (item: Query) => {
     }
 
     return (
-        <div className="flex gap-2 items-center text-foreground/60 overflow-hidden whitespace-nowrap">
+        // On a phone all four chips truncate to "EL…"/"LR: 14…" and the tooltips that
+        // would explain them need a hover, so wrap onto a second line instead.
+        <div className="flex gap-2 items-center text-foreground/60 overflow-hidden whitespace-nowrap mobile:flex-wrap mobile:gap-x-2 mobile:gap-y-0.5">
             {elements.map((element, index) => (
                 <Fragment key={element.tooltip}>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <div className={cn("truncate", element.className)}>{element.content}</div>
+                            <div className={cn("truncate mobile:overflow-visible mobile:text-clip", element.className)}>{element.content}</div>
                         </TooltipTrigger>
                         <TooltipContent className={element.tooltipClassName}>
                             {element.tooltip}
@@ -156,12 +160,16 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
     const [favDialogItem, setFavDialogItem] = useState<T | null>(null);
     const [favName, setFavName] = useState("");
 
+    const isMobile = useIsMobile();
+
     const containerRef = useRef<HTMLUListElement>(null);
 
     const startIndex = stepCounter * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, filteredList.length);
     const items = filteredList.slice(startIndex, endIndex);
-    const itemHeight = typeof items[0] === "string" ? 30 : 40;
+    // Query rows carry a metadata line that wraps in two on a phone.
+    const queryRowHeight = isMobile ? 64 : 40;
+    const itemHeight = typeof items[0] === "string" ? 30 : queryRowHeight;
 
     useEffect(() => {
         setStepCounter(0);

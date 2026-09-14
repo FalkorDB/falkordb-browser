@@ -441,7 +441,8 @@ export default function TableComponent({
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
-            <div className="flex gap-4">
+            {/* The action buttons plus the search box are wider than a phone, and the ancestor clips rather than scrolls. */}
+            <div className="flex gap-4 mobile:flex-col mobile:items-stretch mobile:gap-2">
                 {children}
                 <Input
                     data-testid={`searchInput${label}`}

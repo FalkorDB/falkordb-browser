@@ -3,9 +3,12 @@
 import { ReactNode, RefObject, Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { CustomizingRef, Panel } from "@/lib/utils";
+import { CustomizingRef, Panel, cn } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
+import { PanelLeft } from "lucide-react";
+import useIsMobile from "@/lib/useIsMobile";
+import BottomSheet from "@/components/ui/BottomSheet";
 import { PanelContext } from "./provider";
 import Header from "./Header";
 import Navbar from "./Navbar";
@@ -40,12 +43,19 @@ export default function ProviderLayout({
   showUDF,
 }: ProviderLayoutProps) {
   const pathname = usePathname();
+  const isMobile = useIsMobile();
   const showNavbarAndHeader = pathname !== "/" && pathname !== "/login";
   const isGraph = pathname === "/graph";
   const isUdf = pathname === "/udf";
 
   const [panel, setPanel] = useState<Panel>();
   const [isCollapsed, setIsCollapsed] = useState(true);
+  // Mobile renders the graph info as a sheet rather than a resizable panel, so its
+  // open state has to live in React instead of the panel's imperative handle.
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [udfSheetOpen, setUdfSheetOpen] = useState(false);
+  const [mobileNavSlot, setMobileNavSlot] = useState<HTMLDivElement | null>(null);
+  const [mobileToolbarSlot, setMobileToolbarSlot] = useState<HTMLDivElement | null>(null);
   const isRestoringSize = useRef(false);
   const udfPanelRef = useRef<PanelImperativeHandle>(null);
   const isRestoringUdfSize = useRef(false);
@@ -67,6 +77,11 @@ export default function ProviderLayout({
   }, []);
 
   const onExpand = useCallback(() => {
+    if (isMobile) {
+      setMobilePanelOpen((open) => !open);
+      return;
+    }
+
     const currentPanel = panelRef.current;
     if (!currentPanel) return;
     if (currentPanel.isCollapsed()) {
@@ -84,14 +99,20 @@ export default function ProviderLayout({
     } else {
       currentPanel.collapse();
     }
-  }, [panelRef]);
+  }, [panelRef, isMobile]);
 
   // Auto-expand the graph info panel and restore its persisted width on /graph.
   useEffect(() => {
     if (!isGraph) {
       setIsCollapsed(true);
+      setMobilePanelOpen(false);
       return undefined;
     }
+
+    // Mobile shows the info as a sheet, so there is no panel group to drive. The
+    // ref can still hold a handle from the desktop tree rendered before hydration
+    // corrected the breakpoint, and driving that handle throws "Group not found".
+    if (isMobile) return undefined;
 
     const currentPanel = panelRef.current;
     if (!currentPanel) return undefined;
@@ -111,11 +132,11 @@ export default function ProviderLayout({
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [isGraph, panelRef]);
+  }, [isGraph, panelRef, isMobile]);
 
   // Restore the UDF panel's persisted width on /udf.
   useEffect(() => {
-    if (!isUdf) return undefined;
+    if (!isUdf || isMobile) return undefined;
 
     const currentPanel = udfPanelRef.current;
     if (!currentPanel) return undefined;
@@ -132,18 +153,20 @@ export default function ProviderLayout({
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [isUdf]);
+  }, [isUdf, isMobile]);
 
   const panelContext = useMemo(() => ({
     panel,
     setPanel,
-    panelOpen: !isCollapsed,
+    panelOpen: isMobile ? mobilePanelOpen : !isCollapsed,
     onTogglePanel: onExpand,
     infoPanelRef: panelRef,
     onInfoPanelResize,
     customizingLabel,
     setCustomizingLabel,
-  }), [panel, isCollapsed, onExpand, panelRef, onInfoPanelResize, customizingLabel, setCustomizingLabel]);
+    mobileNavSlot,
+    mobileToolbarSlot,
+  }), [panel, isCollapsed, isMobile, mobilePanelOpen, onExpand, panelRef, onInfoPanelResize, customizingLabel, setCustomizingLabel, mobileNavSlot, mobileToolbarSlot]);
 
   return (
     <PanelContext.Provider value={panelContext}>
@@ -158,15 +181,46 @@ export default function ProviderLayout({
       }
       {
         showNavbarAndHeader &&
-        <Header />
+        <Header
+          mobileLeading={
+            isMobile
+              ? <>
+                <Navbar showUDF={showUDF} />
+                {
+                  isUdf &&
+                  <button
+                    type="button"
+                    data-testid="mobileUdfPanelToggle"
+                    aria-pressed={udfSheetOpen}
+                    className={cn("shrink-0 rounded-lg p-1.5 hover:bg-secondary", udfSheetOpen && "text-primary")}
+                    title="Functions"
+                    onClick={() => setUdfSheetOpen(open => !open)}
+                  >
+                    <PanelLeft size={18} />
+                  </button>
+                }
+              </>
+              : null
+          }
+        />
+      }
+      {
+        // Only /graph has a switcher to show, so every other route gets the row
+        // back rather than paying for an empty strip. The trailing slot lets the
+        // route hang its toolbar actions off the same row.
+        showNavbarAndHeader && isMobile && isGraph &&
+        <div className="shrink-0 flex items-center gap-2 h-11 px-2 border-b border-border/50">
+          <div ref={setMobileNavSlot} className="min-w-0 grow flex items-center" />
+          <div ref={setMobileToolbarSlot} className="shrink-0 h-full py-1 flex items-center gap-1" />
+        </div>
       }
       <div className="basis-0 grow min-h-0 flex">
         {
-          showNavbarAndHeader &&
+          showNavbarAndHeader && !isMobile &&
           <Navbar showUDF={showUDF} />
         }
         {
-          isUdf ?
+          isUdf && !isMobile ?
             <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
               <ResizablePanel
                 panelRef={udfPanelRef}
@@ -187,8 +241,20 @@ export default function ProviderLayout({
               </ResizablePanel>
             </ResizablePanelGroup>
             :
-            <div className="w-1 grow min-h-0">
+            <div className="w-1 grow min-h-0 relative">
               {children}
+              {
+                isUdf && isMobile &&
+                <BottomSheet
+                  open={udfSheetOpen}
+                  onClose={() => setUdfSheetOpen(false)}
+                  title="Functions"
+                  height="full"
+                  data-testid="mobileUdfSheet"
+                >
+                  <UdfPanel />
+                </BottomSheet>
+              }
             </div>
         }
       </div>

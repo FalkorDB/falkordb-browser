@@ -1,7 +1,8 @@
-import { ArrowRight, Circle, ScanEye, Search, X } from "lucide-react";
+import { ArrowRight, Circle, CopyCheck, ScanEye, Search, X } from "lucide-react";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { cn, GraphRef, isSchemaReservedKey, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import useIsMobile from "@/lib/useIsMobile";
 import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
@@ -24,6 +25,9 @@ interface Props {
     expand: boolean
     isAddNode: boolean
     isAddEdge: boolean
+    multiSelect: boolean
+    /** Left out where the mode does not apply, which also hides the toggle. */
+    setMultiSelect?: Dispatch<SetStateAction<boolean>>
 }
 
 const ITEM_HEIGHT = 32;
@@ -44,11 +48,16 @@ export default function Toolbar({
     isAddNode,
     setExpand,
     expand,
+    multiSelect,
+    setMultiSelect,
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    // Delete moves into the data panel there, since this toolbar sits in a sheet
+    // that cannot be open while an element is selected.
+    const isMobile = useIsMobile();
 
 
     const suggestionRef = useRef<HTMLDivElement>(null);
@@ -169,15 +178,28 @@ export default function Toolbar({
 
     const stripBackground = `repeating-linear-gradient(to bottom, hsl(var(--muted)) 0px, hsl(var(--muted)) ${ITEM_HEIGHT}px, transparent ${ITEM_HEIGHT}px, transparent ${ITEM_HEIGHT + GAP}px)`;
 
+    // Mobile stacks the toolbar: search on its own row, actions on the next one.
+    const showAllButton = graph.getElements().length > 0 && (
+        <Button
+            data-testid="elementCanvasShowAllGraph"
+            className="pointer-events-auto"
+            title="Show All"
+            disabled={graph.Labels.every(label => label.show) && graph.Relationships.every(rel => rel.show) ? true : false}
+            onClick={showAllElements}
+        >
+            <ScanEye size={25} />
+        </Button>
+    );
+
     return (
-        <div className={cn("w-full flex flex-wrap gap-4 justify-between items-center")}>
-            <div className="flex gap-2 items-center">
+        <div className={cn("w-full flex flex-wrap gap-4 justify-between items-center", isMobile && "flex-col items-stretch gap-2")}>
+            <div className={cn("flex gap-2 items-center", isMobile && "w-full")}>
 
                 {
                     graph.getElements().length > 0 &&
                     <Button
                         title={expand ? "Close Search & Filter" : "Open Search & Filter"}
-                        className="pointer-events-auto"
+                        className="pointer-events-auto mobile:hidden"
                         onClick={() => setExpand(prev => !prev)}
                     >
                         {
@@ -185,19 +207,8 @@ export default function Toolbar({
                         }
                     </Button>
                 }
-                {
-                    graph.getElements().length > 0 &&
-                    <Button
-                        data-testid="elementCanvasShowAllGraph"
-                        className="pointer-events-auto"
-                        title="Show All"
-                        disabled={graph.Labels.every(label => label.show) && graph.Relationships.every(rel => rel.show) ? true : false}
-                        onClick={showAllElements}
-                    >
-                        <ScanEye size={25} />
-                    </Button>
-                }
-                <div className={cn("basis-0 grow relative pointer-events-auto min-w-[20dvw] max-w-[55dvw]")}>
+                {!isMobile && showAllButton}
+                <div className={cn("basis-0 grow relative pointer-events-auto min-w-[20dvw] max-w-[55dvw]", isMobile && "max-w-none")}>
                     {
                         expand && graph.getElements().length > 0 && !isLoading &&
                         <Input
@@ -339,7 +350,32 @@ export default function Toolbar({
                     }
                 </div>
             </div>
-            <div data-testid="elementCanvasToolbarActionGraph" className={cn("flex flex-row-reverse gap-2 pointer-events-auto")}>
+            <div data-testid="elementCanvasToolbarActionGraph" className={cn("flex flex-row-reverse gap-2 pointer-events-auto", isMobile && "flex-row justify-start")}>
+                {isMobile && showAllButton}
+                {isMobile && setMultiSelect && graph.getElements().length > 0 && (
+                    <Button
+                        data-testid="elementCanvasMultiSelectGraph"
+                        className={cn("p-1 bg-background border-border", multiSelect && "!border-primary !text-primary")}
+                        variant="Secondary"
+                        tooltipVariant="Primary"
+                        tooltipSide="bottom"
+                        aria-pressed={multiSelect}
+                        title={multiSelect ? "Multi select on" : "Multi select"}
+                        onClick={() => {
+                            setMultiSelect(prev => {
+                                // Leaving the mode with a pile of elements selected would drop
+                                // the user into a data panel listing all of them.
+                                if (prev) setSelectedElements([]);
+                                return !prev;
+                            });
+                        }}
+                    >
+                        <CopyCheck size={20} />
+                        {multiSelect && selectedElements.length > 0 && (
+                            <span data-testid="multiSelectCount" className="text-xs tabular-nums">{selectedElements.length}</span>
+                        )}
+                    </Button>
+                )}
                 {
                     graphName && !isReadOnly &&
                     <>
@@ -369,7 +405,7 @@ export default function Toolbar({
                             </Button>
                         }
                         {
-                            selectedElements.length !== 0 &&
+                            selectedElements.length !== 0 && (!isMobile || multiSelect) &&
                             <DeleteElement
                                 description="Are you sure you want to delete this element(s)?"
                                 open={deleteOpen}
@@ -386,4 +422,5 @@ export default function Toolbar({
 
 Toolbar.defaultProps = {
     setIsAddEdge: undefined,
+    setMultiSelect: undefined,
 };

@@ -19,6 +19,7 @@ import GraphLoadIndicator, { GraphLoadDot } from "../components/graph/GraphLoadI
 import { Graph } from "../api/graph/model";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
+import useIsMobile from "@/lib/useIsMobile";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
@@ -43,6 +44,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const isMobile = useIsMobile();
     const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs } = useContext(ConnectionContext);
     const {
         settings: {
@@ -313,7 +315,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent
-                    className="z-20 h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
+                    // Radix copies this computed z-index onto its popper wrapper, and the
+                    // wrapper's transform makes that the only value that counts. On mobile
+                    // it has to clear the graph info bottom sheet, which sits at z-40.
+                    className="z-20 mobile:z-50 h-[40dvh] min-h-fit w-[350px] mobile:w-[85vw] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
                     onInteractOutside={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
                     onEscapeKeyDown={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
                 >
@@ -335,7 +340,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                             variant="Primary"
                             label="Manage"
                             data-testid="manageGraphs"
-                            onClick={() => { setOpenMenage(true); }}
+                            onClick={() => { setOpenMenage(true); if (isMobile) setOpen(false); }}
                         >
                             <Settings size={16} />
                         </Button>
@@ -344,16 +349,29 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             </Popover>
             {
                 mounted && openMenage && createPortal(
-                    <ResizableBox
-                        width={manageSize.width}
-                        height={manageSize.height}
-                        minWidth={400}
-                        minHeight={300}
-                        direction="bottom-right"
-                        onResizeEnd={(w, h) => onManageResize(w, h)}
-                        className="fixed top-16 left-3 z-30 flex flex-col gap-2 border border-border rounded-lg shadow-lg p-2 bg-background"
-                        data-testid="manageContent"
-                    >
+                    <>
+                        {isMobile && (
+                            <button
+                                type="button"
+                                aria-label="Close Manage Graphs"
+                                className="fixed inset-0 z-40 bg-black/50"
+                                onClick={() => setOpenMenage(false)}
+                            />
+                        )}
+                        <ResizableBox
+                            width={manageSize.width}
+                            height={manageSize.height}
+                            minWidth={400}
+                            minHeight={300}
+                            direction="bottom-right"
+                            onResizeEnd={(w, h) => onManageResize(w, h)}
+                            // The stored 750px window overflows a phone and dragging a handle is
+                            // meaningless on touch, so pin the panel to the viewport instead.
+                            // `style` is spread after width/height inside ResizableBox, so it wins.
+                            style={isMobile ? { width: "calc(100vw - 16px)", height: "calc(100dvh - 16px)" } : undefined}
+                            className={`fixed flex flex-col gap-2 border border-border rounded-lg shadow-lg p-2 bg-background ${isMobile ? "top-2 left-2 z-50" : "top-16 left-3 z-30"}`}
+                            data-testid="manageContent"
+                        >
                         <div
                             role="dialog"
                             aria-label="Manage Graphs"
@@ -454,7 +472,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 }
                             </TableComponent>
                         </div>
-                    </ResizableBox >,
+                    </ResizableBox >
+                    </>,
                     document.body
                 )
             }

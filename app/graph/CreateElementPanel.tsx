@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn, Node, Value } from "@/lib/utils";
 import { getNodeDisplayText } from "@falkordb/canvas";
 import Button from "../components/ui/Button";
+import HelpTip from "../components/ui/HelpTip";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
@@ -581,14 +582,9 @@ export default function CreateElementPanel(props: Props) {
                                                 : hover === key &&
                                                 <>
                                                     {isComplex ? (
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <Info size={20} />
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p>Complex values (arrays, objects) can only be added from Cypher queries</p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
+                                                        <HelpTip trigger={<Info size={20} />}>
+                                                            <p>Complex values (arrays, objects) can only be added from Cypher queries</p>
+                                                        </HelpTip>
                                                     ) : (
                                                         <Button
                                                             variant="button"

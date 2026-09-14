@@ -468,8 +468,18 @@ export default class GraphPage extends BasePage {
     });
   }
 
+  /** Selects a canvas element. The app defers selection until the
+   *  double-click window has passed, so this waits it out. */
   async elementClick(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y, { button: "right" });
+    await this.page.mouse.click(x, y);
+    await this.page.waitForTimeout(400);
+  }
+
+  /** Expands/collapses a node. The second click lands inside the double-click
+   *  window, so the pending selection is cancelled and only the expand runs. */
+  async elementDoubleClick(x: number, y: number): Promise<void> {
+    await this.page.mouse.dblclick(x, y);
+    await this.page.waitForTimeout(400);
   }
 
   async getNodesCount(): Promise<string | null> {
@@ -1731,12 +1741,12 @@ export default class GraphPage extends BasePage {
     await this.page.mouse.up();
   }
 
-  async rightClickAtCanvasCenter(): Promise<void> {
+  async clickAtCanvasCenter(): Promise<void> {
     const boundingBox = await this.getBoundingBoxCanvasElement();
     if (!boundingBox) throw new Error("Canvas bounding box not found");
     const centerX = boundingBox.x + boundingBox.width / 2;
     const centerY = boundingBox.y + boundingBox.height / 2;
-    await this.page.mouse.click(centerX, centerY, { button: "right" });
+    await this.page.mouse.click(centerX, centerY);
   }
 
   async hoverAtCanvasCenter(): Promise<void> {
@@ -1768,8 +1778,8 @@ export default class GraphPage extends BasePage {
     return texts;
   }
 
-  async rightClickElement(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y, { button: "right" });
+  async clickElementAt(x: number, y: number): Promise<void> {
+    await this.page.mouse.click(x, y);
     await this.page.waitForTimeout(500);
   }
 
