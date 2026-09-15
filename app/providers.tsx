@@ -27,7 +27,7 @@ import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } f
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
-import { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
+import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -321,10 +321,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newModel, setNewModel] = useState("");
   const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
   const viewportResolved = useViewportResolved();
+  const isMobile = useIsMobile();
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
+
+  // The tour points at desktop-only chrome, so narrowing past the breakpoint
+  // while it is open has to close it rather than leave it over the mobile layout.
+  useEffect(() => {
+    if (isMobile) setTutorialOpen(false);
+  }, [isMobile]);
+
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);

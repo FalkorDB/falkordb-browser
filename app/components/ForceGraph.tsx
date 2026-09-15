@@ -70,8 +70,9 @@ export default function ForceGraph({
     const { background, foreground } = getTheme(theme);
 
     // A click only selects once the double-click window has passed, so a
-    // double-click expands without selecting first. Holds the pending timer.
-    const pendingClick = useRef<{ timer: ReturnType<typeof setTimeout>, id: number } | undefined>(undefined);
+    // double-click expands without selecting first. `select` lets a click on a
+    // different node commit this one instead of discarding it.
+    const pendingClick = useRef<{ timer: ReturnType<typeof setTimeout>, id: number, select: () => void } | undefined>(undefined);
     // One counter per node, bumped whenever a double-click toggles its expansion.
     // An expand awaits a fetch, so a collapse and a re-expand can both land while
     // it is in flight; a completion only touches the graph while its token is
@@ -89,10 +90,25 @@ export default function ForceGraph({
 
     useEffect(() => () => clearTimeout(viewportRestoreTimerRef.current), []);
 
+    // Mirrors the selection so a handler can read it without closing over it.
+    const selectedElementsRef = useRef(selectedElements);
+    selectedElementsRef.current = selectedElements;
+
     const clearPendingClick = useCallback(() => {
         if (!pendingClick.current) return;
         clearTimeout(pendingClick.current.timer);
         pendingClick.current = undefined;
+    }, []);
+
+    // Commits a pending selection early. Clicking a second node inside the
+    // double-click window would otherwise cancel the first one's timer and drop
+    // that click, which multi-select makes easy to hit.
+    const flushPendingClick = useCallback(() => {
+        const pending = pendingClick.current;
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        pendingClick.current = undefined;
+        pending.select();
     }, []);
 
     useEffect(() => clearPendingClick, [clearPendingClick]);
@@ -272,37 +288,48 @@ export default function ForceGraph({
         }
         if (!fullElement) return;
 
+        // Read through the ref: `setSelectedElements` takes an array rather than
+        // an updater, so two selections in the same tick would both build on the
+        // same stale snapshot and the first would be lost.
+        const current = selectedElementsRef.current;
         let nextSelection: (Node | Link)[];
         if (additive) {
-            const alreadyIn = selectedElements.find(e =>
+            const alreadyIn = current.find(e =>
                 (('source' in e) === ('source' in fullElement)) && e.id === fullElement.id
             );
             nextSelection = alreadyIn
-                ? selectedElements.filter(el => el !== fullElement)
-                : [...selectedElements, fullElement];
+                ? current.filter(el => el !== fullElement)
+                : [...current, fullElement];
         } else {
             nextSelection = [fullElement];
         }
+        selectedElementsRef.current = nextSelection;
         setSelectedElements(nextSelection);
         centerOnSelection(nextSelection);
-    }, [graph, selectedElements, setSelectedElements, centerOnSelection]);
+    }, [graph, setSelectedElements, centerOnSelection]);
 
     const handleNodeClick = useCallback(async (node: GraphNode, event: MouseEvent) => {
         const fullNode = graph.NodesMap.get(node.id);
         if (!fullNode) return;
 
         const isDoubleClick = pendingClick.current?.id === node.id;
-        clearPendingClick();
+        if (isDoubleClick) {
+            clearPendingClick();
+        } else {
+            flushPendingClick();
+        }
 
         if (!isDoubleClick) {
+            const additive = event.shiftKey || event.ctrlKey || multiSelect;
+
             if (disableExpand) {
-                handleSelect(node, event.ctrlKey || multiSelect);
+                handleSelect(node, additive);
                 return;
             }
 
-            const additive = event.ctrlKey || multiSelect;
             pendingClick.current = {
                 id: node.id,
+                select: () => handleSelect(node, additive),
                 timer: setTimeout(() => {
                     pendingClick.current = undefined;
                     handleSelect(node, additive);
@@ -337,13 +364,13 @@ export default function ForceGraph({
         } else {
             deleteNeighbors([fullNode]);
         }
-    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand, handleSelect, clearPendingClick, multiSelect]);
+    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand, handleSelect, clearPendingClick, flushPendingClick, multiSelect]);
 
     // Links have nothing to expand, so their click selects straight away.
     const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
-        clearPendingClick();
-        handleSelect(link, event.ctrlKey || multiSelect);
-    }, [handleSelect, clearPendingClick, multiSelect]);
+        flushPendingClick();
+        handleSelect(link, event.shiftKey || event.ctrlKey || multiSelect);
+    }, [handleSelect, flushPendingClick, multiSelect]);
 
     const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
         if (element === null) {
@@ -365,7 +392,7 @@ export default function ForceGraph({
         clearPendingClick();
         // A stray tap on the background must not wipe a selection built up one
         // element at a time, exactly as Ctrl-click protects it on desktop.
-        if (evt?.ctrlKey || multiSelect || selectedElements.length === 0) return;
+        if (evt?.shiftKey || evt?.ctrlKey || multiSelect || selectedElements.length === 0) return;
         setSelectedElements([]);
     }, [selectedElements, setSelectedElements, clearPendingClick, multiSelect]);
 

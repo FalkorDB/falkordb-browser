@@ -35,7 +35,9 @@ export default async function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen mobile:h-[100dvh] overflow-hidden overscroll-none" lang="en" suppressHydrationWarning>
-      <body className="w-full h-full bg-background flex flex-col overflow-hidden overscroll-none">
+      {/* `viewportFit: "cover"` lets the layout run under the notch, so the shell
+          pads itself back out. `env()` is 0 on anything without an inset. */}
+      <body className="w-full h-full bg-background flex flex-col overflow-hidden overscroll-none pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <GTM />
         <TooltipProvider>
           <NextAuthProvider nonce={nonce}>

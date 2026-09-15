@@ -1666,9 +1666,11 @@ export default class GraphPage extends BasePage {
   async deleteElementsByPosition(
     positions: { x: number; y: number }[]
   ): Promise<void> {
-    positions.forEach(async (position) => {
+    // Sequential: the delete control appears after the first selection, so an
+    // unawaited loop could open the dialog on a partial selection.
+    for (const position of positions) {
       await this.elementClick(position.x, position.y);
-    });
+    }
     await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
     await waitForElementToNotBeVisible(this.deleteElementConfirm);

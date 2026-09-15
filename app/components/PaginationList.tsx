@@ -118,7 +118,7 @@ const getQueryElement = (item: Query) => {
                 <Fragment key={element.tooltip}>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <div className={cn("truncate mobile:overflow-visible mobile:text-clip", element.className)}>{element.content}</div>
+                            <div className={cn("truncate mobile:overflow-visible mobile:text-clip mobile:whitespace-normal mobile:break-words", element.className)}>{element.content}</div>
                         </TooltipTrigger>
                         <TooltipContent className={element.tooltipClassName}>
                             {element.tooltip}

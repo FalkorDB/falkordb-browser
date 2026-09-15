@@ -193,6 +193,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
                 }
                 <Button
                     data-testid="DataPanelClose"
+                    className="mobile:min-h-11 mobile:min-w-11 mobile:justify-center"
                     title="Close"
                     onClick={() => onClose()}
                 >
@@ -242,7 +243,8 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
                     ))}
                     <li className="h-8 w-[106px] flex justify-center items-center" key="addLabel">
                         {
-                            type && (labelsHover || label.length === 0) && !readOnly &&
+                            // Hover cannot reveal it on touch, so keep it on screen.
+                            type && (isMobile || labelsHover || label.length === 0) && !readOnly &&
                             <AddLabel
                                 onAddLabel={handleAddLabel}
                                 trigger={

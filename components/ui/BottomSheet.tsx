@@ -79,6 +79,10 @@ export default function BottomSheet({
                         : [
                             "absolute inset-x-0 bottom-0 z-40 shadow-2xl",
                             "transition-transform duration-200 ease-out will-change-transform",
+                            // `viewport-fit=cover` lets the layout run under the home
+                            // indicator, so a sheet pinned to the bottom edge has to pad
+                            // itself back out. `env()` is 0 where there is no inset.
+                            "pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]",
                             HEIGHTS[height],
                             open ? "translate-y-0" : "translate-y-full",
                         ],
@@ -95,7 +99,7 @@ export default function BottomSheet({
                             aria-label="Close"
                             data-testid={testId ? `${testId}Close` : undefined}
                             onClick={onClose}
-                            className="shrink-0 rounded p-1 hover:bg-secondary"
+                            className="shrink-0 rounded p-1 hover:bg-secondary min-h-11 min-w-11 flex items-center justify-center"
                         >
                             <X size={18} />
                         </button>

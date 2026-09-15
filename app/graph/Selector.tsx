@@ -77,7 +77,8 @@ export default function Selector({
     const canvasTips = (
         <div className="text-primary">
             <p>Select And Show Properties (Click)</p>
-            <p>Select Multiple Entities (Click + Left Ctrl)</p>
+            {/* Touch has no Ctrl key, so the toolbar toggle is the only way in. */}
+            <p>{isMobile ? "Select Multiple Entities (Turn On Multi Select)" : "Select Multiple Entities (Click + Left Ctrl)"}</p>
             <p>Select 2 Nodes to Create Edge</p>
             <p>Expand And Collapse Neighbors (Double Click)</p>
         </div>

@@ -102,7 +102,7 @@ export default function Navbar({ showUDF }: Props) {
                         <Button
                             data-testid="mobileNavToggle"
                             title="Menu"
-                            className="shrink-0 text-foreground p-1 rounded-lg hover:bg-secondary"
+                            className="shrink-0 text-foreground p-1 rounded-lg hover:bg-secondary min-h-11 min-w-11 justify-center"
                         >
                             <Menu size={22} />
                         </Button>

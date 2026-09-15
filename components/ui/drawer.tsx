@@ -48,8 +48,12 @@ const DrawerContent = React.forwardRef<
       ref={ref}
       className={cn(
         "fixed z-50 flex h-auto rounded-t-[10px] border bg-background",
-        side === "left" && "inset-y-0 left-0 flex-row-reverse",
-        side === "right" && "inset-y-0 right-0 flex-row",
+        // `viewport-fit=cover` lets the layout run under the notch and the home
+        // indicator, so an edge-anchored drawer has to pad itself back out.
+        // `env()` resolves to 0 everywhere that has no inset, desktop included.
+        "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
+        side === "left" && "inset-y-0 left-0 flex-row-reverse pl-[env(safe-area-inset-left)]",
+        side === "right" && "inset-y-0 right-0 flex-row pr-[env(safe-area-inset-right)]",
         side === "bottom" && "inset-x-0 bottom-0 mt-24 flex-col",
         className
       )}

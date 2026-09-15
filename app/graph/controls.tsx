@@ -19,6 +19,10 @@ const LAYOUTS: { value: LayoutMode; label: string }[] = [
     { value: 'radial', label: 'Radial' },
 ];
 
+// The icons are 18px, so the tap area has to come from the control itself to
+// clear the ~44px touch minimum. Desktop keeps the compact size.
+const CONTROL_CLASS = "text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary mobile:min-h-11 mobile:min-w-11 mobile:justify-center";
+
 const HIERARCHY_DIRECTIONS: { value: HierarchyDirection; label: string }[] = [
     { value: 'td', label: 'Top → Down' },
     { value: 'bu', label: 'Bottom → Up' },
@@ -101,7 +105,7 @@ export function ZoomControls({
         <div data-testid="zoomControls" className={cn("flex items-center gap-1", className)}>
             <Button
                 data-testid="zoomInControl"
-                className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                className={CONTROL_CLASS}
                 disabled={disabled}
                 indicator={indicator}
                 title="Zoom in"
@@ -111,7 +115,7 @@ export function ZoomControls({
             </Button>
             <Button
                 data-testid="centerControl"
-                className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                className={CONTROL_CLASS}
                 disabled={disabled}
                 indicator={indicator}
                 title="Fit graph to screen"
@@ -121,7 +125,7 @@ export function ZoomControls({
             </Button>
             <Button
                 data-testid="zoomOutControl"
-                className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                className={CONTROL_CLASS}
                 disabled={disabled}
                 indicator={indicator}
                 title="Zoom out"
@@ -278,7 +282,7 @@ export default function Controls({
                         <TooltipTrigger asChild>
                             <Button
                                 data-testid="pinControl"
-                                className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                                className={CONTROL_CLASS}
                                 disabled={disabled}
                                 indicator={indicator}
                                 title={pinned ? "Unpin nodes" : "Pin nodes on drag"}
@@ -303,7 +307,7 @@ export default function Controls({
                                 type="button"
                                 data-testid="layoutControl"
                                 aria-label="Select graph layout"
-                                className="flex items-center gap-1 text-sm pointer-events-auto rounded-md px-2 py-1 hover:bg-secondary disabled:opacity-50"
+                                className="flex items-center gap-1 text-sm pointer-events-auto rounded-md px-2 py-1 hover:bg-secondary disabled:opacity-50 mobile:min-h-11"
                                 disabled={disabled}
                             >
                                 {LAYOUTS.find(l => l.value === layout)?.label}

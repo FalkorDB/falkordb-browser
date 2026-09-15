@@ -234,7 +234,15 @@ test.describe("@admin Mobile layout", () => {
         // of the way and the nodes have settled where they will be tapped.
         await graph.canvasToolsSheetClose.click();
         await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(false);
-        const nodes = await graph.getNodesScreenPositions();
+        const allNodes = await graph.getNodesScreenPositions();
+        // Positions are absolute page coordinates, and a node parked outside the
+        // canvas cannot be tapped — pick from the ones actually on screen.
+        const canvasBox = await graph.canvasElement.boundingBox();
+        expect(canvasBox).not.toBeNull();
+        const nodes = allNodes.filter(n =>
+            n.screenX >= canvasBox!.x && n.screenX <= canvasBox!.x + canvasBox!.width &&
+            n.screenY >= canvasBox!.y && n.screenY <= canvasBox!.y + canvasBox!.height
+        );
         expect(nodes.length).toBeGreaterThanOrEqual(2);
 
         await graph.elementClick(nodes[0].screenX, nodes[0].screenY);

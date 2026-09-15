@@ -37,7 +37,10 @@ export default function HelpTip({ children, trigger, className, contentClassName
     if (isMobile) {
         return (
             <Popover>
-                <PopoverTrigger type="button" data-testid={testId} aria-label="More information" className={triggerClassName}>
+                {/* The glyph is 16px and sits inline next to text, so the tap area is
+                    grown with a pseudo-element rather than by padding the trigger out
+                    and shifting whatever it labels. */}
+                <PopoverTrigger type="button" data-testid={testId} aria-label="More information" className={cn(triggerClassName, "relative after:absolute after:-inset-[14px] after:content-['']")}>
                     {content}
                 </PopoverTrigger>
                 {/* Mirrors TooltipContent's colours and leading icon so the hint reads

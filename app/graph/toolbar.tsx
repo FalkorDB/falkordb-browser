@@ -182,7 +182,7 @@ export default function Toolbar({
     const showAllButton = graph.getElements().length > 0 && (
         <Button
             data-testid="elementCanvasShowAllGraph"
-            className="pointer-events-auto"
+            className="pointer-events-auto mobile:min-h-11 mobile:min-w-11 mobile:justify-center"
             title="Show All"
             disabled={graph.Labels.every(label => label.show) && graph.Relationships.every(rel => rel.show) ? true : false}
             onClick={showAllElements}
@@ -355,7 +355,7 @@ export default function Toolbar({
                 {isMobile && setMultiSelect && graph.getElements().length > 0 && (
                     <Button
                         data-testid="elementCanvasMultiSelectGraph"
-                        className={cn("p-1 bg-background border-border", multiSelect && "!border-primary !text-primary")}
+                        className={cn("p-1 bg-background border-border mobile:min-h-11 mobile:min-w-11 mobile:justify-center", multiSelect && "!border-primary !text-primary")}
                         variant="Secondary"
                         tooltipVariant="Primary"
                         tooltipSide="bottom"
@@ -381,7 +381,7 @@ export default function Toolbar({
                     <>
                         <Button
                             data-testid="elementCanvasAddNodeGraph"
-                            className="p-1 bg-background border-green text-green"
+                            className="p-1 bg-background border-green text-green mobile:min-h-11 mobile:min-w-11 mobile:justify-center"
                             variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
@@ -394,7 +394,7 @@ export default function Toolbar({
                             setIsAddEdge &&
                             <Button
                                 data-testid="elementCanvasAddEdgeGraph"
-                                className="p-1 bg-background border-green text-green"
+                                className="p-1 bg-background border-green text-green mobile:min-h-11 mobile:min-w-11 mobile:justify-center"
                                 variant="Secondary"
                                 tooltipVariant="Primary"
                                 tooltipSide="bottom"
