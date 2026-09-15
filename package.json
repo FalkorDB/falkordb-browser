@@ -15,7 +15,8 @@
     "test": "node --test \"app/**/*.test.ts\" \"lib/**/*.test.ts\"",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=\"lib/cypherSuggestions.ts\" --test-coverage-include=\"lib/cypherDiagnostics.ts\" --test-coverage-include=\"lib/aiFix.ts\" --test-coverage-include=\"lib/cypherErrors.ts\" --test-coverage-include=\"lib/clipboard.ts\" --test-coverage-include=\"app/graph/confidence.ts\" --test-coverage-include=\"app/graph/chatHistory.ts\" --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 \"app/**/*.test.ts\" \"lib/**/*.test.ts\"",
     "test:smoke": "node --test \"lib/**/*.smoke.ts\"",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "generate:grammar": "cd lib/falkordb-cypher/generated/.grammar-src && antlr4ng -Dlanguage=TypeScript Cypher.g4 && mv CypherLexer.ts CypherParser.ts CypherListener.ts .. && rm -f Cypher.interp Cypher.tokens CypherLexer.interp CypherLexer.tokens"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",
@@ -110,6 +111,7 @@
     "@types/react-dom": "^19.2.5",
     "@types/react-gtm-module": "^2.0.4",
     "@types/swagger-ui-react": "^5.18.0",
+    "antlr4ng-cli": "^2.0.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3",
     "playwright": "^1.61.0",

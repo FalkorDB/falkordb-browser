@@ -20,6 +20,7 @@ import { udfFunctionNames } from "@/lib/cypherLang";
 import { createFalkorCypherEngine, attachGrammarLinting, registerGrammarCodeActions, getGrammarDiagnostics, toCompletionItems, type FalkorSchema } from "@/lib/falkordb-cypher";
 import PaginationList from "../components/PaginationList";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext, AiFixContext } from "../components/provider";
+import useQueryPreflight from "../components/useQueryPreflight";
 import { Explain, Metadata, Profile } from "./MetadataView";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
@@ -48,6 +49,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { indicator } = useContext(IndicatorContext);
     const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
+    const checkPreflight = useQueryPreflight();
     const { toast } = useToast();
 
     const { theme } = useTheme();
@@ -405,9 +407,15 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             toast({ title: "Syntax Error", description: message, variant: "destructive", query });
             return;
         }
+
+        const query = historyQuery!.query.trim();
+
+        // Parses, but known-doomed (e.g. a LOAD CSV source FalkorDB cannot fetch).
+        if (checkPreflight(query)) return;
+
         try {
             setIsLoading(true);
-            await runQuery(historyQuery!.query.trim());
+            await runQuery(query);
             onClose();
         } finally {
             setIsLoading(false);

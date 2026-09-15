@@ -61,7 +61,7 @@ function relativeImportPath(owner: string, key: string): string {
     return `${CSV_TEMP_SUBDIR}/${requireOwner(owner)}/${normalizeCsvKey(key)}.csv`;
 }
 
-function getLocalLoadUriMode(): "file" | "http" {
+export function getLocalLoadUriMode(): "file" | "http" {
     const configured = process.env.CSV_LOCAL_LOAD_URI_MODE?.toLowerCase();
     if (configured === "file") return "file";
     if (configured === "http") return "http";

@@ -9,6 +9,7 @@ import { OC_QueryContext } from "./CypherParser.js";
 import { OC_FalkorCommandContext } from "./CypherParser.js";
 import { OC_CreateIndexContext } from "./CypherParser.js";
 import { OC_DropIndexContext } from "./CypherParser.js";
+import { OC_IndexQualifierContext } from "./CypherParser.js";
 import { OC_IndexEntityContext } from "./CypherParser.js";
 import { OC_IndexPropertiesContext } from "./CypherParser.js";
 import { OC_CreateConstraintContext } from "./CypherParser.js";
@@ -21,6 +22,7 @@ import { OC_SinglePartQueryContext } from "./CypherParser.js";
 import { OC_MultiPartQueryContext } from "./CypherParser.js";
 import { OC_UpdatingClauseContext } from "./CypherParser.js";
 import { OC_ReadingClauseContext } from "./CypherParser.js";
+import { OC_LoadCsvContext } from "./CypherParser.js";
 import { OC_ForeachContext } from "./CypherParser.js";
 import { OC_CallSubqueryContext } from "./CypherParser.js";
 import { OC_MatchContext } from "./CypherParser.js";
@@ -186,6 +188,16 @@ export class CypherListener implements ParseTreeListener {
      */
     exitOC_DropIndex?: (ctx: OC_DropIndexContext) => void;
     /**
+     * Enter a parse tree produced by `CypherParser.oC_IndexQualifier`.
+     * @param ctx the parse tree
+     */
+    enterOC_IndexQualifier?: (ctx: OC_IndexQualifierContext) => void;
+    /**
+     * Exit a parse tree produced by `CypherParser.oC_IndexQualifier`.
+     * @param ctx the parse tree
+     */
+    exitOC_IndexQualifier?: (ctx: OC_IndexQualifierContext) => void;
+    /**
      * Enter a parse tree produced by `CypherParser.oC_IndexEntity`.
      * @param ctx the parse tree
      */
@@ -305,6 +317,16 @@ export class CypherListener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitOC_ReadingClause?: (ctx: OC_ReadingClauseContext) => void;
+    /**
+     * Enter a parse tree produced by `CypherParser.oC_LoadCsv`.
+     * @param ctx the parse tree
+     */
+    enterOC_LoadCsv?: (ctx: OC_LoadCsvContext) => void;
+    /**
+     * Exit a parse tree produced by `CypherParser.oC_LoadCsv`.
+     * @param ctx the parse tree
+     */
+    exitOC_LoadCsv?: (ctx: OC_LoadCsvContext) => void;
     /**
      * Enter a parse tree produced by `CypherParser.oC_Foreach`.
      * @param ctx the parse tree

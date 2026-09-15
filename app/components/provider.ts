@@ -669,3 +669,20 @@ export const AiFixContext = createContext<AiFixContextType>({
   dismissResult: () => { },
   insertCorrectedQuery: () => { },
 });
+
+type CsvLoadContextType = {
+  /** Whether `LOAD CSV FROM 'file://…'` can resolve on this deployment. */
+  fileUriSupported: boolean;
+  /** Whether the CSV upload flow is available to this user. */
+  uploadEnabled: boolean;
+  /** Open the Upload Data dialog on its Load CSV tab. */
+  openCsvUpload: () => void;
+};
+
+export const CsvLoadContext = createContext<CsvLoadContextType>({
+  // Assume `file://` works until the server says otherwise, so a failed or
+  // pending capability lookup never blocks a query that would have run.
+  fileUriSupported: true,
+  uploadEnabled: false,
+  openCsvUpload: () => { },
+});

@@ -2,13 +2,13 @@
 
 'use client';
 
-import { useState, useCallback, useContext, Dispatch, SetStateAction } from "react";
+import { useState, useCallback, useContext, useEffect, useMemo, Dispatch, SetStateAction } from "react";
 import { cn, formatName, HistoryQuery } from "@/lib/utils";
 import { History, Info, Network, Sparkles, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, CsvLoadContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
@@ -58,9 +58,41 @@ export default function Selector({
 
     const [maximize, setMaximize] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
+    const [uploadMode, setUploadMode] = useState<"cypher" | "load-csv">("cypher");
+    // What this deployment can do with LOAD CSV. Assume file:// works until the
+    // server says otherwise, so a failed lookup never blocks a runnable query.
+    const [csvCapabilities, setCsvCapabilities] = useState({ fileUriSupported: true, uploadEnabled: false });
     const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
         setCypherLanguageConfig(config);
     }, [setCypherLanguageConfig]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        fetch("/api/csv-temp/capabilities", { credentials: "same-origin" })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data) => {
+                if (cancelled || !data) return;
+                setCsvCapabilities({
+                    fileUriSupported: data.fileUriSupported !== false,
+                    uploadEnabled: data.uploadEnabled === true,
+                });
+            })
+            .catch(() => undefined);
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const csvLoad = useMemo(() => ({
+        ...csvCapabilities,
+        uploadEnabled: csvCapabilities.uploadEnabled && !isReadOnly && Boolean(graphName),
+        openCsvUpload: () => {
+            setUploadMode("load-csv");
+            setUploadOpen(true);
+        },
+    }), [csvCapabilities, isReadOnly, graphName]);
 
     const { size: historySize, onResize: onHistoryResize } = useResizableSize("queryHistory-size", 560, 600, 350, 300);
 
@@ -70,7 +102,7 @@ export default function Selector({
         setGraphName(formatName(name));
     };
 
-    return (
+    const toolbar = (
         <div className="z-20 w-full h-[44px] flex flex-row gap-3 items-center">
             <Button
                 aria-label="Graph info panel"
@@ -105,6 +137,8 @@ export default function Selector({
                 disabled={isReadOnly || !graphName}
                 open={uploadOpen}
                 onOpenChange={setUploadOpen}
+                mode={uploadMode}
+                onModeChange={setUploadMode}
             />
             <div className="h-full w-1 grow relative overflow-visible">
                 <CypherEditor
@@ -241,4 +275,6 @@ export default function Selector({
             </Button>
         </div >
     );
+
+    return <CsvLoadContext.Provider value={csvLoad}>{toolbar}</CsvLoadContext.Provider>;
 }

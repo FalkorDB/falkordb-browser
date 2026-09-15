@@ -7,8 +7,9 @@ source**, so the app builds and ships without needing Java/ANTLR at build time.
 generated/
   CypherLexer.ts            ← generated lexer (antlr4ng target)
   CypherParser.ts           ← generated parser (antlr4ng target)
-  CypherParserListener.ts   ← generated listener (imported by the parser)
+  CypherListener.ts         ← generated listener (imported by the parser)
   .grammar-src/             ← the .g4 sources used to generate the above
+    Cypher.g4               ← the combined grammar that is actually generated from
     CypherLexer.g4
     CypherParser.g4
 ```
@@ -30,7 +31,10 @@ must stay. It is **extended with FalkorDB-specific clauses**:
 - `shortestPath(…)` / `allShortestPaths(…)` — shortest-path pattern functions
 - `reduce(acc = init, x IN list | expr)` — list reduction
 - `EXISTS { … }` extended to accept a full `MATCH …` subquery
+- `LOAD CSV [WITH HEADERS] FROM <uri> AS <var> [FIELDTERMINATOR '<c>']`
 - Schema DDL: `CREATE/DROP INDEX`, `CREATE FULLTEXT INDEX`, `CREATE/DROP CONSTRAINT`
+- Vector indexes: `CREATE/DROP VECTOR INDEX …`, and an optional trailing
+  `OPTIONS { … }` map on any `CREATE`/`DROP INDEX`
 
 Coverage is verified empirically against 357 real FalkorDB queries extracted from
 the FalkorDB test suite: **99.2%** accepted (the remainder are intentionally
