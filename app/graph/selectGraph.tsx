@@ -20,6 +20,7 @@ import { Graph } from "../api/graph/model";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { recordGraphsFirstSeen, renameGraphFirstSeen, sortGraphNames, type GraphsFirstSeen } from "@/lib/graphSortOrder";
 
 interface Props {
     options: string[] | undefined,
@@ -47,7 +48,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const {
         settings: {
             graphInfo: { showMemoryUsage },
-            userExperienceSettings: { refreshInterval }
+            userExperienceSettings: { refreshInterval, graphsSortOrder }
         },
         tutorialOpen
     } = useContext(BrowserSettingsContext);
@@ -80,6 +81,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openMenage, setOpenMenage] = useState(false);
     const [openDuplicate, setOpenDuplicate] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [graphsFirstSeen, setGraphsFirstSeen] = useState<GraphsFirstSeen>({});
 
     const { size: manageSize, onResize: onManageResize } = useResizableSize("manageGraphs-size", 750, 493, 400, 300);
 
@@ -87,6 +89,22 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         setOpen(false);
     }, [selectedValue]);
 
+    // GRAPH.LIST carries no creation time, so the chronological orders go by
+    // when this browser first saw each graph. The tutorial's demo graphs are
+    // not the user's, so they are kept out of that history — and a list that
+    // has not loaded yet must not look like a server with no graphs at all.
+    // The list is replaced on every connection switch, which is what re-reads
+    // the timestamps of the connection now in use.
+    useEffect(() => {
+        if (tutorialOpen || options === undefined) return;
+
+        setGraphsFirstSeen(recordGraphsFirstSeen(safeOptions));
+    }, [safeOptions, options, tutorialOpen]);
+
+    const sortedOptions = useMemo(
+        () => sortGraphNames(safeOptions, graphsSortOrder, graphsFirstSeen),
+        [safeOptions, graphsSortOrder, graphsFirstSeen]
+    );
 
 
     const getOptions = useCallback(async () => {
@@ -195,6 +213,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         if (getConnectionEpoch() !== startEpoch) return false;
 
         if (result.ok) {
+            // A rename is the same graph under a new name, so it keeps the time
+            // it was first seen instead of sorting as a brand-new graph.
+            renameGraphFirstSeen(optionName, option);
+
             const newOptions = safeOptions.map((opt) => (opt === optionName ? option : opt));
             setOptions!(newOptions);
 
@@ -238,8 +260,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     }, [openMenage, openDuplicate]);
 
     useEffect(() => {
-        handleSetRows(safeOptions);
-    }, [safeOptions, handleSetRows]);
+        handleSetRows(sortedOptions);
+    }, [sortedOptions, handleSetRows]);
 
     // Graphs can be created, dropped or offloaded outside this tab, so refresh
     // the list (and with it the offloaded stubs) on the same interval the rest
@@ -319,7 +341,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 >
                     <PaginationList
                         className="basis-0 grow min-h-fit p-0"
-                        list={safeOptions}
+                        list={sortedOptions}
                         onClick={handleClick}
                         dataTestId="selectGraph"
                         label="Graph"
@@ -370,7 +392,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                             <p>Graphs Count: {safeOptions.length}</p>
                                             <ul className="mt-1 max-h-[200px] overflow-auto flex flex-col gap-1">
                                                 {
-                                                    safeOptions.map((name) => (
+                                                    sortedOptions.map((name) => (
                                                         <li key={name} className="flex items-center gap-2">
                                                             {supportsOffload && <GraphLoadDot offloaded={offloadedGraphs.includes(name)} />}
                                                             <span className="truncate">{name}</span>

@@ -8,6 +8,7 @@ import type { SessionConnection } from "next-auth";
 import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
 import { DEFAULT_GRAPH_TABS, GraphTab, SchemaViewMeta } from "@/lib/useGraphTabs";
+import { DEFAULT_GRAPH_SORT_ORDER, type GraphSortOrder } from "@/lib/graphSortOrder";
 
 export type ChatApiKey = {
   id: string;
@@ -39,6 +40,8 @@ type BrowserSettingsContextType = {
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
       newMaxTabs: number;
       setNewMaxTabs: Dispatch<SetStateAction<number>>;
+      newGraphsSortOrder: GraphSortOrder;
+      setNewGraphsSortOrder: Dispatch<SetStateAction<GraphSortOrder>>;
       captionKeysSettings: {
         newCaptionsKeys: [string, boolean][];
         setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -96,6 +99,9 @@ type BrowserSettingsContextType = {
       /** Upper bound on open graph tabs, between 4 and 10. */
       maxTabs: number;
       setMaxTabs: Dispatch<SetStateAction<number>>;
+      /** Order the graph list and the Manage Graphs table are shown in. */
+      graphsSortOrder: GraphSortOrder;
+      setGraphsSortOrder: Dispatch<SetStateAction<GraphSortOrder>>;
       captionKeysSettings: {
         captionsKeys: [string, boolean][];
         setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -369,6 +375,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewRefreshInterval: () => { },
         newMaxTabs: DEFAULT_GRAPH_TABS,
         setNewMaxTabs: () => { },
+        newGraphsSortOrder: DEFAULT_GRAPH_SORT_ORDER,
+        setNewGraphsSortOrder: () => { },
       },
       chatSettings: {
         newSecretKey: "",
@@ -411,6 +419,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setRefreshInterval: () => { },
         maxTabs: DEFAULT_GRAPH_TABS,
         setMaxTabs: () => { },
+        graphsSortOrder: DEFAULT_GRAPH_SORT_ORDER,
+        setGraphsSortOrder: () => { },
         captionKeysSettings: {
           captionsKeys: [],
           setCaptionsKeys: () => { },

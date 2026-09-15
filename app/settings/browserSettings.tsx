@@ -16,6 +16,8 @@ import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provi
 import { serverEncrypt } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
+import { GRAPH_SORT_ORDERS, GRAPH_SORT_ORDER_LABELS, type GraphSortOrder } from "@/lib/graphSortOrder";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -53,6 +55,8 @@ export default function BrowserSettings() {
                 setNewRefreshInterval,
                 newMaxTabs,
                 setNewMaxTabs,
+                newGraphsSortOrder,
+                setNewGraphsSortOrder,
             },
             chatSettings: { setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
             graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
@@ -69,6 +73,7 @@ export default function BrowserSettings() {
                 captionKeysSettings: { captionsKeys, showPropertyKeyPrefix },
                 refreshInterval,
                 maxTabs,
+                graphsSortOrder,
                 tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple },
             },
             chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, setModel, setSecretKey, setSelectedChatApiKeyId, setChatApiKeys, maxSavedMessages, cypherOnly, perSourceModels, setPerSourceModels },
@@ -293,6 +298,7 @@ export default function BrowserSettings() {
         setEditingKeyValue("");
         setNewRefreshInterval(refreshInterval);
         setNewMaxTabs(maxTabs);
+        setNewGraphsSortOrder(graphsSortOrder);
         setNewMaxSavedMessages(maxSavedMessages);
         setNewCaptionsKeys(captionsKeys);
         setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
@@ -305,7 +311,7 @@ export default function BrowserSettings() {
         setNewLocalLlmProvider(localLlmProvider);
         setNewLocalLlmEndpoint(localLlmEndpoint);
         setNewModel(model);
-    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
+    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewGraphsSortOrder, graphsSortOrder, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
 
     useEffect(() => {
         setHasChanges(
@@ -315,6 +321,7 @@ export default function BrowserSettings() {
             newRunDefaultQuery !== runDefaultQuery ||
             refreshInterval !== newRefreshInterval ||
             newMaxTabs !== maxTabs ||
+            newGraphsSortOrder !== graphsSortOrder ||
             newMaxSavedMessages !== maxSavedMessages ||
             !areCaptionKeysEqual(newCaptionsKeys, captionsKeys) ||
             newShowPropertyKeyPrefix !== showPropertyKeyPrefix ||
@@ -328,7 +335,7 @@ export default function BrowserSettings() {
             newLocalLlmEndpoint !== localLlmEndpoint ||
             newModel !== model
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, maxTabs, newMaxTabs, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, maxTabs, newMaxTabs, graphsSortOrder, newGraphsSortOrder, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -1474,6 +1481,44 @@ export default function BrowserSettings() {
                                                 <span>{MIN_GRAPH_TABS}</span>
                                                 <span>{MAX_GRAPH_TABS}</span>
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Graphs Sort Order */}
+                                    <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
+                                        <div className="flex flex-col gap-2 flex-1">
+                                            <label id="graphsSortOrderLabel" htmlFor="graphsSortOrder" className="text-lg font-semibold">Graphs Order</label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Order the graph list and the Manage Graphs table by the time a graph was first seen, or by name.
+                                            </p>
+                                        </div>
+                                        <div className="sm:w-64">
+                                            <Select
+                                                value={newGraphsSortOrder}
+                                                onValueChange={(value) => createChangeHandler(setNewGraphsSortOrder)(value as GraphSortOrder, "graphsSortOrder")}
+                                            >
+                                                <SelectTrigger
+                                                    id="graphsSortOrder"
+                                                    data-testid="graphsSortOrder"
+                                                    aria-labelledby="graphsSortOrderLabel"
+                                                    className="w-full border border-border p-2"
+                                                >
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className="bg-background">
+                                                    {
+                                                        GRAPH_SORT_ORDERS.map((order) => (
+                                                            <SelectItem
+                                                                key={order}
+                                                                value={order}
+                                                                data-testid={`graphsSortOrder${order}`}
+                                                            >
+                                                                {GRAPH_SORT_ORDER_LABELS[order]}
+                                                            </SelectItem>
+                                                        ))
+                                                    }
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
 
