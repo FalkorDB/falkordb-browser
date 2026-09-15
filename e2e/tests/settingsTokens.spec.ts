@@ -734,4 +734,29 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       expect(tokensAfter).toBeLessThan(tokensBefore);
     });
   });
+
+  test.describe("Token Storage - Cypher escaping", () => {
+    // The FalkorDB-backed store writes the token name into a query. `\'` exits
+    // a FalkorDB string literal cleanly, so naive `''` doubling would leave the
+    // rest of this name running as Cypher.
+    const HOSTILE_NAME = "x\\'}) MATCH (v) DETACH DELETE v //";
+
+    test("@admin Token name that is a Cypher fragment is stored as data", async () => {
+      const sentinelName = getRandomString("sentinel-token");
+      await apiCall.generateToken({ name: sentinelName });
+
+      const created = await apiCall.generateToken({ name: HOSTILE_NAME });
+      expect(created.token).toBeDefined();
+
+      const response = await apiCall.listTokens();
+      const hostile = response.tokens.find((t: { name: string }) => t.name === HOSTILE_NAME);
+      expect(hostile).toBeDefined();
+      // The sentinel is the canary: the payload's DETACH DELETE would take it.
+      expect(response.tokens.some((t: { name: string }) => t.name === sentinelName)).toBe(true);
+
+      await apiCall.revokeToken((hostile as { token_id: string }).token_id);
+      const sentinel = response.tokens.find((t: { name: string }) => t.name === sentinelName);
+      await apiCall.revokeToken((sentinel as { token_id: string }).token_id);
+    });
+  });
 });

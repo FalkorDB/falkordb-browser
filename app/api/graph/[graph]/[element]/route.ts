@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { quoteCypherIdentifier } from "@/lib/cypher";
 import {
   createGraphElement,
   deleteGraphElement,
@@ -94,35 +95,43 @@ export async function POST(
         if (label.length === 0) throw new Error("Label is required");
       }
 
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const graph = client.selectGraph(graphId);
+      // Labels and property keys cannot travel as parameters, so they are
+      // quoted; the values do travel as parameters, named by position so the
+      // key itself never reaches the query text unquoted.
+      const properties =
+        attributes.length > 0
+          ? ` {${attributes
+              .map(([k], i) => `${quoteCypherIdentifier(k)}: $attr_${i}`)
+              .join(",")}}`
+          : "";
       const query = type
-        ? `CREATE (n${label && label.length > 0 ? `:${label.join(":")}` : ""}${
-            attributes.length > 0
-              ? ` {${attributes.map(([k]) => `${k}: $attr_${k}`).join(",")}}`
+        ? `CREATE (n${
+            label.length > 0
+              ? `:${label.map(quoteCypherIdentifier).join(":")}`
               : ""
-          }) RETURN n`
-        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${
+          }${properties}) RETURN n`
+        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${quoteCypherIdentifier(
             label![0]
-          }${
-            attributes.length > 0
-              ? ` {${attributes.map(([k]) => `${k}: $attr_${k}`).join(",")}}`
-              : ""
-          }]->(b) RETURN e`;
+          )}${properties}]->(b) RETURN e`;
 
       const queryParams: Record<string, string | number | boolean> = {};
       if (!type && selectedNodes) {
         queryParams.nodeA = selectedNodes[0].id;
         queryParams.nodeB = selectedNodes[1].id;
       }
-      if (attributes.length > 0) {
-        attributes.forEach(([k, v]) => {
-          queryParams[`attr_${k}`] = v;
-        });
-      }
+      attributes.forEach(([, v], i) => {
+        queryParams[`attr_${i}`] = v;
+      });
 
-      const result = isReadOnly
-          ? await graph.roQuery(query, { params: queryParams })
-          : await graph.query(query, { params: queryParams });
+      const result = await graph.query(query, { params: queryParams });
 
       return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {

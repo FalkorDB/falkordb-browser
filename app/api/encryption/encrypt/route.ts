@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { encrypt } from "@/app/api/auth/encryption";
+import { encryptForOwner } from "@/app/api/auth/encryption";
+import { generateConsistentUserId } from "@/app/api/auth/[...nextauth]/options";
 
 const ENCRYPTED_PREFIX = "senc:";
 
@@ -13,6 +14,14 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Bind the ciphertext to the caller's connection, so the matching decrypt
+    // route cannot reopen a value lifted from someone else's browser.
+    const owner = generateConsistentUserId(
+      (token.username as string | undefined) ?? "",
+      (token.host as string | undefined) ?? "",
+      Number(token.port) || 6379
+    );
 
     let body;
     try {
@@ -50,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ result: "" }, { status: 200 });
     }
 
-    const encrypted = ENCRYPTED_PREFIX + encrypt(value);
+    const encrypted = ENCRYPTED_PREFIX + encryptForOwner(value, owner);
     return NextResponse.json({ result: encrypted }, { status: 200 });
   } catch (error) {
     console.error("Encrypt API error:", error);

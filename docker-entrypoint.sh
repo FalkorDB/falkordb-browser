@@ -1,5 +1,25 @@
 #!/bin/sh
 
+# Generate the session-signing secret if not provided by the user. Never ship a
+# default here: a known AUTH_SECRET lets anyone forge a session cookie.
+if [ -z "$AUTH_SECRET" ] && [ -z "$NEXTAUTH_SECRET" ]; then
+  AUTH_SECRET=$(head -c 32 /dev/urandom | od -A n -t x1 | tr -d ' \n')
+  if [ -z "$AUTH_SECRET" ] || [ ${#AUTH_SECRET} -lt 64 ]; then
+    echo "ERROR: Failed to generate a valid AUTH_SECRET. Aborting."
+    exit 1
+  fi
+  export AUTH_SECRET
+  echo "INFO: No AUTH_SECRET provided, generated a random one for this container session."
+  echo "WARNING: Every session is invalidated if the container is recreated without persisting the secret."
+else
+  for weak in SECRET secret changeme CHANGE_ME_IN_PRODUCTION your-secret-here; do
+    if [ "$AUTH_SECRET" = "$weak" ] || [ "$NEXTAUTH_SECRET" = "$weak" ]; then
+      echo "WARNING: AUTH_SECRET is a well-known placeholder value. Anyone can forge a session cookie."
+      echo "WARNING: Replace it with a random 32-byte value, e.g. \`openssl rand -hex 32\`."
+    fi
+  done
+fi
+
 # Generate ENCRYPTION_KEY if not provided by the user
 if [ -z "$ENCRYPTION_KEY" ]; then
   ENCRYPTION_KEY=$(head -c 32 /dev/urandom | od -A n -t x1 | tr -d ' \n')

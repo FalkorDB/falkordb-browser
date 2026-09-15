@@ -11,18 +11,19 @@ import LoginPage from "../logic/POM/loginPage";
  *
  * 1. Plain text (never encrypted) → migrated to server-side AES-256-GCM
  * 2. Legacy client-side `enc:` prefix → detected and migrated
- * 3. Already server-encrypted (iv:authTag:ciphertext hex) → decrypted on load
+ * 3. Already server-encrypted (v2:iv:authTag:ciphertext hex) → decrypted on load
  * 4. Saving via UI stores encrypted value
  */
 
-const HEX_COLON_PATTERN = /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
+// Owner-bound ciphertext: v2:iv(12B):authTag(16B):data
+const HEX_COLON_PATTERN = /^v2:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
 const CHAT_API_KEYS_STORAGE_KEY = "chatApiKeys";
 
 async function waitForMigratedChatApiKeys(page: Awaited<ReturnType<BrowserWrapper["getPage"]>>) {
     await expect.poll(async () => page.evaluate((storageKey) => {
         const secretKey = localStorage.getItem("secretKey");
         const chatApiKeys = localStorage.getItem(storageKey);
-        return secretKey === null && chatApiKeys !== null && /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(chatApiKeys);
+        return secretKey === null && chatApiKeys !== null && /^v2:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(chatApiKeys);
     }, CHAT_API_KEYS_STORAGE_KEY), { timeout: 15000 }).toBe(true);
 
     return page.evaluate(async (storageKey) => {
@@ -279,5 +280,65 @@ test.describe(`@admin Encryption migration tests`, () => {
         });
 
         expect(status).toBe(401);
+    });
+
+    test(`/api/encrypt rejects a ciphertext that predates owner binding`, async () => {
+        await browser.createNewPage(LoginPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+
+        const page = await browser.getPage();
+
+        // Dropping the `v2:` prefix leaves the 3-part shape the endpoint used
+        // to produce, which is no longer readable by design.
+        const result = await page.evaluate(async () => {
+            const encRes = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: "legacy-value", action: 'encrypt' }),
+            });
+            const { value } = await encRes.json();
+
+            const decRes = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: value.replace(/^v2:/, ''), action: 'decrypt' }),
+            });
+            return { status: decRes.status, body: await decRes.json() };
+        });
+
+        expect(result.status).toBe(400);
+        expect(result.body.error).toBe("Value predates owner binding and must be re-entered");
+    });
+
+    test(`/api/encrypt rejects a ciphertext that fails its owner binding`, async () => {
+        await browser.createNewPage(LoginPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+
+        const page = await browser.getPage();
+
+        const result = await page.evaluate(async () => {
+            const encRes = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: "value-belonging-to-someone-else", action: 'encrypt' }),
+            });
+            const { value } = await encRes.json();
+
+            // Flip a ciphertext nibble — the same failure a blob lifted from
+            // another connection produces, since both miss the auth tag.
+            const parts = value.split(':');
+            const data = parts[3];
+            const flipped = (data[0] === 'a' ? 'b' : 'a') + data.slice(1);
+            const tampered = [parts[0], parts[1], parts[2], flipped].join(':');
+
+            const decRes = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: tampered, action: 'decrypt' }),
+            });
+            return { status: decRes.status, body: await decRes.json() };
+        });
+
+        expect(result.status).toBe(403);
     });
 });

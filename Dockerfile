@@ -47,6 +47,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV CSV_STORAGE=local
 ENV CSV_LOCAL_TEMP_DIR=/var/lib/FalkorDB/import
 ENV CSV_LOCAL_LOAD_URI_MODE=file
+# Auth.js derives `trustHost` from AUTH_URL when it is set. The image used to
+# get that for free from a baked-in .env.local; say it directly instead, so the
+# image ships no secrets and an explicit NEXTAUTH_URL is no longer shadowed.
+ENV AUTH_TRUST_HOST=true
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -76,7 +80,6 @@ RUN chown nextjs:nodejs /var/lib/FalkorDB/import
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/.env.local.template ./.env.local
 
 
 EXPOSE 3000

@@ -164,11 +164,12 @@ env:
   chatUrl: "http://localhost:8080/"
   # Base URL for the browser (should match your ingress/service URL)
   nextauthUrl: "http://localhost:3000/"
-  # Secret for NextAuth.js authentication
-  # WARNING: This MUST be changed in production! Generate a secure random string.
-  # You can generate one with: openssl rand -base64 32
-  # IMPORTANT: Do not use the default value in production environments!
-  nextauthSecret: "CHANGE_ME_IN_PRODUCTION"
+  # Secret for NextAuth.js authentication (session signing).
+  # Leave empty to have the chart generate a random secret on first install and
+  # reuse it on every upgrade. Set it explicitly only if you need to share the
+  # secret across releases; generate one with: openssl rand -base64 32
+  # Known placeholders (e.g. CHANGE_ME_IN_PRODUCTION) are rejected.
+  nextauthSecret: ""
   # Google Analytics ID (optional)
   googleAnalytics: ""
   # Main browser port

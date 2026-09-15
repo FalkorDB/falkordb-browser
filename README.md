@@ -60,6 +60,11 @@ docker run -p 3000:3000 -e "NEXTAUTH_URL=https://www.yoururl.com" -p 6379:6379 -
 
 For reverse-proxy deployments using `NEXTAUTH_URL=auto`, set `TRUST_PROXY_HEADERS=true` only when the proxy strips or overwrites incoming `X-Forwarded-Host` and `X-Forwarded-Proto` headers.
 
+> Note: the image ships no default `AUTH_SECRET`. If you do not supply one, a
+> random secret is generated per container, which means every session is
+> invalidated when the container is recreated. For anything long-lived, set your
+> own: `-e AUTH_SECRET="$(openssl rand -hex 32)"`.
+
 > Note: Alternativly, you can run the browser from source and database using Docker
 
 ### Run the graph database from Docker container

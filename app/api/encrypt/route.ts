@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders } from "../utils";
-import { encrypt, decrypt } from "../auth/encryption";
-import { getClient } from "../auth/[...nextauth]/options";
+import { encryptForOwner, decryptForOwner, UnboundCiphertextError } from "../auth/encryption";
+import { getClient, generateConsistentUserId } from "../auth/[...nextauth]/options";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -11,6 +11,11 @@ export async function OPTIONS(request: Request) {
  * POST /api/encrypt
  * Body: { value: string, action: "encrypt" | "decrypt" }
  * Returns: { value: string }
+ *
+ * Ciphertext is bound to the caller's identity, so this endpoint cannot be used
+ * to decrypt a blob lifted from another user's browser storage. The binding is
+ * the stable per-connection id (username@host:port), not the per-login session
+ * id, so a user keeps access to their own values across logins.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -21,6 +26,12 @@ export async function POST(request: NextRequest) {
     if (session instanceof NextResponse) {
       return session;
     }
+
+    const owner = generateConsistentUserId(
+      session.user.username ?? "",
+      session.user.host,
+      session.user.port
+    );
 
     let body;
     try {
@@ -57,7 +68,7 @@ export async function POST(request: NextRequest) {
       if (!value) {
         return NextResponse.json({ value: "" }, { status: 200, headers: corsHeaders });
       }
-      const encrypted = encrypt(value);
+      const encrypted = encryptForOwner(value, owner);
       return NextResponse.json({ value: encrypted }, { status: 200, headers: corsHeaders });
     }
 
@@ -67,12 +78,22 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const decrypted = decrypt(value);
+      const decrypted = decryptForOwner(value, owner);
       return NextResponse.json({ value: decrypted }, { status: 200, headers: corsHeaders });
-    } catch {
+    } catch (err) {
+      if (err instanceof UnboundCiphertextError) {
+        // Pre-binding ciphertext. Unreadable by design — the client should drop
+        // it and ask the user to re-enter the value.
+        return NextResponse.json(
+          { error: "Value predates owner binding and must be re-entered" },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+      // Wrong owner or tampered input; GCM cannot tell them apart. 403 tells
+      // the client to keep the value — it may belong to another connection.
       return NextResponse.json(
-        { error: "Decryption failed" },
-        { status: 400, headers: corsHeaders }
+        { error: "Value does not belong to this connection" },
+        { status: 403, headers: corsHeaders }
       );
     }
   } catch (err) {

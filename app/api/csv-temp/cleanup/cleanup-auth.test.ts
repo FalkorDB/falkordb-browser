@@ -59,3 +59,22 @@ test("authorizeCleanup ignores a non-Bearer Authorization scheme", () => {
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.status, 401);
 });
+
+test("authorizeCleanup compares secrets of differing length without throwing", () => {
+    // timingSafeEqual requires equal-length buffers; the comparison hashes
+    // first so a length mismatch is a plain rejection, not a TypeError.
+    const result = authorizeCleanup(["a-long-configured-secret"], "Bearer x", null);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.status, 401);
+});
+
+test("authorizeCleanup rejects a credential that is a prefix of the configured secret", () => {
+    const result = authorizeCleanup(["s3cr3t"], "Bearer s3c", null);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.status, 401);
+});
+
+test("authorizeCleanup matches the last configured secret even though it does not short-circuit", () => {
+    const result = authorizeCleanup(["first", "second", "third"], "Bearer third", null);
+    assert.deepEqual(result, { ok: true });
+});

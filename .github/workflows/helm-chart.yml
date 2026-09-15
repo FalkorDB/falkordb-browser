@@ -332,7 +332,7 @@ jobs:
           helm install falkordb-browser falkordb/falkordb-browser \\
             --version ${{ env.CHART_VERSION }} \\
             --set env.nextauthUrl=https://your-domain.com \\
-            --set env.nextauthSecret=your-secret-here
+            --set env.nextauthSecret="$(openssl rand -base64 32)"
           
           ## Verify installation
           

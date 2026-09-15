@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { decrypt } from "@/app/api/auth/encryption";
+import { decryptForOwner, UnboundCiphertextError } from "@/app/api/auth/encryption";
+import { generateConsistentUserId } from "@/app/api/auth/[...nextauth]/options";
 
 const ENCRYPTED_PREFIX = "senc:";
 
@@ -13,6 +14,13 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Only ciphertext bound to this caller's connection can be reopened here.
+    const owner = generateConsistentUserId(
+      (token.username as string | undefined) ?? "",
+      (token.host as string | undefined) ?? "",
+      Number(token.port) || 6379
+    );
 
     let body;
     try {
@@ -54,12 +62,18 @@ export async function POST(request: NextRequest) {
     if (value.startsWith(ENCRYPTED_PREFIX)) {
       const raw = value.substring(ENCRYPTED_PREFIX.length);
       try {
-        const decrypted = decrypt(raw);
+        const decrypted = decryptForOwner(raw, owner);
         return NextResponse.json({ result: decrypted }, { status: 200 });
-      } catch {
+      } catch (error) {
+        if (error instanceof UnboundCiphertextError) {
+          return NextResponse.json(
+            { message: "Value predates owner binding and must be re-entered" },
+            { status: 400 }
+          );
+        }
         return NextResponse.json(
-          { message: "Invalid encrypted payload" },
-          { status: 400 }
+          { message: "Value does not belong to this connection" },
+          { status: 403 }
         );
       }
     }

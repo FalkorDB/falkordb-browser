@@ -114,6 +114,34 @@ Secret value or generates a new key for first install.
 {{- end }}
 
 {{/*
+Return the NEXTAUTH_SECRET used to sign sessions.
+Uses .Values.env.nextauthSecret when set, otherwise reuses the existing release
+Secret value or generates a new secret for first install. A known placeholder is
+rejected outright: anyone who knows it can forge a session cookie.
+*/}}
+{{- define "falkordb-browser.nextauthSecret" -}}
+{{- $provided := .Values.env.nextauthSecret | default "" -}}
+{{- if $provided -}}
+{{- if has $provided (list "CHANGE_ME_IN_PRODUCTION" "SECRET" "secret" "changeme" "your-secret-here") -}}
+{{- fail "env.nextauthSecret is a well-known placeholder; leave it empty to generate one, or set a random value (openssl rand -base64 32)" -}}
+{{- end -}}
+{{- $provided -}}
+{{- else -}}
+{{- $secretName := include "falkordb-browser.fullname" . -}}
+{{- $existingSecret := lookup "v1" "Secret" .Release.Namespace $secretName -}}
+{{- $existing := "" -}}
+{{- if and $existingSecret (hasKey ($existingSecret.data | default dict) "NEXTAUTH_SECRET") -}}
+{{- $existing = index $existingSecret.data "NEXTAUTH_SECRET" | b64dec -}}
+{{- end -}}
+{{- if $existing -}}
+{{- $existing -}}
+{{- else -}}
+{{- randBytes 32 | sha256sum -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Validate existing Secret based ENCRYPTION_KEY configuration.
 */}}
 {{- define "falkordb-browser.validateEncryptionKeySecret" -}}

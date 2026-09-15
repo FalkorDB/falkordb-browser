@@ -37,17 +37,20 @@ helm install falkordb-browser ./falkordb-browser
 # From OCI registry
 helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser \
   --set env.nextauthUrl=https://your-domain.com \
-  --set env.nextauthSecret=your-secret-here \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=your-domain.com
 
 # Or from local chart
 helm install falkordb-browser ./falkordb-browser \
   --set env.nextauthUrl=https://your-domain.com \
-  --set env.nextauthSecret=your-secret-here \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=your-domain.com
 ```
+
+`env.nextauthSecret` is left empty on purpose: the chart generates a random
+session-signing secret on first install and reuses it on upgrades. Set it only
+if you need the same secret across releases — and then to a real random value
+(`openssl rand -base64 32`), never a placeholder.
 
 ### Install from a values file
 
@@ -85,7 +88,7 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `autoscaling.maxReplicas` | Maximum number of replicas | `100` |
 | `env.chatUrl` | URL for chat/text-to-cypher service | `http://localhost:8080/` |
 | `env.nextauthUrl` | Base URL for the browser | `http://localhost:3000/` |
-| `env.nextauthSecret` | Secret for NextAuth.js | `SECRET` |
+| `env.nextauthSecret` | Secret for NextAuth.js. Empty generates a random one on first install and reuses it on upgrade. | `""` |
 | `env.googleAnalytics` | Google Analytics ID | `""` |
 | `env.cypher` | Enable text-to-cypher feature | `"1"` |
 | `persistence.enabled` | Enable persistence for API tokens | `false` |
@@ -129,7 +132,6 @@ ingress:
 
 env:
   nextauthUrl: https://falkordb-browser.example.com
-  nextauthSecret: "your-secure-secret-here"
 ```
 
 Install:
@@ -144,9 +146,6 @@ persistence:
   enabled: true
   size: 5Gi
   storageClass: standard
-
-env:
-  nextauthSecret: "your-secure-secret-here"
 ```
 
 ### Encryption key management
