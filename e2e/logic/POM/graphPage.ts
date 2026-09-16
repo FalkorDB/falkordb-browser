@@ -104,6 +104,14 @@ export default class GraphPage extends BasePage {
     return this.page.getByRole("tab", { name: labels[mode] });
   }
 
+  public get uploadGraphToolbarTrigger(): Locator {
+    return this.page.getByTestId("uploadGraphToolbarTrigger");
+  }
+
+  public get uploadGraphCancel(): Locator {
+    return this.page.getByTestId("uploadGraphCancel");
+  }
+
   // RELOAD
   public get reloadList(): Locator {
     return this.page.getByTestId("reloadGraphsList");

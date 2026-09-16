@@ -7,7 +7,7 @@ import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, GraphInfo } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, GraphTabsContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
+import { BrowserSettingsContext, CsvLoadContext, GraphContext, GraphTabsContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import ResizableBox from "@/components/ui/ResizableBox";
@@ -146,6 +146,43 @@ export default function Page() {
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
+
+    // The Upload Data dialog lives in the toolbar, but the pre-flight check that
+    // offers it as a quick fix runs from the editor, the history panel and Chat —
+    // so the state and the context it feeds belong to their common ancestor.
+    const [uploadOpen, setUploadOpen] = useState(false);
+    const [uploadMode, setUploadMode] = useState<"cypher" | "load-csv">("cypher");
+    // What this deployment can do with LOAD CSV. Assume file:// works until the
+    // server says otherwise, so a failed lookup never blocks a runnable query.
+    const [csvCapabilities, setCsvCapabilities] = useState({ fileUriSupported: true, uploadEnabled: false });
+
+    useEffect(() => {
+        let cancelled = false;
+
+        fetch("/api/csv-temp/capabilities", { credentials: "same-origin" })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data) => {
+                if (cancelled || !data) return;
+                setCsvCapabilities({
+                    fileUriSupported: data.fileUriSupported !== false,
+                    uploadEnabled: data.uploadEnabled === true,
+                });
+            })
+            .catch(() => undefined);
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const csvLoad = useMemo(() => ({
+        ...csvCapabilities,
+        uploadEnabled: csvCapabilities.uploadEnabled && !isReadOnly && Boolean(graphName),
+        openCsvUpload: () => {
+            setUploadMode("load-csv");
+            setUploadOpen(true);
+        },
+    }), [csvCapabilities, isReadOnly, graphName]);
 
     // Graph and Schema each have a selection of their own; the other tabs have
     // none. `panel` is shared by all of them, so it stays "data" across a tab
@@ -709,6 +746,7 @@ export default function Page() {
                     maxSize="100%"
                 >
                     <div className="h-full w-full flex flex-col">
+                        <CsvLoadContext.Provider value={csvLoad}>
                         <div className="Page p-3 gap-3">
                             <Selector
                                 graph={graph}
@@ -729,6 +767,10 @@ export default function Page() {
                                 setChatOpen={setChatOpen}
                                 queriesOpen={queriesOpen}
                                 setQueriesOpen={setQueriesOpen}
+                                uploadOpen={uploadOpen}
+                                setUploadOpen={setUploadOpen}
+                                uploadMode={uploadMode}
+                                setUploadMode={setUploadMode}
                             />
                             <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
                                 <ResizablePanel
@@ -788,6 +830,7 @@ export default function Page() {
                                 }
                             </ResizablePanelGroup>
                         </div>
+                        </CsvLoadContext.Provider>
                         <div className="h-4 w-full Gradient" />
                     </div>
                 </ResizablePanel>

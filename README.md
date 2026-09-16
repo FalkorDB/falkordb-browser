@@ -204,8 +204,8 @@ source FalkorDB cannot fetch (it only accepts `https://` and `file://`). Run sta
 because the query is not malformed; instead the request is stopped with an explanation and, when
 uploading the file is what would fix it, an **"Upload CSV"** button that opens the Load CSV tab
 with the storage and URI handled for you. Whether `file://` can resolve depends on the
-deployment, so it is inferred from the CSV storage settings and can be stated outright with
-`LOAD_CSV_FILE_URI=true|false` (default `auto`).
+deployment and nothing the browser can see settles it, so it is assumed to work unless you
+set `LOAD_CSV_FILE_URI=false`.
 
 ### Testing
 

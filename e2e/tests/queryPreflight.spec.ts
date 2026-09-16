@@ -183,6 +183,12 @@ test.describe("Query pre-flight and FalkorDB grammar extensions", () => {
 
         // Lands directly on the Load CSV tab of the upload dialog.
         await expect(graph.loadCsvTabTrigger).toHaveAttribute("data-state", "active");
+
+        // …and does not leave the dialog stuck there: the toolbar's Upload button
+        // is the ordinary Cypher upload, whoever opened the dialog last.
+        await graph.uploadGraphCancel.click();
+        await graph.uploadGraphToolbarTrigger.click();
+        await expect(graph.uploadTabTrigger("cypher")).toHaveAttribute("data-state", "active");
     });
 
     test(`@admin A LOAD CSV source the browser cannot evaluate is left to the server`, async () => {

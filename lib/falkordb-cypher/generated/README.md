@@ -63,6 +63,19 @@ Then commit the regenerated `.ts` files. Day-to-day schema changes (labels,
 procedures, `algo.*`, `$params`) do **not** require regeneration — they are
 injected at runtime via the engine's schema getter.
 
+### Why the generator is pinned to a deprecated package
+
+npm marks `antlr4ng-cli` deprecated in favour of [`antlr-ng`], which needs no
+Java. It is not a drop-in swap: `antlr-ng@1.0.10` emits a byte-identical
+`CypherParser.ts` and `CypherListener.ts`, but a **different serialized ATN for
+the lexer** — its Unicode identifier tables disagree with ANTLR 4.13.1's (793 vs
+768 entries, with shifted ranges), so it would change which characters lex as
+identifiers. Adopting it is a deliberate change to validate on its own, not a
+dependency bump. Until then the pinned `2.0.0` is the only thing that reproduces
+the committed files.
+
+[`antlr-ng`]: https://github.com/mike-lischke/antlr-ng
+
 ## How the rest of the engine binds to these
 
 `../grammarMapping.ts` is the single place that references concrete grammar

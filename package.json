@@ -111,7 +111,7 @@
     "@types/react-dom": "^19.2.5",
     "@types/react-gtm-module": "^2.0.4",
     "@types/swagger-ui-react": "^5.18.0",
-    "antlr4ng-cli": "^2.0.0",
+    "antlr4ng-cli": "2.0.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3",
     "playwright": "^1.61.0",

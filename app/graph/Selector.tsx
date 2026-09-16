@@ -2,13 +2,13 @@
 
 'use client';
 
-import { useState, useCallback, useContext, useEffect, useMemo, Dispatch, SetStateAction } from "react";
+import { useState, useCallback, useContext, Dispatch, SetStateAction } from "react";
 import { cn, formatName, HistoryQuery } from "@/lib/utils";
 import { History, Info, Network, Sparkles, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, ConnectionContext, CsvLoadContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
@@ -31,6 +31,12 @@ interface Props {
     historyQuery: HistoryQuery;
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>;
     isQueryLoading: boolean;
+    /** Owned by the page, because the Chat panel is outside this toolbar but needs
+     *  the same `CsvLoadContext`. */
+    uploadOpen: boolean;
+    setUploadOpen: Dispatch<SetStateAction<boolean>>;
+    uploadMode: "cypher" | "load-csv";
+    setUploadMode: Dispatch<SetStateAction<"cypher" | "load-csv">>;
 }
 
 export default function Selector({
@@ -47,7 +53,11 @@ export default function Selector({
     chatOpen,
     setChatOpen,
     queriesOpen,
-    setQueriesOpen
+    setQueriesOpen,
+    uploadOpen,
+    setUploadOpen,
+    uploadMode,
+    setUploadMode
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -57,42 +67,9 @@ export default function Selector({
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
 
     const [maximize, setMaximize] = useState(false);
-    const [uploadOpen, setUploadOpen] = useState(false);
-    const [uploadMode, setUploadMode] = useState<"cypher" | "load-csv">("cypher");
-    // What this deployment can do with LOAD CSV. Assume file:// works until the
-    // server says otherwise, so a failed lookup never blocks a runnable query.
-    const [csvCapabilities, setCsvCapabilities] = useState({ fileUriSupported: true, uploadEnabled: false });
     const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
         setCypherLanguageConfig(config);
     }, [setCypherLanguageConfig]);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        fetch("/api/csv-temp/capabilities", { credentials: "same-origin" })
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data) => {
-                if (cancelled || !data) return;
-                setCsvCapabilities({
-                    fileUriSupported: data.fileUriSupported !== false,
-                    uploadEnabled: data.uploadEnabled === true,
-                });
-            })
-            .catch(() => undefined);
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    const csvLoad = useMemo(() => ({
-        ...csvCapabilities,
-        uploadEnabled: csvCapabilities.uploadEnabled && !isReadOnly && Boolean(graphName),
-        openCsvUpload: () => {
-            setUploadMode("load-csv");
-            setUploadOpen(true);
-        },
-    }), [csvCapabilities, isReadOnly, graphName]);
 
     const { size: historySize, onResize: onHistoryResize } = useResizableSize("queryHistory-size", 560, 600, 350, 300);
 
@@ -127,7 +104,12 @@ export default function Selector({
                 )}
                 title="Upload data"
                 disabled={isReadOnly || !graphName}
-                onClick={() => setUploadOpen(true)}
+                onClick={() => {
+                    // The quick-fix path leaves the dialog on Load CSV; the toolbar is the
+                    // ordinary Cypher upload, so it has to say which tab it wants.
+                    setUploadMode("cypher");
+                    setUploadOpen(true);
+                }}
                 data-testid="uploadGraphToolbarTrigger"
             >
                 <Upload size={20} />
@@ -276,5 +258,5 @@ export default function Selector({
         </div >
     );
 
-    return <CsvLoadContext.Provider value={csvLoad}>{toolbar}</CsvLoadContext.Provider>;
+    return toolbar;
 }

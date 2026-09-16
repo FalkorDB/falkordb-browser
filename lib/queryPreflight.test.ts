@@ -57,6 +57,11 @@ describe("preflightQuery", () => {
       "LOAD CSV FROM source AS row RETURN row",
       "LOAD CSV FROM toString($url) AS row RETURN row",
       "LOAD CSV FROM 'unterminated AS row RETURN row",
+      // FalkorDB evaluates these to a URI it can fetch, so reading only the
+      // first literal and judging that would block a working query.
+      "LOAD CSV FROM 'http' + 's://example.com/a.csv' AS row RETURN row",
+      "LOAD CSV FROM 'ftp' + '://example.com/a.csv' AS row RETURN row",
+      "LOAD CSV FROM 'file://' + $name AS row RETURN row",
     ];
 
     for (const query of cases) {

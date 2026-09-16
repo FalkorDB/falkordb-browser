@@ -26,70 +26,42 @@ describe("isFileUriLoadSupported", () => {
         });
     });
 
-    it("lets an explicit LOAD_CSV_FILE_URI override the inference", () => {
-        // s3 storage would otherwise infer false.
-        process.env.CSV_STORAGE = "s3";
-        process.env.S3_BUCKET = "bucket";
-        process.env.LOAD_CSV_FILE_URI = "true";
-        assert.equal(isFileUriLoadSupported(), true);
-
-        // Local + file:// would otherwise infer true.
-        delete process.env.CSV_STORAGE;
-        delete process.env.S3_BUCKET;
-        process.env.CSV_LOCAL_LOAD_URI_MODE = "file";
+    it("blocks file:// only when an operator says so", () => {
         process.env.LOAD_CSV_FILE_URI = "false";
         assert.equal(isFileUriLoadSupported(), false);
+
+        process.env.LOAD_CSV_FILE_URI = "true";
+        assert.equal(isFileUriLoadSupported(), true);
     });
 
     it("reads the override case-insensitively and ignores surrounding space", () => {
-        process.env.CSV_LOCAL_LOAD_URI_MODE = "file";
         process.env.LOAD_CSV_FILE_URI = "  FALSE ";
         assert.equal(isFileUriLoadSupported(), false);
     });
 
-    it("falls through to inference for 'auto', an empty value, or junk", () => {
-        process.env.CSV_STORAGE = "local";
-        process.env.CSV_LOCAL_LOAD_URI_MODE = "file";
-
+    it("answers true for 'auto', an unset value, or junk", () => {
         ["auto", "", "   ", "yes-please"].forEach((value) => {
             process.env.LOAD_CSV_FILE_URI = value;
             assert.equal(isFileUriLoadSupported(), true, `LOAD_CSV_FILE_URI=${JSON.stringify(value)}`);
         });
-    });
 
-    it("infers true only when local storage hands FalkorDB file:// URIs", () => {
-        process.env.CSV_STORAGE = "local";
-
-        process.env.CSV_LOCAL_LOAD_URI_MODE = "file";
+        delete process.env.LOAD_CSV_FILE_URI;
         assert.equal(isFileUriLoadSupported(), true);
-
-        // Local storage that serves CSVs over HTTPS proves nothing about the
-        // database's filesystem — it may well be on another host.
-        process.env.CSV_LOCAL_LOAD_URI_MODE = "http";
-        assert.equal(isFileUriLoadSupported(), false);
     });
 
-    it("infers false for remote storage providers", () => {
-        process.env.CSV_LOCAL_LOAD_URI_MODE = "file";
-
+    it("does not read failure into the CSV storage configuration", () => {
+        // Uploading to S3 says nothing about the database's own import folder,
+        // which may still be mounted and full of files a query can name.
         process.env.CSV_STORAGE = "s3";
         process.env.S3_BUCKET = "bucket";
-        assert.equal(isFileUriLoadSupported(), false);
-
-        delete process.env.S3_BUCKET;
-        process.env.CSV_STORAGE = "blob";
-        process.env.BLOB_READ_WRITE_TOKEN = "token";
-        assert.equal(isFileUriLoadSupported(), false);
-    });
-
-    it("stays quiet rather than throwing when storage is misconfigured", () => {
-        // Resolving the storage mode throws on these; a broken upload config is
-        // not evidence that the database cannot read its own import folder, and
-        // answering false here would block a query that may be fine.
-        process.env.CSV_STORAGE = "s3"; // no S3_BUCKET
         assert.equal(isFileUriLoadSupported(), true);
 
-        process.env.CSV_STORAGE = "not-a-provider";
+        // Nor does a storage config broken badly enough to throw.
+        delete process.env.S3_BUCKET;
+        assert.equal(isFileUriLoadSupported(), true);
+
+        process.env.CSV_STORAGE = "local";
+        process.env.CSV_LOCAL_LOAD_URI_MODE = "http";
         assert.equal(isFileUriLoadSupported(), true);
     });
 });
