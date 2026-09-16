@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import crypto from "crypto";
 import { newClient, generateTimeUUID } from "../../[...nextauth]/options";
-import { storeEncryptedCredential } from "../../tokenUtils";
+import { storeEncryptedCredential, getAuthSecret } from "../../tokenUtils";
 import { login, validateBody } from "../../../validate-body";
 
 // Typed shape for the validated login request body
@@ -32,7 +32,7 @@ type LoginInput = {
 export async function POST(request: NextRequest) {
   try {
     // 1. Validate JWT secret
-    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    const authSecret = getAuthSecret();
     if (!authSecret) {
       return NextResponse.json(
         { message: "Server configuration error: AUTH_SECRET or NEXTAUTH_SECRET not set" },

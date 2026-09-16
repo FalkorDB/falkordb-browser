@@ -5,10 +5,21 @@ import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { encrypt } from "./encryption";
 
 /**
+ * The session-signing secret, under either of its two names.
+ *
+ * `||` rather than `??` on purpose: an exported-but-empty `AUTH_SECRET` is a
+ * missing secret, not a chosen one, and `??` would let it beat a perfectly good
+ * `NEXTAUTH_SECRET` and leave every caller signing with "".
+ */
+export function getAuthSecret(): string | undefined {
+  return process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || undefined;
+}
+
+/**
  * Validates JWT secret exists in environment
  */
 export function validateJWTSecret(): { valid: boolean; secret?: Uint8Array; error?: NextResponse } {
-  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const authSecret = getAuthSecret();
   if (!authSecret) {
     // eslint-disable-next-line no-console
     console.error("AUTH_SECRET environment variable is required");
@@ -37,7 +48,7 @@ export async function isTokenActive(
   token: string
 ): Promise<boolean> {
   try {
-    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    const authSecret = getAuthSecret();
     if (!authSecret) {
       return false; // Fail-closed: cannot validate without secret
     }

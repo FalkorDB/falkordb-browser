@@ -20,6 +20,7 @@ import {
   isTokenActive,
   getPasswordFromTokenDB,
   storeEncryptedCredential,
+  getAuthSecret,
 } from "../tokenUtils";
 
 interface CustomJWTPayload {
@@ -551,7 +552,7 @@ async function isJWTOnlyRequest(): Promise<boolean> {
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
   const { jwtVerify } = await import('jose');
-  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const authSecret = getAuthSecret();
   if (!authSecret) throw new Error('AUTH_SECRET or NEXTAUTH_SECRET must be set');
   const secret = new TextEncoder().encode(authSecret);
   const { payload } = await jwtVerify(token, secret);
@@ -1068,7 +1069,7 @@ export async function getSessionFromRequest(
   const token = await getToken({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     req: request as any,
-    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secret: getAuthSecret(),
     secureCookie: shouldUseSecureCookies(request),
   });
 
@@ -1225,7 +1226,7 @@ export async function getClient(
       const jwt = await getToken({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         req: request as any,
-        secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+        secret: getAuthSecret(),
         secureCookie: shouldUseSecureCookies(request),
       });
       const credentialRef = jwt?.credentialRef as string | undefined;

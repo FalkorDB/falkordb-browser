@@ -4,7 +4,7 @@ import { SignJWT } from "jose";
 import crypto from "crypto";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient, generateTimeUUID } from "../[...nextauth]/options";
-import { storeEncryptedCredential } from "../tokenUtils";
+import { storeEncryptedCredential, getAuthSecret } from "../tokenUtils";
 import { getCorsHeaders } from "../../utils";
 import { createToken, validateBody } from "../../validate-body";
 
@@ -117,7 +117,7 @@ export async function GET(request: Request) {
 export async function POST(request: NextRequest) {
   try {
     // 1. Validate JWT secret
-    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    const authSecret = getAuthSecret();
     if (!authSecret) {
       return NextResponse.json(
         { message: "Server configuration error" },

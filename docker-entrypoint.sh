@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# An exported-but-empty secret is a missing secret, not a chosen one. Drop it,
+# so neither the check below nor the application can mistake "" for a value.
+if [ -z "$AUTH_SECRET" ]; then unset AUTH_SECRET; fi
+if [ -z "$NEXTAUTH_SECRET" ]; then unset NEXTAUTH_SECRET; fi
+
 # Generate the session-signing secret if not provided by the user. Never ship a
 # default here: a known AUTH_SECRET lets anyone forge a session cookie.
 if [ -z "$AUTH_SECRET" ] && [ -z "$NEXTAUTH_SECRET" ]; then

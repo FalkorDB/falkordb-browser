@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { encryptForOwner } from "@/app/api/auth/encryption";
+import { getAuthSecret } from "@/app/api/auth/tokenUtils";
 import { generateConsistentUserId, isEndpointBound } from "@/app/api/auth/[...nextauth]/options";
 
 const ENCRYPTED_PREFIX = "senc:";
 
 export async function POST(request: NextRequest) {
   try {
-    const token = await getToken({ req: request, secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET });
+    const token = await getToken({ req: request, secret: getAuthSecret() });
     if (!token) {
       return NextResponse.json(
         { message: "Not authenticated" },
