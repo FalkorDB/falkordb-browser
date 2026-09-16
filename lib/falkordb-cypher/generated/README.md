@@ -33,8 +33,10 @@ must stay. It is **extended with FalkorDB-specific clauses**:
 - `EXISTS { … }` extended to accept a full `MATCH …` subquery
 - `LOAD CSV [WITH HEADERS] FROM <uri> AS <var> [FIELDTERMINATOR '<c>']`
 - Schema DDL: `CREATE/DROP INDEX`, `CREATE FULLTEXT INDEX`, `CREATE/DROP CONSTRAINT`
-- Vector indexes: `CREATE/DROP VECTOR INDEX …`, and an optional trailing
-  `OPTIONS { … }` map on any `CREATE`/`DROP INDEX`
+- Vector indexes: `CREATE/DROP VECTOR INDEX …`, with a trailing `OPTIONS { … }` map
+  on a *qualified* `CREATE … INDEX FOR` only — FalkorDB rejects `OPTIONS` on an
+  unqualified `CREATE INDEX` and on every `DROP`, and rejects the `FULLTEXT`/`VECTOR`
+  qualifiers on the legacy `ON :Label(prop)` form
 
 Coverage is verified empirically against 357 real FalkorDB queries extracted from
 the FalkorDB test suite: **99.2%** accepted (the remainder are intentionally

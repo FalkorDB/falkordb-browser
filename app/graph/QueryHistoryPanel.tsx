@@ -396,6 +396,21 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
         /* eslint-enable no-bitwise */
     };
 
+    // The only way this panel runs a query. Both entry points — the Run button and
+    // double-clicking a history row — go through here so a saved known-doomed query
+    // (e.g. a LOAD CSV source FalkorDB cannot fetch) cannot skip the pre-flight guard.
+    const runChecked = useCallback(async (query: string) => {
+        if (checkPreflight(query)) return;
+
+        try {
+            setIsLoading(true);
+            if (query) await runQuery(query);
+            onClose();
+        } finally {
+            setIsLoading(false);
+        }
+    }, [checkPreflight, runQuery, onClose]);
+
     const handleSubmit = async () => {
         // Grammar validation gates execution: invalid syntax never runs. Reuse the
         // failed-run pipeline: prettified toast + "Fix with AI" button.
@@ -408,18 +423,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             return;
         }
 
-        const query = historyQuery!.query.trim();
-
-        // Parses, but known-doomed (e.g. a LOAD CSV source FalkorDB cannot fetch).
-        if (checkPreflight(query)) return;
-
-        try {
-            setIsLoading(true);
-            await runQuery(query);
-            onClose();
-        } finally {
-            setIsLoading(false);
-        }
+        await runChecked(historyQuery!.query.trim());
     };
 
     const handleDeleteQuery = useCallback(() => {
@@ -646,15 +650,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                             counter: index + 1
                         }));
                         setTab("text");
-                        try {
-                            setIsLoading(true);
-                            if (item.text.trim()) {
-                                await runQuery(item.text.trim());
-                            }
-                            onClose();
-                        } finally {
-                            setIsLoading(false);
-                        }
+                        await runChecked(item.text.trim());
                     }}
                     searchRef={searchQueryRef}
                 >

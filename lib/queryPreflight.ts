@@ -13,10 +13,9 @@
 // file that may or may not exist on the server) is left to the server.
 
 import { stripCypherStringsAndComments } from "./graphUpload.ts";
-
-/** Schemes FalkorDB's `LOAD CSV` will actually fetch. Anything else is rejected
- *  by the server with "Unsupported URI" before it ever opens the resource. */
-export const FALKOR_LOAD_CSV_SCHEMES = ["https", "file"] as const;
+// Single source of truth for what FalkorDB's `LOAD CSV` can fetch, shared with the
+// server-side guard in the load-csv route so the two cannot drift apart.
+import { FALKOR_FETCHABLE_SCHEMES } from "../app/lib/csv-load-url.ts";
 
 export type PreflightCode = "LOAD_CSV_UNSUPPORTED_URI" | "LOAD_CSV_FILE_URI_UNAVAILABLE";
 
@@ -73,14 +72,14 @@ function schemeOf(uri: string): string | null {
 function inspectSource(uri: string, context: PreflightContext): PreflightIssue | null {
   const scheme = schemeOf(uri);
 
-  if (scheme === null || !(FALKOR_LOAD_CSV_SCHEMES as readonly string[]).includes(scheme)) {
+  if (scheme === null || !(FALKOR_FETCHABLE_SCHEMES as readonly string[]).includes(scheme)) {
     return {
       code: "LOAD_CSV_UNSUPPORTED_URI",
       message:
         scheme === null
           ? `LOAD CSV needs an absolute URI, but "${uri}" has no scheme.`
           : `LOAD CSV cannot read "${scheme}://" sources.`,
-      hint: `FalkorDB only loads CSV from ${FALKOR_LOAD_CSV_SCHEMES.map((s) => `${s}://`).join(" or ")}.`,
+      hint: `FalkorDB only loads CSV from ${FALKOR_FETCHABLE_SCHEMES.map((s) => `${s}://`).join(" or ")}.`,
       uri,
       fixableByUpload: true,
     };

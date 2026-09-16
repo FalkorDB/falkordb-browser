@@ -47,17 +47,19 @@ oC_FalkorCommand
                  | oC_DropConstraint
                  ;
 
+// FalkorDB accepts a qualifier (FULLTEXT / VECTOR) only on the `FOR` form, and an
+// `OPTIONS` map only on a qualified `CREATE`. `CREATE INDEX FOR … OPTIONS { … }`,
+// `CREATE VECTOR INDEX ON :Label(prop)` and `DROP … OPTIONS { … }` are all parse
+// errors in the server, so they must not parse here either.
 oC_CreateIndex
-           :  CREATE SP ( oC_IndexQualifier SP )? INDEX SP?
-              ( ( FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties )
-                | ( ON SP? ':' SP? oC_LabelName SP? oC_IndexProperties ) )
-              ( SP? OPTIONS SP? oC_MapLiteral )? ;
+           :  CREATE SP oC_IndexQualifier SP INDEX SP? FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties ( SP? OPTIONS SP? oC_MapLiteral )?
+               | CREATE SP INDEX SP? FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties
+               | CREATE SP INDEX SP? ON SP? ':' SP? oC_LabelName SP? oC_IndexProperties ;
 
 oC_DropIndex
-         :  DROP SP ( oC_IndexQualifier SP )? INDEX SP?
-            ( ( FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties )
-              | ( ON SP? ':' SP? oC_LabelName SP? oC_IndexProperties ) )
-            ( SP? OPTIONS SP? oC_MapLiteral )? ;
+         :  DROP SP oC_IndexQualifier SP INDEX SP? FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties
+             | DROP SP INDEX SP? FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties
+             | DROP SP INDEX SP? ON SP? ':' SP? oC_LabelName SP? oC_IndexProperties ;
 
 oC_IndexQualifier
               :  FULLTEXT

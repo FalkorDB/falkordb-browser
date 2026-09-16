@@ -70,8 +70,33 @@ test.describe("Query pre-flight and FalkorDB grammar extensions", () => {
         },
         {
             issue: "#2058",
+            label: "CREATE FULLTEXT INDEX with an OPTIONS map",
+            query: "CREATE FULLTEXT INDEX FOR (p:Person) ON (p.name) OPTIONS { weight: 2.0 }",
+        },
+        {
+            issue: "#2058",
             label: "DROP VECTOR INDEX",
             query: "DROP VECTOR INDEX FOR (u:User) ON (u.embedding)",
+        },
+        {
+            issue: "#2058",
+            label: "an unqualified CREATE INDEX FOR",
+            query: "CREATE INDEX FOR (p:Person) ON (p.name)",
+        },
+        {
+            issue: "#2058",
+            label: "an unqualified DROP INDEX FOR",
+            query: "DROP INDEX FOR (p:Person) ON (p.name)",
+        },
+        {
+            issue: "#2058",
+            label: "the legacy CREATE INDEX ON :Label(prop) form",
+            query: "CREATE INDEX ON :Person(name)",
+        },
+        {
+            issue: "#2058",
+            label: "the legacy DROP INDEX ON :Label(prop) form",
+            query: "DROP INDEX ON :Person(name)",
         },
     ];
 
@@ -86,6 +111,37 @@ test.describe("Query pre-flight and FalkorDB grammar extensions", () => {
             await graph.insertQuery(query);
             expect(await graph.hasEditorErrorMarker()).toBe(false);
             expect(await graph.isEnabledEditorRun()).toBe(true);
+        });
+    });
+
+    // -------------------------------------------------------------------------
+    // The mirror image: the grammar must not be *more* permissive than FalkorDB
+    // either, or the editor green-lights a query the server cannot parse. Each of
+    // these was confirmed to be a parse error on a live server, so accepting them
+    // here would be dead grammar that only delays the failure.
+    // -------------------------------------------------------------------------
+
+    const invalidQueries: { label: string; query: string }[] = [
+        {
+            label: "DROP INDEX with an OPTIONS map",
+            query: "DROP VECTOR INDEX FOR (u:User) ON (u.embedding) OPTIONS { dimension: 4 }",
+        },
+        {
+            label: "an unqualified CREATE INDEX with an OPTIONS map",
+            query: "CREATE INDEX FOR (p:Person) ON (p.name) OPTIONS { weight: 2.0 }",
+        },
+        {
+            label: "a qualified index on the legacy ON :Label(prop) form",
+            query: "CREATE VECTOR INDEX ON :User(embedding)",
+        },
+    ];
+
+    invalidQueries.forEach(({ label, query }) => {
+        test(`@admin #2058 ${label} is a syntax error, as it is on the server`, async () => {
+            const graph = await openGraph();
+
+            await graph.insertQuery(query);
+            expect(await graph.hasEditorErrorMarker()).toBe(true);
         });
     });
 
