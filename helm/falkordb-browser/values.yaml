@@ -52,7 +52,11 @@ connection:
   port: ""
   # Left empty to fall back to the url, then to "default".
   username: ""
-  password: ""
+  # Password. Deliberately has no default: an empty one would be indistinguishable
+  # from "not set", and the chart must not emit an empty FALKORDB_PASSWORD (it
+  # would override the password carried by the url). Set it with
+  # `--set connection.password=…`, an override file, or existingSecret below.
+  # password:
   # "true" / "false", or empty to take TLS from the url scheme (falkors/rediss).
   tls: ""
   # Base64-encoded CA certificate; needed only for a private TLS CA.

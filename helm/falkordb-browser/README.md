@@ -96,7 +96,7 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `connection.host` | Hostname. Required unless `connection.url` is set | `""` |
 | `connection.port` | Port. Empty falls back to the URL, then `6379` | `""` |
 | `connection.username` | Username. Empty falls back to the URL, then `default` | `""` |
-| `connection.password` | Password. Stored in the chart-managed Secret | `""` |
+| `connection.password` | Password. Stored in the chart-managed Secret. Has no default — an empty value would override the password carried by `connection.url` | unset |
 | `connection.tls` | `"true"`/`"false"`; empty takes TLS from the URL scheme | `""` |
 | `connection.ca` | Base64-encoded CA certificate | `""` |
 | `connection.autoConnect` | Sign in automatically on load. `false` only prefills the login form | `true` |
