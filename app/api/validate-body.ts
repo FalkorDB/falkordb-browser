@@ -352,8 +352,9 @@ const BASE64_PEM = /^[A-Za-z0-9+/]+={0,2}$/;
 // far away in the TLS handshake with an opaque error instead of here, naming the field.
 const requireMtlsPair = (
   // tls arrives as a string on the login schema and as string | boolean on
-  // addConnection, so both spellings of "on" have to count.
-  v: { tls?: string | boolean; cert?: string; key?: string },
+  // addConnection, so both spellings of "on" have to count. url is only modelled
+  // by the credentials provider; the route schemas leave it undefined.
+  v: { tls?: string | boolean; cert?: string; key?: string; url?: string },
   ctx: z.RefinementCtx
 ) => {
   if (!!v.cert !== !!v.key) {
@@ -370,7 +371,42 @@ const requireMtlsPair = (
       message: "Client certificate authentication requires TLS to be enabled",
     });
   }
+  // A URL login builds its socket options from the URL alone, so a certificate
+  // handed alongside one would be dropped without a word.
+  if ((v.cert || v.key) && v.url) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["url"],
+      message:
+        "Client certificate authentication is not supported with a connection URL",
+    });
+  }
 };
+
+// next-auth serialises an absent credential, so the literal "undefined" reaches
+// authorize() as a value and has to count as absent.
+const optionalCredential = (inner: z.ZodString) =>
+  z.preprocess(
+    (v) => (v === "" || v === "undefined" ? undefined : v),
+    inner.optional()
+  );
+
+// signIn() posts straight to the Auth.js callback, so the credentials provider is
+// the one connection entry point with no route schema in front of it. Validating
+// here keeps unchecked certificate material out of newClient and out of the Token
+// DB, which interpolates it into Cypher.
+export const authCredentials = z
+  .object({
+    tls: z.union([z.string(), z.boolean()]).optional(),
+    url: optionalCredential(z.string()),
+    cert: optionalCredential(
+      z.string().regex(BASE64_PEM, "Client certificate must be base64-encoded")
+    ),
+    key: optionalCredential(
+      z.string().regex(BASE64_PEM, "Client key must be base64-encoded")
+    ),
+  })
+  .superRefine(requireMtlsPair);
 
 export const login = z.object({
   username: z

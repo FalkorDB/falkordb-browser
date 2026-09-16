@@ -21,6 +21,7 @@ import {
   getPasswordFromTokenDB,
   storeEncryptedCredential,
 } from "../tokenUtils";
+import { authCredentials } from "../../validate-body";
 
 interface CustomJWTPayload {
   sub: string;
@@ -112,24 +113,24 @@ export async function newClient(
 ): Promise<{ role: Role; client: FalkorDB }> {
   let connectionOptions: FalkorDBOptions;
 
+  // The credentials provider is the one connection entry point with no route
+  // schema in front of it — signIn() posts straight to the Auth.js callback — and
+  // every other connect path (reconnect from the Token DB, JWT fallback) comes
+  // through here too, so the mTLS rules are applied here for all of them. This
+  // runs before the material is persisted; without it a half-configured setup
+  // fails in the TLS handshake, far from the cause, and authorize() reports it as
+  // a generic "Connection failed".
+  const validation = authCredentials.safeParse(credentials);
+  if (!validation.success) {
+    throw new Error(
+      validation.error.issues.map((issue) => issue.message).join("; ")
+    );
+  }
+
   const tlsEnabled = credentials.tls === "true";
   const ca = pemFromBase64(credentials.ca);
-  const cert = pemFromBase64(credentials.cert);
-  const key = pemFromBase64(credentials.key);
-
-  // Every connect path — login, reconnect from the Token DB, JWT fallback —
-  // comes through here, so this is the one place a half-configured mTLS setup
-  // can be named. Without it the handshake fails far from the cause and
-  // authorize() reports it as a generic "Connection failed".
-  if (!!cert !== !!key) {
-    throw new Error("Client certificate and client key must be provided together");
-  }
-  if (cert && !tlsEnabled) {
-    throw new Error("Client certificate authentication requires TLS to be enabled");
-  }
-  if (cert && credentials.url) {
-    throw new Error("Client certificate authentication is not supported with a connection URL");
-  }
+  const cert = pemFromBase64(validation.data.cert);
+  const key = pemFromBase64(validation.data.key);
 
   // If URL is provided, use it directly
   if (credentials.url) {
