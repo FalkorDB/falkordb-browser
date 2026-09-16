@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout, ToastFn } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -70,6 +70,11 @@ const defaultQueryHistory: HistoryQuery = {
   },
   counter: 0
 };
+
+const DEMO_GRAPH_NAMES = ["social-demo", "social-demo-test"];
+
+// Swallows the "graph does not exist" error the demo pre-clean expects to get.
+const silentToast = (() => { }) as ToastFn;
 
 const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
 const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
@@ -2002,8 +2007,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const cid = getActiveConnectionIdGlobal();
 
     try {
-      // Store current user graphs and URL params
-      setUserGraphsBeforeTutorial(graphNames);
+      // Store current user graphs and URL params. A previous tutorial session that
+      // ended without cleanup leaves its demo graphs in the list; they are about to
+      // be dropped, so they must not come back when the list is restored.
+      setUserGraphsBeforeTutorial(graphNames?.filter(name => !DEMO_GRAPH_NAMES.includes(name)));
       setUserGraphBeforeTutorial(graphName);
       setUrlParamsBeforeTutorial(window.location.search);
 
@@ -2051,24 +2058,31 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       (eve)-[:FOLLOWS]->(frank)
       `;
 
+      // The CREATEs below only append, so a demo graph left behind by a session
+      // that ended without cleanup — a refresh or a closed tab, and the tutorial
+      // re-opens by itself on every load until it is dismissed — would gain another
+      // full copy of the dataset on every run (#2087). Drop both first. DELETE
+      // answers 400 for a graph that does not exist, which is the normal case, so
+      // the pre-clean stays silent rather than toasting at every first-time user.
+      await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
+        method: "DELETE",
+      }, silentToast, setIndicator, cid)));
+
+      if (getConnectionEpoch() !== startEpoch) return;
+
       await Promise.all([
         getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator, { connectionId: cid }),
         getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator, { connectionId: cid })
       ]).catch(async () => {
-        await Promise.all([
-          securedFetch("/api/graph/social-demo", {
-            method: "DELETE",
-          }, toast, setIndicator, cid),
-          securedFetch("/api/graph/social-demo-test", {
-            method: "DELETE",
-          }, toast, setIndicator, cid)
-        ]);
+        await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
+          method: "DELETE",
+        }, toast, setIndicator, cid)));
       });
 
       if (getConnectionEpoch() !== startEpoch) return;
 
       // Update graph list to only show demo graphs
-      setGraphNames(["social-demo", "social-demo-test"]);
+      setGraphNames([...DEMO_GRAPH_NAMES]);
       handleSetGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       setGraph(Graph.empty());
@@ -2089,14 +2103,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const cid = getActiveConnectionIdGlobal();
 
     try {
-      await Promise.all([
-        securedFetch("/api/graph/social-demo", {
-          method: "DELETE",
-        }, toast, setIndicator, cid),
-        securedFetch("/api/graph/social-demo-test", {
-          method: "DELETE",
-        }, toast, setIndicator, cid)
-      ]);
+      await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
+        method: "DELETE",
+      }, toast, setIndicator, cid)));
     } catch (error) {
 
       console.error("Failed to cleanup demo graphs", error);

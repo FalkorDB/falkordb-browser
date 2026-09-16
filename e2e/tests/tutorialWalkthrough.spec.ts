@@ -34,6 +34,46 @@ test.describe("Tutorial Walkthrough", () => {
         await browser.closeBrowser();
     });
 
+    test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
+        test.setTimeout(120_000);
+
+        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+
+        const countPeople = async () => {
+            const result = await apiCall.runQuery(
+                "social-demo",
+                "MATCH (n:Person) RETURN count(n) AS cnt"
+            );
+            return result.data[0]?.cnt;
+        };
+
+        try {
+            await tutorial.changeLocalStorage("true");
+            await tutorial.refreshPage();
+            await tutorial.waitForStep("Welcome to FalkorDB Browser");
+            expect(await countPeople()).toBe(9);
+
+            // Leaving mid-tutorial skips the cleanup, and the tutorial re-opens by
+            // itself on the next load and loads the demo data again — which used to
+            // stack another copy of the dataset on top of the old one (#2087).
+            await tutorial.refreshPage();
+            await tutorial.waitForStep("Welcome to FalkorDB Browser");
+            expect(await countPeople()).toBe(9);
+        } finally {
+            await tutorial.changeLocalStorage("false");
+            // Navigate away first: a live graph page polls graph info, and that
+            // poll re-creates a graph deleted out from under it.
+            const page = await browser.getPage();
+            await page.goto("about:blank");
+            await Promise.all(
+                ["social-demo", "social-demo-test"].map(name =>
+                    apiCall.removeGraph(name).catch(() => { })
+                )
+            );
+        }
+    });
+
     test("@admin walk through the entire tutorial and verify user data is restored", async () => {
         // Increase timeout — tutorial walkthrough involves many UI interactions
         test.setTimeout(180_000);
