@@ -180,15 +180,21 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // Set connection prefix for scoped localStorage
   const [prefixReady, setPrefixReady] = useState(false);
+  // Which connection the prefix above currently points at. The prefix follows
+  // the session, which lags `activeConnectionId` through a switch, so anything
+  // writing connection-scoped storage has to know whether the two agree yet.
+  const [prefixConnectionId, setPrefixConnectionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
       setConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default");
       migrateToScopedStorage();
       setPrefixReady(true);
+      setPrefixConnectionId(sessionData.activeConnectionId ?? null);
     } else if (status === "unauthenticated") {
       clearConnectionPrefix();
       setPrefixReady(false);
+      setPrefixConnectionId(null);
     }
   }, [status, sessionData]);
 
@@ -736,6 +742,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const statusRef = useRef(status);
   statusRef.current = status;
 
+  const stubsSeqRef = useRef(0);
+
   // GRAPH.STUBS lists the graphs offloaded from memory. It is registered by the
   // enterprise module only and needs a recent enough core, so the fetch is gated
   // on `supportsOffload`.
@@ -745,10 +753,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // `activeConnectionId` changes before the JWT catches up, so the request is
     // pinned to it by header the same way /api/DBVersion and /api/ldap are —
     // otherwise the stubs can describe the connection being switched away from.
-    // The epoch additionally catches A→B→A, where the id alone repeats.
+    // The epoch additionally catches A→B→A, where the id alone repeats. The
+    // sequence orders probes WITHIN one connection: the list refresh, the
+    // periodic effect and the selector all call this, so two can overlap and
+    // the slower one must not resurrect the names the newer one dropped.
     const connectionId = getActiveConnectionIdGlobal();
     const epoch = getConnectionEpoch();
-    const isCurrent = () => getActiveConnectionIdGlobal() === connectionId && getConnectionEpoch() === epoch;
+    const seq = (stubsSeqRef.current += 1);
+    const isCurrent = () => getActiveConnectionIdGlobal() === connectionId
+      && getConnectionEpoch() === epoch
+      && stubsSeqRef.current === seq;
 
     try {
       const result = await fetch("/api/graph/stubs", {
@@ -828,11 +842,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setAdditionalConnections,
     activeConnectionId,
     setActiveConnectionId,
+    prefixConnectionId,
     updateSession,
     beginConnectionSwitch,
     endConnectionSwitch,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, usesLdap, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,

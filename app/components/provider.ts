@@ -317,6 +317,11 @@ type ConnectionContextType = {
   setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
   activeConnectionId: string | null;
   setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
+  // The connection the scoped-localStorage prefix currently points at. It is
+  // derived from the session, which lags `activeConnectionId` through a switch,
+  // so connection-scoped writes must wait for the two to agree. `null` also
+  // means "first load", where `activeConnectionId` has not been chosen yet.
+  prefixConnectionId: string | null;
   updateSession: (data: { activeConnectionId?: string | null }) => Promise<unknown>;
   // Mark a user connection switch as in-progress (blocks graph ops + supersedes
   // in-flight ones) and clear it once the switch settles. `beginConnectionSwitch`
@@ -620,6 +625,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   setAdditionalConnections: () => { },
   activeConnectionId: null,
   setActiveConnectionId: () => { },
+  prefixConnectionId: null,
   updateSession: async () => { },
   beginConnectionSwitch: () => 0,
   endConnectionSwitch: () => { },

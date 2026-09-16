@@ -20,7 +20,7 @@ import { Graph } from "../api/graph/model";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { recordGraphsFirstSeen, renameGraphFirstSeen, sortGraphNames, type GraphsFirstSeen } from "@/lib/graphSortOrder";
+import { readGraphsFirstSeen, recordGraphsFirstSeen, renameGraphFirstSeen, sortGraphNames, type GraphsFirstSeen } from "@/lib/graphSortOrder";
 
 interface Props {
     options: string[] | undefined,
@@ -44,7 +44,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs } = useContext(ConnectionContext);
+    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage },
@@ -83,6 +83,21 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [isLoading, setIsLoading] = useState(false);
     const [graphsFirstSeen, setGraphsFirstSeen] = useState<GraphsFirstSeen>({});
 
+    // The first-seen history is connection-scoped localStorage, but its prefix
+    // follows the session, which lags `activeConnectionId` through a switch. In
+    // that window the list already describes the new server while storage still
+    // points at the old one, and recording rebuilds the map — so it would stamp
+    // one server's graphs into the other's history and drop what was there.
+    // `null` is first load, where the list is fetched off the session too.
+    const canRecordHistory = activeConnectionId === null || prefixConnectionId === activeConnectionId;
+
+    // Storage moved to another connection, so the timestamps in hand belong to
+    // the one just left — re-read, or the new server's list is ordered by the
+    // old server's history until something records over it.
+    useEffect(() => {
+        setGraphsFirstSeen(readGraphsFirstSeen());
+    }, [prefixConnectionId]);
+
     const { size: manageSize, onResize: onManageResize } = useResizableSize("manageGraphs-size", 750, 493, 400, 300);
 
     useEffect(() => {
@@ -98,13 +113,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     // recording it would forget the whole connection's history and re-stamp
     // every graph as new on the next successful refresh. Deleting the last
     // graph is confirmed and goes through `handleSetGraphNames` instead.
-    // The list is replaced on every connection switch, which is what re-reads
-    // the timestamps of the connection now in use.
     useEffect(() => {
-        if (tutorialOpen || options === undefined || safeOptions.length === 0) return;
+        if (tutorialOpen || !canRecordHistory || options === undefined || safeOptions.length === 0) return;
 
         setGraphsFirstSeen(recordGraphsFirstSeen(safeOptions));
-    }, [safeOptions, options, tutorialOpen]);
+    }, [safeOptions, options, tutorialOpen, canRecordHistory]);
 
     // A list handed back by an explicit action IS confirmed, so it records even
     // when it is empty — deleting the last graph must still forget its name, or
@@ -114,8 +127,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const handleSetGraphNames = useCallback((names: string[]) => {
         setOptions(names);
         pruneOffloadedGraphs(names);
-        if (!tutorialOpen) setGraphsFirstSeen(recordGraphsFirstSeen(names));
-    }, [setOptions, pruneOffloadedGraphs, tutorialOpen]);
+        if (!tutorialOpen && canRecordHistory) setGraphsFirstSeen(recordGraphsFirstSeen(names));
+    }, [setOptions, pruneOffloadedGraphs, tutorialOpen, canRecordHistory]);
 
     const sortedOptions = useMemo(
         () => sortGraphNames(safeOptions, graphsSortOrder, graphsFirstSeen),
@@ -238,7 +251,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             // it was first seen instead of sorting as a brand-new graph. The
             // rendered map is updated with it, or the row jumps to the far end
             // of the order for the render between here and the recording effect.
-            setGraphsFirstSeen(renameGraphFirstSeen(optionName, option));
+            if (canRecordHistory) setGraphsFirstSeen(renameGraphFirstSeen(optionName, option));
 
             const newOptions = safeOptions.map((opt) => (opt === optionName ? option : opt));
             setOptions!(newOptions);
