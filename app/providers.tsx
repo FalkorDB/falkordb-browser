@@ -750,10 +750,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       if (!isCurrent()) return;
 
-      if (!result.ok) {
-        setOffloadedGraphs([]);
-        return;
-      }
+      // A failed probe says nothing about what is offloaded, so the last known
+      // stubs are kept rather than published as "nothing is offloaded": that
+      // would drop the graph out of the merged list and make the first-seen
+      // history forget it, so it would come back stamped as brand new. The
+      // list is cleared explicitly on a connection switch and on sign-out.
+      if (!result.ok) return;
 
       const { stubs } = (await result.json()) as StubsResponse;
 
@@ -765,7 +767,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         prev.length === stubs.length && prev.every((name, i) => name === stubs[i]) ? prev : stubs
       ));
     } catch {
-      if (isCurrent()) setOffloadedGraphs([]);
+      // Same as a failed response: a transient error is not an observation.
     }
   }, [supportsOffload]);
 

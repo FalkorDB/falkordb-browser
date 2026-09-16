@@ -1360,6 +1360,37 @@ export default class GraphPage extends BasePage {
     return count;
   }
 
+  /**
+   * Sets the graphs order the way the browser settings page persists it, and
+   * reloads so the providers pick it up (the value is read once on load).
+   */
+  async setGraphsSortOrder(order: string): Promise<void> {
+    await this.page.evaluate(
+      (value) => localStorage.setItem("graphsSortOrder", value),
+      order
+    );
+    await this.refreshPage();
+  }
+
+  /**
+   * The graph names as the select list renders them, in display order, narrowed
+   * to the graphs matching `searchTerm` so a shared server doesn't affect it.
+   */
+  async getGraphNamesInList(
+    searchTerm: string,
+    expectedCount: number
+  ): Promise<string[]> {
+    await this.clickSelect();
+    await this.fillSearch(searchTerm);
+    const names = this.page.locator(
+      '//ul[@data-testid="queryList"]//p[contains(@data-testid, "selectGraph")]'
+    );
+    // The search is debounced, so the unfiltered list is still on screen for a
+    // moment; wait for it to settle on the matches before reading the order.
+    await expect(names).toHaveCount(expectedCount);
+    return (await names.allInnerTexts()).map((name) => name.trim());
+  }
+
   async verifyGraphExists(graphName: string, apiCall?: any): Promise<boolean> {
     if (apiCall) {
       let attempts = 0;

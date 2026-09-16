@@ -49,6 +49,27 @@ test.describe("Graph Tests", () => {
     }
   });
 
+  test(`@admin Change the graphs order -> verify the select list is rendered in that order`, async () => {
+    // A shared suffix so the list can be narrowed to these graphs regardless of
+    // what else lives on the server.
+    const suffix = getRandomString("order");
+    // GRAPH.LIST carries no creation time and this browser sees all three at
+    // once, so only the name orders are deterministic here.
+    const names = [`a-${suffix}`, `m-${suffix}`, `z-${suffix}`];
+    await Promise.all(names.map((name) => apiCall.addGraph(name)));
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+
+      await graph.setGraphsSortOrder("a-z");
+      expect(await graph.getGraphNamesInList(suffix, names.length)).toEqual(names);
+
+      await graph.setGraphsSortOrder("z-a");
+      expect(await graph.getGraphNamesInList(suffix, names.length)).toEqual([...names].reverse());
+    } finally {
+      await Promise.all(names.map((name) => apiCall.removeGraph(name)));
+    }
+  });
+
   test(`@admin Add graph via API -> remove graph via UI -> validate graph exists via API`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
