@@ -226,7 +226,8 @@ helm install falkordb-browser ./falkordb-browser \
 Notes:
 
 - The discrete fields override `connection.url` field by field. Leave a field empty to keep the value from the URL.
-- Set `connection.autoConnect: false` to prefill the login form without signing in automatically.
+- Set `connection.autoConnect: false` to prefill the login form without signing in automatically. The password is then never handed out by the server, so leave `connection.password` unset and omit the password from `connection.url` — otherwise the form is prefilled but the credential still only lives on the server.
+- Changing a Secret referenced through `connection.existingSecret` (or `encryption.existingSecret`) does **not** restart the pod: those values are resolved when the container starts and the deployment's checksum annotations only cover chart-managed objects. Roll it yourself with `kubectl rollout restart deployment/<release>-falkordb-browser`.
 - **Security:** with `autoConnect` enabled, anyone who can reach the browser reaches the database with these credentials. Enable it only where the browser itself is access-controlled, and prefer a read-only FalkorDB user.
 
 ### Installation with resource limits

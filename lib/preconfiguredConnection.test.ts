@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     parsePreconfiguredUrl,
+    preconfiguredLoginCredentials,
     readPreconfiguredConnection,
     toPreconfiguredConnectionInfo,
     DEFAULT_PRECONFIGURED_HOST,
@@ -154,4 +155,63 @@ test("the public info shape never carries the password or ca", () => {
 
 test("the public info shape reports nothing when unconfigured", () => {
     assert.deepEqual(toPreconfiguredConnectionInfo(null), { configured: false, autoConnect: false });
+});
+
+test("a url with a trailing colon is a typo, not a request for the default port", () => {
+    assert.throws(() => parsePreconfiguredUrl("falkor://db.internal:"), /no port/);
+    assert.throws(
+        () => readPreconfiguredConnection({ FALKORDB_CONNECTION_URL: "falkor://alice:s3cr3t@db.internal:" }),
+        /no port/
+    );
+});
+
+test("a malformed percent-escape in the url is rejected, and is not echoed back", () => {
+    assert.throws(() => parsePreconfiguredUrl("falkor://alice:%ZZ@db.internal"), (err: Error) => {
+        assert.match(err.message, /malformed percent-escape/);
+        assert.equal(err.message.includes("%ZZ"), false);
+        return true;
+    });
+    assert.throws(() => parsePreconfiguredUrl("falkor://%E0%A4%A@db.internal"), /malformed percent-escape/);
+});
+
+test("login credentials are refused when auto connect is off", () => {
+    const env = { FALKORDB_HOST: "db.internal", FALKORDB_PASSWORD: "s3cr3t" };
+
+    assert.equal(preconfiguredLoginCredentials({ ...env, FALKORDB_AUTO_CONNECT: "false" }), null);
+    assert.equal(preconfiguredLoginCredentials({ ...env, FALKORDB_AUTO_CONNECT: "no" }), null);
+    assert.notEqual(preconfiguredLoginCredentials(env), null);
+});
+
+test("login credentials are refused when nothing is configured", () => {
+    assert.equal(preconfiguredLoginCredentials({}), null);
+});
+
+test("login credentials are strings shaped for newClient", () => {
+    const creds = preconfiguredLoginCredentials({
+        FALKORDB_CONNECTION_URL: "falkors://alice:s3cr3t@db.internal:6380",
+        FALKORDB_CA: "LS0tLS1CRUdJTg==",
+    });
+
+    assert.deepEqual(creds, {
+        host: "db.internal",
+        port: "6380",
+        username: "alice",
+        password: "s3cr3t",
+        tls: "true",
+        ca: "LS0tLS1CRUdJTg==",
+    });
+});
+
+test("a passwordless connection omits the username so no AUTH is sent", () => {
+    const creds = preconfiguredLoginCredentials({ FALKORDB_HOST: "db.internal" });
+
+    assert.equal(creds?.username, undefined);
+    assert.equal(creds?.password, undefined);
+});
+
+test("invalid environment propagates out of the login credentials lookup", () => {
+    assert.throws(
+        () => preconfiguredLoginCredentials({ FALKORDB_HOST: "db", FALKORDB_PORT: "0" }),
+        /FALKORDB_PORT/
+    );
 });

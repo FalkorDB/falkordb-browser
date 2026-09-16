@@ -65,11 +65,12 @@ function parsePort(value: string | undefined, fallback: number, name: string): n
     return port;
 }
 
-function decodeUrlPart(value: string): string {
+function decodeUrlPart(value: string, part: string, name: string): string {
     try {
         return decodeURIComponent(value);
     } catch {
-        return value;
+        // The value itself is not reported — this is reached for the password.
+        throw new Error(`${name} has a malformed percent-escape in its ${part}`);
     }
 }
 
@@ -111,10 +112,10 @@ export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_U
         rest = rest.slice(at + 1);
         const colon = creds.indexOf(":");
         if (colon >= 0) {
-            username = decodeUrlPart(creds.slice(0, colon));
-            password = decodeUrlPart(creds.slice(colon + 1));
+            username = decodeUrlPart(creds.slice(0, colon), "username", name);
+            password = decodeUrlPart(creds.slice(colon + 1), "password", name);
         } else {
-            username = decodeUrlPart(creds);
+            username = decodeUrlPart(creds, "username", name);
         }
     }
 
@@ -127,7 +128,10 @@ export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_U
     const colon = rest.lastIndexOf(":");
     if (colon >= 0) {
         host = rest.slice(0, colon);
-        port = parsePort(rest.slice(colon + 1), DEFAULT_PRECONFIGURED_PORT, `${name} port`);
+        const portText = rest.slice(colon + 1);
+        // A trailing ":" is a typo, not a request for the default port.
+        if (!portText.trim()) throw new Error(`${name} has a ":" with no port after it`);
+        port = parsePort(portText, DEFAULT_PRECONFIGURED_PORT, `${name} port`);
     }
 
     if (!host) throw new Error(`${name} is missing a host`);
@@ -176,5 +180,42 @@ export function toPreconfiguredConnectionInfo(
         port: connection.port,
         username: connection.username,
         tls: connection.tls,
+    };
+}
+
+/** The credentials shape the credentials provider hands to `newClient`. */
+export type PreconfiguredLoginCredentials = {
+    host: string;
+    port: string;
+    username?: string;
+    password?: string;
+    tls: string;
+    ca?: string;
+};
+
+/**
+ * The credentials to substitute for a client that asks to log in with "the
+ * preconfigured connection", or `null` when it may not have them.
+ *
+ * `autoConnect: false` is an access decision, not a UI hint: it means the
+ * operator wants the form prefilled but the password typed, so the server must
+ * refuse to hand the password out — otherwise anyone can POST
+ * `preconfigured=true` to the credentials callback and skip the prompt.
+ */
+export function preconfiguredLoginCredentials(env: PreconfiguredEnv): PreconfiguredLoginCredentials | null {
+    const connection = readPreconfiguredConnection(env);
+    if (!connection || !connection.autoConnect) return null;
+
+    const password = connection.password || undefined;
+
+    return {
+        host: connection.host,
+        port: String(connection.port),
+        // Mirrors the Token DB reconnect path: with no password both
+        // credentials are omitted, so no AUTH command is sent to FalkorDB.
+        username: password ? connection.username : undefined,
+        password,
+        tls: connection.tls ? "true" : "false",
+        ca: connection.ca,
     };
 }

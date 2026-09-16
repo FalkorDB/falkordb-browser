@@ -62,20 +62,32 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (!preconfigured?.autoConnect || signedOut || hasConnectionParams) return;
+    if (!preconfigured?.autoConnect || signedOut || hasConnectionParams) return undefined;
     // StrictMode invokes effects twice in development; one login attempt is enough.
-    if (autoConnectStarted.current) return;
+    if (autoConnectStarted.current) return undefined;
     autoConnectStarted.current = true;
+
+    // The sign-in can outlive this effect — the user may navigate away or add
+    // explicit connection params while it is in flight, and a late redirect
+    // would override that.
+    let active = true;
 
     signIn("credentials", { redirect: false, preconfigured: "true" })
       .then((res) => {
+        if (!active) return;
         if (res?.error) {
           setAutoConnectError(AUTO_CONNECT_FAILED);
           return;
         }
         router.push("/graph");
       })
-      .catch(() => setAutoConnectError(AUTO_CONNECT_FAILED));
+      .catch(() => {
+        if (active) setAutoConnectError(AUTO_CONNECT_FAILED);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [preconfigured, signedOut, hasConnectionParams, router]);
 
   useEffect(() => {
@@ -84,9 +96,12 @@ export default function LoginPage() {
     const usernameParam = searchParams.get("username");
     const tls = searchParams.get("tls");
 
-    setInitialHost(decodeURIComponent(hostParam ?? preconfigured?.host ?? ""));
-    setInitialPort(decodeURIComponent(portParam ?? (preconfigured?.port ? String(preconfigured.port) : "")));
-    setInitialUsername(decodeURIComponent(usernameParam ?? preconfigured?.username ?? ""));
+    // Neither source needs decoding: URLSearchParams already decoded the query
+    // params, and the preconfigured values are plain strings. Decoding again
+    // corrupts a literal "%25" and throws URIError on a literal "%".
+    setInitialHost(hostParam ?? preconfigured?.host ?? "");
+    setInitialPort(portParam ?? (preconfigured?.port ? String(preconfigured.port) : ""));
+    setInitialUsername(usernameParam ?? preconfigured?.username ?? "");
     setInitialTLS(tls !== null ? tls === "true" : preconfigured?.tls ?? false);
   }, [searchParams, preconfigured]);
 

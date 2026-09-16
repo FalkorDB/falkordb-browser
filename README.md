@@ -126,6 +126,9 @@ Notes:
   the password from `FALKORDB_CONNECTION_URL`.
 - The password never reaches the browser: the client only asks to log in with
   "the preconfigured connection" and the server substitutes the credentials.
+- `FALKORDB_AUTO_CONNECT=false` is enforced server-side, not just in the UI: the
+  server refuses to substitute the credentials at all, so the prefilled form
+  needs a password the user knows.
 - Signing out explicitly returns to the login form and stays there; only a
   reload after an expired session reconnects automatically.
 - **Security:** with `FALKORDB_AUTO_CONNECT=true`, anyone who can reach the

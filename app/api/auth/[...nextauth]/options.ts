@@ -9,7 +9,7 @@ import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
 import { LRUCache } from "lru-cache";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
-import { readPreconfiguredConnection } from "@/lib/preconfiguredConnection";
+import { preconfiguredLoginCredentials } from "@/lib/preconfiguredConnection";
 import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
@@ -707,21 +707,23 @@ const authOptions: NextAuthConfig = {
         if (credentials.preconfigured === "true") {
           let preconfigured;
           try {
-            preconfigured = readPreconfiguredConnection(process.env);
+            preconfigured = preconfiguredLoginCredentials(process.env);
           } catch (err) {
             // eslint-disable-next-line no-console
             console.error("Invalid preconfigured connection environment:", err);
             return null;
           }
 
+          // Also null when FALKORDB_AUTO_CONNECT is false — the operator wants
+          // the password typed, so the server does not substitute it.
           if (!preconfigured) return null;
 
           creds = {
             host: preconfigured.host,
-            port: String(preconfigured.port),
-            password: preconfigured.password || undefined,
+            port: preconfigured.port,
+            password: preconfigured.password,
             username: preconfigured.username,
-            tls: preconfigured.tls ? "true" : "false",
+            tls: preconfigured.tls,
             ca: preconfigured.ca,
             url: undefined,
           };

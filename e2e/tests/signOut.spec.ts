@@ -19,8 +19,11 @@ roles.userRoles.forEach((role) => {
         test("Sign out Test", async () => {
             const navBar = await browser.createNewPage(HeaderComponent, urls.graphUrl);
             await navBar.Logout();
-            const newUrl = navBar.getCurrentURL();
-            expect(newUrl).toBe(urls.loginUrl);
+            const newUrl = new URL(navBar.getCurrentURL());
+            expect(newUrl.origin + newUrl.pathname).toBe(urls.loginUrl);
+            // The marker keeps a preconfigured connection from signing the user
+            // straight back in.
+            expect(newUrl.searchParams.get("signedOut")).toBe("true");
         });
 
     });

@@ -39,8 +39,11 @@ encryption:
 #
 # SECURITY: with autoConnect enabled and a password supplied, anyone who can
 # reach the browser reaches the database with it. Only enable that where the
-# browser is already protected (private network, ingress auth, VPN). Leave the
-# password empty to have users supply it themselves on a prefilled form.
+# browser is already protected (private network, ingress auth, VPN). To have
+# users supply the password themselves on a prefilled form, set
+# autoConnect: false AND make sure neither `password` nor the password field of
+# `url` is set — autoConnect defaults to true and the url carries its own
+# password.
 connection:
   enabled: false
   # Either set url, or the discrete fields below. Discrete fields win over the
