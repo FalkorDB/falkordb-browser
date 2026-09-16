@@ -1796,6 +1796,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   );
 
   useEffect(() => {
+    // Drop the previous connection's credentials before anything awaits. The
+    // global connection id changes as soon as the switch starts, so a chat sent
+    // while this load is still in flight would otherwise carry connection A's
+    // key to connection B. Only the React state is cleared -- the stored values
+    // stay put under their own prefix and are re-read below. This runs on every
+    // identity change, including the one to "" on sign-out.
+    setChatApiKeys([]);
+    setSelectedChatApiKeyId("");
+    setSecretKey("");
+
     if (status !== "authenticated" || !prefixReady || !connectionIdentity) return undefined;
 
     // The storage prefix is module-global and every step below awaits the

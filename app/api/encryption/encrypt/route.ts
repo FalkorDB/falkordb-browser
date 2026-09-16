@@ -16,11 +16,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Bind the ciphertext to the caller's connection, so the matching decrypt
-    // route cannot reopen a value lifted from someone else's browser.
+    // route cannot reopen a value lifted from someone else's browser. A token
+    // that carries no endpoint would collapse every such caller onto one shared
+    // owner, which is the opposite of binding, so refuse it instead of guessing.
+    const host = token.host as string | undefined;
+    const port = Number(token.port);
+    if (!host || !Number.isFinite(port) || port <= 0) {
+      return NextResponse.json(
+        { message: "Connection identity unavailable, please retry" },
+        { status: 503 }
+      );
+    }
     const owner = generateConsistentUserId(
       (token.username as string | undefined) ?? "",
-      (token.host as string | undefined) ?? "",
-      Number(token.port) || 6379
+      host,
+      port
     );
 
     let body;

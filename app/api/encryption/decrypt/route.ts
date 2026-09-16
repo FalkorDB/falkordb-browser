@@ -16,10 +16,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Only ciphertext bound to this caller's connection can be reopened here.
+    // A token with no endpoint would share one owner with every other such
+    // token, letting them read each other's values, so refuse it.
+    const host = token.host as string | undefined;
+    const port = Number(token.port);
+    if (!host || !Number.isFinite(port) || port <= 0) {
+      return NextResponse.json(
+        { message: "Connection identity unavailable, please retry" },
+        { status: 503 }
+      );
+    }
     const owner = generateConsistentUserId(
       (token.username as string | undefined) ?? "",
-      (token.host as string | undefined) ?? "",
-      Number(token.port) || 6379
+      host,
+      port
     );
 
     let body;

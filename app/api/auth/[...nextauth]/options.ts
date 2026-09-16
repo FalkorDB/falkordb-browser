@@ -182,6 +182,13 @@ export function generateTimeUUID() {
 }
 
 /**
+ * Marks tokens whose host/port were resolved from the connection URL rather
+ * than defaulted. Bump this whenever a change makes older tokens unable to
+ * identify their own connection; the jwt callback retires anything older.
+ */
+const BINDING_VERSION = 2;
+
+/**
  * Generates a consistent user ID based on credentials
  * This ensures the same user gets the same ID across multiple logins
  * Format: SHA-256 hash of "username@host:port"
@@ -837,8 +844,17 @@ const authOptions: NextAuthConfig = {
           username: user.username || "default",
           role: user.role,
           tls: user.tls,
+          bv: BINDING_VERSION,
         };
       }
+
+      // Tokens minted before the endpoint binding recorded the URL's real
+      // host/port cannot be trusted to identify a connection: a URL login was
+      // persisted as localhost:6379, so every such session would share one
+      // owner and could read the others' ciphertext. There is no way to repair
+      // them -- the URL was never stored on the token -- so retire them and
+      // make the user sign in again once.
+      if (token.bv !== BINDING_VERSION) return null;
 
       // ── Strip any accumulated bloat from old tokens ──
       // Remove fields that are no longer needed and inflate the cookie.
