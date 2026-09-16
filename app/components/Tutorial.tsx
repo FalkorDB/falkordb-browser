@@ -1753,6 +1753,10 @@ function TutorialSpotlight({ targetSelector, spotlightSelector, passthrough }: {
 function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: TutorialProps) {
     const [step, setStep] = useState(0);
     const [demoLoaded, setDemoLoaded] = useState(false);
+    // `demoLoaded` is only set once the load RESOLVES, and the loader itself
+    // changes the graph list — which gives it a new identity and re-runs the
+    // effect below while the first load is still in flight.
+    const demoLoadStartedRef = useRef(false);
     const { handleSetGraphName, runQuery, setCurrentTab, setGraph } = useContext(GraphContext);
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
     const { setLayout, setDirection, canvasRef } = useContext(ForceGraphContext);
@@ -1761,7 +1765,14 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
 
     // Load demo graphs when tutorial opens and auto-advance to step 1
     useEffect(() => {
-        if (open && step === 0 && !demoLoaded) {
+        if (!open) {
+            demoLoadStartedRef.current = false;
+            return;
+        }
+
+        if (step === 0 && !demoLoaded && !demoLoadStartedRef.current) {
+            demoLoadStartedRef.current = true;
+
             // Every step before the schema track is written against the graph
             // view, and the tutorial's own strip is handed over without going
             // through a tab activation — so the view the user was on would
