@@ -20,7 +20,7 @@ import { Graph } from "../api/graph/model";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { readGraphsFirstSeen, recordGraphsFirstSeen, renameGraphFirstSeen, sortGraphNames, type GraphsFirstSeen } from "@/lib/graphSortOrder";
+import { observeGraphsFirstSeen, readGraphsFirstSeen, recordGraphsFirstSeen, renameGraphFirstSeen, sortGraphNames, type GraphsFirstSeen } from "@/lib/graphSortOrder";
 
 interface Props {
     options: string[] | undefined,
@@ -44,7 +44,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
+    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage },
@@ -106,17 +106,17 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     // GRAPH.LIST carries no creation time, so the chronological orders go by
     // when this browser first saw each graph. The tutorial's demo graphs are
-    // not the user's, so they are kept out of that history — and a list that
-    // has not loaded yet must not look like a server with no graphs at all.
-    // An empty list is never taken as a confirmed observation either: a failed
-    // refresh on a connection switch publishes `[]` too (providers.tsx), and
-    // recording it would forget the whole connection's history and re-stamp
-    // every graph as new on the next successful refresh. Deleting the last
-    // graph is confirmed and goes through `handleSetGraphNames` instead.
+    // not the user's, so they are kept out of that history.
+    // What is rendered is only ever an observation, so it records new graphs
+    // but forgets none: a graph can be missing from it because a refresh has
+    // not landed, because a connection switch left the old list in place, or
+    // because it is offloaded and the probe that says so has not answered yet.
+    // Forgetting it there would hand it back as brand new the moment it
+    // reappears. Deletions are confirmed and go through `handleSetGraphNames`.
     useEffect(() => {
         if (tutorialOpen || !canRecordHistory || options === undefined || safeOptions.length === 0) return;
 
-        setGraphsFirstSeen(recordGraphsFirstSeen(safeOptions));
+        setGraphsFirstSeen(observeGraphsFirstSeen(safeOptions));
     }, [safeOptions, options, tutorialOpen, canRecordHistory]);
 
     // A list handed back by an explicit action IS confirmed, so it records even
@@ -253,6 +253,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             // of the order for the render between here and the recording effect.
             if (canRecordHistory) setGraphsFirstSeen(renameGraphFirstSeen(optionName, option));
 
+            // The stub is keyed by name, so it has to follow the rename too, or
+            // the old name is merged back in beside the new one below.
+            renameOffloadedGraph(optionName, option);
+
             const newOptions = safeOptions.map((opt) => (opt === optionName ? option : opt));
             setOptions!(newOptions);
 
@@ -273,7 +277,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok;
-    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, buildMetricCells]);
+    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, buildMetricCells, canRecordHistory, renameOffloadedGraph]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {

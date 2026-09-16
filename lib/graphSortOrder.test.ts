@@ -28,6 +28,7 @@ const {
     normalizeGraphSortOrder,
     readGraphsFirstSeen,
     recordGraphsFirstSeen,
+    observeGraphsFirstSeen,
     renameGraphFirstSeen,
     sortGraphNames,
 } = await import("./graphSortOrder.ts");
@@ -168,6 +169,24 @@ test("nothing is stored before a connection prefix is set", () => {
 
     renameGraphFirstSeen("a", "b");
     assert.equal(storage.length, 0);
+});
+
+test("a graph missing from an observed list keeps the time it was first seen", () => {
+    recordGraphsFirstSeen(["a", "b"], 100);
+
+    // `b` can be absent because it was offloaded, or because the list belongs to
+    // a refresh that has not landed — an observation cannot tell those from a
+    // deletion, so it forgets nothing.
+    assert.deepEqual(plain(observeGraphsFirstSeen(["a"], 200)), { a: 100, b: 100 });
+    assert.deepEqual(plain(observeGraphsFirstSeen(["a", "b"], 300)), { a: 100, b: 100 });
+    assert.deepEqual(JSON.parse(storage.getItem(SCOPED_KEY)!), { a: 100, b: 100 });
+});
+
+test("an observed list still stamps the graphs it does bring", () => {
+    observeGraphsFirstSeen(["a"], 100);
+
+    assert.deepEqual(plain(observeGraphsFirstSeen(["a", "b"], 200)), { a: 100, b: 200 });
+    assert.deepEqual(plain(readGraphsFirstSeen()), { a: 100, b: 200 });
 });
 
 test("a renamed graph keeps the time it was first seen", () => {

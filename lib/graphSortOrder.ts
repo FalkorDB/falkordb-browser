@@ -76,14 +76,9 @@ export function readGraphsFirstSeen(): GraphsFirstSeen {
   }
 }
 
-/**
- * Stamps every graph that was not seen before with `now` and forgets the ones
- * that are gone, so a name reused after a drop counts as a new graph. Returns
- * the up-to-date timestamps.
- */
-export function recordGraphsFirstSeen(names: string[], now = Date.now()): GraphsFirstSeen {
+function stampGraphsFirstSeen(names: string[], now: number, forget: boolean): GraphsFirstSeen {
   const stored = readGraphsFirstSeen();
-  const firstSeen = emptyFirstSeen();
+  const firstSeen = forget ? emptyFirstSeen() : stored;
   let changed = false;
 
   names.forEach((name) => {
@@ -100,11 +95,33 @@ export function recordGraphsFirstSeen(names: string[], now = Date.now()): Graphs
   // Graphs that are gone simply did not make it into the rebuilt map, so the
   // key counts differ — comparing against `names.length` instead would miss a
   // list that dropped one graph and gained another under a duplicate name.
-  if (Object.keys(stored).length !== Object.keys(firstSeen).length) changed = true;
+  if (forget && Object.keys(stored).length !== Object.keys(firstSeen).length) changed = true;
 
   if (changed && getConnectionPrefix()) setConnectionItem(GRAPHS_FIRST_SEEN_KEY, JSON.stringify(firstSeen));
 
   return firstSeen;
+}
+
+/**
+ * Records a *confirmed* list: every graph not seen before is stamped with `now`
+ * and the ones that are gone are forgotten, so a name reused after a drop counts
+ * as a new graph. Only for lists handed back by an action that knows the whole
+ * list changed — see `observeGraphsFirstSeen` for the rest. Returns the
+ * up-to-date timestamps.
+ */
+export function recordGraphsFirstSeen(names: string[], now = Date.now()): GraphsFirstSeen {
+  return stampGraphsFirstSeen(names, now, true);
+}
+
+/**
+ * Records what a rendered list happens to show. It stamps new graphs but forgets
+ * nothing, because a graph missing from that list has not necessarily been
+ * dropped: it may be offloaded and not yet reported, or belong to a refresh that
+ * has not landed. Forgetting it there would hand it back as brand new the moment
+ * it reappears, and with the default order that jumps it to the top.
+ */
+export function observeGraphsFirstSeen(names: string[], now = Date.now()): GraphsFirstSeen {
+  return stampGraphsFirstSeen(names, now, false);
 }
 
 /**

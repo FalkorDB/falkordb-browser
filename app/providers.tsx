@@ -77,6 +77,10 @@ const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
 const LOCAL_LLM_ENDPOINT_STORAGE_KEY = "localLlmEndpoint";
 // Shared instance so an unresolved stub probe hands consumers a stable array.
 const NO_OFFLOADED_GRAPHS: string[] = [];
+
+// The graph list waits on the stub probe, so this bounds how long a hung
+// GRAPH.STUBS can hold the selector empty.
+const STUBS_PROBE_TIMEOUT = 10000;
 const DEFAULT_LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
   ollama: "http://localhost:11434",
   lmstudio: "http://localhost:1234/v1",
@@ -768,6 +772,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const result = await fetch("/api/graph/stubs", {
         method: "GET",
         headers: connectionId ? { "X-Connection-Id": connectionId } : undefined,
+        // The graph list waits on this probe so the offloaded graphs can be
+        // merged into it in one step. That makes a hung enterprise endpoint a
+        // blank selector, so the wait is bounded: timing out is handled like
+        // any other failed probe, and the list goes out without the stubs.
+        signal: AbortSignal.timeout(STUBS_PROBE_TIMEOUT),
       });
 
       if (!isCurrent()) return;
@@ -810,12 +819,32 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // and its first-seen timestamp survives to be reused by a graph recreated
   // under the same name.
   const pruneOffloadedGraphs = useCallback((confirmed: string[]) => {
+    // Stubs are kept under the connection they were read from, so a list
+    // confirmed against another one says nothing about them — applying it would
+    // empty the connection being switched away from and lose its indicators
+    // (and its first-seen entries) on the way back.
+    const connectionId = getActiveConnectionIdGlobal();
+
     setOffloadStubs((prev) => {
-      if (prev === null) return prev;
+      if (prev === null || prev.connectionId !== connectionId) return prev;
 
       const names = prev.names.filter((name) => confirmed.includes(name));
 
       return names.length === prev.names.length ? prev : { ...prev, names };
+    });
+  }, []);
+
+  // A renamed graph is still offloaded, but the probe that would say so is up to
+  // a refresh interval away. Until then the old name is not in the published
+  // list, so the selector would merge the stale stub back in beside the new one
+  // and show the graph twice — the second one stamped as brand new.
+  const renameOffloadedGraph = useCallback((from: string, to: string) => {
+    const connectionId = getActiveConnectionIdGlobal();
+
+    setOffloadStubs((prev) => {
+      if (prev === null || prev.connectionId !== connectionId || !prev.names.includes(from)) return prev;
+
+      return { ...prev, names: prev.names.map((name) => (name === from ? to : name)) };
     });
   }, []);
 
@@ -837,6 +866,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     offloadedGraphs,
     refreshOffloadedGraphs,
     pruneOffloadedGraphs,
+    renameOffloadedGraph,
     usesLdap,
     additionalConnections,
     setAdditionalConnections,
@@ -847,7 +877,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     beginConnectionSwitch,
     endConnectionSwitch,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,

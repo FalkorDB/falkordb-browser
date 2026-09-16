@@ -308,6 +308,9 @@ type ConnectionContextType = {
   // deleted through the UI leaves the merged list at once instead of lingering
   // until the next probe.
   pruneOffloadedGraphs: (confirmed: string[]) => void;
+  // Carries a stub over to the graph's new name, so a renamed offloaded graph
+  // does not show up twice (once per name) until the next probe.
+  renameOffloadedGraph: (from: string, to: string) => void;
   // True when the enterprise module is loaded with LDAP servers configured. In
   // that case FalkorDB defers authentication and authorization to LDAP, so the
   // browser must not offer user/role management for this connection. `null`
@@ -620,6 +623,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   offloadedGraphs: [],
   refreshOffloadedGraphs: async () => { },
   pruneOffloadedGraphs: () => { },
+  renameOffloadedGraph: () => { },
   usesLdap: null,
   additionalConnections: [],
   setAdditionalConnections: () => { },
