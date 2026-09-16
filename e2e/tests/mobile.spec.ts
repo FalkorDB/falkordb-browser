@@ -211,6 +211,38 @@ test.describe("@admin Mobile layout", () => {
         await expect(graph.editorMaximize).toBeVisible();
     });
 
+    // Every sheet covers the same region at the same stacking level, so a second
+    // one opened over the first would only hide it — with no hint that the first
+    // is still there. Opening one therefore closes whichever is up.
+    test("Only one sheet covers the canvas at a time", async () => {
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+        await graph.selectGraphByName(graphName);
+        await graph.closeGraphInfoSheet();
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(false);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.clickRunQuery();
+
+        // Only nodes parked inside the canvas can actually be tapped.
+        const canvasBox = await graph.canvasElement.boundingBox();
+        expect(canvasBox).not.toBeNull();
+        const node = (await graph.getNodesScreenPositions()).find(n =>
+            n.screenX >= canvasBox!.x && n.screenX <= canvasBox!.x + canvasBox!.width &&
+            n.screenY >= canvasBox!.y && n.screenY <= canvasBox!.y + canvasBox!.height
+        );
+        expect(node).toBeDefined();
+
+        await graph.elementClick(node.screenX, node.screenY);
+        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(true);
+
+        await graph.openGraphInfoSheet();
+        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(false);
+
+        await graph.chatToggle.click();
+        await expect.poll(() => graph.isSheetOpen(graph.chatSheet)).toBe(true);
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(false);
+    });
+
     // Touch has no Ctrl key, so the only way to build a selection is a mode that
     // makes every tap additive — and while it is on the data panel has to stay
     // shut, since it covers the canvas the user is still picking from.
@@ -258,6 +290,17 @@ test.describe("@admin Mobile layout", () => {
         // while the panel is suppressed.
         await expect(graph.canvasToolsSheet.getByTestId("elementCanvasAddEdgeGraph")).toBeVisible();
         await expect(graph.canvasToolsSheet.getByTestId("deleteElementGraph")).toBeVisible();
+
+        // Re-running the query swaps in a fresh graph object and the selection is
+        // re-resolved from it. That restore path has to honour the mode too —
+        // otherwise it reopens the panel over the canvas the user is still picking from.
+        await graph.canvasToolsSheetClose.click();
+        await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(false);
+        await graph.clickRunQuery();
+        await graph.canvasToolsToggle.click();
+        await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(true);
+        await expect(graph.canvasToolsSheet.getByTestId("multiSelectCount")).toHaveText("2");
+        await expect(graph.dataPanel).toHaveCount(0);
 
         // Turning the mode off drops the selection rather than dumping the user
         // into a panel listing everything they picked.

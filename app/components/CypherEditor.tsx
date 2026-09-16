@@ -10,7 +10,7 @@ import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useM
 import * as monaco from "monaco-editor";
 import { History, Info, Maximize2, Minimize2, MoreHorizontal, Play, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import useIsMobile from "@/lib/useIsMobile";
 import { cn, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS, FALLBACK_PROCEDURE_NAMES, udfFunctionNames } from "@/lib/cypherLang";
@@ -1259,16 +1259,15 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                         <MoreHorizontal size={20} />
                                     </Button>
                                 </DropdownMenuTrigger>
+                                {/* The actions have to be `DropdownMenuItem`s: an open menu swallows
+                                    Tab, so anything it has not registered is unreachable by keyboard. */}
                                 <DropdownMenuContent align="end" className="mobile:z-50 w-[80vw] max-w-[320px] bg-background p-1">
                                     {
                                         historyQuery.query &&
-                                        <Button
+                                        <DropdownMenuItem
                                             data-testid="clearEditor"
-                                            className="w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-secondary"
-                                            title=""
-                                            label="Clear"
-                                            onClick={() => {
-                                                setActionsOpen(false);
+                                            className="gap-3 rounded-lg px-3 py-2.5 text-sm cursor-pointer"
+                                            onSelect={() => {
                                                 setHistoryQuery(prev => ({
                                                     ...prev,
                                                     query: "",
@@ -1276,20 +1275,17 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                             }}
                                         >
                                             <X size={18} />
-                                        </Button>
+                                            <span>Clear</span>
+                                        </DropdownMenuItem>
                                     }
-                                    <Button
+                                    <DropdownMenuItem
                                         data-testid="editorMaximize"
-                                        className="w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-secondary"
-                                        title=""
-                                        label="Maximize"
-                                        onClick={() => {
-                                            setActionsOpen(false);
-                                            setMaximize(true);
-                                        }}
+                                        className="gap-3 rounded-lg px-3 py-2.5 text-sm cursor-pointer"
+                                        onSelect={() => setMaximize(true)}
                                     >
                                         <Maximize2 size={18} />
-                                    </Button>
+                                        <span>Maximize</span>
+                                    </DropdownMenuItem>
                                     {historyQuery.counter > 0 && (
                                         <div className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground">
                                             <History size={18} className="shrink-0" />

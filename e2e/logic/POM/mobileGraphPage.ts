@@ -35,6 +35,10 @@ export default class MobileGraphPage extends GraphPage {
     return this.page.getByTestId("mobileChatSheet");
   }
 
+  public get chatToggle(): Locator {
+    return this.page.getByTestId("chatToggleButton");
+  }
+
   public get canvasToolsToggle(): Locator {
     return this.page.getByTestId("canvasToolsToggle");
   }
@@ -96,9 +100,9 @@ export default class MobileGraphPage extends GraphPage {
     return this.page.getByTestId("settings");
   }
 
-  /** The dropdown panel holding the tab rows. Only present while the menu is open. */
+  /** The popover panel holding the tab rows. Only present while the menu is open. */
   public get tabsMenu(): Locator {
-    return this.page.locator('[role="menu"]').filter({ has: this.page.getByTestId("graphTabAdd") });
+    return this.page.getByTestId("graphTabsMenuContent");
   }
 
   async openTabsMenu(): Promise<void> {

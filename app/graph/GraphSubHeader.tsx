@@ -6,7 +6,7 @@ import { ChevronDown, Pencil, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { tabStripItemWidth } from "@/lib/useGraphTabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import useIsMobile from "@/lib/useIsMobile";
 import { GraphTabsContext, PanelContext } from "../components/provider";
 
@@ -61,10 +61,15 @@ export default function GraphSubHeader() {
 
     // Portalled into the nav row so navigation stays one row on mobile. Test ids
     // match the desktop strip so the page objects carry over.
+    //
+    // A popover rather than a dropdown menu: a menu registers its items and then
+    // swallows Tab, and a tab row is not one item — it is a select button, a
+    // rename button, a close button and, mid-rename, a text input. Under a menu
+    // none of those are reachable by keyboard and typing in the input feeds the
+    // menu's typeahead. A popover leaves normal tab order and typing intact.
     const menu = (
-      <>
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
+        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+          <PopoverTrigger asChild>
             <button
               type="button"
               data-testid="graphTabsMenu"
@@ -74,8 +79,8 @@ export default function GraphSubHeader() {
               <span className="shrink-0 text-xs text-muted-foreground">({tabs.length}/{maxTabs})</span>
               <ChevronDown size={14} className="shrink-0" />
             </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[85vw] max-w-[340px] bg-background p-1">
+          </PopoverTrigger>
+          <PopoverContent data-testid="graphTabsMenuContent" align="start" className="z-50 w-[85vw] max-w-[340px] bg-background p-1">
             {
               tabs.map(tab => {
                 const label = tab.name || tab.graphName || "New tab";
@@ -103,7 +108,7 @@ export default function GraphSubHeader() {
                           autoFocus
                           onChange={e => setDraft(e.target.value)}
                           onBlur={commitRename}
-                          // The menu claims Escape and every character for typeahead.
+                          // Escape cancels the rename rather than closing the popover.
                           onKeyDown={e => {
                             e.stopPropagation();
                             if (e.key === "Enter") commitRename();
@@ -150,7 +155,7 @@ export default function GraphSubHeader() {
                 );
               })
             }
-            <DropdownMenuSeparator />
+            <div className="-mx-1 my-1 h-px bg-border" />
             <button
               type="button"
               data-testid="graphTabAdd"
@@ -165,9 +170,8 @@ export default function GraphSubHeader() {
               <Plus size={16} />
               <span>{canAdd ? "New tab" : `Max ${maxTabs} tabs`}</span>
             </button>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </>
+          </PopoverContent>
+        </Popover>
     );
 
     return mobileNavSlot ? createPortal(menu, mobileNavSlot) : null;

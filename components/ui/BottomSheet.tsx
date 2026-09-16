@@ -54,16 +54,15 @@ export default function BottomSheet({
 }: BottomSheetProps) {
     return (
         <>
-            {withOverlay && !push && (
+            {/* Only while open. The sheet itself stays mounted (see below), but an
+                overlay has no state to preserve, and a hidden one would leave a
+                phantom "Close" control in the accessibility tree — one per sheet. */}
+            {withOverlay && !push && open && (
                 <button
                     type="button"
                     aria-label="Close"
-                    tabIndex={open ? 0 : -1}
                     onClick={onClose}
-                    className={cn(
-                        "absolute inset-0 z-40",
-                        !open && "pointer-events-none"
-                    )}
+                    className="absolute inset-0 z-40"
                 />
             )}
             <div

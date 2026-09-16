@@ -57,7 +57,7 @@ export default function Selector({
     const { settings: { querySettings: { limitSettings: { limit, lastLimit } }, userExperienceSettings: { captionKeysSettings: { showPropertyKeyPrefix } } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { cypherLanguageConfig, setCypherLanguageConfig } = useContext(CypherLanguageContext);
-    const { panelOpen, onTogglePanel, mobileToolbarSlot } = useContext(PanelContext);
+    const { panelOpen, onTogglePanel, setPanel, mobileToolbarSlot } = useContext(PanelContext);
     const isMobile = useIsMobile();
 
     const [maximize, setMaximize] = useState(false);
@@ -122,6 +122,15 @@ export default function Selector({
             )}
             title="Graph info"
             onClick={() => {
+                // On mobile the three sheets share a stacking level and all cover
+                // the canvas, so a second one opened on top of the first would just
+                // hide it. Dropping `panel` closes the data sheet without touching
+                // the selection, which is still there when the user comes back.
+                if (isMobile && !panelOpen) {
+                    setPanel(undefined);
+                    setChatOpen?.(false);
+                }
+
                 onTogglePanel();
             }}
             data-testid="graphInfoToggle"
@@ -142,7 +151,18 @@ export default function Selector({
             indicator={indicator}
             title="Chat"
             disabled={!graphName}
-            onClick={() => setChatOpen?.(prev => !prev)}
+            onClick={() => {
+                // Computed here rather than inside the updater: the other sheets
+                // have to be closed too, and a state updater must stay pure.
+                const next = !chatOpen;
+
+                if (isMobile && next) {
+                    setPanel(undefined);
+                    if (panelOpen) onTogglePanel();
+                }
+
+                setChatOpen?.(next);
+            }}
         >
             <Sparkles />
         </Button>

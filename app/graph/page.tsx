@@ -410,6 +410,14 @@ export default function Page() {
         setIsQueryLoading(false);
     }, [fetchCount, graph.Id, graphName, setGraph, runQuery, runDefaultQuery, defaultQuery, setIsQueryLoading, tutorialOpen, pendingAutoLoadRef]);
 
+    // Every route into the data panel goes through here. On mobile the panel
+    // covers the canvas, so while multi select is on it has to stay shut — the
+    // user is still picking the elements it would hide. Multi select is only
+    // offered on mobile, so on desktop this is always a plain open.
+    const openDataPanel = useCallback(() => {
+        setPanel(multiSelect ? undefined : "data");
+    }, [multiSelect, setPanel]);
+
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = [], fromSearch?: boolean) => {
         setSelectedElements(el);
 
@@ -423,16 +431,19 @@ export default function Page() {
             setSelectedParam("");
         }
 
-        // The panel covers the canvas on mobile, so opening it after the first tap
-        // would hide the elements still to be picked.
-        setPanel(el.length !== 0 && !multiSelect ? "data" : undefined);
-
-        if (el.length !== 0) {
-            setChatOpen(false);
-            setIsAddEdge(false);
-            setIsAddNode(false);
+        if (el.length === 0) {
+            setPanel(undefined);
+            return;
         }
-    }, [setPanel, setChatOpen, setSelectedParam, multiSelect]);
+
+        openDataPanel();
+        setChatOpen(false);
+        setIsAddEdge(false);
+        setIsAddNode(false);
+        // The sheets share a stacking level on mobile, so the data sheet would
+        // otherwise open behind an already-open graph info sheet.
+        if (isMobile && panelOpen) onTogglePanel();
+    }, [openDataPanel, setPanel, setChatOpen, setSelectedParam, isMobile, panelOpen, onTogglePanel]);
 
     // Keep selectedElementsRef in sync so the restore effect below can read the
     // full multi-selection without adding selectedElements as a dependency.
@@ -481,7 +492,7 @@ export default function Page() {
             });
             if (restored.length > 0) {
                 setSelectedElements(restored);
-                setPanel("data");
+                openDataPanel();
                 return;
             }
         }
@@ -502,7 +513,7 @@ export default function Page() {
 
                 if (element) {
                     setSelectedElements([element]);
-                    setPanel("data");
+                    openDataPanel();
                     if (isFromSearch && !pendingZoomRef.current) {
                         const zoomFilter = (node: any) => "labels" in element! ? element!.id === node.id : node.id === (element as Link).source || node.id === (element as Link).target;
                         if (graphData) {
