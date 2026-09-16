@@ -405,7 +405,8 @@ test.describe("Data panel Tests", () => {
     const valueAttribute = await graph.getAttributeValue("id");
     await graph.setAttribute("id", "10", "integer");
     await graph.clickUnDoButtonInToast();
-    expect(await graph.getAttributeValue("id")).toBe(valueAttribute);
+    // Undo only queues the write; the panel is not repainted until it returns.
+    await expect.poll(() => graph.getAttributeValue("id")).toBe(valueAttribute);
     await apicalls.removeGraph(graphName);
   });
 
@@ -489,7 +490,8 @@ test.describe("Data panel Tests", () => {
     await graph.searchElementInCanvas("Alice");
     await graph.removeAttribute("name");
     await graph.clickUnDoButtonInToast();
-    expect(await graph.getContentDataPanelAttributesCount()).toBe(2);
+    // Undo only queues the write; the panel is not repainted until it returns.
+    await expect.poll(() => graph.getContentDataPanelAttributesCount()).toBe(2);
     await apicalls.removeGraph(graphName);
   });
 
