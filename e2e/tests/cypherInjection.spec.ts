@@ -62,6 +62,14 @@ test.describe("Cypher identifier escaping", () => {
     await apiCall.runQuery(graphName, SENTINELS);
     await apiCall.addGraphNodeLabel(graphName, "0", { label: HOSTILE_LABEL });
 
+    // Without this, a pair of no-op API calls would leave the label absent and
+    // the sentinels intact, and the assertions below would pass vacuously.
+    const beforeRemoval = await apiCall.runQuery(
+      graphName,
+      "MATCH (n) WHERE ID(n) = 0 RETURN n"
+    );
+    expect(beforeRemoval.data[0].n.labels).toContain(HOSTILE_LABEL);
+
     await apiCall.deleteGraphNodeLabel(graphName, "0", { label: HOSTILE_LABEL });
 
     expect(await countVictims(graphName)).toBe(2);

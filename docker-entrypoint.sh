@@ -12,10 +12,11 @@ if [ -z "$AUTH_SECRET" ] && [ -z "$NEXTAUTH_SECRET" ]; then
   echo "INFO: No AUTH_SECRET provided, generated a random one for this container session."
   echo "WARNING: Every session is invalidated if the container is recreated without persisting the secret."
 else
-  for weak in SECRET secret changeme CHANGE_ME_IN_PRODUCTION your-secret-here; do
+  for weak in SECRET secret changeme CHANGE_ME_IN_PRODUCTION your-secret-here test-secret-for-ci; do
     if [ "$AUTH_SECRET" = "$weak" ] || [ "$NEXTAUTH_SECRET" = "$weak" ]; then
-      echo "WARNING: AUTH_SECRET is a well-known placeholder value. Anyone can forge a session cookie."
-      echo "WARNING: Replace it with a random 32-byte value, e.g. \`openssl rand -hex 32\`."
+      echo "ERROR: The auth secret is a well-known placeholder value. Anyone who knows it can forge a session cookie."
+      echo "ERROR: Replace it with a random 32-byte value, e.g. \`openssl rand -hex 32\`, or unset it to have one generated."
+      exit 1
     fi
   done
 fi

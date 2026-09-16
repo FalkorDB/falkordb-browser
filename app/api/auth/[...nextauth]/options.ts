@@ -195,6 +195,36 @@ export function generateConsistentUserId(
   return crypto.createHash('sha256').update(identifier).digest('hex');
 }
 
+/**
+ * Pulls host/port/username out of a `falkor[s]://` connection string.
+ *
+ * URL logins send only `url`, so without this every one of them was recorded as
+ * `default@localhost:6379`. That identity is what `generateConsistentUserId`
+ * hashes into the AAD that binds encrypted browser values to a connection, so
+ * two unrelated servers reached by URL would have shared one binding and could
+ * decrypt each other's values.
+ *
+ * Returns an empty object when the string does not parse; the caller then keeps
+ * its previous defaults.
+ */
+export function parseConnectionUrl(url: string): {
+  host?: string;
+  port?: string;
+  username?: string;
+} {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname) return {};
+    return {
+      host: parsed.hostname,
+      port: parsed.port || undefined,
+      username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Multi-connection helpers
 // ---------------------------------------------------------------------------
@@ -698,6 +728,20 @@ const authOptions: NextAuthConfig = {
           ca: (credentials.ca as string) || undefined,
           url: (credentials.url as string) || undefined,
         };
+
+        // A URL login carries the endpoint only inside `url`. Record the real
+        // host/port/username so the connection is not filed under the
+        // localhost:6379 defaults below — that identity is hashed into the AAD
+        // that binds encrypted browser values to a connection, so sharing it
+        // across unrelated servers would let them read each other's values.
+        // `newClient` still connects via `url`, so nothing about the connection
+        // itself changes.
+        if (creds.url) {
+          const fromUrl = parseConnectionUrl(creds.url);
+          creds.host = creds.host ?? fromUrl.host;
+          creds.port = creds.port ?? fromUrl.port;
+          creds.username = creds.username ?? fromUrl.username;
+        }
 
         try {
           // Generate random UUID for this session and its first connection

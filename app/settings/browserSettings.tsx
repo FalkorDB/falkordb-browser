@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { serverEncrypt } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
+import { removeConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
 import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
@@ -477,9 +478,9 @@ export default function BrowserSettings() {
                     });
                     return false;
                 }
-                localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+                setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
             } else {
-                localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+                removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
             }
             localStorage.removeItem("secretKey");
 

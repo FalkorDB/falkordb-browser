@@ -1767,22 +1767,68 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewLocalLlmProvider(loadedLocalLlmProvider);
       setLocalLlmEndpoint(loadedLocalLlmEndpoint);
       setNewLocalLlmEndpoint(loadedLocalLlmEndpoint);
+      const rawModel = localStorage.getItem("model") || "";
+      const loadedModel = looksServerEncrypted(rawModel) ? "" : rawModel;
+      setModel(loadedModel);
+      setNewModel(loadedModel);
+      try {
+        const storedPerSourceModels = localStorage.getItem("perSourceModels");
+        if (storedPerSourceModels) setPerSourceModels(sanitizePerSourceModels(JSON.parse(storedPerSourceModels)));
+      } catch { /* ignore corrupted data */ }
+    })();
+  }, [status, prefixReady, toast]);
+
+  // Chat API keys are loaded separately from the settings above because they
+  // are connection-scoped: /api/encrypt binds each blob to `username@host:port`,
+  // so a blob written by one connection is unreadable by another. Storing them
+  // under a single global key meant the last connection to save wiped the
+  // others, and keeping them out of this effect's dependencies meant a
+  // connection switch left the previous connection's decrypted keys in state.
+  // `connectionIdentity` mirrors the scoped-storage prefix, which uses the same
+  // host/port/username triple as the server-side binding.
+  const connectionIdentity = useMemo(
+    () => (status === "authenticated" && sessionData?.user
+      ? `${sessionData.user.host}:${sessionData.user.port}:${sessionData.user.username || "default"}`
+      : ""),
+    [status, sessionData?.user]
+  );
+
+  useEffect(() => {
+    if (status !== "authenticated" || !prefixReady || !connectionIdentity) return;
+
+    (async () => {
       let loadedChatApiKeys: ChatApiKey[] = [];
-      const storedChatApiKeys = localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
-      if (storedChatApiKeys) {
+      let stored = getConnectionItem(CHAT_API_KEYS_STORAGE_KEY) || "";
+      // Before scoping, every connection shared one unscoped entry. Claim it
+      // for whichever connection can actually decrypt it; the others leave it
+      // in place so its owner still finds it.
+      const legacyStored = stored ? "" : localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
+      let claimingLegacy = false;
+      if (legacyStored) {
+        stored = legacyStored;
+        claimingLegacy = true;
+      }
+
+      if (stored) {
         try {
           // Validate format before decrypting - only decrypt if looks server-encrypted
-          if (looksServerEncrypted(storedChatApiKeys)) {
-            const decryptedKeys = await serverDecrypt(storedChatApiKeys);
+          if (looksServerEncrypted(stored)) {
+            const decryptedKeys = await serverDecrypt(stored);
             loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
           } else {
             // Try to parse directly as plaintext JSON for legacy or test values
             try {
-              loadedChatApiKeys = parseChatApiKeys(storedChatApiKeys);
+              loadedChatApiKeys = parseChatApiKeys(stored);
             } catch {
               console.warn('Stored API keys format unrecognized, clearing corrupted data');
-              localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+              if (claimingLegacy) localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+              else removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
+              claimingLegacy = false;
             }
+          }
+          if (claimingLegacy) {
+            setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, stored);
+            localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
           }
         } catch (error) {
           if (error instanceof ServerDecryptError && error.status === 403) {
@@ -1791,7 +1837,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             console.warn('Stored API keys belong to a different connection, leaving them untouched');
           } else {
             console.error('Failed to decrypt API keys:', error);
-            localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            if (claimingLegacy) localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            else removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
           }
         }
       }
@@ -1807,12 +1854,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           } catch (error) {
             console.error('Failed to migrate legacy secret key:', error);
           }
-        } else {
+        } else if (looksServerEncrypted(storedSecretKey)) {
           try {
             migratedKey = await serverDecrypt(storedSecretKey);
-          } catch {
-            migratedKey = storedSecretKey;
+          } catch (error) {
+            // A refusal must not fall through to treating the ciphertext as the
+            // key itself: that would re-encrypt the blob as a bogus API key and
+            // delete the original.
+            if (error instanceof ServerDecryptError && error.status === 403) {
+              console.warn('Legacy secret key belongs to a different connection, leaving it untouched');
+            } else if (error instanceof ServerDecryptError) {
+              // 400: predates owner binding and is unreadable. Drop it.
+              localStorage.removeItem("secretKey");
+            } else {
+              console.error('Failed to decrypt legacy secret key:', error);
+            }
           }
+        } else {
+          // Never encrypted — the value is the key.
+          migratedKey = storedSecretKey;
         }
 
         if (migratedKey) {
@@ -1820,7 +1880,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           const encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
           if (encryptedKeys) {
             loadedChatApiKeys = migratedChatApiKeys;
-            localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+            setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
             localStorage.removeItem("secretKey");
           }
         } else if (isLegacyEncrypted(storedSecretKey)) {
@@ -1836,17 +1896,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setChatApiKeys(loadedChatApiKeys);
       setSelectedChatApiKeyId(selectedId);
       setSecretKey(selectedApiKey?.key ?? "");
-
-      const rawModel = localStorage.getItem("model") || "";
-      const loadedModel = looksServerEncrypted(rawModel) ? "" : rawModel;
-      setModel(loadedModel);
-      setNewModel(loadedModel);
-      try {
-        const storedPerSourceModels = localStorage.getItem("perSourceModels");
-        if (storedPerSourceModels) setPerSourceModels(sanitizePerSourceModels(JSON.parse(storedPerSourceModels)));
-      } catch { /* ignore corrupted data */ }
     })();
-  }, [status, prefixReady, toast]);
+  }, [status, prefixReady, connectionIdentity]);
 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.

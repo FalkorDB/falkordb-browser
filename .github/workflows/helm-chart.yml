@@ -176,10 +176,12 @@ jobs:
 
       - name: Install Helm chart
         run: |
+          # Leave env.nextauthSecret unset so the chart generates a random
+          # secret. Pinning a literal here would publish a session-signing
+          # secret that anyone could copy into a real install.
           helm install test-release helm/falkordb-browser \
             --wait \
-            --timeout 5m \
-            --set env.nextauthSecret=test-secret-for-ci
+            --timeout 5m
 
       - name: Dump diagnostics when install fails
         if: failure()
@@ -332,7 +334,7 @@ jobs:
           helm install falkordb-browser falkordb/falkordb-browser \\
             --version ${{ env.CHART_VERSION }} \\
             --set env.nextauthUrl=https://your-domain.com \\
-            --set env.nextauthSecret="$(openssl rand -base64 32)"
+            --set env.nextauthSecret="\$(openssl rand -base64 32)"
           
           ## Verify installation
           
