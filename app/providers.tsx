@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -763,10 +763,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // pinned to it by header the same way /api/DBVersion and /api/ldap are —
     // otherwise the stubs can describe the connection being switched away from.
     // Callers that are about to publish a graph list pass the connection THAT
-    // list was read for: a round trip separates the two, and `null` → an id at
-    // bootstrap does not bump the epoch, so reading the global again here can
-    // merge one connection's stubs into another's list.
-    const connectionId = pinnedConnectionId !== undefined ? pinnedConnectionId : getActiveConnectionIdGlobal();
+    // list was read for, so a round trip cannot merge one connection's stubs
+    // into another's list. A `null` pin is not a connection: it is the
+    // bootstrap list, read with no header and resolved from the JWT, so the
+    // probe has to resolve the same way rather than be pinned to nothing.
+    const connectionId = pinnedConnectionId ?? getActiveConnectionIdGlobal();
 
     // Bail before claiming a sequence: a pinned probe whose connection has
     // already moved on would otherwise discard the probe made for the new one.
@@ -874,9 +875,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // A graph list the server handed back for an explicit create/delete/rename is
   // confirmed, and outranks every refresh already in flight: one read before the
   // mutation would otherwise land after it and put the old names back, taking
-  // the first-seen history with them.
+  // the first-seen history with them. The generation is module-level because the
+  // list has more than one publisher and the mutation does not always share a
+  // component with the refresh it has to discard.
   const supersedeGraphRefreshes = useCallback(() => {
-    optionsSeqRef.current += 1;
+    supersedeGraphLists();
     invalidateStubProbes();
   }, [invalidateStubProbes]);
 
@@ -2026,7 +2029,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const ctx = contextGenRef.current;
     const cid = getActiveConnectionIdGlobal();
     const epoch = getConnectionEpoch();
-    const isCurrent = () => getConnectionEpoch() === epoch && optionsSeqRef.current === oseq;
+    // A mutation that happened while this was in flight already published a list
+    // it knows to be correct, so this one is stale however recent it is.
+    const generation = getGraphListGeneration();
+    const isCurrent = () => getConnectionEpoch() === epoch
+      && getGraphListGeneration() === generation
+      && optionsSeqRef.current === oseq;
     const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
     const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
 

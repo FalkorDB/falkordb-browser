@@ -3,7 +3,7 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { fetchOptions, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
+import { fetchOptions, getActiveConnectionIdGlobal, getConnectionEpoch, getGraphListGeneration, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, Loader2, Settings, X } from "lucide-react";
@@ -126,26 +126,20 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         setGraphsFirstSeen(observeGraphsFirstSeen(safeOptions));
     }, [safeOptions, options, tutorialOpen, canRecordHistory]);
 
-    // A confirmed list — one an explicit create, delete or rename produced —
-    // outranks every refresh already in flight, this component's and the
-    // provider's alike: a list read before the mutation would otherwise land
-    // after it and put the old names back, and be recorded as an observation.
-    const supersedeRefreshes = useCallback(() => {
-        optionsSeqRef.current += 1;
-        supersedeGraphRefreshes();
-    }, [supersedeGraphRefreshes]);
-
     // A list handed back by an explicit action IS confirmed, so it records even
     // when it is empty — deleting the last graph must still forget its name, or
     // recreating it later would reuse the old timestamp. The stubs are pruned to
     // match, or a deleted offloaded graph would be merged straight back in (and
-    // its timestamp with it) until the next probe.
+    // its timestamp with it) until the next probe. Superseding first discards
+    // every refresh already in flight — this component's and the provider's
+    // alike — so a list read before the mutation cannot land after it and put
+    // the old names back, to be recorded as an observation.
     const handleSetGraphNames = useCallback((names: string[]) => {
-        supersedeRefreshes();
+        supersedeGraphRefreshes();
         setOptions(names);
         pruneOffloadedGraphs(names);
         if (!tutorialOpen && canRecordHistory()) setGraphsFirstSeen(recordGraphsFirstSeen(names));
-    }, [setOptions, pruneOffloadedGraphs, supersedeRefreshes, tutorialOpen, canRecordHistory]);
+    }, [setOptions, pruneOffloadedGraphs, supersedeGraphRefreshes, tutorialOpen, canRecordHistory]);
 
     const sortedOptions = useMemo(
         () => sortGraphNames(safeOptions, graphsSortOrder, graphsFirstSeen),
@@ -155,12 +149,16 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const getOptions = useCallback(async () => {
         // Pin the refresh to the connection active when it started and discard a
-        // stale result if the connection changed mid-flight (epoch) or a newer
-        // refresh on the same connection started (optionsSeq) — the newest wins.
+        // stale result if the connection changed mid-flight (epoch), a mutation
+        // published a confirmed list (generation) or a newer refresh on the same
+        // connection started (optionsSeq) — the newest wins.
         const seq = (optionsSeqRef.current += 1);
         const startEpoch = getConnectionEpoch();
+        const generation = getGraphListGeneration();
         const cid = getActiveConnectionIdGlobal();
-        const isCurrent = () => getConnectionEpoch() === startEpoch && optionsSeqRef.current === seq;
+        const isCurrent = () => getConnectionEpoch() === startEpoch
+            && getGraphListGeneration() === generation
+            && optionsSeqRef.current === seq;
         const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
         const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
         const res = await fetchOptions(gToast, gInd, indicator, cid);
@@ -265,7 +263,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         if (getConnectionEpoch() !== startEpoch) return false;
 
         if (result.ok) {
-            supersedeRefreshes();
+            supersedeGraphRefreshes();
 
             // A rename is the same graph under a new name, so it keeps the time
             // it was first seen instead of sorting as a brand-new graph. The
@@ -297,7 +295,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok;
-    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, buildMetricCells, canRecordHistory, renameOffloadedGraph, supersedeRefreshes]);
+    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, buildMetricCells, canRecordHistory, renameOffloadedGraph, supersedeGraphRefreshes]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
@@ -527,7 +525,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                             open={openDuplicate}
                                             onOpenChange={setOpenDuplicate}
                                             onDuplicate={(duplicateName) => {
-                                                supersedeRefreshes();
+                                                supersedeGraphRefreshes();
                                                 setSelectedValue(duplicateName);
                                                 setOptions!([...safeOptions, duplicateName]);
                                             }}
