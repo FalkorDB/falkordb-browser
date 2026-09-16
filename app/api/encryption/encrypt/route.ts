@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { encryptForOwner } from "@/app/api/auth/encryption";
-import { generateConsistentUserId } from "@/app/api/auth/[...nextauth]/options";
+import { generateConsistentUserId, isEndpointBound } from "@/app/api/auth/[...nextauth]/options";
 
 const ENCRYPTED_PREFIX = "senc:";
 
@@ -19,6 +19,15 @@ export async function POST(request: NextRequest) {
     // route cannot reopen a value lifted from someone else's browser. A token
     // that carries no endpoint would collapse every such caller onto one shared
     // owner, which is the opposite of binding, so refuse it instead of guessing.
+    // `getToken` hands back the raw payload, so a pre-binding token — whose
+    // host/port are the localhost defaults, not the endpoint it reached — gets
+    // here without the jwt callback's chance to retire it. Refuse it too.
+    if (!isEndpointBound(token)) {
+      return NextResponse.json(
+        { message: "Session predates connection binding, please sign in again" },
+        { status: 401 }
+      );
+    }
     const host = token.host as string | undefined;
     const port = Number(token.port);
     if (!host || !Number.isFinite(port) || port <= 0) {

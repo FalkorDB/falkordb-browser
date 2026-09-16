@@ -375,6 +375,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // can tell whether it is still the latest (out-of-order completions are ignored).
   const pendingSwitchesRef = useRef(0);
   const switchTicketRef = useRef(0);
+  // Rendered mirror of `pendingSwitchesRef`, for effects that must hold off
+  // until a switch settles. The ref alone cannot wake them.
+  const [switchPending, setSwitchPending] = useState(false);
 
   const bumpContextGen = useCallback(() => {
     contextGenRef.current += 1;
@@ -393,12 +396,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const beginConnectionSwitch = useCallback(() => {
     pendingSwitchesRef.current += 1;
     switchTicketRef.current += 1;
+    setSwitchPending(true);
     bumpContextGen();
     return switchTicketRef.current;
   }, [bumpContextGen]);
 
   const endConnectionSwitch = useCallback(() => {
     pendingSwitchesRef.current = Math.max(0, pendingSwitchesRef.current - 1);
+    setSwitchPending(pendingSwitchesRef.current > 0);
   }, []);
 
   // True if `ticket` is still the most recently started switch (so a stale,
@@ -1806,6 +1811,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedChatApiKeyId("");
     setSecretKey("");
 
+    // `connectionIdentity` and the storage prefix both come from the session,
+    // which only catches up once `updateSession` resolves -- while the global
+    // connection id every request is tagged with changed at the start of the
+    // switch. Reloading against the old identity in that window would republish
+    // connection A's key for requests already addressed to B, so wait it out.
+    // `endConnectionSwitch` (and the reset effect, which zeroes the counter
+    // once React agrees) re-runs this with whichever identity won, so a
+    // rolled-back switch restores the keys it just cleared.
+    if (switchPending) return undefined;
+
     if (status !== "authenticated" || !prefixReady || !connectionIdentity) return undefined;
 
     // The storage prefix is module-global and every step below awaits the
@@ -1875,13 +1890,21 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const storedSecretKey = localStorage.getItem("secretKey") || "";
       if (loadedChatApiKeys.length === 0 && storedSecretKey) {
         let migratedKey = "";
+        // The legacy key is the only way back into `secretKey`, and it is
+        // shared rather than connection-scoped. Dropping it the moment the
+        // decrypt succeeds would strand the ciphertext if the migration then
+        // failed to commit -- or if a connection switch superseded this run
+        // before it got the chance. Clear it only once `secretKey` itself is
+        // gone, at which point nothing is left for it to open.
+        let legacyKeySpent = false;
         if (isLegacyEncrypted(storedSecretKey)) {
           try {
             migratedKey = await legacyDecrypt(storedSecretKey);
-            clearLegacyEncryptionKey();
+            legacyKeySpent = true;
           } catch (error) {
             console.error('Failed to migrate legacy secret key:', error);
           }
+          if (stale()) return;
         } else if (looksServerEncrypted(storedSecretKey)) {
           try {
             migratedKey = await serverDecrypt(storedSecretKey);
@@ -1912,9 +1935,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             loadedChatApiKeys = migratedChatApiKeys;
             setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
             localStorage.removeItem("secretKey");
+            if (legacyKeySpent) clearLegacyEncryptionKey();
           }
         } else if (isLegacyEncrypted(storedSecretKey)) {
           localStorage.removeItem("secretKey");
+          if (legacyKeySpent) clearLegacyEncryptionKey();
         }
       }
 
@@ -1930,7 +1955,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     })();
 
     return () => { cancelled = true; };
-  }, [status, prefixReady, connectionIdentity]);
+  }, [status, prefixReady, connectionIdentity, switchPending]);
 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.
@@ -2063,6 +2088,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     bumpContextGen();
     activeGraphNameRef.current = "";
     pendingSwitchesRef.current = 0;
+    setSwitchPending(false);
 
     // Clear graph data so stale results from the old connection are gone.
     // Build the empty graph with the real toast/setIndicator callbacks up front

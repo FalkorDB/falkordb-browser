@@ -189,6 +189,20 @@ export function generateTimeUUID() {
 const BINDING_VERSION = 2;
 
 /**
+ * True when a JWT carries the current endpoint binding.
+ *
+ * The `jwt` callback retires older tokens, but that only runs for callers that
+ * go through NextAuth. Anything reading a token directly with `getToken` sees
+ * the raw payload, pre-binding tokens included, so it has to ask here before
+ * trusting `host`/`port`/`username` to identify a connection.
+ */
+export function isEndpointBound(
+  token: Record<string, unknown> | null | undefined
+): boolean {
+  return token?.bv === BINDING_VERSION;
+}
+
+/**
  * Generates a consistent user ID based on credentials
  * This ensures the same user gets the same ID across multiple logins
  * Format: SHA-256 hash of "username@host:port"
@@ -203,13 +217,18 @@ export function generateConsistentUserId(
 }
 
 /**
- * Pulls host/port/username out of a `falkor[s]://` connection string.
+ * Pulls the connection parameters out of a `falkor[s]://` connection string.
  *
  * URL logins send only `url`, so without this every one of them was recorded as
  * `default@localhost:6379`. That identity is what `generateConsistentUserId`
  * hashes into the AAD that binds encrypted browser values to a connection, so
  * two unrelated servers reached by URL would have shared one binding and could
  * decrypt each other's values.
+ *
+ * The scheme and password come out too: the connection record outlives the URL
+ * (which is deliberately never stored), and a record that kept the discrete
+ * fields' empty `tls`/`password` would describe a plaintext, unauthenticated
+ * connection that the user never asked for.
  *
  * Returns an empty object when the string does not parse; the caller then keeps
  * its previous defaults.
@@ -218,6 +237,8 @@ export function parseConnectionUrl(url: string): {
   host?: string;
   port?: string;
   username?: string;
+  password?: string;
+  tls?: boolean;
 } {
   try {
     const parsed = new URL(url);
@@ -226,6 +247,8 @@ export function parseConnectionUrl(url: string): {
       host: parsed.hostname,
       port: parsed.port || undefined,
       username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+      password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+      tls: parsed.protocol === "falkors:" || parsed.protocol === "rediss:",
     };
   } catch {
     return {};
@@ -751,6 +774,8 @@ const authOptions: NextAuthConfig = {
             creds.host = fromUrl.host;
             creds.port = fromUrl.port;
             creds.username = fromUrl.username;
+            creds.password = fromUrl.password;
+            creds.tls = fromUrl.tls ? "true" : "false";
           }
         }
 
@@ -1048,6 +1073,12 @@ export async function getSessionFromRequest(
   });
 
   if (!token?.sub) return null;
+
+  // The jwt callback retires pre-binding tokens, but it never sees this read.
+  // Such a token's host/port are the localhost defaults rather than the
+  // endpoint it actually reached, so the identity built below would be wrong
+  // for every URL login — and shared between all of them.
+  if (!isEndpointBound(token)) return null;
 
   return {
     user: {

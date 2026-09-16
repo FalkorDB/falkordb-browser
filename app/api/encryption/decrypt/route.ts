@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { decryptForOwner, UnboundCiphertextError } from "@/app/api/auth/encryption";
-import { generateConsistentUserId } from "@/app/api/auth/[...nextauth]/options";
+import { generateConsistentUserId, isEndpointBound } from "@/app/api/auth/[...nextauth]/options";
 
 const ENCRYPTED_PREFIX = "senc:";
 
@@ -18,6 +18,15 @@ export async function POST(request: NextRequest) {
     // Only ciphertext bound to this caller's connection can be reopened here.
     // A token with no endpoint would share one owner with every other such
     // token, letting them read each other's values, so refuse it.
+    // `getToken` hands back the raw payload, so a pre-binding token — whose
+    // host/port are the localhost defaults, not the endpoint it reached — gets
+    // here without the jwt callback's chance to retire it. Refuse it too.
+    if (!isEndpointBound(token)) {
+      return NextResponse.json(
+        { message: "Session predates connection binding, please sign in again" },
+        { status: 401 }
+      );
+    }
     const host = token.host as string | undefined;
     const port = Number(token.port);
     if (!host || !Number.isFinite(port) || port <= 0) {
