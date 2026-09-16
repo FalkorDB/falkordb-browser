@@ -44,7 +44,7 @@ describe("preflightQuery", () => {
     }
   });
 
-  it("flags file:// only where the database cannot see the browser's import folder", () => {
+  it("flags file:// only where an operator has turned it off", () => {
     const query = "LOAD CSV FROM 'file://a.csv' AS row RETURN row";
 
     assert.deepEqual(codes(query, FILE_OK), []);

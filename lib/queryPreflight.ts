@@ -20,8 +20,8 @@ import { FALKOR_FETCHABLE_SCHEMES } from "../app/lib/csv-load-url.ts";
 export type PreflightCode = "LOAD_CSV_UNSUPPORTED_URI" | "LOAD_CSV_FILE_URI_UNAVAILABLE";
 
 export interface PreflightContext {
-  /** Whether `file://` sources can resolve — i.e. FalkorDB reads its import
-   *  folder from the same filesystem this browser deployment writes to. */
+  /** Whether `file://` sources can resolve. Nothing the browser can see settles
+   *  it, so this is `false` only where an operator has said so outright. */
   fileUriSupported: boolean;
 }
 
@@ -112,7 +112,7 @@ function inspectSource(uri: string, context: PreflightContext): PreflightIssue |
     return {
       code: "LOAD_CSV_FILE_URI_UNAVAILABLE",
       message: `This deployment cannot read "file://" sources.`,
-      hint: "The database reads its import folder from a different machine than this browser.",
+      hint: "An operator turned them off with LOAD_CSV_FILE_URI=false.",
       uri,
       fixableByUpload: true,
     };
