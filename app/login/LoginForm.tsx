@@ -340,46 +340,51 @@ export default function LoginForm({
     }
   };
 
-  const onFileDrop = (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-
+  // A file the browser cannot read (an unreadable private key, say) never fires
+  // `load`, so the failure has to be reported from `onerror`.
+  const readPemAsBase64 = (file: File, onRead: (base64: string, name: string) => void) => {
     const reader = new FileReader();
 
     reader.onload = () => {
       clearError();
-      setCA((reader.result as string).split(',').pop());
-      setUploadedFileName(acceptedFiles[0].name);
+      onRead((reader.result as string).split(',').pop() ?? "", file.name);
     };
 
-    reader.readAsDataURL(acceptedFiles[0]);
+    reader.onerror = () => {
+      setError({
+        message: <p className="text-xs text-destructive">{`Could not read ${file.name}`}</p>,
+        show: true,
+      });
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const onFileDrop = (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+
+    readPemAsBase64(acceptedFiles[0], (base64, name) => {
+      setCA(base64);
+      setUploadedFileName(name);
+    });
   };
 
   const onCertDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      clearError();
-      setClientCert((reader.result as string).split(',').pop());
-      setClientCertFileName(acceptedFiles[0].name);
-    };
-
-    reader.readAsDataURL(acceptedFiles[0]);
+    readPemAsBase64(acceptedFiles[0], (base64, name) => {
+      setClientCert(base64);
+      setClientCertFileName(name);
+    });
   };
 
   const onKeyDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      clearError();
-      setClientKey((reader.result as string).split(',').pop());
-      setClientKeyFileName(acceptedFiles[0].name);
-    };
-
-    reader.readAsDataURL(acceptedFiles[0]);
+    readPemAsBase64(acceptedFiles[0], (base64, name) => {
+      setClientKey(base64);
+      setClientKeyFileName(name);
+    });
   };
 
   return (

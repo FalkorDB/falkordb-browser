@@ -263,7 +263,12 @@ jobs:
           # Stop the container gracefully once certificates are ready
           echo "Certificates generated, stopping container..."
           docker stop $CONTAINER_ID || true
-          
+
+          # The container writes the private keys as root with mode 600, so the
+          # browser under test cannot read client.key when the mTLS test uploads
+          # it. The FalkorDB container still reads them as root.
+          sudo chown -R "$(id -u):$(id -g)" tls
+
           echo "Generated certificates:"
           ls -la tls/
       - name: Create Redis TLS config
