@@ -2023,8 +2023,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLayout('force');
       setDirection('');
 
+      // CREATE only appends, and the tutorial re-opens by itself on every load
+      // until it is dismissed, so a demo graph left behind by a refresh or a closed
+      // tab used to gain another full copy of the dataset (#2087). Purging in the
+      // same query keeps the reset atomic: two tabs racing each other still end up
+      // with exactly one copy, and there is no delete response to interpret.
+      const purge = "MATCH (n) DETACH DELETE n WITH count(n) AS purged";
+
       // Create social demo graph
       const socialQuery = `
+        ${purge}
         CREATE 
           (alice:Person {name: 'Alice', age: 30, role: 'CEO'}),
           (bob:Person {name: 'Bob', age: 25, role: 'VP Engineering'}),
@@ -2052,37 +2060,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       // Create social-test demo graph
       const socialTestQuery = `
+      ${purge}
       CREATE 
       (eve:Person {name: 'Eve', age: 32}),
       (frank:Person {name: 'Frank', age: 29}),
       (eve)-[:FOLLOWS]->(frank)
       `;
 
-      // The CREATEs below only append, so a demo graph left behind by a session
-      // that ended without cleanup — a refresh or a closed tab, and the tutorial
-      // re-opens by itself on every load until it is dismissed — would gain another
-      // full copy of the dataset on every run (#2087). Drop both first. DELETE
-      // answers 400 for a graph that does not exist, which is the normal case, so
-      // the pre-clean stays silent rather than toasting at every first-time user.
-      const cleaned = await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
-        method: "DELETE",
-      }, silentToast, setIndicator, cid)));
-
-      // 400 is the answer for a graph that isn't there. Any other failure means
-      // the old copy survived, and the CREATEs would stack a second one on it.
-      if (cleaned.some(({ ok, status }) => !ok && status !== 400)) {
-        throw new Error("Failed to remove the leftover demo graphs");
-      }
-
-      if (getConnectionEpoch() !== startEpoch) return;
-
       await Promise.all([
         getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator, { connectionId: cid }),
         getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator, { connectionId: cid })
-      ]).catch(async () => {
+      ]).catch(async error => {
+        // One graph can be loaded while the other failed, so drop both rather
+        // than walk the tutorial into half a dataset.
         await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
           method: "DELETE",
-        }, toast, setIndicator, cid)));
+        }, silentToast, setIndicator, cid)));
+        throw error;
       });
 
       if (getConnectionEpoch() !== startEpoch) return;
