@@ -6,7 +6,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey, ServerDecryptError } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
-import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
+import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
@@ -1794,7 +1794,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   );
 
   useEffect(() => {
-    if (status !== "authenticated" || !prefixReady || !connectionIdentity) return;
+    if (status !== "authenticated" || !prefixReady || !connectionIdentity) return undefined;
+
+    // The storage prefix is module-global and every step below awaits the
+    // server, so a connection switch mid-flight could publish this
+    // connection's keys into the next one's state, or write its ciphertext
+    // under the next one's prefix. Nothing commits once the run is superseded.
+    let cancelled = false;
+    const scope = `${connectionIdentity}:`;
+    const stale = () => cancelled || getConnectionPrefix() !== scope;
 
     (async () => {
       let loadedChatApiKeys: ChatApiKey[] = [];
@@ -1814,6 +1822,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           // Validate format before decrypting - only decrypt if looks server-encrypted
           if (looksServerEncrypted(stored)) {
             const decryptedKeys = await serverDecrypt(stored);
+            if (stale()) return;
             loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
           } else {
             // Try to parse directly as plaintext JSON for legacy or test values
@@ -1831,14 +1840,21 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
           }
         } catch (error) {
+          if (stale()) return;
           if (error instanceof ServerDecryptError && error.status === 403) {
             // The value belongs to another connection. Keep it: switching back
             // to that connection restores access.
             console.warn('Stored API keys belong to a different connection, leaving them untouched');
-          } else {
-            console.error('Failed to decrypt API keys:', error);
+          } else if (error instanceof ServerDecryptError && error.status === 400) {
+            // The only permanent refusal: the value predates owner binding and
+            // can never be read again.
+            console.error('Stored API keys are unreadable, clearing them:', error);
             if (claimingLegacy) localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
             else removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
+          } else {
+            // A 5xx or a dropped request says nothing about the value itself;
+            // deleting on one would destroy a perfectly good key.
+            console.error('Failed to decrypt API keys, keeping them for a later attempt:', error);
           }
         }
       }
@@ -1863,13 +1879,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             // delete the original.
             if (error instanceof ServerDecryptError && error.status === 403) {
               console.warn('Legacy secret key belongs to a different connection, leaving it untouched');
-            } else if (error instanceof ServerDecryptError) {
-              // 400: predates owner binding and is unreadable. Drop it.
+            } else if (error instanceof ServerDecryptError && error.status === 400) {
+              // The one permanent refusal: predates owner binding, unreadable.
               localStorage.removeItem("secretKey");
             } else {
-              console.error('Failed to decrypt legacy secret key:', error);
+              console.error('Failed to decrypt legacy secret key, keeping it:', error);
             }
           }
+          if (stale()) return;
         } else {
           // Never encrypted — the value is the key.
           migratedKey = storedSecretKey;
@@ -1878,6 +1895,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         if (migratedKey) {
           const migratedChatApiKeys = [createChatApiKey(migratedKey)];
           const encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
+          if (stale()) return;
           if (encryptedKeys) {
             loadedChatApiKeys = migratedChatApiKeys;
             setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
@@ -1892,11 +1910,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
       // selectedApiKey.id is a UUID identifier, not the API key value itself
       const selectedId = String(selectedApiKey?.id ?? "");
+      if (stale()) return;
       persistSelectedChatApiKeyId(selectedId);
       setChatApiKeys(loadedChatApiKeys);
       setSelectedChatApiKeyId(selectedId);
       setSecretKey(selectedApiKey?.key ?? "");
     })();
+
+    return () => { cancelled = true; };
   }, [status, prefixReady, connectionIdentity]);
 
   // Re-check UDF availability whenever the active connection changes so

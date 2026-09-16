@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { serverEncrypt } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
-import { removeConnectionItem, setConnectionItem } from "@/lib/connection-storage";
+import { getConnectionPrefix, removeConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
 import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
@@ -466,6 +466,12 @@ export default function BrowserSettings() {
     const persistChatApiKeys = async (keys: typeof chatApiKeys, selectedId: string): Promise<boolean> => {
         const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
         const nextSelectedId = selectedApiKey?.id ?? "";
+        // `serverEncrypt` binds the ciphertext to the connection behind the
+        // request, while the storage prefix is resolved only once the promise
+        // settles. If the user switches connections in between, writing would
+        // file a blob bound to one connection under another's key, where it can
+        // never be decrypted — and would overwrite that connection's own keys.
+        const scope = getConnectionPrefix();
 
         try {
             if (keys.length > 0) {
@@ -474,6 +480,14 @@ export default function BrowserSettings() {
                     toast({
                         title: "Error",
                         description: "Could not encrypt API keys. Please try again.",
+                        variant: "destructive",
+                    });
+                    return false;
+                }
+                if (getConnectionPrefix() !== scope) {
+                    toast({
+                        title: "Error",
+                        description: "The connection changed while saving. Please try again.",
                         variant: "destructive",
                     });
                     return false;

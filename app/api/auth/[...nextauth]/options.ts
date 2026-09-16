@@ -729,18 +729,22 @@ const authOptions: NextAuthConfig = {
           url: (credentials.url as string) || undefined,
         };
 
-        // A URL login carries the endpoint only inside `url`. Record the real
-        // host/port/username so the connection is not filed under the
-        // localhost:6379 defaults below — that identity is hashed into the AAD
-        // that binds encrypted browser values to a connection, so sharing it
-        // across unrelated servers would let them read each other's values.
-        // `newClient` still connects via `url`, so nothing about the connection
-        // itself changes.
+        // A URL login carries the endpoint only inside `url`, and `newClient`
+        // ignores host/port/username entirely when a URL is present. Record
+        // what the URL actually connects to, so the connection is not filed
+        // under the localhost:6379 defaults below — that identity is hashed
+        // into the AAD binding encrypted browser values to a connection, so a
+        // shared one would let unrelated servers read each other's values.
+        // The URL wins outright rather than merging: keeping a host or port the
+        // client never used would describe a connection that does not exist,
+        // and would let two different URLs share one identity.
         if (creds.url) {
           const fromUrl = parseConnectionUrl(creds.url);
-          creds.host = creds.host ?? fromUrl.host;
-          creds.port = creds.port ?? fromUrl.port;
-          creds.username = creds.username ?? fromUrl.username;
+          if (fromUrl.host) {
+            creds.host = fromUrl.host;
+            creds.port = fromUrl.port;
+            creds.username = fromUrl.username;
+          }
         }
 
         try {
