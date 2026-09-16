@@ -91,7 +91,20 @@ describe("preflightQuery", () => {
     ]);
   });
 
-  it("reads the scheme through backslash escapes", () => {
+  it("decodes the escapes FalkorDB decodes, and only those", () => {
+    // `\\` is decoded on the server, so the path below really is `file://a\b.csv`.
+    assert.deepEqual(codes("LOAD CSV FROM 'file://a\\\\b.csv' AS row RETURN row", FILE_OK), []);
+
+    // `\uXXXX` is not: the server keeps the backslash and answers "Unsupported URI",
+    // and a backslash is never legal in a scheme, so we must reach the same verdict.
+    const escaped = "LOAD CSV FROM 'ht\\u0074ps://example.com/a.csv' AS row RETURN row";
+    const [issue] = preflightQuery(escaped, FILE_OK);
+
+    assert.equal(issue.code, "LOAD_CSV_UNSUPPORTED_URI");
+    assert.equal(issue.uri, "ht\\u0074ps://example.com/a.csv");
+  });
+
+  it("reports an unknown escape in the scheme, as the server does", () => {
     const query = "LOAD CSV FROM 'ft\\p://a.csv' AS row RETURN row";
 
     assert.deepEqual(codes(query, FILE_OK), ["LOAD_CSV_UNSUPPORTED_URI"]);

@@ -44,6 +44,21 @@ const LOAD_CSV_FROM = /\bLOAD\s+CSV\s+(?:WITH\s+HEADERS\s+)?FROM\s+/gi;
 /** A URI scheme per RFC 3986: ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ":" */
 const URI_SCHEME = /^([A-Za-z][A-Za-z0-9+.-]*):/;
 
+/** The backslash escapes FalkorDB's parser actually decodes. Everything else keeps
+ *  its backslash on the server — `\uXXXX` included, which the grammar accepts as an
+ *  `EscapedChar` but the server leaves verbatim — so we must keep it too, or we would
+ *  judge a different URI than the one the server is given. */
+const FALKOR_STRING_ESCAPES = new Map([
+  ["\\", "\\"],
+  ["'", "'"],
+  ['"', '"'],
+  ["n", "\n"],
+  ["r", "\r"],
+  ["t", "\t"],
+  ["b", "\b"],
+  ["f", "\f"],
+]);
+
 /**
  * Find the string literal that starts at `start` in `masked`, and return its
  * content taken from `original`.
@@ -60,8 +75,10 @@ function readSourceLiteral(original: string, masked: string, start: number): str
   const end = masked.indexOf(quote, start + 1);
   if (end === -1) return null;
 
-  // Undo backslash escapes so the scheme is read from the effective value.
-  return original.slice(start + 1, end).replace(/\\(.)/g, "$1");
+  // Decode exactly what the server decodes, so we inspect the value it will see.
+  return original
+    .slice(start + 1, end)
+    .replace(/\\(.)/gs, (escape, char: string) => FALKOR_STRING_ESCAPES.get(char) ?? escape);
 }
 
 function schemeOf(uri: string): string | null {
