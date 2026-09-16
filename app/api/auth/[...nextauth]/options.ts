@@ -445,27 +445,18 @@ async function getConnectionClient(
   }
 
   // Get metadata from Token DB for role/host/port.
-  // If the Token DB query fails or the entry is missing, we still have a
-  // healthy cached client — return it with minimal info rather than
-  // invalidating the session.
+  // A healthy socket says nothing about who is on the other end of it: the
+  // record is the only source of the connection's role, and a `Read-Write`
+  // fallback would hand every read-only connection write access for the
+  // length of a Token DB outage. Refuse instead — the caller turns this into
+  // SESSION_INVALID.
   try {
     const storage = StorageFactory.getStorage();
     const tokenData = await storage.fetchTokenById(connId);
     if (!tokenData) {
-      // Entry missing but client is alive — use fallback metadata.
       // eslint-disable-next-line no-console
-      console.warn("Token DB entry not found for connId (non-fatal, using cached client):", connId);
-      return {
-        client,
-        connInfo: {
-          id: connId,
-          username: "",
-          role: "Read-Write" as Role,
-          host: "",
-          port: 0,
-          tls: false,
-        },
-      };
+      console.warn("Token DB entry not found for connId:", connId);
+      return null;
     }
 
     return {
@@ -482,18 +473,8 @@ async function getConnectionClient(
     };
   } catch (metaErr) {
     // eslint-disable-next-line no-console
-    console.warn("Failed to fetch connection metadata (non-fatal, using cached client):", metaErr);
-    return {
-      client,
-      connInfo: {
-        id: connId,
-        username: "",
-        role: "Read-Write" as Role,
-        host: "",
-        port: 0,
-        tls: false,
-      },
-    };
+    console.warn("Failed to fetch connection metadata:", metaErr);
+    return null;
   }
 }
 
@@ -1366,43 +1347,50 @@ export async function getClient(
   const connKey = sessionConnectionKey(id, connId);
   const cachedClient = connections.get(connKey);
   if (cachedClient) {
+    let healthy = false;
     try {
       const conn = await cachedClient.connection;
       await conn.ping();
-      // Cache hit + healthy → return without lock
-      const connUser: AuthenticatedUserWithPassword = {
-        id,
-        username: "",
-        role: "Read-Write" as Role,
-        host: "",
-        port: 0,
-        tls: false,
-        password: undefined,
-      };
-      try {
-        const storage = StorageFactory.getStorage();
-        const tokenData = await storage.fetchTokenById(connId);
-        if (tokenData) {
-          connUser.username = tokenData.username;
-          connUser.role = tokenData.role as Role;
-          connUser.host = tokenData.host;
-          connUser.port = tokenData.port;
-          connUser.tls = tokenData.tls ?? false;
-          if (tokenData.encrypted_password) {
-            const { decrypt } = await import("../encryption");
-            connUser.password = decrypt(tokenData.encrypted_password) || undefined;
-          }
-        }
-      } catch {
-        // Non-fatal: metadata lookup failed but connection works
-      }
-      return { client: cachedClient, user: connUser };
+      healthy = true;
     } catch {
       // Health check failed — fall through to locked recreation path.
       // Only remove from cache; do NOT close the client here because
       // another concurrent request may still hold a reference to it.
       // The underlying socket error handler or GC will clean it up.
       connections.delete(connKey);
+    }
+
+    if (healthy) {
+      // A live socket says nothing about who is on the other end of it. Without
+      // the Token DB record there is no role to enforce and no endpoint to
+      // identify the connection by, and a `Read-Write` default would hand every
+      // read-only connection write access for the length of the outage. Leave
+      // the client cached and fall through to the locked path, which resolves
+      // the record properly or refuses the request.
+      const tokenData = await StorageFactory.getStorage()
+        .fetchTokenById(connId)
+        .catch(() => null);
+      if (tokenData) {
+        const connUser: AuthenticatedUserWithPassword = {
+          id,
+          username: tokenData.username,
+          role: tokenData.role as Role,
+          host: tokenData.host,
+          port: tokenData.port,
+          tls: tokenData.tls ?? false,
+          password: undefined,
+        };
+        if (tokenData.encrypted_password) {
+          try {
+            const { decrypt } = await import("../encryption");
+            connUser.password = decrypt(tokenData.encrypted_password) || undefined;
+          } catch {
+            // Non-fatal: the password is only needed to reconnect, and the
+            // cached client is already connected.
+          }
+        }
+        return { client: cachedClient, user: connUser };
+      }
     }
   }
 
