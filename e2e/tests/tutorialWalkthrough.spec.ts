@@ -15,6 +15,10 @@ import { getRandomString } from "../infra/utils";
  */
 
 test.describe("Tutorial Walkthrough", () => {
+    // Both tests drive the tutorial, which loads and drops the same fixed
+    // `social-demo` graphs, so they cannot run against the server at once.
+    test.describe.configure({ mode: "default" });
+
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
     const userGraph = getRandomString("tutorialTest");
@@ -67,9 +71,14 @@ test.describe("Tutorial Walkthrough", () => {
             const page = await browser.getPage();
             await page.goto("about:blank");
             await Promise.all(
-                ["social-demo", "social-demo-test"].map(name =>
-                    apiCall.removeGraph(name).catch(() => { })
-                )
+                ["social-demo", "social-demo-test"].map(async name => {
+                    const { message } = await apiCall.removeGraph(name, "admin");
+                    // A graph the tutorial already dropped is the one failure
+                    // this teardown may ignore.
+                    if (!message.includes("deleted") && !message.includes("empty key")) {
+                        throw new Error(`Failed to remove ${name}: ${message}`);
+                    }
+                })
             );
         }
     });

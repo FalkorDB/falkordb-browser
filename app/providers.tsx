@@ -2064,9 +2064,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // full copy of the dataset on every run (#2087). Drop both first. DELETE
       // answers 400 for a graph that does not exist, which is the normal case, so
       // the pre-clean stays silent rather than toasting at every first-time user.
-      await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
+      const cleaned = await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
         method: "DELETE",
       }, silentToast, setIndicator, cid)));
+
+      // 400 is the answer for a graph that isn't there. Any other failure means
+      // the old copy survived, and the CREATEs would stack a second one on it.
+      if (cleaned.some(({ ok, status }) => !ok && status !== 400)) {
+        throw new Error("Failed to remove the leftover demo graphs");
+      }
 
       if (getConnectionEpoch() !== startEpoch) return;
 
@@ -2095,6 +2101,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         description: "Failed to load demo graphs",
         variant: "destructive",
       });
+      // The tutorial takes a resolved promise as a loaded dataset and walks the
+      // user into steps that query it, so a failure has to reach it.
+      throw error;
     }
   }, [graphName, graphNames, toast]);
 
