@@ -67,7 +67,10 @@ test.describe("Graph Tests", () => {
       await graph.setGraphsSortOrder("z-a");
       expect(await graph.getGraphNamesInList(suffix, names.length)).toEqual([...names].reverse());
     } finally {
-      await Promise.all(names.map((name) => apiCall.removeGraph(name)));
+      // `removeGraph` only sends the admin cookie when it is told to, and an
+      // unauthenticated DELETE is refused with a body rather than a throw — so
+      // without the role the cleanup silently leaves the graphs behind.
+      await Promise.all(names.map((name) => apiCall.removeGraph(name, "admin")));
     }
   });
 
