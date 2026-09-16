@@ -114,6 +114,17 @@ test("a dropped graph is forgotten, so reusing its name counts as a new graph", 
     assert.deepEqual(plain(recordGraphsFirstSeen(["a", "b"], 300)), { a: 100, b: 300 });
 });
 
+test("deleting the last graph empties the history", () => {
+    recordGraphsFirstSeen(["a"], 100);
+
+    // The caller decides whether an empty list is a confirmed observation; when
+    // it is (a successful deletion), the name has to be forgotten so that
+    // recreating it later counts as a new graph.
+    assert.deepEqual(plain(recordGraphsFirstSeen([], 200)), {});
+    assert.deepEqual(JSON.parse(storage.getItem(SCOPED_KEY)!), {});
+    assert.deepEqual(plain(recordGraphsFirstSeen(["a"], 300)), { a: 300 });
+});
+
 test("graph names that collide with Object.prototype members are ordinary graphs", () => {
     const names = ["__proto__", "constructor", "toString"];
     const byName = (a: string, b: string) => a.localeCompare(b);

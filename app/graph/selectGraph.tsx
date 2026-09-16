@@ -96,7 +96,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     // An empty list is never taken as a confirmed observation either: a failed
     // refresh on a connection switch publishes `[]` too (providers.tsx), and
     // recording it would forget the whole connection's history and re-stamp
-    // every graph as new on the next successful refresh.
+    // every graph as new on the next successful refresh. Deleting the last
+    // graph is confirmed and goes through `handleSetGraphNames` instead.
     // The list is replaced on every connection switch, which is what re-reads
     // the timestamps of the connection now in use.
     useEffect(() => {
@@ -104,6 +105,14 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
         setGraphsFirstSeen(recordGraphsFirstSeen(safeOptions));
     }, [safeOptions, options, tutorialOpen]);
+
+    // A list handed back by an explicit action IS confirmed, so it records even
+    // when it is empty — deleting the last graph must still forget its name, or
+    // recreating it later would reuse the old timestamp.
+    const handleSetGraphNames = useCallback((names: string[]) => {
+        setOptions(names);
+        if (!tutorialOpen) setGraphsFirstSeen(recordGraphsFirstSeen(names));
+    }, [setOptions, tutorialOpen]);
 
     const sortedOptions = useMemo(
         () => sortGraphNames(safeOptions, graphsSortOrder, graphsFirstSeen),
@@ -451,7 +460,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                             setGraph={setGraph}
                                             setOpenMenage={setOpenMenage}
                                             graphNames={safeOptions}
-                                            setGraphNames={opts => setOptions(opts)}
+                                            setGraphNames={handleSetGraphNames}
                                         />
                                         <ExportGraph
                                             selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
