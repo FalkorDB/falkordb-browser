@@ -107,18 +107,24 @@ export function recordGraphsFirstSeen(names: string[], now = Date.now()): Graphs
   return firstSeen;
 }
 
-/** Carries a renamed graph's timestamp over, so it keeps its place in the order. */
-export function renameGraphFirstSeen(from: string, to: string): void {
-  if (from === to || !getConnectionPrefix()) return;
-
+/**
+ * Carries a renamed graph's timestamp over, so it keeps its place in the order.
+ * Returns the up-to-date timestamps.
+ */
+export function renameGraphFirstSeen(from: string, to: string): GraphsFirstSeen {
   const firstSeen = readGraphsFirstSeen();
+
+  if (from === to || !getConnectionPrefix()) return firstSeen;
+
   const seen = seenAt(firstSeen, from);
 
-  if (seen === undefined) return;
+  if (seen === undefined) return firstSeen;
 
   delete firstSeen[from];
   firstSeen[to] = seen;
   setConnectionItem(GRAPHS_FIRST_SEEN_KEY, JSON.stringify(firstSeen));
+
+  return firstSeen;
 }
 
 /**

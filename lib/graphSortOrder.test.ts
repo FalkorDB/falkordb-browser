@@ -174,17 +174,20 @@ test("a renamed graph keeps the time it was first seen", () => {
     recordGraphsFirstSeen(["a", "b"], 100);
     recordGraphsFirstSeen(["a", "b", "c"], 200);
 
-    renameGraphFirstSeen("a", "renamed");
+    // The selector renders from the returned map, so it must already carry the
+    // new name — reading the order back off the stored value only is not enough.
+    const renamed = renameGraphFirstSeen("a", "renamed");
 
+    assert.deepEqual(plain(renamed), { renamed: 100, b: 100, c: 200 });
     assert.deepEqual(plain(readGraphsFirstSeen()), { renamed: 100, b: 100, c: 200 });
-    assert.deepEqual(sortGraphNames(["renamed", "b", "c"], "new-old", readGraphsFirstSeen()), ["c", "b", "renamed"]);
+    assert.deepEqual(sortGraphNames(["renamed", "b", "c"], "new-old", renamed), ["c", "b", "renamed"]);
 });
 
 test("renaming leaves the timestamps alone when there is nothing to carry over", () => {
     recordGraphsFirstSeen(["a"], 100);
 
-    renameGraphFirstSeen("a", "a");
-    renameGraphFirstSeen("missing", "renamed");
+    assert.deepEqual(plain(renameGraphFirstSeen("a", "a")), { a: 100 });
+    assert.deepEqual(plain(renameGraphFirstSeen("missing", "renamed")), { a: 100 });
 
     assert.deepEqual(plain(readGraphsFirstSeen()), { a: 100 });
 });

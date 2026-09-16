@@ -44,7 +44,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs } = useContext(ConnectionContext);
+    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs } = useContext(ConnectionContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage },
@@ -108,11 +108,14 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     // A list handed back by an explicit action IS confirmed, so it records even
     // when it is empty — deleting the last graph must still forget its name, or
-    // recreating it later would reuse the old timestamp.
+    // recreating it later would reuse the old timestamp. The stubs are pruned to
+    // match, or a deleted offloaded graph would be merged straight back in (and
+    // its timestamp with it) until the next probe.
     const handleSetGraphNames = useCallback((names: string[]) => {
         setOptions(names);
+        pruneOffloadedGraphs(names);
         if (!tutorialOpen) setGraphsFirstSeen(recordGraphsFirstSeen(names));
-    }, [setOptions, tutorialOpen]);
+    }, [setOptions, pruneOffloadedGraphs, tutorialOpen]);
 
     const sortedOptions = useMemo(
         () => sortGraphNames(safeOptions, graphsSortOrder, graphsFirstSeen),
@@ -232,8 +235,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
         if (result.ok) {
             // A rename is the same graph under a new name, so it keeps the time
-            // it was first seen instead of sorting as a brand-new graph.
-            renameGraphFirstSeen(optionName, option);
+            // it was first seen instead of sorting as a brand-new graph. The
+            // rendered map is updated with it, or the row jumps to the far end
+            // of the order for the render between here and the recording effect.
+            setGraphsFirstSeen(renameGraphFirstSeen(optionName, option));
 
             const newOptions = safeOptions.map((opt) => (opt === optionName ? option : opt));
             setOptions!(newOptions);

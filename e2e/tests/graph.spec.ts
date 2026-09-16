@@ -56,8 +56,9 @@ test.describe("Graph Tests", () => {
     // GRAPH.LIST carries no creation time and this browser sees all three at
     // once, so only the name orders are deterministic here.
     const names = [`a-${suffix}`, `m-${suffix}`, `z-${suffix}`];
-    await Promise.all(names.map((name) => apiCall.addGraph(name)));
     try {
+      await Promise.all(names.map((name) => apiCall.addGraph(name)));
+
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
 
       await graph.setGraphsSortOrder("a-z");
