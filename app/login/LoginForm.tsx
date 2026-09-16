@@ -309,6 +309,20 @@ export default function LoginForm({
       }
     }
 
+    // mTLS needs both halves. Say so here, where the missing upload is on
+    // screen, instead of letting the TLS handshake fail with a generic error.
+    if (!!clientCert !== !!clientKey) {
+      setError({
+        message: (
+          <p className="text-xs text-destructive">
+            {clientCert ? "Upload the client private key to use this client certificate." : "Upload the client certificate that matches this private key."}
+          </p>
+        ),
+        show: true,
+      });
+      return;
+    }
+
     try {
       await onSubmit({
         host: host.trim() || DEFAULT_HOST,

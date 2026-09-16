@@ -275,7 +275,9 @@ jobs:
           tls-cert-file /var/lib/falkordb/tls/redis.crt
           tls-key-file /var/lib/falkordb/tls/redis.key
           tls-ca-cert-file /var/lib/falkordb/tls/ca.crt
-          tls-auth-clients no
+          # "optional" rather than "no" so the same server serves both the plain
+          # TLS tests and the client-certificate one.
+          tls-auth-clients optional
           EOF
       - name: Start FalkorDB with TLS
         run: |

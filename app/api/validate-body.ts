@@ -342,6 +342,11 @@ export const fixRequest = z.object({
 });
 
 // Auth schemas
+// Both mTLS fields carry base64 of a PEM file, produced by FileReader on the
+// client. Pinning the alphabet keeps quotes and backslashes out of values that
+// reach the credential store, which interpolates them into Cypher.
+const BASE64_PEM = /^[A-Za-z0-9+/]+={0,2}$/;
+
 // mTLS material is only usable as a PAIR, and only under TLS. A certificate without
 // its key (or either with tls off) cannot open a connection, and without this it fails
 // far away in the TLS handshake with an opaque error instead of here, naming the field.
@@ -409,12 +414,14 @@ export const login = z.object({
       error: "Invalid client certificate",
     })
     .min(1, "Client certificate cannot be empty")
+    .regex(BASE64_PEM, "Client certificate must be base64-encoded")
     .optional(),
   key: z
     .string({
       error: "Invalid client key",
     })
     .min(1, "Client key cannot be empty")
+    .regex(BASE64_PEM, "Client key must be base64-encoded")
     .optional(),
   name: z
     .string({
@@ -491,9 +498,11 @@ export const addConnection = z.object({
     .optional(),
   cert: z
     .string({ error: "Invalid client certificate" })
+    .regex(BASE64_PEM, "Client certificate must be base64-encoded")
     .optional(),
   key: z
     .string({ error: "Invalid client key" })
+    .regex(BASE64_PEM, "Client key must be base64-encoded")
     .optional(),
 }).superRefine(requireMtlsPair);
 

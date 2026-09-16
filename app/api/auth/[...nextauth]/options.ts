@@ -86,6 +86,16 @@ function sessionConnectionKey(sessionId: string, connectionId: string): string {
   return `${sessionId}:${connectionId}`;
 }
 
+/**
+ * Decode a base64 certificate field into the PEM text the TLS socket takes.
+ * NextAuth stringifies an absent credential, so the literal "undefined" has to
+ * count as absent too.
+ */
+function pemFromBase64(value?: string): string | undefined {
+  if (!value || value === "undefined") return undefined;
+  return Buffer.from(value, "base64").toString("utf8");
+}
+
 export async function newClient(
   credentials: {
     host?: string;
@@ -102,6 +112,25 @@ export async function newClient(
 ): Promise<{ role: Role; client: FalkorDB }> {
   let connectionOptions: FalkorDBOptions;
 
+  const tlsEnabled = credentials.tls === "true";
+  const ca = pemFromBase64(credentials.ca);
+  const cert = pemFromBase64(credentials.cert);
+  const key = pemFromBase64(credentials.key);
+
+  // Every connect path — login, reconnect from the Token DB, JWT fallback —
+  // comes through here, so this is the one place a half-configured mTLS setup
+  // can be named. Without it the handshake fails far from the cause and
+  // authorize() reports it as a generic "Connection failed".
+  if (!!cert !== !!key) {
+    throw new Error("Client certificate and client key must be provided together");
+  }
+  if (cert && !tlsEnabled) {
+    throw new Error("Client certificate authentication requires TLS to be enabled");
+  }
+  if (cert && credentials.url) {
+    throw new Error("Client certificate authentication is not supported with a connection URL");
+  }
+
   // If URL is provided, use it directly
   if (credentials.url) {
     connectionOptions = {
@@ -109,38 +138,28 @@ export async function newClient(
     };
   } else {
     // Use individual connection parameters
-    connectionOptions =
-      credentials.tls === "true"
-        ? {
-          socket: {
-            host: credentials.host ?? "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            tls: credentials.tls === "true",
-            ...(process.env.SKIP_SERVER_IDENTITY_CHECK === "true" ? { checkServerIdentity: () => undefined } : {}),
-            ca:
-              !credentials.ca || credentials.ca === "undefined"
-                ? undefined
-                : [Buffer.from(credentials.ca, "base64").toString("utf8")],
-            cert:
-              !credentials.cert || credentials.cert === "undefined"
-                ? undefined
-                : Buffer.from(credentials.cert, "base64").toString("utf8"),
-            key:
-              !credentials.key || credentials.key === "undefined"
-                ? undefined
-                : Buffer.from(credentials.key, "base64").toString("utf8"),
-          },
-          password: credentials.password ?? undefined,
-          username: credentials.username ?? undefined,
-        }
-        : {
-          socket: {
-            host: credentials.host || "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-          },
-          password: credentials.password ?? undefined,
-          username: credentials.username ?? undefined,
-        };
+    connectionOptions = tlsEnabled
+      ? {
+        socket: {
+          host: credentials.host ?? "localhost",
+          port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+          tls: true,
+          ...(process.env.SKIP_SERVER_IDENTITY_CHECK === "true" ? { checkServerIdentity: () => undefined } : {}),
+          ca: ca ? [ca] : undefined,
+          cert,
+          key,
+        },
+        password: credentials.password ?? undefined,
+        username: credentials.username ?? undefined,
+      }
+      : {
+        socket: {
+          host: credentials.host || "localhost",
+          port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+        },
+        password: credentials.password ?? undefined,
+        username: credentials.username ?? undefined,
+      };
   }
 
   const client = await FalkorDB.connect(connectionOptions);

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { updateGraphElementAttribute } from "./validate-body.ts";
+import { updateGraphElementAttribute, login, addConnection } from "./validate-body.ts";
 import { CALENDAR_DATE_ERROR } from "../../lib/graphValues.ts";
 
 const parse = (body: unknown) => updateGraphElementAttribute.safeParse(body);
@@ -84,5 +84,48 @@ describe("updateGraphElementAttribute", () => {
 
   it("needs to know which element is edited", () => {
     assert.equal(parse({ value: "hello" }).success, false);
+  });
+});
+
+const CERT = Buffer.from("-----BEGIN CERTIFICATE-----").toString("base64");
+const KEY = Buffer.from("-----BEGIN PRIVATE KEY-----").toString("base64");
+
+const messages = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
+  result.success ? [] : result.error!.issues.map((i) => i.message);
+
+describe("mTLS credentials", () => {
+  // The login form is the only path that can reach a FalkorDB with
+  // tls-auth-clients on, so a half-filled pair has to be named here rather
+  // than surfacing as a failed handshake.
+  it("takes a client certificate only together with its key, under TLS", () => {
+    assert.equal(login.safeParse({ tls: "true", cert: CERT, key: KEY }).success, true);
+    assert.equal(login.safeParse({ tls: "true" }).success, true);
+
+    assert.match(
+      messages(login.safeParse({ tls: "true", cert: CERT })).join(),
+      /together/
+    );
+    assert.match(
+      messages(login.safeParse({ tls: "true", key: KEY })).join(),
+      /together/
+    );
+    assert.match(
+      messages(login.safeParse({ tls: "false", cert: CERT, key: KEY })).join(),
+      /TLS/
+    );
+  });
+
+  // The values are interpolated into Cypher by FalkorDBTokenStorage, so
+  // anything outside the base64 alphabet must not get that far.
+  it("takes certificate material only as base64", () => {
+    assert.equal(login.safeParse({ tls: "true", cert: "not base64!", key: KEY }).success, false);
+    assert.equal(login.safeParse({ tls: "true", cert: CERT, key: "a'b\\" }).success, false);
+  });
+
+  it("applies the same rules to a connection added mid-session", () => {
+    assert.equal(addConnection.safeParse({ tls: true, cert: CERT, key: KEY }).success, true);
+    assert.equal(addConnection.safeParse({ tls: true, cert: CERT }).success, false);
+    assert.equal(addConnection.safeParse({ tls: false, cert: CERT, key: KEY }).success, false);
+    assert.equal(addConnection.safeParse({ tls: true, cert: "%%%", key: KEY }).success, false);
   });
 });

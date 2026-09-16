@@ -55,6 +55,22 @@ export default class LoginPage extends HeaderComponent {
     return this.page.getByTestId("remove-certificate-btn");
   }
 
+  private get uploadClientCertInput(): Locator {
+    return this.page.getByText("Upload Client Certificate");
+  }
+
+  private get clientCertUploadedStatus(): Locator {
+    return this.page.getByTestId("client-cert-uploaded-status");
+  }
+
+  private get uploadClientKeyInput(): Locator {
+    return this.page.getByText("Upload Client Key");
+  }
+
+  private get clientKeyUploadedStatus(): Locator {
+    return this.page.getByTestId("client-key-uploaded-status");
+  }
+
   // URL mode locators
   private get manualConfigRadio(): Locator {
     return this.page.getByRole("radio", { name: "Manual Configuration" });
@@ -157,14 +173,6 @@ export default class LoginPage extends HeaderComponent {
     return this.certificateUploadedStatus.isHidden();
   }
 
-  async clickUploadCA(): Promise<void> {
-    await interactWhenVisible(
-      this.uploadCertificateInput,
-      (el) => el.click(),
-      "upload certificate input"
-    );
-  }
-
   async clickRemoveCertificateBtn(): Promise<void> {
     await interactWhenVisible(
       this.removeCertificateBtn,
@@ -174,8 +182,12 @@ export default class LoginPage extends HeaderComponent {
   }
 
   async isCertificateUploaded(): Promise<boolean> {
+    return this.isUploaded(this.certificateUploadedStatus);
+  }
+
+  private async isUploaded(status: Locator): Promise<boolean> {
     try {
-      await this.certificateUploadedStatus.waitFor({
+      await status.waitFor({
         state: "visible",
         timeout: 5000,
       });
@@ -234,16 +246,52 @@ export default class LoginPage extends HeaderComponent {
   }
 
   async uploadCertificate(filePath: string): Promise<void> {
+    await this.uploadThroughDropzone(
+      filePath,
+      this.uploadCertificateInput,
+      this.certificateUploadedStatus
+    );
+  }
+
+  async uploadClientCertificate(filePath: string): Promise<void> {
+    await this.uploadThroughDropzone(
+      filePath,
+      this.uploadClientCertInput,
+      this.clientCertUploadedStatus
+    );
+  }
+
+  async uploadClientKey(filePath: string): Promise<void> {
+    await this.uploadThroughDropzone(
+      filePath,
+      this.uploadClientKeyInput,
+      this.clientKeyUploadedStatus
+    );
+  }
+
+  async isClientCertificateUploaded(): Promise<boolean> {
+    return this.isUploaded(this.clientCertUploadedStatus);
+  }
+
+  async isClientKeyUploaded(): Promise<boolean> {
+    return this.isUploaded(this.clientKeyUploadedStatus);
+  }
+
+  private async uploadThroughDropzone(
+    filePath: string,
+    trigger: Locator,
+    status: Locator
+  ): Promise<void> {
     if (!existsSync(filePath)) {
       throw new Error(`Certificate file does not exist: ${filePath}`);
     }
     const fileChooserPromise = this.page.waitForEvent("filechooser");
-    await this.clickUploadCA();
+    await interactWhenVisible(trigger, (el) => el.click(), "upload input");
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles(filePath);
 
     try {
-      await this.certificateUploadedStatus.waitFor({
+      await status.waitFor({
         state: "visible",
         timeout: 10000,
       });
