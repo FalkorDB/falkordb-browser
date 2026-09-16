@@ -1916,6 +1916,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     const res = await fetchOptions(gToast, gInd, indicator, cid);
 
+    // GRAPH.LIST omits offloaded graphs and the selector merges the stubs back
+    // in, so settle the stubs first: publishing the list on its own would take
+    // a newly offloaded graph out of the merged list until they land.
+    if (res) await refreshOffloadedGraphs();
+
     // The list is connection-scoped: apply only if this is still the newest
     // refresh for the same connection (a later switch/refresh owns it otherwise).
     if (!isCurrent()) return;
@@ -1927,7 +1932,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphNamesLoaded(true);
     // Auto-select is graph-scoped: only apply if the graph context is unchanged.
     if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
-  }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName]);
+  }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName, refreshOffloadedGraphs]);
 
   useEffect(() => {
     if (status !== "authenticated") return;

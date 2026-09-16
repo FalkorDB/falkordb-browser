@@ -31,6 +31,15 @@ export const GRAPHS_FIRST_SEEN_KEY = "graphsFirstSeen";
 /** Epoch milliseconds at which each graph name was first seen. */
 export type GraphsFirstSeen = Record<string, number>;
 
+// A graph name is an arbitrary string, so `__proto__` and `constructor` are
+// legal names. Every map built here is prototype-less and every lookup is an
+// own-property one, so such a name is an ordinary entry instead of a prototype
+// member on read and the prototype setter on write.
+const emptyFirstSeen = (): GraphsFirstSeen => Object.create(null) as GraphsFirstSeen;
+
+const seenAt = (firstSeen: GraphsFirstSeen, name: string): number | undefined =>
+  (Object.hasOwn(firstSeen, name) ? firstSeen[name] : undefined);
+
 /** Falls back to the default for anything that is not a known sort order. */
 export const normalizeGraphSortOrder = (value: string | null | undefined): GraphSortOrder =>
   (GRAPH_SORT_ORDERS as readonly string[]).includes(value ?? "")
@@ -44,22 +53,26 @@ export const normalizeGraphSortOrder = (value: string | null | undefined): Graph
 export function readGraphsFirstSeen(): GraphsFirstSeen {
   // Unprefixed, the entry would be written to the shared namespace and read
   // back for whichever server connects next.
-  if (!getConnectionPrefix()) return {};
+  if (!getConnectionPrefix()) return emptyFirstSeen();
 
   const stored = getConnectionItem(GRAPHS_FIRST_SEEN_KEY);
 
-  if (!stored) return {};
+  if (!stored) return emptyFirstSeen();
 
   try {
     const parsed: unknown = JSON.parse(stored);
 
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return emptyFirstSeen();
 
-    return Object.fromEntries(
-      Object.entries(parsed).filter((entry): entry is [string, number] => Number.isFinite(entry[1]))
-    );
+    const firstSeen = emptyFirstSeen();
+
+    Object.entries(parsed).forEach(([name, seen]) => {
+      if (Number.isFinite(seen)) firstSeen[name] = seen as number;
+    });
+
+    return firstSeen;
   } catch {
-    return {};
+    return emptyFirstSeen();
   }
 }
 
@@ -70,11 +83,11 @@ export function readGraphsFirstSeen(): GraphsFirstSeen {
  */
 export function recordGraphsFirstSeen(names: string[], now = Date.now()): GraphsFirstSeen {
   const stored = readGraphsFirstSeen();
-  const firstSeen: GraphsFirstSeen = {};
-  let changed = Object.keys(stored).length !== names.length;
+  const firstSeen = emptyFirstSeen();
+  let changed = false;
 
   names.forEach((name) => {
-    const seen = stored[name];
+    const seen = seenAt(stored, name);
 
     if (seen === undefined) {
       firstSeen[name] = now;
@@ -83,6 +96,11 @@ export function recordGraphsFirstSeen(names: string[], now = Date.now()): Graphs
       firstSeen[name] = seen;
     }
   });
+
+  // Graphs that are gone simply did not make it into the rebuilt map, so the
+  // key counts differ — comparing against `names.length` instead would miss a
+  // list that dropped one graph and gained another under a duplicate name.
+  if (Object.keys(stored).length !== Object.keys(firstSeen).length) changed = true;
 
   if (changed && getConnectionPrefix()) setConnectionItem(GRAPHS_FIRST_SEEN_KEY, JSON.stringify(firstSeen));
 
@@ -94,7 +112,7 @@ export function renameGraphFirstSeen(from: string, to: string): void {
   if (from === to || !getConnectionPrefix()) return;
 
   const firstSeen = readGraphsFirstSeen();
-  const seen = firstSeen[from];
+  const seen = seenAt(firstSeen, from);
 
   if (seen === undefined) return;
 
@@ -118,7 +136,7 @@ export function sortGraphNames(names: string[], order: GraphSortOrder, firstSeen
   const direction = order === "new-old" ? -1 : 1;
 
   return [...names].sort((a, b) => {
-    const diff = (firstSeen[a] ?? 0) - (firstSeen[b] ?? 0);
+    const diff = (seenAt(firstSeen, a) ?? 0) - (seenAt(firstSeen, b) ?? 0);
 
     return diff === 0 ? byName(a, b) : diff * direction;
   });

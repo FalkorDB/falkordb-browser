@@ -93,10 +93,14 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     // when this browser first saw each graph. The tutorial's demo graphs are
     // not the user's, so they are kept out of that history — and a list that
     // has not loaded yet must not look like a server with no graphs at all.
+    // An empty list is never taken as a confirmed observation either: a failed
+    // refresh on a connection switch publishes `[]` too (providers.tsx), and
+    // recording it would forget the whole connection's history and re-stamp
+    // every graph as new on the next successful refresh.
     // The list is replaced on every connection switch, which is what re-reads
     // the timestamps of the connection now in use.
     useEffect(() => {
-        if (tutorialOpen || options === undefined) return;
+        if (tutorialOpen || options === undefined || safeOptions.length === 0) return;
 
         setGraphsFirstSeen(recordGraphsFirstSeen(safeOptions));
     }, [safeOptions, options, tutorialOpen]);
@@ -119,13 +123,18 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
         const res = await fetchOptions(gToast, gInd, indicator, cid);
         if (!isCurrent() || !res) return;
+        // Offloaded graphs can change between refreshes, so keep the enterprise
+        // load indicators in sync with the list. The stubs are refreshed BEFORE
+        // the list is published: a graph offloaded since the last refresh drops
+        // out of GRAPH.LIST, so publishing first would take it out of the merged
+        // list until the stubs land — long enough for the first-seen history to
+        // forget it and stamp it as brand new when it comes back.
+        await refreshOffloadedGraphs();
+        if (!isCurrent()) return;
         const prev = optionsRef.current;
         const unchanged = prev !== undefined && prev.length === res.opts.length && prev.every((name, i) => name === res.opts[i]);
         if (!unchanged) setOptions(res.opts);
         if (res.autoSelect) setSelectedValue(res.autoSelect);
-        // Offloaded graphs can change between refreshes, so keep the enterprise
-        // load indicators in sync with the list.
-        refreshOffloadedGraphs();
     }, [toast, setIndicator, indicator, setSelectedValue, setOptions, refreshOffloadedGraphs]);
 
     const loadMemory = useCallback((opt: string) =>
