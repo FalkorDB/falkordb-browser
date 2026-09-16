@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection, NodeShape } from "@falkordb/canvas";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
@@ -91,8 +91,13 @@ export default function ForceGraph({
     useEffect(() => () => clearTimeout(viewportRestoreTimerRef.current), []);
 
     // Mirrors the selection so a handler can read it without closing over it.
+    // Synced after commit, never during render, so a discarded render cannot leak
+    // into the committed canvas handlers.
     const selectedElementsRef = useRef(selectedElements);
-    selectedElementsRef.current = selectedElements;
+
+    useLayoutEffect(() => {
+        selectedElementsRef.current = selectedElements;
+    }, [selectedElements]);
 
     const clearPendingClick = useCallback(() => {
         if (!pendingClick.current) return;
@@ -393,6 +398,7 @@ export default function ForceGraph({
         // A stray tap on the background must not wipe a selection built up one
         // element at a time, exactly as Ctrl-click protects it on desktop.
         if (evt?.shiftKey || evt?.ctrlKey || multiSelect || selectedElements.length === 0) return;
+        selectedElementsRef.current = [];
         setSelectedElements([]);
     }, [selectedElements, setSelectedElements, clearPendingClick, multiSelect]);
 

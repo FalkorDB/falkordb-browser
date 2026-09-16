@@ -469,9 +469,16 @@ export default class GraphPage extends BasePage {
   }
 
   /** Selects a canvas element. The app defers selection until the
-   *  double-click window has passed, so this waits it out. */
-  async elementClick(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y);
+   *  double-click window has passed, so this waits it out. `additive` holds
+   *  Shift, which is what ForceGraph reads to extend a selection instead of
+   *  replacing it; `mouse.click` takes no modifiers, so the key is held. */
+  async elementClick(x: number, y: number, additive = false): Promise<void> {
+    if (additive) await this.page.keyboard.down("Shift");
+    try {
+      await this.page.mouse.click(x, y);
+    } finally {
+      if (additive) await this.page.keyboard.up("Shift");
+    }
     await this.page.waitForTimeout(400);
   }
 
@@ -1667,9 +1674,10 @@ export default class GraphPage extends BasePage {
     positions: { x: number; y: number }[]
   ): Promise<void> {
     // Sequential: the delete control appears after the first selection, so an
-    // unawaited loop could open the dialog on a partial selection.
-    for (const position of positions) {
-      await this.elementClick(position.x, position.y);
+    // unawaited loop could open the dialog on a partial selection. Shift from the
+    // second click on, or each one would replace the selection instead of adding.
+    for (const [index, position] of positions.entries()) {
+      await this.elementClick(position.x, position.y, index > 0);
     }
     await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
