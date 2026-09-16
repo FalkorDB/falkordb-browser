@@ -145,3 +145,26 @@ Validate existing Secret based ENCRYPTION_KEY configuration.
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Render one env entry for a secret part of the preconfigured connection.
+Prefers connection.existingSecret when that key is named, falls back to the
+chart-managed Secret, and renders nothing when neither supplies a value.
+Call with (dict "root" $ "name" "FALKORDB_PASSWORD" "value" ... "existingKey" ...)
+*/}}
+{{- define "falkordb-browser.connectionSecretEnv" -}}
+{{- $existingName := .root.Values.connection.existingSecret.name | default "" -}}
+{{- if and .existingKey $existingName -}}
+- name: {{ .name }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ $existingName | quote }}
+      key: {{ .existingKey | quote }}
+{{- else if .value -}}
+- name: {{ .name }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "falkordb-browser.fullname" .root }}
+      key: {{ .name }}
+{{- end -}}
+{{- end }}

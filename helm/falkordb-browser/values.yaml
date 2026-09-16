@@ -32,6 +32,41 @@ encryption:
     name: ""
     key: "ENCRYPTION_KEY"
 
+# A single FalkorDB connection supplied by the operator, so the browser starts
+# already connected instead of asking every user to fill in the login form.
+# This is the GitOps path: the connection lives in Git (and its password in a
+# Secret) rather than in each user's browser.
+#
+# SECURITY: with autoConnect enabled and a password supplied, anyone who can
+# reach the browser reaches the database with it. Only enable that where the
+# browser is already protected (private network, ingress auth, VPN). Leave the
+# password empty to have users supply it themselves on a prefilled form.
+connection:
+  enabled: false
+  # Either set url, or the discrete fields below. Discrete fields win over the
+  # url, so a single field can be overridden without rewriting the url.
+  # Example: "falkors://default:password@falkordb-master.falkordb.svc:6379"
+  url: ""
+  host: ""
+  # Left empty to fall back to the url, then to 6379.
+  port: ""
+  # Left empty to fall back to the url, then to "default".
+  username: ""
+  password: ""
+  # "true" / "false", or empty to take TLS from the url scheme (falkors/rediss).
+  tls: ""
+  # Base64-encoded CA certificate; needed only for a private TLS CA.
+  ca: ""
+  # Log in automatically on page load. Set to false to only prefill the form.
+  autoConnect: true
+  # Read the secret parts from an existing Secret instead of from values.yaml.
+  # Each key is optional; an unset key falls back to the value above.
+  existingSecret:
+    name: ""
+    urlKey: ""
+    passwordKey: ""
+    caKey: ""
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: true

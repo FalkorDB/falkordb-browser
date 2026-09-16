@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
 import { LRUCache } from "lru-cache";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
+import { readPreconfiguredConnection } from "@/lib/preconfiguredConnection";
 import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
@@ -682,6 +683,7 @@ const authOptions: NextAuthConfig = {
         tls: { label: "tls", type: "boolean" },
         ca: { label: "ca", type: "string" },
         url: { label: "url", type: "string" },
+        preconfigured: { label: "preconfigured", type: "string" },
       },
       async authorize(credentials) {
         if (!credentials) {
@@ -689,7 +691,7 @@ const authOptions: NextAuthConfig = {
         }
 
         // In next-auth v5, credential values are `unknown`. Cast to strings.
-        const creds = {
+        let creds = {
           host: (credentials.host as string) || undefined,
           port: (credentials.port as string) || undefined,
           password: (credentials.password as string) || undefined,
@@ -698,6 +700,32 @@ const authOptions: NextAuthConfig = {
           ca: (credentials.ca as string) || undefined,
           url: (credentials.url as string) || undefined,
         };
+
+        // The client may ask to log in with the operator's preconfigured
+        // connection, but it may not influence it: every field is replaced by
+        // the server-side value, so the password never crosses the wire.
+        if (credentials.preconfigured === "true") {
+          let preconfigured;
+          try {
+            preconfigured = readPreconfiguredConnection(process.env);
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error("Invalid preconfigured connection environment:", err);
+            return null;
+          }
+
+          if (!preconfigured) return null;
+
+          creds = {
+            host: preconfigured.host,
+            port: String(preconfigured.port),
+            password: preconfigured.password || undefined,
+            username: preconfigured.username,
+            tls: preconfigured.tls ? "true" : "false",
+            ca: preconfigured.ca,
+            url: undefined,
+          };
+        }
 
         try {
           // Generate random UUID for this session and its first connection

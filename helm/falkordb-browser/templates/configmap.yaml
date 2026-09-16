@@ -13,3 +13,19 @@ data:
   CYPHER: {{ .Values.env.cypher | quote }}
   HOSTNAME: {{ .Values.env.hostname | quote }}
   API_TOKEN_STORAGE_PATH: {{ .Values.env.apiTokenStoragePath | quote }}
+{{- if .Values.connection.enabled }}
+  {{- /* Only non-empty fields are emitted: an empty value would override the url. */}}
+  FALKORDB_AUTO_CONNECT: {{ .Values.connection.autoConnect | quote }}
+  {{- with .Values.connection.host }}
+  FALKORDB_HOST: {{ . | quote }}
+  {{- end }}
+  {{- if ne (toString .Values.connection.port) "" }}
+  FALKORDB_PORT: {{ .Values.connection.port | quote }}
+  {{- end }}
+  {{- with .Values.connection.username }}
+  FALKORDB_USERNAME: {{ . | quote }}
+  {{- end }}
+  {{- if ne (toString .Values.connection.tls) "" }}
+  FALKORDB_TLS: {{ .Values.connection.tls | quote }}
+  {{- end }}
+{{- end }}
