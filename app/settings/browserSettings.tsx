@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server, Minus, Plus } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
-import { areCaptionKeysEqual, cn, getDefaultQuery } from "@/lib/utils";
+import { areCaptionKeysEqual, cn, getConnectionEpoch, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -471,7 +471,11 @@ export default function BrowserSettings() {
         // settles. If the user switches connections in between, writing would
         // file a blob bound to one connection under another's key, where it can
         // never be decrypted — and would overwrite that connection's own keys.
+        // The prefix alone cannot tell: an A→B→A switch restores it, so a promise
+        // that settles after the round trip would still match. The epoch only
+        // moves forward, so pair the two.
         const scope = getConnectionPrefix();
+        const epoch = getConnectionEpoch();
 
         try {
             if (keys.length > 0) {
@@ -484,7 +488,7 @@ export default function BrowserSettings() {
                     });
                     return false;
                 }
-                if (getConnectionPrefix() !== scope) {
+                if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
                     toast({
                         title: "Error",
                         description: "The connection changed while saving. Please try again.",

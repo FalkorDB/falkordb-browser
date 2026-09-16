@@ -27,13 +27,13 @@ export async function POST(request: NextRequest) {
       return session;
     }
 
-    // `getClient` returns a healthy cached client with empty connection
-    // metadata when its Token DB lookup fails — it treats that lookup as
-    // non-fatal because the connection itself still works. Hashing those
-    // placeholders would bind every caller in that state to one shared
-    // identity, and the values they store would stop decrypting the moment the
-    // lookup recovers. Refuse instead, with a status the client treats as
-    // transient so it keeps what it already has.
+    // `getClient` refuses rather than inventing connection metadata when its
+    // Token DB lookup fails, so this should now be unreachable. It stays as a
+    // second line of defence because the failure it guards is silent: hashing
+    // a placeholder host/port would bind every caller in that state to one
+    // shared identity, and their values would stop decrypting the moment the
+    // lookup recovered. The status is one the client treats as transient, so
+    // it keeps what it already has.
     if (!session.user.host || !session.user.port) {
       return NextResponse.json(
         { error: "Connection identity unavailable, please retry" },

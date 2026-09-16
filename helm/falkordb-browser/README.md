@@ -52,6 +52,13 @@ session-signing secret on first install and reuses it on upgrades. Set it only
 if you need the same secret across releases — and then to a real random value
 (`openssl rand -base64 32`), never a placeholder.
 
+Reuse depends on `lookup`, which reads the existing release Secret from the
+cluster. Rendering without cluster access — `helm template`, and the GitOps
+reconcilers that build on it — gets an empty `lookup` and therefore a fresh
+secret on every render, so re-applying the manifest signs every session out.
+Those deployments must set `env.nextauthSecret` to a value they keep, from
+whatever secret store they already use.
+
 ### Install from a values file
 
 ```bash

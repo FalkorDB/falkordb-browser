@@ -1863,8 +1863,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             }
           }
           if (claimingLegacy) {
-            setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, stored);
-            localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            // The unscoped entry predates server encryption, so it may still be
+            // plain text. Encrypt it on the way in rather than carrying the
+            // plaintext forward until the user happens to edit a key. A failure
+            // here throws to the catch below, which leaves the unscoped entry
+            // where it is — nothing is lost, the migration just retries later.
+            const toStore = looksServerEncrypted(stored) ? stored : await serverEncrypt(stored);
+            if (stale()) return;
+            if (toStore) {
+              setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, toStore);
+              localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            }
           }
         } catch (error) {
           if (stale()) return;
