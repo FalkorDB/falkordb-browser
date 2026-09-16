@@ -71,6 +71,13 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+        if (error instanceof Error && error.message.includes("ENCRYPTION_KEY")) {
+          // A misconfigured server, not a rejected value.
+          return NextResponse.json(
+            { message: "Server configuration error" },
+            { status: 500 }
+          );
+        }
         return NextResponse.json(
           { message: "Value does not belong to this connection" },
           { status: 403 }

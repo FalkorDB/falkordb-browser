@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
-import { serverEncrypt } from "@/lib/server-encryption";
+import { looksServerEncrypted, serverEncrypt } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionPrefix, removeConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
@@ -496,7 +496,14 @@ export default function BrowserSettings() {
             } else {
                 removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
             }
-            localStorage.removeItem("secretKey");
+            // The legacy single-key setting is superseded once this connection
+            // has its own list — but only if the value is ours to drop. A
+            // server-encrypted one may belong to another connection, which the
+            // loader deliberately preserves so switching back recovers it.
+            const legacySecretKey = localStorage.getItem("secretKey");
+            if (legacySecretKey && !looksServerEncrypted(legacySecretKey)) {
+                localStorage.removeItem("secretKey");
+            }
 
             persistSelectedChatApiKeyId(nextSelectedId);
         } catch (error) {

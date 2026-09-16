@@ -103,6 +103,15 @@ export async function POST(request: NextRequest) {
           { status: 400, headers: corsHeaders }
         );
       }
+      if (err instanceof Error && err.message.includes("ENCRYPTION_KEY")) {
+        // A misconfigured server, not a rejected value. Reporting it as 403
+        // would tell the client the blob belongs to someone else, which is a
+        // lie that outlives the outage.
+        return NextResponse.json(
+          { error: "Server configuration error" },
+          { status: 500, headers: corsHeaders }
+        );
+      }
       // Wrong owner or tampered input; GCM cannot tell them apart. 403 tells
       // the client to keep the value — it may belong to another connection.
       return NextResponse.json(

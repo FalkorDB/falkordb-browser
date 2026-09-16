@@ -125,7 +125,9 @@ const parseChatApiKeys = (value: string): ChatApiKey[] => {
 };
 
 const loadSelectedChatApiKeyId = () =>
-  localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
+  getConnectionItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY)
+  || localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY)
+  || "";
 
 /**
  * Validates and normalises a model identifier before it is persisted.
