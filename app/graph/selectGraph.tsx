@@ -44,7 +44,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
+    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage },
@@ -89,7 +89,14 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     // points at the old one, and recording rebuilds the map — so it would stamp
     // one server's graphs into the other's history and drop what was there.
     // `null` is first load, where the list is fetched off the session too.
-    const canRecordHistory = activeConnectionId === null || prefixConnectionId === activeConnectionId;
+    // The module-level id is checked as well because a switch sets it before
+    // React's: between the two, every request is already pinned to the new
+    // server while both values here still name the old one.
+    const canRecordHistory = useCallback(
+        () => (activeConnectionId === null || prefixConnectionId === activeConnectionId)
+            && getActiveConnectionIdGlobal() === activeConnectionId,
+        [activeConnectionId, prefixConnectionId]
+    );
 
     // Storage moved to another connection, so the timestamps in hand belong to
     // the one just left — re-read, or the new server's list is ordered by the
@@ -114,10 +121,19 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     // Forgetting it there would hand it back as brand new the moment it
     // reappears. Deletions are confirmed and go through `handleSetGraphNames`.
     useEffect(() => {
-        if (tutorialOpen || !canRecordHistory || options === undefined || safeOptions.length === 0) return;
+        if (tutorialOpen || !canRecordHistory() || options === undefined || safeOptions.length === 0) return;
 
         setGraphsFirstSeen(observeGraphsFirstSeen(safeOptions));
     }, [safeOptions, options, tutorialOpen, canRecordHistory]);
+
+    // A confirmed list — one an explicit create, delete or rename produced —
+    // outranks every refresh already in flight, this component's and the
+    // provider's alike: a list read before the mutation would otherwise land
+    // after it and put the old names back, and be recorded as an observation.
+    const supersedeRefreshes = useCallback(() => {
+        optionsSeqRef.current += 1;
+        supersedeGraphRefreshes();
+    }, [supersedeGraphRefreshes]);
 
     // A list handed back by an explicit action IS confirmed, so it records even
     // when it is empty — deleting the last graph must still forget its name, or
@@ -125,10 +141,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     // match, or a deleted offloaded graph would be merged straight back in (and
     // its timestamp with it) until the next probe.
     const handleSetGraphNames = useCallback((names: string[]) => {
+        supersedeRefreshes();
         setOptions(names);
         pruneOffloadedGraphs(names);
-        if (!tutorialOpen && canRecordHistory) setGraphsFirstSeen(recordGraphsFirstSeen(names));
-    }, [setOptions, pruneOffloadedGraphs, tutorialOpen, canRecordHistory]);
+        if (!tutorialOpen && canRecordHistory()) setGraphsFirstSeen(recordGraphsFirstSeen(names));
+    }, [setOptions, pruneOffloadedGraphs, supersedeRefreshes, tutorialOpen, canRecordHistory]);
 
     const sortedOptions = useMemo(
         () => sortGraphNames(safeOptions, graphsSortOrder, graphsFirstSeen),
@@ -153,8 +170,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         // the list is published: a graph offloaded since the last refresh drops
         // out of GRAPH.LIST, so publishing first would take it out of the merged
         // list until the stubs land — long enough for the first-seen history to
-        // forget it and stamp it as brand new when it comes back.
-        await refreshOffloadedGraphs();
+        // forget it and stamp it as brand new when it comes back. Pinning the
+        // probe to `cid` keeps both halves describing the same connection.
+        await refreshOffloadedGraphs(cid);
         if (!isCurrent()) return;
         const prev = optionsRef.current;
         const unchanged = prev !== undefined && prev.length === res.opts.length && prev.every((name, i) => name === res.opts[i]);
@@ -247,11 +265,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         if (getConnectionEpoch() !== startEpoch) return false;
 
         if (result.ok) {
+            supersedeRefreshes();
+
             // A rename is the same graph under a new name, so it keeps the time
             // it was first seen instead of sorting as a brand-new graph. The
             // rendered map is updated with it, or the row jumps to the far end
             // of the order for the render between here and the recording effect.
-            if (canRecordHistory) setGraphsFirstSeen(renameGraphFirstSeen(optionName, option));
+            if (canRecordHistory()) setGraphsFirstSeen(renameGraphFirstSeen(optionName, option));
 
             // The stub is keyed by name, so it has to follow the rename too, or
             // the old name is merged back in beside the new one below.
@@ -277,7 +297,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok;
-    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, buildMetricCells, canRecordHistory, renameOffloadedGraph]);
+    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, buildMetricCells, canRecordHistory, renameOffloadedGraph, supersedeRefreshes]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
@@ -507,6 +527,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                             open={openDuplicate}
                                             onOpenChange={setOpenDuplicate}
                                             onDuplicate={(duplicateName) => {
+                                                supersedeRefreshes();
                                                 setSelectedValue(duplicateName);
                                                 setOptions!([...safeOptions, duplicateName]);
                                             }}

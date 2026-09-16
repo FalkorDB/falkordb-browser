@@ -303,7 +303,9 @@ type ConnectionContextType = {
   // currently offloaded from memory.
   supportsOffload: boolean;
   offloadedGraphs: string[];
-  refreshOffloadedGraphs: () => Promise<void>;
+  // Pass the connection a graph list was read for when the probe is about to be
+  // merged into it, so the two can never describe different servers.
+  refreshOffloadedGraphs: (pinnedConnectionId?: string | null) => Promise<void>;
   // Drops every stub that is not in a freshly confirmed graph list, so a graph
   // deleted through the UI leaves the merged list at once instead of lingering
   // until the next probe.
@@ -311,6 +313,10 @@ type ConnectionContextType = {
   // Carries a stub over to the graph's new name, so a renamed offloaded graph
   // does not show up twice (once per name) until the next probe.
   renameOffloadedGraph: (from: string, to: string) => void;
+  // Discards every graph-list refresh and stub probe already in flight. Callers
+  // that are applying a confirmed list (create/delete/rename) use it so a read
+  // taken before the mutation cannot land after it and undo it.
+  supersedeGraphRefreshes: () => void;
   // True when the enterprise module is loaded with LDAP servers configured. In
   // that case FalkorDB defers authentication and authorization to LDAP, so the
   // browser must not offer user/role management for this connection. `null`
@@ -624,6 +630,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   refreshOffloadedGraphs: async () => { },
   pruneOffloadedGraphs: () => { },
   renameOffloadedGraph: () => { },
+  supersedeGraphRefreshes: () => { },
   usesLdap: null,
   additionalConnections: [],
   setAdditionalConnections: () => { },
