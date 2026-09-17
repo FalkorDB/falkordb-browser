@@ -4,15 +4,31 @@
  * Includes legacy migration support for old client-side encrypted values.
  */
 
+import { getActiveConnectionIdGlobal } from './active-connection.ts';
+
 const LEGACY_ENCRYPTED_PREFIX = 'enc:';
 const LEGACY_KEY_STORAGE_KEY = 'falkordb-key';
+
+/**
+ * Owner binding is derived from the connection behind the request, and the
+ * storage key these values are filed under is derived from the connection this
+ * tab is showing. Pin the request to the latter so the two cannot disagree:
+ * without the header the server falls back to the session's active connection,
+ * which another tab can switch out from under this one.
+ */
+function encryptionHeaders(): HeadersInit {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const connId = getActiveConnectionIdGlobal();
+  if (connId) headers['X-Connection-Id'] = connId;
+  return headers;
+}
 
 export async function serverEncrypt(value: string): Promise<string> {
   if (!value) return '';
 
   const res = await fetch('/api/encrypt', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: encryptionHeaders(),
     body: JSON.stringify({ value, action: 'encrypt' }),
   });
 
@@ -25,13 +41,34 @@ export async function serverEncrypt(value: string): Promise<string> {
 }
 
 /**
- * Returns true if the value looks like it was produced by the server's encrypt() function.
- * Format: iv(hex):authTag(hex):encryptedData(hex) — three colon-separated hex strings.
+ * Thrown when /api/encrypt refuses to decrypt. `status` distinguishes the two
+ * refusals the server makes:
+ *  - 400: the value predates owner binding and must be re-entered (drop it).
+ *  - 403: the value belongs to a different connection (keep it — switching back
+ *    to that connection restores access).
+ */
+export class ServerDecryptError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`Decryption failed: ${status}`);
+    this.name = 'ServerDecryptError';
+    this.status = status;
+  }
+}
+
+/**
+ * Returns true if the value looks like ciphertext produced by the server.
+ * Current format: v2:iv:authTag:encryptedData — owner-bound.
+ * Legacy format:  iv:authTag:encryptedData — unbound, no longer decryptable,
+ * but still recognised so it is never mistaken for plain text and shown to the
+ * user as a hex blob.
  * Avoids sending plain-text values to the decrypt API (which would result in a 400).
  */
 export function looksServerEncrypted(value: string): boolean {
   const parts = value.split(':');
-  return parts.length === 3 && parts.every(p => p.length > 0 && /^[0-9a-fA-F]+$/.test(p));
+  const hexParts = parts[0] === 'v2' ? parts.slice(1) : parts;
+  return hexParts.length === 3 && hexParts.every(p => p.length > 0 && /^[0-9a-fA-F]+$/.test(p));
 }
 
 export async function serverDecrypt(encryptedValue: string): Promise<string> {
@@ -43,12 +80,12 @@ export async function serverDecrypt(encryptedValue: string): Promise<string> {
 
   const res = await fetch('/api/encrypt', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: encryptionHeaders(),
     body: JSON.stringify({ value: encryptedValue, action: 'decrypt' }),
   });
 
   if (!res.ok) {
-    throw new Error(`Decryption failed: ${res.status}`);
+    throw new ServerDecryptError(res.status);
   }
 
   const data = await res.json();

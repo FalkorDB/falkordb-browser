@@ -2,6 +2,7 @@ import test, { expect } from "@playwright/test";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
+import { user } from '../config/user.json';
 
 /**
  * Encryption migration e2e tests.
@@ -11,37 +12,55 @@ import LoginPage from "../logic/POM/loginPage";
  *
  * 1. Plain text (never encrypted) → migrated to server-side AES-256-GCM
  * 2. Legacy client-side `enc:` prefix → detected and migrated
- * 3. Already server-encrypted (iv:authTag:ciphertext hex) → decrypted on load
+ * 3. Already server-encrypted (v2:iv:authTag:ciphertext hex) → decrypted on load
  * 4. Saving via UI stores encrypted value
  */
 
-const HEX_COLON_PATTERN = /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
+// Owner-bound ciphertext: v2:iv(12B):authTag(16B):data
+const HEX_COLON_PATTERN = /^v2:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
+// Chat API keys live under a connection-scoped key (`<host>:<port>:<user>:chatApiKeys`)
+// because each blob is encrypted against that same connection identity. Tests
+// resolve the concrete key by suffix instead of hardcoding the connection.
 const CHAT_API_KEYS_STORAGE_KEY = "chatApiKeys";
+const CHAT_API_KEYS_SUFFIX = `:${CHAT_API_KEYS_STORAGE_KEY}`;
+
+/** Reads the connection-scoped chat API keys entry from inside the page. */
+async function readStoredChatApiKeys(
+    page: Awaited<ReturnType<BrowserWrapper["getPage"]>>
+): Promise<string | null> {
+    return page.evaluate((suffix) => {
+        for (let i = 0; i < localStorage.length; i += 1) {
+            const key = localStorage.key(i);
+            if (key && key.endsWith(suffix)) return localStorage.getItem(key);
+        }
+        return null;
+    }, CHAT_API_KEYS_SUFFIX);
+}
 
 async function waitForMigratedChatApiKeys(page: Awaited<ReturnType<BrowserWrapper["getPage"]>>) {
-    await expect.poll(async () => page.evaluate((storageKey) => {
-        const secretKey = localStorage.getItem("secretKey");
-        const chatApiKeys = localStorage.getItem(storageKey);
-        return secretKey === null && chatApiKeys !== null && /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(chatApiKeys);
-    }, CHAT_API_KEYS_STORAGE_KEY), { timeout: 15000 }).toBe(true);
+    await expect.poll(async () => {
+        const chatApiKeys = await readStoredChatApiKeys(page);
+        const secretKey = await page.evaluate(() => localStorage.getItem("secretKey"));
+        return secretKey === null && chatApiKeys !== null && HEX_COLON_PATTERN.test(chatApiKeys);
+    }, { timeout: 15000 }).toBe(true);
 
-    return page.evaluate(async (storageKey) => {
-        const encryptedKeys = localStorage.getItem(storageKey);
-        if (!encryptedKeys) return null;
+    const encryptedKeys = await readStoredChatApiKeys(page);
+    if (!encryptedKeys) return null;
 
+    return page.evaluate(async (value) => {
         const response = await fetch('/api/encrypt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ value: encryptedKeys, action: 'decrypt' }),
+            body: JSON.stringify({ value, action: 'decrypt' }),
         });
         const payload = await response.json();
 
         return {
-            encryptedKeys,
+            encryptedKeys: value,
             decryptedKeys: payload.value as string,
             secretKey: localStorage.getItem("secretKey"),
         };
-    }, CHAT_API_KEYS_STORAGE_KEY);
+    }, encryptedKeys);
 }
 
 test.describe(`@admin Encryption migration tests`, () => {
@@ -196,7 +215,7 @@ test.describe(`@admin Encryption migration tests`, () => {
         await page.reload({ waitUntil: "networkidle" });
         await page.waitForTimeout(2000);
 
-        const afterReload = await page.evaluate((storageKey) => localStorage.getItem(storageKey), CHAT_API_KEYS_STORAGE_KEY);
+        const afterReload = await readStoredChatApiKeys(page);
         expect(afterReload).toBe(encryptedValue);
     });
 
@@ -279,5 +298,101 @@ test.describe(`@admin Encryption migration tests`, () => {
         });
 
         expect(status).toBe(401);
+    });
+
+    test(`/api/encrypt rejects a ciphertext that predates owner binding`, async () => {
+        await browser.createNewPage(LoginPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+
+        const page = await browser.getPage();
+
+        // Dropping the `v2:` prefix leaves the 3-part shape the endpoint used
+        // to produce, which is no longer readable by design.
+        const result = await page.evaluate(async () => {
+            const encRes = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: "legacy-value", action: 'encrypt' }),
+            });
+            const { value } = await encRes.json();
+
+            const decRes = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: value.replace(/^v2:/, ''), action: 'decrypt' }),
+            });
+            return { status: decRes.status, body: await decRes.json() };
+        });
+
+        expect(result.status).toBe(400);
+        expect(result.body.error).toBe("Value predates owner binding and must be re-entered");
+    });
+
+    test(`/api/encrypt rejects a tampered ciphertext`, async () => {
+        await browser.createNewPage(LoginPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+
+        const page = await browser.getPage();
+
+        const result = await page.evaluate(async () => {
+            const encRes = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: "value-belonging-to-someone-else", action: 'encrypt' }),
+            });
+            const { value } = await encRes.json();
+
+            // Flip a ciphertext nibble so the auth tag no longer matches.
+            const parts = value.split(':');
+            const data = parts[3];
+            const flipped = (data[0] === 'a' ? 'b' : 'a') + data.slice(1);
+            const tampered = [parts[0], parts[1], parts[2], flipped].join(':');
+
+            const decRes = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: tampered, action: 'decrypt' }),
+            });
+            return { status: decRes.status, body: await decRes.json() };
+        });
+
+        expect(result.status).toBe(403);
+    });
+
+    test(`/api/encrypt refuses a ciphertext minted by another connection`, async () => {
+        // The binding is `username@host:port`, so signing in as a different
+        // ACL user is a different owner even on the same server. This is the
+        // attack the binding exists for: a blob lifted out of one user's
+        // browser storage must not decrypt under another user's session.
+        const login = await browser.createNewPage(LoginPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+
+        const page = await browser.getPage();
+        const ciphertext = await page.evaluate(async () => {
+            const res = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: "sk-admin-only", action: 'encrypt' }),
+            });
+            return (await res.json()).value as string;
+        });
+        expect(ciphertext).toMatch(HEX_COLON_PATTERN);
+
+        // Same browser, different ACL user — so a different owner.
+        await login.disconnectConnection();
+        await login.connectWithCredentials("readwriteuser", user.password);
+        await login.waitForUrl(urls.graphUrl);
+
+        const result = await page.evaluate(async (value) => {
+            const res = await fetch('/api/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value, action: 'decrypt' }),
+            });
+            return { status: res.status, body: await res.json() };
+        }, ciphertext);
+
+        expect(result.status).toBe(403);
+        expect(result.body.error).toBe("Value does not belong to this connection");
     });
 });

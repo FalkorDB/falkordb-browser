@@ -1,6 +1,32 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
 export type CleanupAuthResult =
     | { ok: true }
     | { ok: false; status: number; message: string };
+
+/**
+ * Compare two secrets without leaking how far they matched.
+ *
+ * Both sides are hashed first so the comparison is always over 32 equal-length
+ * bytes: `timingSafeEqual` throws on a length mismatch, and the length of the
+ * configured secret is itself something we would rather not leak.
+ */
+function secretMatches(candidate: string, configured: string): boolean {
+    const a = createHash("sha256").update(candidate, "utf8").digest();
+    const b = createHash("sha256").update(configured, "utf8").digest();
+    return timingSafeEqual(a, b);
+}
+
+/**
+ * Check a candidate against every configured secret. Deliberately does not
+ * short-circuit, so the time taken does not reveal which entry matched.
+ */
+function matchesAnySecret(candidate: string, configuredSecrets: string[]): boolean {
+    return configuredSecrets.reduce(
+        (matched, configured) => secretMatches(candidate, configured) || matched,
+        false
+    );
+}
 
 /**
  * Fail closed: a cleanup secret MUST be configured. Missing configuration is a
@@ -29,8 +55,8 @@ export function authorizeCleanup(
     const headerSecret = cleanupSecretHeader?.trim() ?? "";
 
     if (
-        (bearer && configuredSecrets.includes(bearer)) ||
-        (headerSecret && configuredSecrets.includes(headerSecret))
+        (bearer !== "" && matchesAnySecret(bearer, configuredSecrets)) ||
+        (headerSecret !== "" && matchesAnySecret(headerSecret, configuredSecrets))
     ) {
         return { ok: true };
     }

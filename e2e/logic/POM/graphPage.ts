@@ -510,6 +510,35 @@ export default class GraphPage extends BasePage {
     );
   }
 
+  async clickErrorToastSeeMore(): Promise<void> {
+    await interactWhenVisible(
+      this.errorToast.getByTestId("toast-see-more"),
+      (el) => el.click(),
+      "Error toast See more"
+    );
+  }
+
+  /** Rendered height of the toast against the viewport, and whether its body overflows. */
+  async getErrorToastSizing(): Promise<{
+    toastHeight: number;
+    toastBottom: number;
+    viewportHeight: number;
+    contentScrollHeight: number;
+    contentClientHeight: number;
+  }> {
+    return this.errorToast.evaluate((toast) => {
+      const content = toast.querySelector('[data-testid="toast-content"]');
+      const rect = toast.getBoundingClientRect();
+      return {
+        toastHeight: rect.height,
+        toastBottom: rect.bottom,
+        viewportHeight: window.innerHeight,
+        contentScrollHeight: content?.scrollHeight ?? 0,
+        contentClientHeight: content?.clientHeight ?? 0,
+      };
+    });
+  }
+
   // Monaco renders a diagnostic marker as a `.squiggly-error` decoration in the editor.
   async hasEditorErrorMarker(): Promise<boolean> {
     return waitForElementToBeVisible(this.page.locator(".squiggly-error:visible").first());

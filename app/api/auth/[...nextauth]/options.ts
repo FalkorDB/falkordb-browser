@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
 import { LRUCache } from "lru-cache";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
+import type { TokenData } from "@/lib/token-storage/ITokenStorage";
 import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
@@ -20,6 +21,7 @@ import {
   isTokenActive,
   getPasswordFromTokenDB,
   storeEncryptedCredential,
+  getAuthSecret,
 } from "../tokenUtils";
 
 interface CustomJWTPayload {
@@ -32,6 +34,7 @@ interface CustomJWTPayload {
   tls: boolean;
   ca?: string;
   url?: string;
+  pbv?: number; // Endpoint binding marker; see PAT_BINDING_VERSION
 }
 
 interface AuthenticatedUser {
@@ -182,6 +185,37 @@ export function generateTimeUUID() {
 }
 
 /**
+ * Marks tokens whose host/port were resolved from the connection URL rather
+ * than defaulted. Bump this whenever a change makes older tokens unable to
+ * identify their own connection; the jwt callback retires anything older.
+ */
+const BINDING_VERSION = 2;
+
+/**
+ * The same marker for personal access tokens, under a claim of its own.
+ *
+ * It cannot share `bv`: `getToken` falls back to reading an `Authorization:
+ * Bearer` header as a session token, and `getSessionFromRequest` admits anything
+ * `isEndpointBound` accepts without consulting `isTokenActive`. A PAT carrying
+ * `bv` would therefore authenticate on that path after it had been revoked.
+ */
+export const PAT_BINDING_VERSION = 1;
+
+/**
+ * True when a JWT carries the current endpoint binding.
+ *
+ * The `jwt` callback retires older tokens, but that only runs for callers that
+ * go through NextAuth. Anything reading a token directly with `getToken` sees
+ * the raw payload, pre-binding tokens included, so it has to ask here before
+ * trusting `host`/`port`/`username` to identify a connection.
+ */
+export function isEndpointBound(
+  token: Record<string, unknown> | null | undefined
+): boolean {
+  return token?.bv === BINDING_VERSION;
+}
+
+/**
  * Generates a consistent user ID based on credentials
  * This ensures the same user gets the same ID across multiple logins
  * Format: SHA-256 hash of "username@host:port"
@@ -193,6 +227,45 @@ export function generateConsistentUserId(
 ): string {
   const identifier = `${username || 'default'}@${host}:${port}`;
   return crypto.createHash('sha256').update(identifier).digest('hex');
+}
+
+/**
+ * Pulls the connection parameters out of a `falkor[s]://` connection string.
+ *
+ * URL logins send only `url`, so without this every one of them was recorded as
+ * `default@localhost:6379`. That identity is what `generateConsistentUserId`
+ * hashes into the AAD that binds encrypted browser values to a connection, so
+ * two unrelated servers reached by URL would have shared one binding and could
+ * decrypt each other's values.
+ *
+ * The scheme and password come out too: the connection record outlives the URL
+ * (which is deliberately never stored), and a record that kept the discrete
+ * fields' empty `tls`/`password` would describe a plaintext, unauthenticated
+ * connection that the user never asked for.
+ *
+ * Returns an empty object when the string does not parse; the caller then keeps
+ * its previous defaults.
+ */
+export function parseConnectionUrl(url: string): {
+  host?: string;
+  port?: string;
+  username?: string;
+  password?: string;
+  tls?: boolean;
+} {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname) return {};
+    return {
+      host: parsed.hostname,
+      port: parsed.port || undefined,
+      username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+      password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+      tls: parsed.protocol === "falkors:" || parsed.protocol === "rediss:",
+    };
+  } catch {
+    return {};
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -318,6 +391,33 @@ export async function removeSessionConnection(
 }
 
 /**
+ * True while the record still authorises this session to use the connection.
+ *
+ * A cached socket outlives its record: revoking a connection flips `is_active`
+ * but cannot reach into the pool, so every path that hands back a pooled client
+ * has to ask the record again rather than treat "the ping succeeded" as proof.
+ *
+ * Expiry is checked here too. Connection records are always written with a
+ * finite `expires_at` (the session's max age), and `fetchTokenById` — unlike
+ * `fetchTokensByUserId` — applies no filter of its own, so without this clause
+ * an expired connection disappears from the connection list while still
+ * serving requests.
+ */
+function isUsableConnectionRecord(
+  tokenData: TokenData | null | undefined,
+  sessionId: string
+): tokenData is TokenData {
+  return (
+    !!tokenData &&
+    tokenData.is_active &&
+    (tokenData.expires_at === -1 ||
+      tokenData.expires_at > Math.floor(Date.now() / 1000)) &&
+    tokenData.name.startsWith("connection:") &&
+    tokenData.user_id === sessionId
+  );
+}
+
+/**
  * Retrieves the FalkorDB client for a specific additional connection.
  * If the in-memory client is stale, it will be recreated from the Token DB.
  */
@@ -345,7 +445,7 @@ async function getConnectionClient(
     // Recreate from Token DB
     const storage = StorageFactory.getStorage();
     const tokenData = await storage.fetchTokenById(connId);
-    if (!tokenData || !tokenData.is_active || !tokenData.name.startsWith("connection:") || tokenData.user_id !== sessionId) {
+    if (!isUsableConnectionRecord(tokenData, sessionId)) {
       return null;
     }
 
@@ -384,27 +484,18 @@ async function getConnectionClient(
   }
 
   // Get metadata from Token DB for role/host/port.
-  // If the Token DB query fails or the entry is missing, we still have a
-  // healthy cached client — return it with minimal info rather than
-  // invalidating the session.
+  // A healthy socket says nothing about who is on the other end of it: the
+  // record is the only source of the connection's role, and a `Read-Write`
+  // fallback would hand every read-only connection write access for the
+  // length of a Token DB outage. Refuse instead — the caller turns this into
+  // SESSION_INVALID.
   try {
     const storage = StorageFactory.getStorage();
     const tokenData = await storage.fetchTokenById(connId);
-    if (!tokenData) {
-      // Entry missing but client is alive — use fallback metadata.
+    if (!isUsableConnectionRecord(tokenData, sessionId)) {
       // eslint-disable-next-line no-console
-      console.warn("Token DB entry not found for connId (non-fatal, using cached client):", connId);
-      return {
-        client,
-        connInfo: {
-          id: connId,
-          username: "",
-          role: "Read-Write" as Role,
-          host: "",
-          port: 0,
-          tls: false,
-        },
-      };
+      console.warn("No usable Token DB entry for connId:", connId);
+      return null;
     }
 
     return {
@@ -421,18 +512,8 @@ async function getConnectionClient(
     };
   } catch (metaErr) {
     // eslint-disable-next-line no-console
-    console.warn("Failed to fetch connection metadata (non-fatal, using cached client):", metaErr);
-    return {
-      client,
-      connInfo: {
-        id: connId,
-        username: "",
-        role: "Read-Write" as Role,
-        host: "",
-        port: 0,
-        tls: false,
-      },
-    };
+    console.warn("Failed to fetch connection metadata:", metaErr);
+    return null;
   }
 }
 
@@ -491,7 +572,7 @@ async function isJWTOnlyRequest(): Promise<boolean> {
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
   const { jwtVerify } = await import('jose');
-  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const authSecret = getAuthSecret();
   if (!authSecret) throw new Error('AUTH_SECRET or NEXTAUTH_SECRET must be set');
   const secret = new TextEncoder().encode(authSecret);
   const { payload } = await jwtVerify(token, secret);
@@ -503,7 +584,12 @@ async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
  */
 function isValidJWTPayload(payload: unknown): payload is CustomJWTPayload {
   const p = payload as Record<string, unknown>;
-  return Boolean(p.sub && p.host && p.port);
+  // `host`/`port` are the connection's identity here — they pick the server to
+  // talk to and seed the owner that ciphertext is bound to. A token minted
+  // before those were resolved from the connection URL carries the localhost
+  // defaults instead, which every such token shares. Refuse it: the holder must
+  // issue a new one rather than act under an identity that is not theirs alone.
+  return Boolean(p.sub && p.host && p.port) && p.pbv === PAT_BINDING_VERSION;
 }
 
 /**
@@ -699,6 +785,26 @@ const authOptions: NextAuthConfig = {
           url: (credentials.url as string) || undefined,
         };
 
+        // A URL login carries the endpoint only inside `url`, and `newClient`
+        // ignores host/port/username entirely when a URL is present. Record
+        // what the URL actually connects to, so the connection is not filed
+        // under the localhost:6379 defaults below — that identity is hashed
+        // into the AAD binding encrypted browser values to a connection, so a
+        // shared one would let unrelated servers read each other's values.
+        // The URL wins outright rather than merging: keeping a host or port the
+        // client never used would describe a connection that does not exist,
+        // and would let two different URLs share one identity.
+        if (creds.url) {
+          const fromUrl = parseConnectionUrl(creds.url);
+          if (fromUrl.host) {
+            creds.host = fromUrl.host;
+            creds.port = fromUrl.port;
+            creds.username = fromUrl.username;
+            creds.password = fromUrl.password;
+            creds.tls = fromUrl.tls ? "true" : "false";
+          }
+        }
+
         try {
           // Generate random UUID for this session and its first connection
           const id = uuidv4();
@@ -789,8 +895,17 @@ const authOptions: NextAuthConfig = {
           username: user.username || "default",
           role: user.role,
           tls: user.tls,
+          bv: BINDING_VERSION,
         };
       }
+
+      // Tokens minted before the endpoint binding recorded the URL's real
+      // host/port cannot be trusted to identify a connection: a URL login was
+      // persisted as localhost:6379, so every such session would share one
+      // owner and could read the others' ciphertext. There is no way to repair
+      // them -- the URL was never stored on the token -- so retire them and
+      // make the user sign in again once.
+      if (token.bv !== BINDING_VERSION) return null;
 
       // ── Strip any accumulated bloat from old tokens ──
       // Remove fields that are no longer needed and inflate the cookie.
@@ -979,11 +1094,17 @@ export async function getSessionFromRequest(
   const token = await getToken({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     req: request as any,
-    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secret: getAuthSecret(),
     secureCookie: shouldUseSecureCookies(request),
   });
 
   if (!token?.sub) return null;
+
+  // The jwt callback retires pre-binding tokens, but it never sees this read.
+  // Such a token's host/port are the localhost defaults rather than the
+  // endpoint it actually reached, so the identity built below would be wrong
+  // for every URL login — and shared between all of them.
+  if (!isEndpointBound(token)) return null;
 
   return {
     user: {
@@ -1130,7 +1251,7 @@ export async function getClient(
       const jwt = await getToken({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         req: request as any,
-        secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+        secret: getAuthSecret(),
         secureCookie: shouldUseSecureCookies(request),
       });
       const credentialRef = jwt?.credentialRef as string | undefined;
@@ -1270,43 +1391,50 @@ export async function getClient(
   const connKey = sessionConnectionKey(id, connId);
   const cachedClient = connections.get(connKey);
   if (cachedClient) {
+    let healthy = false;
     try {
       const conn = await cachedClient.connection;
       await conn.ping();
-      // Cache hit + healthy → return without lock
-      const connUser: AuthenticatedUserWithPassword = {
-        id,
-        username: "",
-        role: "Read-Write" as Role,
-        host: "",
-        port: 0,
-        tls: false,
-        password: undefined,
-      };
-      try {
-        const storage = StorageFactory.getStorage();
-        const tokenData = await storage.fetchTokenById(connId);
-        if (tokenData) {
-          connUser.username = tokenData.username;
-          connUser.role = tokenData.role as Role;
-          connUser.host = tokenData.host;
-          connUser.port = tokenData.port;
-          connUser.tls = tokenData.tls ?? false;
-          if (tokenData.encrypted_password) {
-            const { decrypt } = await import("../encryption");
-            connUser.password = decrypt(tokenData.encrypted_password) || undefined;
-          }
-        }
-      } catch {
-        // Non-fatal: metadata lookup failed but connection works
-      }
-      return { client: cachedClient, user: connUser };
+      healthy = true;
     } catch {
       // Health check failed — fall through to locked recreation path.
       // Only remove from cache; do NOT close the client here because
       // another concurrent request may still hold a reference to it.
       // The underlying socket error handler or GC will clean it up.
       connections.delete(connKey);
+    }
+
+    if (healthy) {
+      // A live socket says nothing about who is on the other end of it. Without
+      // the Token DB record there is no role to enforce and no endpoint to
+      // identify the connection by, and a `Read-Write` default would hand every
+      // read-only connection write access for the length of the outage. Leave
+      // the client cached and fall through to the locked path, which resolves
+      // the record properly or refuses the request.
+      const tokenData = await StorageFactory.getStorage()
+        .fetchTokenById(connId)
+        .catch(() => null);
+      if (isUsableConnectionRecord(tokenData, id)) {
+        const connUser: AuthenticatedUserWithPassword = {
+          id,
+          username: tokenData.username,
+          role: tokenData.role as Role,
+          host: tokenData.host,
+          port: tokenData.port,
+          tls: tokenData.tls ?? false,
+          password: undefined,
+        };
+        if (tokenData.encrypted_password) {
+          try {
+            const { decrypt } = await import("../encryption");
+            connUser.password = decrypt(tokenData.encrypted_password) || undefined;
+          } catch {
+            // Non-fatal: the password is only needed to reconnect, and the
+            // cached client is already connected.
+          }
+        }
+        return { client: cachedClient, user: connUser };
+      }
     }
   }
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server, Minus, Plus } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
-import { areCaptionKeysEqual, cn, getDefaultQuery } from "@/lib/utils";
+import { areCaptionKeysEqual, cn, getConnectionEpoch, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -13,8 +13,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
-import { serverEncrypt } from "@/lib/server-encryption";
+import { looksServerEncrypted, serverEncrypt } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
+import { getConnectionPrefix, removeConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
 import { GRAPH_SORT_ORDERS, GRAPH_SORT_ORDER_LABELS, type GraphSortOrder } from "@/lib/graphSortOrder";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -472,6 +473,16 @@ export default function BrowserSettings() {
     const persistChatApiKeys = async (keys: typeof chatApiKeys, selectedId: string): Promise<boolean> => {
         const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
         const nextSelectedId = selectedApiKey?.id ?? "";
+        // `serverEncrypt` binds the ciphertext to the connection behind the
+        // request, while the storage prefix is resolved only once the promise
+        // settles. If the user switches connections in between, writing would
+        // file a blob bound to one connection under another's key, where it can
+        // never be decrypted — and would overwrite that connection's own keys.
+        // The prefix alone cannot tell: an A→B→A switch restores it, so a promise
+        // that settles after the round trip would still match. The epoch only
+        // moves forward, so pair the two.
+        const scope = getConnectionPrefix();
+        const epoch = getConnectionEpoch();
 
         try {
             if (keys.length > 0) {
@@ -484,11 +495,26 @@ export default function BrowserSettings() {
                     });
                     return false;
                 }
-                localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+                if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
+                    toast({
+                        title: "Error",
+                        description: "The connection changed while saving. Please try again.",
+                        variant: "destructive",
+                    });
+                    return false;
+                }
+                setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
             } else {
-                localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+                removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
             }
-            localStorage.removeItem("secretKey");
+            // The legacy single-key setting is superseded once this connection
+            // has its own list — but only if the value is ours to drop. A
+            // server-encrypted one may belong to another connection, which the
+            // loader deliberately preserves so switching back recovers it.
+            const legacySecretKey = localStorage.getItem("secretKey");
+            if (legacySecretKey && !looksServerEncrypted(legacySecretKey)) {
+                localStorage.removeItem("secretKey");
+            }
 
             persistSelectedChatApiKeyId(nextSelectedId);
         } catch (error) {
