@@ -278,7 +278,12 @@ test.describe("@admin Mobile layout", () => {
         expect(nodes.length).toBeGreaterThanOrEqual(2);
 
         await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
-        await graph.elementClick(nodes[1].screenX, nodes[1].screenY);
+
+        // Selecting pans the canvas onto the selection, so the second node is no
+        // longer where it was measured — re-read it by id before tapping it.
+        const secondNode = (await graph.getNodesScreenPositions()).find(n => n.id === nodes[1].id);
+        expect(secondNode).toBeDefined();
+        await graph.elementClick(secondNode.screenX, secondNode.screenY);
 
         await expect(graph.dataPanel).toHaveCount(0);
 

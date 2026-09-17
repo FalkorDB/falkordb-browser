@@ -232,7 +232,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                     </Button>
                                                 </PopoverTrigger>
                                                 <PopoverContent
-                                    className="z-30 w-fit p-1 flex flex-col gap-1"
+                                    // Mobile renders this panel inside the z-40 graph info sheet,
+                                    // so at z-30 the popover opens behind it.
+                                    className="z-30 mobile:z-50 w-fit p-1 flex flex-col gap-1"
                                     align="start"
                                     onInteractOutside={(e) => {
                                         if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
@@ -344,7 +346,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                     </Button>
                                                 </PopoverTrigger>
                                                 <PopoverContent
-                                                    className="z-30 w-fit p-1 flex flex-col gap-1"
+                                                    className="z-30 mobile:z-50 w-fit p-1 flex flex-col gap-1"
                                                     align="start"
                                                     onInteractOutside={(e) => {
                                                         if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {

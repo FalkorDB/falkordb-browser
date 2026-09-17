@@ -116,7 +116,10 @@ export default function ForceGraph({
         pending.select();
     }, []);
 
-    useEffect(() => clearPendingClick, [clearPendingClick]);
+    // Keyed on the graph and its data, not just unmount: a queued click closes over
+    // the outgoing elements and would otherwise select one of them into the view
+    // that replaced them.
+    useEffect(() => clearPendingClick, [clearPendingClick, graph, data]);
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -394,13 +397,19 @@ export default function ForceGraph({
     }, [graph]);
 
     const handleUnselected = useCallback((evt?: MouseEvent) => {
-        clearPendingClick();
         // A stray tap on the background must not wipe a selection built up one
-        // element at a time, exactly as Ctrl-click protects it on desktop.
-        if (evt?.shiftKey || evt?.ctrlKey || multiSelect || selectedElements.length === 0) return;
+        // element at a time, exactly as Ctrl-click protects it on desktop. Commit
+        // the pending pick rather than dropping it — additive is the mode that
+        // makes tapping a node and then the background easy to do by accident.
+        if (evt?.shiftKey || evt?.ctrlKey || multiSelect) {
+            flushPendingClick();
+            return;
+        }
+        clearPendingClick();
+        if (selectedElements.length === 0) return;
         selectedElementsRef.current = [];
         setSelectedElements([]);
-    }, [selectedElements, setSelectedElements, clearPendingClick, multiSelect]);
+    }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect]);
 
     const checkIsNodeSelected = useCallback((node: GraphNode) =>
         selectedElements.some(el => el.id === node.id && !('source' in el)) ||
