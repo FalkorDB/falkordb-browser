@@ -165,6 +165,26 @@ test("a url with a trailing colon is a typo, not a request for the default port"
     );
 });
 
+test("an empty credential block in the url is a typo, not an anonymous connection", () => {
+    assert.throws(() => parsePreconfiguredUrl("falkor://@db.internal"), /no username or password/);
+    assert.throws(() => parsePreconfiguredUrl("falkor://:@db.internal"), /no username or password/);
+
+    // An anonymous connection is spelled without the "@".
+    assert.equal(parsePreconfiguredUrl("falkor://db.internal").username, undefined);
+    // An empty password after a username is still a username.
+    assert.equal(parsePreconfiguredUrl("falkor://alice:@db.internal").username, "alice");
+});
+
+test("a boolean variable names every value it accepts when it rejects one", () => {
+    assert.throws(
+        () => readPreconfiguredConnection({ FALKORDB_HOST: "db", FALKORDB_TLS: "maybe" }),
+        /true\/false, 1\/0 or yes\/no/
+    );
+
+    assert.equal(readPreconfiguredConnection({ FALKORDB_HOST: "db", FALKORDB_TLS: "yes" })?.tls, true);
+    assert.equal(readPreconfiguredConnection({ FALKORDB_HOST: "db", FALKORDB_TLS: "0" })?.tls, false);
+});
+
 test("a malformed percent-escape in the url is rejected, and is not echoed back", () => {
     assert.throws(() => parsePreconfiguredUrl("falkor://alice:%ZZ@db.internal"), (err: Error) => {
         assert.match(err.message, /malformed percent-escape/);

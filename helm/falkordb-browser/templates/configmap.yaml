@@ -14,6 +14,7 @@ data:
   HOSTNAME: {{ .Values.env.hostname | quote }}
   API_TOKEN_STORAGE_PATH: {{ .Values.env.apiTokenStoragePath | quote }}
 {{- if .Values.connection.enabled }}
+  {{- include "falkordb-browser.validateConnection" . }}
   {{- /* Only non-empty fields are emitted: an empty value would override the url. */}}
   FALKORDB_AUTO_CONNECT: {{ .Values.connection.autoConnect | quote }}
   {{- with .Values.connection.host }}

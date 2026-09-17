@@ -21,15 +21,19 @@ export async function GET(request: Request) {
     return rejectUntrustedOrigin(request);
   }
 
+  // The answer describes this deployment's environment, so no intermediary may
+  // hold on to it and serve it after the operator changes that environment.
+  const headers = { ...getCorsHeaders(request), "Cache-Control": "no-store" };
+
   try {
     const info = toPreconfiguredConnectionInfo(readPreconfiguredConnection(process.env));
-    return NextResponse.json(info, { status: 200, headers: getCorsHeaders(request) });
+    return NextResponse.json(info, { status: 200, headers });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("Invalid preconfigured connection environment:", err);
     return NextResponse.json(
       { message: "The preconfigured connection environment is invalid. Check the server logs." },
-      { status: 500, headers: getCorsHeaders(request) }
+      { status: 500, headers }
     );
   }
 }

@@ -52,7 +52,7 @@ function parseBoolean(value: string | undefined, fallback: boolean, name: string
     if (text === undefined) return fallback;
     if (text === "true" || text === "1" || text === "yes") return true;
     if (text === "false" || text === "0" || text === "no") return false;
-    throw new Error(`${name} must be one of true/false (got "${value}")`);
+    throw new Error(`${name} must be one of true/false, 1/0 or yes/no (got "${value}")`);
 }
 
 function parsePort(value: string | undefined, fallback: number, name: string): number {
@@ -116,6 +116,11 @@ export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_U
             password = decodeUrlPart(creds.slice(colon + 1), "password", name);
         } else {
             username = decodeUrlPart(creds, "username", name);
+        }
+        // An "@" with nothing before it is a typo, not a request for an
+        // anonymous connection — that one is spelled without the "@".
+        if (!username && !password) {
+            throw new Error(`${name} has an "@" with no username or password before it`);
         }
     }
 
