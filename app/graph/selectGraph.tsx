@@ -3,7 +3,7 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { fetchOptions, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
+import { fetchOptions, getActiveConnectionIdGlobal, getConnectionEpoch, getGraphListGeneration, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, Loader2, Settings, X } from "lucide-react";
@@ -21,6 +21,7 @@ import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
 import useIsMobile from "@/lib/useIsMobile";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { observeGraphsFirstSeen, readGraphsFirstSeen, recordGraphsFirstSeen, renameGraphFirstSeen, sortGraphNames, type GraphsFirstSeen } from "@/lib/graphSortOrder";
 
 interface Props {
     options: string[] | undefined,
@@ -45,11 +46,11 @@ interface Props {
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const isMobile = useIsMobile();
-    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs } = useContext(ConnectionContext);
+    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage },
-            userExperienceSettings: { refreshInterval }
+            userExperienceSettings: { refreshInterval, graphsSortOrder }
         },
         tutorialOpen
     } = useContext(BrowserSettingsContext);
@@ -82,6 +83,29 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openMenage, setOpenMenage] = useState(false);
     const [openDuplicate, setOpenDuplicate] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [graphsFirstSeen, setGraphsFirstSeen] = useState<GraphsFirstSeen>({});
+
+    // The first-seen history is connection-scoped localStorage, but its prefix
+    // follows the session, which lags `activeConnectionId` through a switch. In
+    // that window the list already describes the new server while storage still
+    // points at the old one, and recording rebuilds the map — so it would stamp
+    // one server's graphs into the other's history and drop what was there.
+    // `null` is first load, where the list is fetched off the session too.
+    // The module-level id is checked as well because a switch sets it before
+    // React's: between the two, every request is already pinned to the new
+    // server while both values here still name the old one.
+    const canRecordHistory = useCallback(
+        () => (activeConnectionId === null || prefixConnectionId === activeConnectionId)
+            && getActiveConnectionIdGlobal() === activeConnectionId,
+        [activeConnectionId, prefixConnectionId]
+    );
+
+    // Storage moved to another connection, so the timestamps in hand belong to
+    // the one just left — re-read, or the new server's list is ordered by the
+    // old server's history until something records over it.
+    useEffect(() => {
+        setGraphsFirstSeen(readGraphsFirstSeen());
+    }, [prefixConnectionId]);
 
     const { size: manageSize, onResize: onManageResize } = useResizableSize("manageGraphs-size", 750, 493, 400, 300);
 
@@ -89,27 +113,71 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         setOpen(false);
     }, [selectedValue]);
 
+    // GRAPH.LIST carries no creation time, so the chronological orders go by
+    // when this browser first saw each graph. The tutorial's demo graphs are
+    // not the user's, so they are kept out of that history.
+    // What is rendered is only ever an observation, so it records new graphs
+    // but forgets none: a graph can be missing from it because a refresh has
+    // not landed, because a connection switch left the old list in place, or
+    // because it is offloaded and the probe that says so has not answered yet.
+    // Forgetting it there would hand it back as brand new the moment it
+    // reappears. Deletions are confirmed and go through `handleSetGraphNames`.
+    useEffect(() => {
+        if (tutorialOpen || !canRecordHistory() || options === undefined || safeOptions.length === 0) return;
+
+        setGraphsFirstSeen(observeGraphsFirstSeen(safeOptions));
+    }, [safeOptions, options, tutorialOpen, canRecordHistory]);
+
+    // A list handed back by an explicit action IS confirmed, so it records even
+    // when it is empty — deleting the last graph must still forget its name, or
+    // recreating it later would reuse the old timestamp. The stubs are pruned to
+    // match, or a deleted offloaded graph would be merged straight back in (and
+    // its timestamp with it) until the next probe. Superseding first discards
+    // every refresh already in flight — this component's and the provider's
+    // alike — so a list read before the mutation cannot land after it and put
+    // the old names back, to be recorded as an observation.
+    const handleSetGraphNames = useCallback((names: string[]) => {
+        supersedeGraphRefreshes();
+        setOptions(names);
+        pruneOffloadedGraphs(names);
+        if (!tutorialOpen && canRecordHistory()) setGraphsFirstSeen(recordGraphsFirstSeen(names));
+    }, [setOptions, pruneOffloadedGraphs, supersedeGraphRefreshes, tutorialOpen, canRecordHistory]);
+
+    const sortedOptions = useMemo(
+        () => sortGraphNames(safeOptions, graphsSortOrder, graphsFirstSeen),
+        [safeOptions, graphsSortOrder, graphsFirstSeen]
+    );
 
 
     const getOptions = useCallback(async () => {
         // Pin the refresh to the connection active when it started and discard a
-        // stale result if the connection changed mid-flight (epoch) or a newer
-        // refresh on the same connection started (optionsSeq) — the newest wins.
+        // stale result if the connection changed mid-flight (epoch), a mutation
+        // published a confirmed list (generation) or a newer refresh on the same
+        // connection started (optionsSeq) — the newest wins.
         const seq = (optionsSeqRef.current += 1);
         const startEpoch = getConnectionEpoch();
+        const generation = getGraphListGeneration();
         const cid = getActiveConnectionIdGlobal();
-        const isCurrent = () => getConnectionEpoch() === startEpoch && optionsSeqRef.current === seq;
+        const isCurrent = () => getConnectionEpoch() === startEpoch
+            && getGraphListGeneration() === generation
+            && optionsSeqRef.current === seq;
         const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
         const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
         const res = await fetchOptions(gToast, gInd, indicator, cid);
         if (!isCurrent() || !res) return;
+        // Offloaded graphs can change between refreshes, so keep the enterprise
+        // load indicators in sync with the list. The stubs are refreshed BEFORE
+        // the list is published: a graph offloaded since the last refresh drops
+        // out of GRAPH.LIST, so publishing first would take it out of the merged
+        // list until the stubs land — long enough for the first-seen history to
+        // forget it and stamp it as brand new when it comes back. Pinning the
+        // probe to `cid` keeps both halves describing the same connection.
+        await refreshOffloadedGraphs(cid);
+        if (!isCurrent()) return;
         const prev = optionsRef.current;
         const unchanged = prev !== undefined && prev.length === res.opts.length && prev.every((name, i) => name === res.opts[i]);
         if (!unchanged) setOptions(res.opts);
         if (res.autoSelect) setSelectedValue(res.autoSelect);
-        // Offloaded graphs can change between refreshes, so keep the enterprise
-        // load indicators in sync with the list.
-        refreshOffloadedGraphs();
     }, [toast, setIndicator, indicator, setSelectedValue, setOptions, refreshOffloadedGraphs]);
 
     const loadMemory = useCallback((opt: string) =>
@@ -197,6 +265,18 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         if (getConnectionEpoch() !== startEpoch) return false;
 
         if (result.ok) {
+            supersedeGraphRefreshes();
+
+            // A rename is the same graph under a new name, so it keeps the time
+            // it was first seen instead of sorting as a brand-new graph. The
+            // rendered map is updated with it, or the row jumps to the far end
+            // of the order for the render between here and the recording effect.
+            if (canRecordHistory()) setGraphsFirstSeen(renameGraphFirstSeen(optionName, option));
+
+            // The stub is keyed by name, so it has to follow the rename too, or
+            // the old name is merged back in beside the new one below.
+            renameOffloadedGraph(optionName, option);
+
             const newOptions = safeOptions.map((opt) => (opt === optionName ? option : opt));
             setOptions!(newOptions);
 
@@ -217,7 +297,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok;
-    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, buildMetricCells]);
+    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, buildMetricCells, canRecordHistory, renameOffloadedGraph, supersedeGraphRefreshes]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
@@ -240,8 +320,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     }, [openMenage, openDuplicate]);
 
     useEffect(() => {
-        handleSetRows(safeOptions);
-    }, [safeOptions, handleSetRows]);
+        handleSetRows(sortedOptions);
+    }, [sortedOptions, handleSetRows]);
 
     // Graphs can be created, dropped or offloaded outside this tab, so refresh
     // the list (and with it the offloaded stubs) on the same interval the rest
@@ -324,7 +404,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 >
                     <PaginationList
                         className="basis-0 grow min-h-fit p-0"
-                        list={safeOptions}
+                        list={sortedOptions}
                         onClick={handleClick}
                         dataTestId="selectGraph"
                         label="Graph"
@@ -388,7 +468,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                             <p>Graphs Count: {safeOptions.length}</p>
                                             <ul className="mt-1 max-h-[200px] overflow-auto flex flex-col gap-1">
                                                 {
-                                                    safeOptions.map((name) => (
+                                                    sortedOptions.map((name) => (
                                                         <li key={name} className="flex items-center gap-2">
                                                             {supportsOffload && <GraphLoadDot offloaded={offloadedGraphs.includes(name)} />}
                                                             <span className="truncate">{name}</span>
@@ -438,7 +518,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                             setGraph={setGraph}
                                             setOpenMenage={setOpenMenage}
                                             graphNames={safeOptions}
-                                            setGraphNames={opts => setOptions(opts)}
+                                            setGraphNames={handleSetGraphNames}
                                         />
                                         <ExportGraph
                                             selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
@@ -463,6 +543,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                             open={openDuplicate}
                                             onOpenChange={setOpenDuplicate}
                                             onDuplicate={(duplicateName) => {
+                                                supersedeGraphRefreshes();
                                                 setSelectedValue(duplicateName);
                                                 setOptions!([...safeOptions, duplicateName]);
                                             }}
