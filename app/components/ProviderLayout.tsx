@@ -136,7 +136,14 @@ export default function ProviderLayout({
 
   // Restore the UDF panel's persisted width on /udf.
   useEffect(() => {
-    if (!isUdf || isMobile) return undefined;
+    // `ProviderLayout` outlives the route, so without this the sheet is still open
+    // on the way back and covers the page before the user asks for it.
+    if (!isUdf) {
+      setUdfSheetOpen(false);
+      return undefined;
+    }
+
+    if (isMobile) return undefined;
 
     const currentPanel = udfPanelRef.current;
     if (!currentPanel) return undefined;

@@ -402,6 +402,13 @@ export default class GraphPage extends BasePage {
 
   async getNodesScreenPositions(): Promise<any[]> {
     await this.waitForCanvasAnimationToEnd();
+    return this.readNodesScreenPositions();
+  }
+
+  /** Positions without waiting out the force simulation. `waitForCanvasAnimationToEnd`
+   *  costs a flat five seconds once the graph has loaded — too much to spend again on a
+   *  re-read that only has a camera move to wait for. */
+  async readNodesScreenPositions(): Promise<any[]> {
     await this.page.waitForTimeout(500);
 
     await this.page.waitForFunction(

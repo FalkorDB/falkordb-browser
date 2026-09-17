@@ -74,7 +74,14 @@ export default function BottomSheet({
                 className={cn(
                     "flex flex-col rounded-t-xl border-t border-border bg-background",
                     push
-                        ? ["relative shrink-0 max-h-[70%]", !open && "h-0 overflow-hidden border-t-0"]
+                        ? [
+                            "relative shrink-0 max-h-[70%]",
+                            // Same reason as the covering branch below: this sheet is the
+                            // last row of the region, so under `viewport-fit=cover` its
+                            // final control would sit beneath the home indicator. Only
+                            // while open — padding on a `h-0` border-box still takes space.
+                            open ? "pb-[env(safe-area-inset-bottom)]" : "h-0 overflow-hidden border-t-0",
+                        ]
                         : [
                             "absolute inset-x-0 bottom-0 z-40 shadow-2xl",
                             "transition-transform duration-200 ease-out will-change-transform",

@@ -73,7 +73,7 @@ export default function GraphSubHeader() {
             <button
               type="button"
               data-testid="graphTabsMenu"
-              className="min-w-0 grow flex items-center gap-1 rounded-lg px-2 py-1 text-sm hover:bg-secondary"
+              className="min-h-11 min-w-0 grow flex items-center gap-1 rounded-lg px-2 py-1 text-sm hover:bg-secondary"
             >
               <span className="min-w-0 truncate">{activeLabel}</span>
               <span className="shrink-0 text-xs text-muted-foreground">({tabs.length}/{maxTabs})</span>
@@ -101,7 +101,7 @@ export default function GraphSubHeader() {
                       editingId === tab.id
                         ? <input
                           data-testid={`graphTabRename-${tab.id}`}
-                          className="min-w-0 flex-1 border-b border-primary bg-transparent px-2 py-2.5 text-sm outline-none"
+                          className="min-h-11 min-w-0 flex-1 border-b border-primary bg-transparent px-2 py-2.5 text-sm outline-none"
                           aria-label={`Rename ${label}`}
                           placeholder={tab.graphName || "New tab"}
                           value={draft}
@@ -118,7 +118,7 @@ export default function GraphSubHeader() {
                         : <button
                           type="button"
                           data-testid={`graphTabSelect-${tab.id}`}
-                          className="min-w-0 flex-1 truncate px-2 py-2.5 text-left text-sm"
+                          className="min-h-11 min-w-0 flex-1 truncate px-2 py-2.5 text-left text-sm"
                           aria-current={isActive}
                           onClick={() => {
                             selectTab(tab.id);
@@ -131,7 +131,7 @@ export default function GraphSubHeader() {
                     <button
                       type="button"
                       data-testid={`graphTabRenameTrigger-${tab.id}`}
-                      className="shrink-0 rounded p-2 hover:bg-background"
+                      className="shrink-0 min-h-11 min-w-11 flex items-center justify-center rounded p-2 hover:bg-background"
                       aria-label={`Rename ${label}`}
                       onClick={() => {
                         cancelRenameRef.current = false;
@@ -144,7 +144,7 @@ export default function GraphSubHeader() {
                     <button
                       type="button"
                       data-testid={`graphTabClose-${tab.id}`}
-                      className="shrink-0 rounded p-2 hover:bg-background disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="shrink-0 min-h-11 min-w-11 flex items-center justify-center rounded p-2 hover:bg-background disabled:opacity-30 disabled:cursor-not-allowed"
                       aria-label={`Close ${label}`}
                       disabled={!canClose}
                       onClick={() => closeTab(tab.id)}
@@ -159,7 +159,7 @@ export default function GraphSubHeader() {
             <button
               type="button"
               data-testid="graphTabAdd"
-              className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed"
+              className="min-h-11 w-full flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="New tab"
               disabled={!canAdd}
               onClick={() => {

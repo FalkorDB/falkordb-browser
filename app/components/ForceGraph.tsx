@@ -131,7 +131,10 @@ export default function ForceGraph({
         pending.select();
     }, []);
 
-    useEffect(() => clearPendingClick, [clearPendingClick]);
+    // Keyed on the graph and its data, not just unmount: a queued click closes over
+    // the outgoing elements and would otherwise select one of them into the view
+    // that replaced them.
+    useEffect(() => clearPendingClick, [clearPendingClick, graph, data]);
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -446,19 +449,24 @@ export default function ForceGraph({
             suppressClick.current = false;
             return;
         }
-        clearPendingClick();
         // A stray tap on the background must not wipe a selection built up one
-        // element at a time, exactly as Ctrl-click protects it on desktop.
-        if (evt?.shiftKey || evt?.ctrlKey || selectedElements.length === 0) return;
+        // element at a time, exactly as Ctrl-click protects it on desktop. Commit
+        // the pending pick rather than dropping it — additive is the mode that
+        // makes tapping a node and then the background easy to do by accident.
+        if (evt?.shiftKey || evt?.ctrlKey) {
+            flushPendingClick();
+            return;
+        }
+        clearPendingClick();
         if (multiSelect) {
             // In multi-select the background is the way out, the gesture having no
             // button to switch back off.
             if (!setMultiSelect) return;
             setMultiSelect(false);
-        }
+        } else if (selectedElements.length === 0) return;
         selectedElementsRef.current = [];
         setSelectedElements([]);
-    }, [selectedElements, setSelectedElements, clearPendingClick, multiSelect, setMultiSelect]);
+    }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, setMultiSelect]);
 
     const cancelLongPress = useCallback(() => {
         clearTimeout(longPressTimer.current);

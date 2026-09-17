@@ -249,6 +249,9 @@ test.describe("@admin Mobile layout", () => {
     // panel has to stay shut, since it covers the canvas the user is still
     // picking from.
     test("Long press starts multi select and keeps the data panel closed", async () => {
+        // Four canvas settles and two query runs put this within a couple of seconds
+        // of the default budget, which makes any CI hiccup a timeout.
+        test.setTimeout(60_000);
         const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
         await graph.waitForPageIdle();
         await graph.selectGraphByName(graphName);
@@ -277,7 +280,11 @@ test.describe("@admin Mobile layout", () => {
         await expect(graph.multiSelectCount).toHaveText("1 selected");
         await expect(graph.dataPanel).toHaveCount(0);
 
-        await graph.elementClick(nodes[1].screenX, nodes[1].screenY);
+        // Selecting pans the canvas onto the selection, so the second node is no
+        // longer where it was measured — re-read it by id before tapping it.
+        const secondNode = (await graph.readNodesScreenPositions()).find(n => n.id === nodes[1].id);
+        expect(secondNode).toBeDefined();
+        await graph.elementClick(secondNode.screenX, secondNode.screenY);
         await expect(graph.multiSelectCount).toHaveText("2 selected");
         await expect(graph.dataPanel).toHaveCount(0);
 
