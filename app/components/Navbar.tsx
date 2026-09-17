@@ -81,7 +81,7 @@ export default function Navbar({ showUDF }: Props) {
                 </p>
             </div>
             <div className="flex flex-col gap-8 items-center mobile:gap-4">
-                <p>Version: {`{${pkg.version}}`}</p>
+                <p>Version: {pkg.version}</p>
                 {/* Too wide for a phone in one line, and forcing it there scrolls the drawer sideways. */}
                 <p className="text-sm text-nowrap mobile:text-wrap mobile:text-center">All Rights Reserved © 2024 - {new Date().getFullYear()} falkordb.com</p>
             </div>

@@ -62,7 +62,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
     // Touch has no hover, so a press and hold is what reveals the tooltip — the
     // gesture Android's own buttons answer to.
     const [touchTooltipOpen, setTouchTooltipOpen] = useState(false);
-    const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const pressedButton = useRef<HTMLButtonElement | null>(null);
     // Until when a held tooltip refuses to be closed — see `onOpenChange` below.
     const holdUntil = useRef(0);
