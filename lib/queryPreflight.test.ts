@@ -44,6 +44,24 @@ describe("preflightQuery", () => {
     }
   });
 
+  it("judges the literal exactly as written", () => {
+    // Measured on FalkorDB: each of these answers "Unsupported URI" — the scheme
+    // has to start the value and be followed by "//".
+    const rejected = [
+      "LOAD CSV FROM ' https://example.com/a.csv' AS row RETURN row",
+      "LOAD CSV FROM ' file://a.csv' AS row RETURN row",
+      "LOAD CSV FROM 'https:example.com/a.csv' AS row RETURN row",
+      "LOAD CSV FROM 'file:a.csv' AS row RETURN row",
+    ];
+
+    for (const query of rejected) {
+      assert.deepEqual(codes(query, FILE_OK), ["LOAD_CSV_UNSUPPORTED_URI"], query);
+    }
+
+    // A trailing space, on the other hand, the server accepts.
+    assert.deepEqual(codes("LOAD CSV FROM 'https://example.com/a.csv ' AS row RETURN row", FILE_OK), []);
+  });
+
   it("flags file:// only where an operator has turned it off", () => {
     const query = "LOAD CSV FROM 'file://a.csv' AS row RETURN row";
 

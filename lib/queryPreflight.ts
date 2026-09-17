@@ -41,8 +41,11 @@ export interface PreflightIssue {
  *  keywords cannot come from inside a string literal or a comment. */
 const LOAD_CSV_FROM = /\bLOAD\s+CSV\s+(?:WITH\s+HEADERS\s+)?FROM\s+/gi;
 
-/** A URI scheme per RFC 3986: ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ":" */
-const URI_SCHEME = /^([A-Za-z][A-Za-z0-9+.-]*):/;
+/** A URI scheme per RFC 3986, followed by the `//` FalkorDB requires: it answers
+ *  "Unsupported URI" to a leading space, to `https:example.com` and to
+ *  `file:a.csv` alike (measured), so the delimiter is part of the contract and
+ *  the literal is judged exactly as written. */
+const URI_SCHEME = /^([A-Za-z][A-Za-z0-9+.-]*):\/\//;
 
 /** The backslash escapes FalkorDB's parser actually decodes. Everything else keeps
  *  its backslash on the server — `\uXXXX` included, which the grammar accepts as an
@@ -99,7 +102,7 @@ function readSourceLiteral(original: string, masked: string, start: number): str
 }
 
 function schemeOf(uri: string): string | null {
-  const match = URI_SCHEME.exec(uri.trim());
+  const match = URI_SCHEME.exec(uri);
   return match ? match[1].toLowerCase() : null;
 }
 
@@ -111,7 +114,7 @@ function inspectSource(uri: string, context: PreflightContext): PreflightIssue |
       code: "LOAD_CSV_UNSUPPORTED_URI",
       message:
         scheme === null
-          ? `LOAD CSV needs an absolute URI, but "${uri}" has no scheme.`
+          ? `LOAD CSV needs an absolute "scheme://" URI, but "${uri}" is not one.`
           : `LOAD CSV cannot read "${scheme}://" sources.`,
       hint: `FalkorDB only loads CSV from ${FALKOR_FETCHABLE_SCHEMES.map((s) => `${s}://`).join(" or ")}.`,
       uri,
