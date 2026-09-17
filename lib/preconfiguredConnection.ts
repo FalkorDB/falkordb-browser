@@ -130,10 +130,29 @@ export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_U
 
     let host = rest;
     let port: number | undefined;
-    const colon = rest.lastIndexOf(":");
-    if (colon >= 0) {
-        host = rest.slice(0, colon);
-        const portText = rest.slice(colon + 1);
+    let portColon: number;
+
+    if (rest.startsWith("[")) {
+        // A bracketed IPv6 literal owns every colon inside the brackets, so the
+        // last-colon rule below would read "::1]" as a port. The brackets are
+        // URL syntax and not part of the address the socket wants.
+        const bracketEnd = rest.indexOf("]");
+        if (bracketEnd < 0) throw new Error(`${name} has a "[" with no matching "]"`);
+        host = rest.slice(1, bracketEnd);
+        const afterBracket = rest.slice(bracketEnd + 1);
+        if (afterBracket && !afterBracket.startsWith(":")) {
+            throw new Error(`${name} has unexpected text after the host's "]" ("${afterBracket}")`);
+        }
+        portColon = afterBracket ? bracketEnd + 1 : -1;
+    } else {
+        // A password is already gone by now, but an unbracketed host may still
+        // be a bare IPv6 address, so the LAST colon is the only candidate.
+        portColon = rest.lastIndexOf(":");
+        if (portColon >= 0) host = rest.slice(0, portColon);
+    }
+
+    if (portColon >= 0) {
+        const portText = rest.slice(portColon + 1);
         // A trailing ":" is a typo, not a request for the default port.
         if (!portText.trim()) throw new Error(`${name} has a ":" with no port after it`);
         port = parsePort(portText, DEFAULT_PRECONFIGURED_PORT, `${name} port`);

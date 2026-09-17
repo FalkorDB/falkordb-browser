@@ -173,13 +173,14 @@ Call with (dict "root" $ "name" "FALKORDB_PASSWORD" "value" ... "existingKey" ..
 Validate the preconfigured connection.
 Without a URL or a host the browser finds no connection at all, so an enabled
 but empty connection would install cleanly and then quietly show the login
-form — fail the render instead of shipping that.
+form — fail the render instead of shipping that. Values are trimmed first,
+because the browser trims them too and would read "   " as unconfigured.
 */}}
 {{- define "falkordb-browser.validateConnection" -}}
 {{- $connection := .Values.connection -}}
 {{- $existing := $connection.existingSecret | default dict -}}
-{{- $externalUrl := and ($existing.name | default "") ($existing.urlKey | default "") -}}
-{{- if not (or ($connection.url | default "") ($connection.host | default "") $externalUrl) -}}
+{{- $externalUrl := and ($existing.name | default "" | trim) ($existing.urlKey | default "" | trim) -}}
+{{- if not (or ($connection.url | default "" | trim) ($connection.host | default "" | trim) $externalUrl) -}}
 {{- fail "connection.enabled requires connection.url, connection.host, or connection.existingSecret.name together with connection.existingSecret.urlKey" -}}
 {{- end -}}
 {{- end }}

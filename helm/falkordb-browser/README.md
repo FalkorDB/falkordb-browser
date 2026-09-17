@@ -96,7 +96,7 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `connection.host` | Hostname. Required unless `connection.url` is set | `""` |
 | `connection.port` | Port. Empty falls back to the URL, then `6379` | `""` |
 | `connection.username` | Username. Empty falls back to the URL, then `default` | `""` |
-| `connection.password` | Password. Stored in the chart-managed Secret. Has no default — an empty value would override the password carried by `connection.url` | unset |
+| `connection.password` | Password. Stored in the chart-managed Secret. Omitted or empty keeps the password from `connection.url`; only a non-empty value overrides it | unset |
 | `connection.tls` | `"true"`/`"false"`; empty takes TLS from the URL scheme | `""` |
 | `connection.ca` | Base64-encoded CA certificate | `""` |
 | `connection.autoConnect` | Sign in automatically on load. `false` only prefills the login form | `true` |
@@ -211,11 +211,17 @@ connection:
   password: password
 ```
 
-To keep the secrets out of the values file, reference an existing Secret:
+To keep the secrets out of the values file, reference an existing Secret. Read
+the URL rather than typing it into the command, so the credential stays out of
+the shell history and out of the argument list `ps` shows every user on the box:
 
 ```bash
+read -rs -p 'FalkorDB URL: ' FALKORDB_URL
+(umask 077 && printf '%s' "$FALKORDB_URL" > falkordb-url) && unset FALKORDB_URL
+
 kubectl create secret generic falkordb-browser-connection \
-  --from-literal=url='falkors://default:password@falkordb:6379'
+  --from-file=url=falkordb-url
+rm falkordb-url
 
 helm install falkordb-browser ./falkordb-browser \
   --set connection.enabled=true \

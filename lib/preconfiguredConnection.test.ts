@@ -175,6 +175,27 @@ test("an empty credential block in the url is a typo, not an anonymous connectio
     assert.equal(parsePreconfiguredUrl("falkor://alice:@db.internal").username, "alice");
 });
 
+test("a bracketed ipv6 host keeps its colons and loses its brackets", () => {
+    assert.deepEqual(parsePreconfiguredUrl("falkor://[::1]"), {
+        host: "::1",
+        port: undefined,
+        username: undefined,
+        password: undefined,
+        tls: false,
+    });
+
+    const withPort = parsePreconfiguredUrl("falkors://alice:s3cr3t@[2001:db8::1]:7000/0");
+    assert.equal(withPort.host, "2001:db8::1");
+    assert.equal(withPort.port, 7000);
+
+    // The socket wants the address, not the URL syntax around it.
+    assert.equal(readPreconfiguredConnection({ FALKORDB_CONNECTION_URL: "falkor://[::1]:7000" })?.host, "::1");
+
+    assert.throws(() => parsePreconfiguredUrl("falkor://[::1"), /no matching/);
+    assert.throws(() => parsePreconfiguredUrl("falkor://[::1]x"), /unexpected text/);
+    assert.throws(() => parsePreconfiguredUrl("falkor://[::1]:"), /no port/);
+});
+
 test("a boolean variable names every value it accepts when it rejects one", () => {
     assert.throws(
         () => readPreconfiguredConnection({ FALKORDB_HOST: "db", FALKORDB_TLS: "maybe" }),
