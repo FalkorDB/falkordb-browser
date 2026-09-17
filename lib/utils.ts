@@ -773,6 +773,22 @@ export function getConnectionEpoch(): number {
   return _connectionEpoch;
 }
 
+// Monotonic counter bumped whenever a mutation (create/delete/rename/duplicate)
+// hands back a graph list it knows to be correct. The graph list has more than
+// one publisher, and a refresh read before the mutation would otherwise land
+// after it and undo it, so every publisher captures this before fetching and
+// re-checks it before applying. Module-level rather than a ref because the
+// mutation and the refresh it supersedes do not share a component.
+let _graphListGeneration = 0;
+
+export function supersedeGraphLists(): void {
+  _graphListGeneration += 1;
+}
+
+export function getGraphListGeneration(): number {
+  return _graphListGeneration;
+}
+
 /** Error thrown when an in-flight request is superseded (e.g. a graph/connection
  *  switch aborts its AbortSignal). Callers should treat it as a no-op, not a
  *  failure — it must never surface a toast. */
