@@ -271,6 +271,31 @@ test.describe("@admin Mobile layout", () => {
             .toBeGreaterThan(await graph.sheetZIndex(graph.chatSheet));
     });
 
+    // A trigger whose sheet is open but buried is how the user asks to see it
+    // again, so it raises that sheet rather than closing something they cannot
+    // even see. Only the sheet already on top toggles shut.
+    test("A buried sheet's trigger brings it forward instead of closing it", async () => {
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+        await graph.selectGraphByName(graphName);
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(true);
+
+        await graph.chatToggle.click();
+        await expect.poll(() => graph.isSheetOpen(graph.chatSheet)).toBe(true);
+        expect(await graph.sheetZIndex(graph.chatSheet))
+            .toBeGreaterThan(await graph.sheetZIndex(graph.graphInfoSheet));
+
+        await graph.infoToggle.click();
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(true);
+        await expect.poll(() => graph.isSheetOpen(graph.chatSheet)).toBe(true);
+        expect(await graph.sheetZIndex(graph.graphInfoSheet))
+            .toBeGreaterThan(await graph.sheetZIndex(graph.chatSheet));
+
+        // Now that it is on top the same trigger closes it.
+        await graph.infoToggle.click();
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(false);
+    });
+
     // Touch has no Ctrl key, so the only way to build a selection is a mode that
     // makes every tap additive — entered by pressing and holding an element, the
     // way every touch platform starts a bulk selection. While it is on the data

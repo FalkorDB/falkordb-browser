@@ -9,7 +9,7 @@ import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { PanelLeft } from "lucide-react";
 import useIsMobile from "@/lib/useIsMobile";
 import BottomSheet from "@/components/ui/BottomSheet";
-import { PanelContext } from "./provider";
+import { PanelContext, SheetKey } from "./provider";
 import Header from "./Header";
 import Navbar from "./Navbar";
 import Tutorial from "./Tutorial";
@@ -56,6 +56,9 @@ export default function ProviderLayout({
   const [udfSheetOpen, setUdfSheetOpen] = useState(false);
   const [mobileNavSlot, setMobileNavSlot] = useState<HTMLDivElement | null>(null);
   const [mobileToolbarSlot, setMobileToolbarSlot] = useState<HTMLDivElement | null>(null);
+  // Lives here rather than in the route that renders the sheets, because their
+  // triggers sit in the nav row and have to raise a buried one.
+  const [sheetStack, setSheetStack] = useState<SheetKey[]>([]);
   const isRestoringSize = useRef(false);
   const udfPanelRef = useRef<PanelImperativeHandle>(null);
   const isRestoringUdfSize = useRef(false);
@@ -173,7 +176,12 @@ export default function ProviderLayout({
     setCustomizingLabel,
     mobileNavSlot,
     mobileToolbarSlot,
-  }), [panel, isCollapsed, isMobile, mobilePanelOpen, onExpand, panelRef, onInfoPanelResize, customizingLabel, setCustomizingLabel, mobileNavSlot, mobileToolbarSlot]);
+    sheetStack,
+    setSheetStack,
+    raiseSheet: (key: SheetKey) => setSheetStack(prev => (
+      prev[prev.length - 1] === key ? prev : [...prev.filter(k => k !== key), key]
+    )),
+  }), [panel, isCollapsed, isMobile, mobilePanelOpen, onExpand, panelRef, onInfoPanelResize, customizingLabel, setCustomizingLabel, mobileNavSlot, mobileToolbarSlot, sheetStack]);
 
   return (
     <PanelContext.Provider value={panelContext}>

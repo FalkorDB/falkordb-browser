@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
-import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext, SheetKey } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
@@ -58,8 +58,13 @@ export default function Selector({
     const { settings: { querySettings: { limitSettings: { limit, lastLimit } }, userExperienceSettings: { captionKeysSettings: { showPropertyKeyPrefix } } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { cypherLanguageConfig, setCypherLanguageConfig } = useContext(CypherLanguageContext);
-    const { panelOpen, onTogglePanel, mobileToolbarSlot } = useContext(PanelContext);
+    const { panelOpen, onTogglePanel, mobileToolbarSlot, sheetStack, raiseSheet } = useContext(PanelContext);
     const isMobile = useIsMobile();
+
+    // A sheet the user can see only the edge of comes forward on its trigger:
+    // the tap that reveals it should not be the one that throws it away.
+    const isBuried = (key: SheetKey) =>
+        sheetStack.includes(key) && sheetStack[sheetStack.length - 1] !== key;
 
     const [maximize, setMaximize] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
@@ -124,7 +129,7 @@ export default function Selector({
                 panelOpen && "!text-primary"
             )}
             title="Graph info"
-            onClick={onTogglePanel}
+            onClick={() => (isBuried("info") ? raiseSheet("info") : onTogglePanel())}
             data-testid="graphInfoToggle"
         >
             <Network className="mobile:size-[18px]" />
@@ -143,7 +148,7 @@ export default function Selector({
             indicator={indicator}
             title="Chat"
             disabled={!graphName}
-            onClick={() => setChatOpen?.(!chatOpen)}
+            onClick={() => (isBuried("chat") ? raiseSheet("chat") : setChatOpen?.(!chatOpen))}
         >
             <Sparkles className="mobile:size-[18px]" />
         </Button>
