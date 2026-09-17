@@ -144,9 +144,13 @@ export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_U
             throw new Error(`${name} has unexpected text after the host's "]" ("${afterBracket}")`);
         }
         portColon = afterBracket ? bracketEnd + 1 : -1;
+    } else if (rest.indexOf(":") !== rest.lastIndexOf(":")) {
+        // Two colons and no brackets: a hostname or an IPv4 address can hold
+        // none at all, so this is a bare IPv6 literal. Splitting on the last
+        // colon would invent a port out of its final group — brackets are what
+        // separate an IPv6 address from a port, so without them there is none.
+        portColon = -1;
     } else {
-        // A password is already gone by now, but an unbracketed host may still
-        // be a bare IPv6 address, so the LAST colon is the only candidate.
         portColon = rest.lastIndexOf(":");
         if (portColon >= 0) host = rest.slice(0, portColon);
     }
