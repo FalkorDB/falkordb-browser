@@ -194,6 +194,11 @@ test("a bracketed ipv6 host keeps its colons and loses its brackets", () => {
     assert.throws(() => parsePreconfiguredUrl("falkor://[::1"), /no matching/);
     assert.throws(() => parsePreconfiguredUrl("falkor://[::1]x"), /unexpected text/);
     assert.throws(() => parsePreconfiguredUrl("falkor://[::1]:"), /no port/);
+
+    // Brackets mean IPv6, so anything else inside them is a typo.
+    assert.throws(() => parsePreconfiguredUrl("falkor://[db.internal]"), /IPv6 address is expected/);
+    // The address the socket gets is canonical, whatever the operator wrote.
+    assert.equal(parsePreconfiguredUrl("falkor://[2001:0DB8:0000::1]").host, "2001:db8::1");
 });
 
 test("an unbracketed ipv6 host is an address, not a host and a port", () => {
@@ -202,6 +207,10 @@ test("an unbracketed ipv6 host is an address, not a host and a port", () => {
     const parsed = parsePreconfiguredUrl("falkor://2001:db8::1");
     assert.equal(parsed.host, "2001:db8::1");
     assert.equal(parsed.port, undefined);
+
+    // ...and a host that is not an address is a typo rather than a host that
+    // happens to contain colons.
+    assert.throws(() => parsePreconfiguredUrl("falkor://db.internal:6379:0"), /IPv6 address is expected/);
 
     // One colon is still host:port — that is the ordinary case.
     const ordinary = parsePreconfiguredUrl("falkor://db.internal:7000");

@@ -74,6 +74,24 @@ function decodeUrlPart(value: string, part: string, name: string): string {
     }
 }
 
+/**
+ * Validates an IPv6 literal and returns it in canonical form, without brackets.
+ *
+ * Borrows the URL parser rather than hand-rolling a regex: it is the same
+ * grammar the address came from, it normalises the address the socket gets, and
+ * it is what makes "host:6379:extra" a reported typo instead of a hostname that
+ * only fails much later, at DNS.
+ */
+function parseIpv6(address: string, name: string): string {
+    let hostname: string;
+    try {
+        ({ hostname } = new URL(`http://[${address}]`));
+    } catch {
+        throw new Error(`${name} has "${address}" where an IPv6 address is expected`);
+    }
+    return hostname.slice(1, -1);
+}
+
 type ParsedConnectionUrl = {
     host?: string;
     port?: number;
@@ -138,7 +156,7 @@ export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_U
         // URL syntax and not part of the address the socket wants.
         const bracketEnd = rest.indexOf("]");
         if (bracketEnd < 0) throw new Error(`${name} has a "[" with no matching "]"`);
-        host = rest.slice(1, bracketEnd);
+        host = parseIpv6(rest.slice(1, bracketEnd), name);
         const afterBracket = rest.slice(bracketEnd + 1);
         if (afterBracket && !afterBracket.startsWith(":")) {
             throw new Error(`${name} has unexpected text after the host's "]" ("${afterBracket}")`);
@@ -146,9 +164,11 @@ export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_U
         portColon = afterBracket ? bracketEnd + 1 : -1;
     } else if (rest.indexOf(":") !== rest.lastIndexOf(":")) {
         // Two colons and no brackets: a hostname or an IPv4 address can hold
-        // none at all, so this is a bare IPv6 literal. Splitting on the last
-        // colon would invent a port out of its final group — brackets are what
-        // separate an IPv6 address from a port, so without them there is none.
+        // none at all, so this is meant to be an IPv6 literal. Splitting on the
+        // last colon would invent a port out of its final group — brackets are
+        // what separate an IPv6 address from a port, so without them there is
+        // none, and anything that is not an address is a typo.
+        host = parseIpv6(rest, name);
         portColon = -1;
     } else {
         portColon = rest.lastIndexOf(":");
