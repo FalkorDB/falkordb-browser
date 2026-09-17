@@ -1959,12 +1959,30 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     if (status !== "authenticated" || !prefixReady || !connectionScope) return undefined;
 
+    // `switchPending` only covers switches that went through
+    // `beginConnectionSwitch`. The bootstrap restore does not -- it moves the
+    // global connection id straight to the stored one -- so it opens the same
+    // window with the flag false: requests are already tagged with connection
+    // B while the session, and with it `connectionScope`, still names A.
+    // Compare the two ids directly so this load waits for them to agree.
+    // A null global is not a disagreement: requests then carry no
+    // `X-Connection-Id` and the server resolves the same identity from the JWT.
+    // If the session never catches up, refusing to load is the right answer --
+    // `connectionScope` is stale too, so loading would publish the wrong
+    // connection's keys.
+    const pinnedConnectionId = getActiveConnectionIdGlobal();
+    const sessionConnectionId = sessionData?.activeConnectionId ?? null;
+    if (pinnedConnectionId !== null && pinnedConnectionId !== sessionConnectionId) return undefined;
+
     // The storage prefix is module-global and every step below awaits the
     // server, so a connection switch mid-flight could publish this
     // connection's keys into the next one's state, or write its ciphertext
     // under the next one's prefix. Nothing commits once the run is superseded.
     let cancelled = false;
-    const stale = () => cancelled || getConnectionPrefix() !== connectionScope;
+    const stale = () =>
+      cancelled ||
+      getConnectionPrefix() !== connectionScope ||
+      getActiveConnectionIdGlobal() !== pinnedConnectionId;
 
     (async () => {
       let loadedChatApiKeys: ChatApiKey[] = [];
@@ -2076,7 +2094,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
         if (migratedKey) {
           const migratedChatApiKeys = [createChatApiKey(migratedKey)];
-          const encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
+          // `serverEncrypt` throws on a refusal, and an unhandled rejection
+          // here would abandon the run before the keys below are published.
+          // A failure says nothing about the value, so leave `secretKey` where
+          // it is and let the next run retry the migration.
+          let encryptedKeys = "";
+          try {
+            encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
+          } catch (error) {
+            console.error('Failed to encrypt the migrated secret key, keeping it for a later attempt:', error);
+          }
           if (stale()) return;
           if (encryptedKeys) {
             loadedChatApiKeys = migratedChatApiKeys;
@@ -2102,7 +2129,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     })();
 
     return () => { cancelled = true; };
-  }, [status, prefixReady, connectionScope, switchPending]);
+  }, [status, prefixReady, connectionScope, switchPending, sessionData?.activeConnectionId]);
 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.

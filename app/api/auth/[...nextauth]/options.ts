@@ -396,6 +396,12 @@ export async function removeSessionConnection(
  * A cached socket outlives its record: revoking a connection flips `is_active`
  * but cannot reach into the pool, so every path that hands back a pooled client
  * has to ask the record again rather than treat "the ping succeeded" as proof.
+ *
+ * Expiry is checked here too. Connection records are always written with a
+ * finite `expires_at` (the session's max age), and `fetchTokenById` — unlike
+ * `fetchTokensByUserId` — applies no filter of its own, so without this clause
+ * an expired connection disappears from the connection list while still
+ * serving requests.
  */
 function isUsableConnectionRecord(
   tokenData: TokenData | null | undefined,
@@ -404,6 +410,8 @@ function isUsableConnectionRecord(
   return (
     !!tokenData &&
     tokenData.is_active &&
+    (tokenData.expires_at === -1 ||
+      tokenData.expires_at > Math.floor(Date.now() / 1000)) &&
     tokenData.name.startsWith("connection:") &&
     tokenData.user_id === sessionId
   );
