@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { SignJWT } from "jose";
 import crypto from "crypto";
-import { newClient, generateTimeUUID } from "../../[...nextauth]/options";
+import { newClient, generateTimeUUID, PAT_BINDING_VERSION } from "../../[...nextauth]/options";
 import { storeEncryptedCredential, getAuthSecret } from "../../tokenUtils";
 import { login, validateBody } from "../../../validate-body";
 
@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
       tls: authenticatedUser.tls,
       ca: authenticatedUser.ca || undefined,
       iat: currentTime,
+      pbv: PAT_BINDING_VERSION,
     };
 
     const signer = new SignJWT(tokenPayload)

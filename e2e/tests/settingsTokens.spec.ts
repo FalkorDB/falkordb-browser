@@ -736,15 +736,16 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
   });
 
   test.describe("Token Storage - Cypher escaping", () => {
-    // The FalkorDB-backed store writes the token name into a query. `\'` exits
-    // a FalkorDB string literal cleanly, so naive `''` doubling would leave the
-    // rest of this name running as Cypher.
-    const HOSTILE_NAME = "x\\'}) MATCH (v) DETACH DELETE v //";
-
     test("@admin Token name that is a Cypher fragment is stored as data", async () => {
       const sentinelName = getRandomString("sentinel-token");
       await apiCall.generateToken({ name: sentinelName });
 
+      // The FalkorDB-backed store writes the token name into a query. `\'` exits
+      // a FalkorDB string literal cleanly, so naive `''` doubling would leave the
+      // rest of this name running as Cypher. The trailing `//` comments out the
+      // remainder, so the unique suffix keeps the payload hostile while keeping
+      // this row distinguishable from one a parallel project created.
+      const HOSTILE_NAME = `x\\'}) MATCH (v) DETACH DELETE v // ${getRandomString("h")}`;
       const created = await apiCall.generateToken({ name: HOSTILE_NAME });
       expect(created.token).toBeDefined();
 

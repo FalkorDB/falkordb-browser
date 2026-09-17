@@ -64,6 +64,11 @@ For reverse-proxy deployments using `NEXTAUTH_URL=auto`, set `TRUST_PROXY_HEADER
 > random secret is generated per container, which means every session is
 > invalidated when the container is recreated. For anything long-lived, set your
 > own: `-e AUTH_SECRET="$(openssl rand -hex 32)"`.
+>
+> Supplying one is mandatory, not merely advisable, when more than one container
+> serves the same site: each generates its own signing key, so a session minted
+> by one replica is rejected by every other. Give all replicas the same
+> `AUTH_SECRET`.
 
 > Note: Alternativly, you can run the browser from source and database using Docker
 

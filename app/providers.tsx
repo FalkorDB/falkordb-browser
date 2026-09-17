@@ -1918,6 +1918,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           try {
             migratedKey = await serverDecrypt(storedSecretKey);
           } catch (error) {
+            // A superseded run must not touch storage, even to delete: the
+            // verdict below is acted on, not merely logged.
+            if (stale()) return;
             // A refusal must not fall through to treating the ciphertext as the
             // key itself: that would re-encrypt the blob as a bogus API key and
             // delete the original.

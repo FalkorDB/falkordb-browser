@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import crypto from "crypto";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
-import { getClient, generateTimeUUID } from "../[...nextauth]/options";
+import { getClient, generateTimeUUID, PAT_BINDING_VERSION } from "../[...nextauth]/options";
 import { storeEncryptedCredential, getAuthSecret } from "../tokenUtils";
 import { getCorsHeaders } from "../../utils";
 import { createToken, validateBody } from "../../validate-body";
@@ -192,6 +192,7 @@ export async function POST(request: NextRequest) {
       tls: user.tls,
       ca: user.ca || undefined,
       iat: currentTime,
+      pbv: PAT_BINDING_VERSION,
     };
 
     const signer = new SignJWT(tokenPayload)

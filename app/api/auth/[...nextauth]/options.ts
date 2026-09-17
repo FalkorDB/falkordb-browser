@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
 import { LRUCache } from "lru-cache";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
+import type { TokenData } from "@/lib/token-storage/ITokenStorage";
 import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
@@ -33,6 +34,7 @@ interface CustomJWTPayload {
   tls: boolean;
   ca?: string;
   url?: string;
+  pbv?: number; // Endpoint binding marker; see PAT_BINDING_VERSION
 }
 
 interface AuthenticatedUser {
@@ -188,6 +190,16 @@ export function generateTimeUUID() {
  * identify their own connection; the jwt callback retires anything older.
  */
 const BINDING_VERSION = 2;
+
+/**
+ * The same marker for personal access tokens, under a claim of its own.
+ *
+ * It cannot share `bv`: `getToken` falls back to reading an `Authorization:
+ * Bearer` header as a session token, and `getSessionFromRequest` admits anything
+ * `isEndpointBound` accepts without consulting `isTokenActive`. A PAT carrying
+ * `bv` would therefore authenticate on that path after it had been revoked.
+ */
+export const PAT_BINDING_VERSION = 1;
 
 /**
  * True when a JWT carries the current endpoint binding.
@@ -379,6 +391,25 @@ export async function removeSessionConnection(
 }
 
 /**
+ * True while the record still authorises this session to use the connection.
+ *
+ * A cached socket outlives its record: revoking a connection flips `is_active`
+ * but cannot reach into the pool, so every path that hands back a pooled client
+ * has to ask the record again rather than treat "the ping succeeded" as proof.
+ */
+function isUsableConnectionRecord(
+  tokenData: TokenData | null | undefined,
+  sessionId: string
+): tokenData is TokenData {
+  return (
+    !!tokenData &&
+    tokenData.is_active &&
+    tokenData.name.startsWith("connection:") &&
+    tokenData.user_id === sessionId
+  );
+}
+
+/**
  * Retrieves the FalkorDB client for a specific additional connection.
  * If the in-memory client is stale, it will be recreated from the Token DB.
  */
@@ -406,7 +437,7 @@ async function getConnectionClient(
     // Recreate from Token DB
     const storage = StorageFactory.getStorage();
     const tokenData = await storage.fetchTokenById(connId);
-    if (!tokenData || !tokenData.is_active || !tokenData.name.startsWith("connection:") || tokenData.user_id !== sessionId) {
+    if (!isUsableConnectionRecord(tokenData, sessionId)) {
       return null;
     }
 
@@ -453,9 +484,9 @@ async function getConnectionClient(
   try {
     const storage = StorageFactory.getStorage();
     const tokenData = await storage.fetchTokenById(connId);
-    if (!tokenData) {
+    if (!isUsableConnectionRecord(tokenData, sessionId)) {
       // eslint-disable-next-line no-console
-      console.warn("Token DB entry not found for connId:", connId);
+      console.warn("No usable Token DB entry for connId:", connId);
       return null;
     }
 
@@ -545,7 +576,12 @@ async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
  */
 function isValidJWTPayload(payload: unknown): payload is CustomJWTPayload {
   const p = payload as Record<string, unknown>;
-  return Boolean(p.sub && p.host && p.port);
+  // `host`/`port` are the connection's identity here — they pick the server to
+  // talk to and seed the owner that ciphertext is bound to. A token minted
+  // before those were resolved from the connection URL carries the localhost
+  // defaults instead, which every such token shares. Refuse it: the holder must
+  // issue a new one rather than act under an identity that is not theirs alone.
+  return Boolean(p.sub && p.host && p.port) && p.pbv === PAT_BINDING_VERSION;
 }
 
 /**
@@ -1370,7 +1406,7 @@ export async function getClient(
       const tokenData = await StorageFactory.getStorage()
         .fetchTokenById(connId)
         .catch(() => null);
-      if (tokenData) {
+      if (isUsableConnectionRecord(tokenData, id)) {
         const connUser: AuthenticatedUserWithPassword = {
           id,
           username: tokenData.username,

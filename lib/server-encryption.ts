@@ -4,15 +4,31 @@
  * Includes legacy migration support for old client-side encrypted values.
  */
 
+import { getActiveConnectionIdGlobal } from './active-connection.ts';
+
 const LEGACY_ENCRYPTED_PREFIX = 'enc:';
 const LEGACY_KEY_STORAGE_KEY = 'falkordb-key';
+
+/**
+ * Owner binding is derived from the connection behind the request, and the
+ * storage key these values are filed under is derived from the connection this
+ * tab is showing. Pin the request to the latter so the two cannot disagree:
+ * without the header the server falls back to the session's active connection,
+ * which another tab can switch out from under this one.
+ */
+function encryptionHeaders(): HeadersInit {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const connId = getActiveConnectionIdGlobal();
+  if (connId) headers['X-Connection-Id'] = connId;
+  return headers;
+}
 
 export async function serverEncrypt(value: string): Promise<string> {
   if (!value) return '';
 
   const res = await fetch('/api/encrypt', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: encryptionHeaders(),
     body: JSON.stringify({ value, action: 'encrypt' }),
   });
 
@@ -64,7 +80,7 @@ export async function serverDecrypt(encryptedValue: string): Promise<string> {
 
   const res = await fetch('/api/encrypt', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: encryptionHeaders(),
     body: JSON.stringify({ value: encryptedValue, action: 'decrypt' }),
   });
 

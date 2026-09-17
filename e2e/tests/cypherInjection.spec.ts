@@ -36,7 +36,7 @@ test.describe("Cypher identifier escaping", () => {
       graphName,
       "MATCH (n:Victim) RETURN count(n) AS c"
     );
-    return response.data[0].c as number;
+    return Number(response.data[0].c);
   };
 
   test(`@readwrite Validate that a hostile node label added via API is stored literally`, async () => {
