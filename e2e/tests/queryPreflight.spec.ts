@@ -186,7 +186,7 @@ test.describe("Query pre-flight and FalkorDB grammar extensions", () => {
 
         // …and does not leave the dialog stuck there: the toolbar's Upload button
         // is the ordinary Cypher upload, whoever opened the dialog last.
-        await graph.uploadGraphCancel.click();
+        await graph.uploadCancel.click();
         await graph.uploadGraphToolbarTrigger.click();
         await expect(graph.uploadTabTrigger("cypher")).toHaveAttribute("data-state", "active");
     });
@@ -208,7 +208,7 @@ test.describe("Query pre-flight and FalkorDB grammar extensions", () => {
         await expect(uploadAction).toBeVisible();
         await uploadAction.click();
         await expect(graph.loadCsvTabTrigger).toHaveAttribute("data-state", "active");
-        await graph.uploadGraphCancel.click();
+        await graph.uploadCancel.click();
     });
 
     test(`@admin A LOAD CSV source the browser cannot evaluate is left to the server`, async () => {
