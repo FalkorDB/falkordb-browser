@@ -321,6 +321,22 @@ test.describe("@admin Mobile layout", () => {
         await expect(graph.multiSelectCount).toHaveText("2 selected");
         await expect(graph.dataPanel).toHaveCount(0);
 
+        // A miss on the background is easy to make at this size, and it must not
+        // cost a selection built up one tap at a time — Done is the only way out.
+        const settled = await graph.readNodesScreenPositions();
+        const corners = [
+            { x: canvasBox!.x + 12, y: canvasBox!.y + 12 },
+            { x: canvasBox!.x + canvasBox!.width - 12, y: canvasBox!.y + 12 },
+            { x: canvasBox!.x + 12, y: canvasBox!.y + canvasBox!.height - 12 },
+            { x: canvasBox!.x + canvasBox!.width - 12, y: canvasBox!.y + canvasBox!.height - 12 },
+        ];
+        const distanceToNearestNode = (c: { x: number; y: number }) =>
+            Math.min(...settled.map(n => Math.hypot(n.screenX - c.x, n.screenY - c.y)));
+        const emptySpot = corners.reduce((a, b) => (distanceToNearestNode(b) > distanceToNearestNode(a) ? b : a));
+        await graph.elementClick(emptySpot.x, emptySpot.y);
+        await expect(graph.multiSelectCount).toHaveText("2 selected");
+        await expect(graph.multiSelectBar).toBeVisible();
+
         // Done is the way out, and it drops the selection rather than dumping the
         // user into a panel listing everything they picked.
         await graph.multiSelectDone.click();

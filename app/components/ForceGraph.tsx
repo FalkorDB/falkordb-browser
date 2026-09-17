@@ -309,8 +309,12 @@ export default function ForceGraph({
             const alreadyIn = current.find(e =>
                 (('source' in e) === ('source' in fullElement)) && e.id === fullElement.id
             );
+            // Filter on the instance that was actually found: the map may hand
+            // back a different object than the one the selection holds, and an
+            // identity test against `fullElement` would then remove nothing while
+            // `alreadyIn` still blocks the add — a toggle that does nothing at all.
             nextSelection = alreadyIn
-                ? current.filter(el => el !== fullElement)
+                ? current.filter(el => el !== alreadyIn)
                 : [...current, fullElement];
         } else {
             nextSelection = [fullElement];
@@ -446,20 +450,19 @@ export default function ForceGraph({
         // element at a time, exactly as Ctrl-click protects it on desktop. Commit
         // the pending pick rather than dropping it — additive is the mode that
         // makes tapping a node and then the background easy to do by accident.
-        if (evt?.shiftKey || evt?.ctrlKey) {
+        // Multi-select is the mobile stand-in for Ctrl-click, so the background
+        // is protected there for the same reason: a selection built up one tap at
+        // a time is too expensive to lose to a miss. Done on the toolbar is the
+        // deliberate way out, and untoggling the last element is the other.
+        if (evt?.shiftKey || evt?.ctrlKey || multiSelect) {
             flushPendingClick();
             return;
         }
         clearPendingClick();
-        if (multiSelect) {
-            // In multi-select the background is the way out, the gesture having no
-            // button to switch back off.
-            if (!setMultiSelect) return;
-            setMultiSelect(false);
-        } else if (selectedElements.length === 0) return;
+        if (selectedElements.length === 0) return;
         selectedElementsRef.current = [];
         setSelectedElements([]);
-    }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, setMultiSelect, consumeClick]);
+    }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, consumeClick]);
 
     const checkIsNodeSelected = useCallback((node: GraphNode) =>
         selectedElements.some(el => el.id === node.id && !('source' in el)) ||
