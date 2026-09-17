@@ -102,6 +102,17 @@ export default class MobileGraphPage extends GraphPage {
     return this.page.getByTestId("editorMore");
   }
 
+  public get tooltip(): Locator {
+    return this.page.getByRole("tooltip");
+  }
+
+  /** Press and hold an element — touch's stand-in for hovering a tooltip. */
+  async longPressElement(locator: Locator): Promise<void> {
+    const box = await locator.boundingBox();
+    if (!box) throw new Error("the element has no box to press");
+    await this.longPressCanvas(box.x + box.width / 2, box.y + box.height / 2);
+  }
+
   public get layoutMenu(): Locator {
     return this.page.getByTestId("layoutDropdownContent");
   }
@@ -113,6 +124,11 @@ export default class MobileGraphPage extends GraphPage {
   /** Named `infoToggle` because `graphInfoToggle` is private on the desktop page object. */
   public get infoToggle(): Locator {
     return this.page.getByTestId("graphInfoToggle");
+  }
+
+  /** The nav row's overflow menu: upload, query history and the canvas tips. */
+  public get selectorMore(): Locator {
+    return this.page.getByTestId("selectorMore");
   }
 
   public get uploadTrigger(): Locator {

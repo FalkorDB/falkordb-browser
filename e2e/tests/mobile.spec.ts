@@ -107,15 +107,31 @@ test.describe("@admin Mobile layout", () => {
         await expect.poll(() => graph.getMenuTabLabels()).toHaveLength(1);
     });
 
-    test("Secondary toolbar actions sit directly in the navigation row", async () => {
+    test("Secondary toolbar actions fold into the nav row's overflow menu", async () => {
         const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
         await graph.waitForPageIdle();
 
         // The graph info toggle stays out in the open: it is the only route to
-        // the graph picker, which lives inside the info panel.
+        // the graph picker, which lives inside the info panel. The rest of the
+        // desktop bar is one tap deeper, in the overflow menu.
         await expect(graph.infoToggle).toBeVisible();
+        await expect(graph.uploadTrigger).toBeHidden();
+
+        await graph.selectorMore.click();
         await expect(graph.uploadTrigger).toBeVisible();
         await expect(graph.queryHistoryTrigger).toBeVisible();
+    });
+
+    // A phone cannot hover, so every icon-only button would be unlabelled if the
+    // tooltip only answered to a mouse.
+    test("A press and hold reads out an icon button's tooltip", async () => {
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+
+        await expect(graph.tooltip).toHaveCount(0);
+
+        await graph.longPressElement(graph.infoToggle);
+        await expect(graph.tooltip).toContainText("Graph info");
     });
 
     test("The graph info sheet leaves the header and navigation visible", async () => {

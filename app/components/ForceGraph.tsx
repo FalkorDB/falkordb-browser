@@ -692,6 +692,7 @@ export default function ForceGraph({
         <div
             className="relative w-full h-full"
             data-testid={testId}
+            data-long-press={setMultiSelect ? "" : undefined}
             data-focus-active={String(dimmed && selectedElements.length > 0)}
             data-selection-count={String(selectedElements.length)}
             {...longPressHandlers}

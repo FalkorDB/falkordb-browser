@@ -5,9 +5,10 @@
 import { useState, useCallback, useContext, Dispatch, SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { cn, formatName, HistoryQuery } from "@/lib/utils";
-import { History, Info, Network, Sparkles, Upload } from "lucide-react";
+import { History, Info, MoreHorizontal, Network, Sparkles, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
@@ -62,6 +63,7 @@ export default function Selector({
 
     const [maximize, setMaximize] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
+    const [actionsOpen, setActionsOpen] = useState(false);
     const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
         setCypherLanguageConfig(config);
     }, [setCypherLanguageConfig]);
@@ -118,7 +120,7 @@ export default function Selector({
             aria-pressed={panelOpen}
             indicator={indicator}
             className={cn(
-                "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary",
+                "h-full text-foreground p-2 mobile:p-1.5 rounded-lg border border-border bg-background hover:bg-secondary",
                 panelOpen && "!text-primary"
             )}
             title="Graph info"
@@ -136,7 +138,7 @@ export default function Selector({
             }}
             data-testid="graphInfoToggle"
         >
-            <Network />
+            <Network className="mobile:size-[18px]" />
         </Button>
     );
 
@@ -146,7 +148,7 @@ export default function Selector({
             aria-pressed={chatOpen}
             data-testid="chatToggleButton"
             className={cn(
-                "text-foreground border border-border rounded-lg p-2 hover:bg-secondary mobile:h-full",
+                "text-foreground border border-border rounded-lg p-2 mobile:p-1.5 hover:bg-secondary mobile:h-full",
                 chatOpen && "!text-primary"
             )}
             indicator={indicator}
@@ -165,7 +167,7 @@ export default function Selector({
                 setChatOpen?.(next);
             }}
         >
-            <Sparkles />
+            <Sparkles className="mobile:size-[18px]" />
         </Button>
     );
 
@@ -198,49 +200,53 @@ export default function Selector({
     if (isMobile) {
         // Portalled into the nav row: those actions and the tab switcher together
         // fit one row, which leaves the editor as the only thing above the canvas.
-        const action = "h-full shrink-0 text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed";
+        const action = "h-full shrink-0 text-foreground p-1.5 rounded-lg border border-border bg-background hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed";
 
-        // Same left-to-right order as the desktop bar, so the two layouts stay learnable.
+        // Only the two panels that own a whole screen stay out in the open; the
+        // rest of the desktop bar folds into the overflow so the tab name keeps
+        // the width it needs to be readable.
         const toolbar = (
             <>
                 {graphInfoButton}
-                <Button
-                    data-testid="uploadGraphToolbarTrigger"
-                    aria-label="Upload data"
-                    title="Upload data"
-                    className={action}
-                    disabled={isReadOnly || !graphName}
-                    onClick={() => setUploadOpen(true)}
-                >
-                    <Upload />
-                </Button>
-                <Button
-                    data-testid="queryHistory"
-                    aria-label="Query history panel"
-                    title="Query history"
-                    className={action}
-                    disabled={historyQuery.queries.length === 0}
-                    onClick={() => setQueriesOpen?.(true)}
-                >
-                    <History />
-                </Button>
-                <Popover>
-                    {/* A plain button, not `Button`: its tooltip wrapper would swallow
-                        the trigger's ref. */}
-                    <PopoverTrigger asChild>
+                <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
+                    <DropdownMenuTrigger asChild>
                         <button
                             type="button"
-                            data-testid="selectorCanvasInfo"
-                            aria-label="Canvas tips"
+                            data-testid="selectorMore"
+                            aria-label="More actions"
                             className={cn(action, "flex items-center justify-center")}
                         >
-                            <Info />
+                            <MoreHorizontal size={18} />
                         </button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="z-50 w-[80vw] max-w-[320px] bg-background text-xs">
-                        {canvasNotices ?? canvasTips}
-                    </PopoverContent>
-                </Popover>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="mobile:z-50 w-[80vw] max-w-[320px] bg-background p-1">
+                        <DropdownMenuItem
+                            data-testid="uploadGraphToolbarTrigger"
+                            className="gap-3 rounded-lg px-3 py-2.5 text-sm cursor-pointer"
+                            disabled={isReadOnly || !graphName}
+                            onSelect={() => setUploadOpen(true)}
+                        >
+                            <Upload size={18} />
+                            <span>Upload data</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            data-testid="queryHistory"
+                            className="gap-3 rounded-lg px-3 py-2.5 text-sm cursor-pointer"
+                            disabled={historyQuery.queries.length === 0}
+                            onSelect={() => setQueriesOpen?.(true)}
+                        >
+                            <History size={18} />
+                            <span>Query history</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {/* The tips have nowhere else to live on a phone, so the menu shows
+                            them in place rather than behind one more tap. */}
+                        <div data-testid="selectorCanvasInfo" className="flex items-start gap-3 px-3 py-2 text-xs text-muted-foreground max-h-[40dvh] overflow-auto">
+                            <Info size={18} className="shrink-0" />
+                            <div>{canvasNotices ?? canvasTips}</div>
+                        </div>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 {chatButton}
             </>
         );

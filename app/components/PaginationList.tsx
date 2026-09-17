@@ -399,6 +399,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                     getItemClassName(selected, hover)
                                 )}
                                 data-testid={`${dataTestId}${text}`}
+                                data-long-press={onLongPress ? "" : undefined}
                                 style={isMobile ? { minHeight: `${itemHeight}px` } : { height: `${itemHeight}px` }}
                                 key={text}
                                 {...longPressHandlers}

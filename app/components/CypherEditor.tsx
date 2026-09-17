@@ -1433,7 +1433,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             languageConfig={cypherLanguageConfig}
                             options={{
                                 lineNumbersMinChars: 3,
-                                fontSize: 25,
+                                fontSize: isMobile ? 16 : 25,
                                 minimap: { enabled: true },
                                 scrollbar: { vertical: 'auto', horizontal: 'auto' },
                                 overviewRulerLanes: 3,

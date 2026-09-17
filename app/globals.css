@@ -10,6 +10,14 @@
    A short desktop window needs the same vertical trimming as a phone. */
 @custom-variant short (@media (height < 800px));
 
+/* Everything rem-based comes down a notch on a phone, rather than each component
+   picking its own mobile size. Keep the query in step with the variant above. */
+@media (width < 1100px) {
+    html {
+        font-size: 15px;
+    }
+}
+
 @layer base {
     :root {
         --background: 0 0% 100%;

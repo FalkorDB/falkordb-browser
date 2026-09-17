@@ -200,7 +200,7 @@ export default function Toolbar({
                         }
                     </Button>
                 }
-                {!isMobile && showAllButton}
+                {!isMobile && expand && showAllButton}
                 <div className={cn("basis-0 grow relative pointer-events-auto min-w-[20dvw] max-w-[55dvw]", isMobile && "max-w-none")}>
                     {
                         expand && graph.getElements().length > 0 && !isLoading &&
