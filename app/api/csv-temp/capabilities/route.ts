@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders } from "../../utils";
 import { getClient } from "../../auth/[...nextauth]/options";
-import { isFileUriLoadSupported } from "@/app/lib/csv-load-capabilities";
+import { isFileUriLoadSupported, uploadProducesLoadableSource } from "@/app/lib/csv-load-capabilities";
 import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 
 /**
@@ -15,6 +15,10 @@ import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
  * is what lets a single fetch survive a connection switch. The route is still
  * session-guarded so an unauthenticated caller cannot enumerate how the instance
  * is wired up, and the upload routes enforce the role themselves.
+ *
+ * `uploadEnabled` also answers no where uploading cannot fix anything: a
+ * deployment whose uploads come back as `file://` while `file://` is turned off
+ * would only produce a second rejected query.
  */
 export async function OPTIONS(request: Request) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -26,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
         {
-            uploadEnabled: CSV_UPLOAD_ENABLED,
+            uploadEnabled: CSV_UPLOAD_ENABLED && uploadProducesLoadableSource(),
             fileUriSupported: isFileUriLoadSupported(),
         },
         { headers: getCorsHeaders(request) }
