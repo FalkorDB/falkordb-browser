@@ -263,7 +263,12 @@ jobs:
           # Stop the container gracefully once certificates are ready
           echo "Certificates generated, stopping container..."
           docker stop $CONTAINER_ID || true
-          
+
+          # The container writes the private keys as root with mode 600, so the
+          # browser under test cannot read client.key when the mTLS test uploads
+          # it. The FalkorDB container still reads them as root.
+          sudo chown -R "$(id -u):$(id -g)" tls
+
           echo "Generated certificates:"
           ls -la tls/
       - name: Create Redis TLS config
@@ -275,7 +280,9 @@ jobs:
           tls-cert-file /var/lib/falkordb/tls/redis.crt
           tls-key-file /var/lib/falkordb/tls/redis.key
           tls-ca-cert-file /var/lib/falkordb/tls/ca.crt
-          tls-auth-clients no
+          # "optional" rather than "no" so the same server serves both the plain
+          # TLS tests and the client-certificate one.
+          tls-auth-clients optional
           EOF
       - name: Start FalkorDB with TLS
         run: |

@@ -342,6 +342,72 @@ export const fixRequest = z.object({
 });
 
 // Auth schemas
+// Both mTLS fields carry base64 of a PEM file, produced by FileReader on the
+// client. Pinning the alphabet keeps quotes and backslashes out of values that
+// reach the credential store, which interpolates them into Cypher.
+const BASE64_PEM = /^[A-Za-z0-9+/]+={0,2}$/;
+
+// mTLS material is only usable as a PAIR, and only under TLS. A certificate without
+// its key (or either with tls off) cannot open a connection, and without this it fails
+// far away in the TLS handshake with an opaque error instead of here, naming the field.
+const requireMtlsPair = (
+  // tls arrives as a string on the login schema and as string | boolean on
+  // addConnection, so both spellings of "on" have to count. url is only modelled
+  // by the credentials provider; the route schemas leave it undefined.
+  v: { tls?: string | boolean; cert?: string; key?: string; url?: string },
+  ctx: z.RefinementCtx
+) => {
+  if (!!v.cert !== !!v.key) {
+    ctx.addIssue({
+      code: "custom",
+      path: [v.cert ? "key" : "cert"],
+      message: "Client certificate and client key must be provided together",
+    });
+  }
+  if ((v.cert || v.key) && !(v.tls === "true" || v.tls === true)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["tls"],
+      message: "Client certificate authentication requires TLS to be enabled",
+    });
+  }
+  // A URL login builds its socket options from the URL alone, so a certificate
+  // handed alongside one would be dropped without a word.
+  if ((v.cert || v.key) && v.url) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["url"],
+      message:
+        "Client certificate authentication is not supported with a connection URL",
+    });
+  }
+};
+
+// next-auth serialises an absent credential, so the literal "undefined" reaches
+// authorize() as a value and has to count as absent.
+const optionalCredential = (inner: z.ZodString) =>
+  z.preprocess(
+    (v) => (v === "" || v === "undefined" ? undefined : v),
+    inner.optional()
+  );
+
+// signIn() posts straight to the Auth.js callback, so the credentials provider is
+// the one connection entry point with no route schema in front of it. Validating
+// here keeps unchecked certificate material out of newClient and out of the Token
+// DB, which interpolates it into Cypher.
+export const authCredentials = z
+  .object({
+    tls: z.union([z.string(), z.boolean()]).optional(),
+    url: optionalCredential(z.string()),
+    cert: optionalCredential(
+      z.string().regex(BASE64_PEM, "Client certificate must be base64-encoded")
+    ),
+    key: optionalCredential(
+      z.string().regex(BASE64_PEM, "Client key must be base64-encoded")
+    ),
+  })
+  .superRefine(requireMtlsPair);
+
 export const login = z.object({
   username: z
     .string({
@@ -379,6 +445,20 @@ export const login = z.object({
     })
     .min(1, "CA certificate cannot be empty")
     .optional(),
+  cert: z
+    .string({
+      error: "Invalid client certificate",
+    })
+    .min(1, "Client certificate cannot be empty")
+    .regex(BASE64_PEM, "Client certificate must be base64-encoded")
+    .optional(),
+  key: z
+    .string({
+      error: "Invalid client key",
+    })
+    .min(1, "Client key cannot be empty")
+    .regex(BASE64_PEM, "Client key must be base64-encoded")
+    .optional(),
   name: z
     .string({
       error: "Invalid token name",
@@ -395,7 +475,7 @@ export const login = z.object({
       error: "Invalid TTL value",
     })
     .optional(),
-});
+}).superRefine(requireMtlsPair);
 
 export const revokeToken = z.object({
   token: z
@@ -452,7 +532,15 @@ export const addConnection = z.object({
   ca: z
     .string({ error: "Invalid CA certificate" })
     .optional(),
-});
+  cert: z
+    .string({ error: "Invalid client certificate" })
+    .regex(BASE64_PEM, "Client certificate must be base64-encoded")
+    .optional(),
+  key: z
+    .string({ error: "Invalid client key" })
+    .regex(BASE64_PEM, "Client key must be base64-encoded")
+    .optional(),
+}).superRefine(requireMtlsPair);
 
 // Token creation schema
 export const createToken = z.object({

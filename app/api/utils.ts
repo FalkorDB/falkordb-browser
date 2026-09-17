@@ -32,6 +32,8 @@ export function buildFalkorDBConnection(user: {
     password?: string;
     tls?: boolean;
     ca?: string;
+    cert?: string;
+    key?: string;
 }): string {
     // Use URL if provided
     if (user.url) {
