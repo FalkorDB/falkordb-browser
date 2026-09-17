@@ -24,7 +24,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const { Labels, Relationships, PropertyKeys, MemoryUsage } = graph.GraphInfo;
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { graphInfo: { showMemoryUsage, maxItemsForSearch } } } = useContext(BrowserSettingsContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly, supersedeGraphRefreshes } = useContext(ConnectionContext);
 
     const [nodesSearch, setNodesSearch] = useState("");
     const [edgesSearch, setEdgesSearch] = useState("");
@@ -88,6 +88,18 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
         setGraph(g);
     }, [setGraph]);
 
+    // The created graph is appended to the list rather than re-read, so every
+    // refresh already in flight was read before it existed: without superseding
+    // them, the slower one lands afterwards and takes the new graph back out of
+    // the selector until the next refresh puts it in again.
+    const handleGraphCreated = useCallback((newGraphName: string) => {
+        const name = formatName(newGraphName);
+
+        supersedeGraphRefreshes();
+        handleSetGraphName(name);
+        setGraphNames(prev => [...(prev ?? []), name]);
+    }, [supersedeGraphRefreshes, handleSetGraphName, setGraphNames]);
+
     return (
         <div data-testid="graphInfoPanel" data-graph-info-version={graphInfoVersion} className={cn("relative h-full w-full p-3 gap-3", customizing ? "flex flex-col" : cn("grid", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]"))}>
             {
@@ -116,10 +128,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 !isReadOnly &&
                                 <CreateGraph
                                     graphNames={graphNames ?? []}
-                                    onSetGraphName={(newGraphName) => {
-                                        handleSetGraphName(formatName(newGraphName));
-                                        setGraphNames(prev => [...(prev ?? []), formatName(newGraphName)]);
-                                    }}
+                                    onSetGraphName={handleGraphCreated}
                                     trigger={
                                         <Button
                                             data-testid="createGraph"
