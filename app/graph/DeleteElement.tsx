@@ -1,5 +1,3 @@
-/* eslint-disable react/require-default-props */
-
 "use client";
 
 import React, { useState, useContext, useEffect } from "react";
@@ -14,6 +12,8 @@ interface Props {
     open: boolean
     setOpen: (open: boolean) => void
     description: string
+    label?: string
+    testId?: string
 }
 
 export default function DeleteElement({
@@ -21,6 +21,8 @@ export default function DeleteElement({
     open,
     setOpen,
     description,
+    label,
+    testId = "deleteElementGraph",
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -50,11 +52,12 @@ export default function DeleteElement({
             description={description}
             trigger={(
                 <Button
-                    data-testid="deleteElementGraph"
-                    className="pointer-events-auto bg-background p-1.5 mobile:min-h-11 mobile:min-w-11 mobile:justify-center"
+                    data-testid={testId}
+                    className="pointer-events-auto bg-background p-1.5 gap-2 mobile:min-h-11 mobile:min-w-11 mobile:justify-center"
                     variant="Delete"
                     tooltipSide="bottom"
                     title="Delete Element(s)"
+                    label={label}
                 >
                     <Trash2 size={20} />
                 </Button>

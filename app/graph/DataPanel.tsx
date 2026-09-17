@@ -182,15 +182,6 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
     return (
         <div data-testid="DataPanel" className="DataPanel gap-2 p-3 relative">
             <div className="absolute top-2 right-2 flex items-center gap-1">
-                {
-                    isMobile && onDeleteElement && !readOnly &&
-                    <DeleteElement
-                        description="Are you sure you want to delete this element(s)?"
-                        open={deleteOpen}
-                        setOpen={setDeleteOpen}
-                        onDeleteElement={onDeleteElement}
-                    />
-                }
                 <Button
                     data-testid="DataPanelClose"
                     className="mobile:min-h-11 mobile:min-w-11 mobile:justify-center"
@@ -269,6 +260,20 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
                 type={type}
                 canvasRef={canvasRef}
                 schema={schema}
+                actions={
+                    // The toolbar that holds delete on desktop sits behind this
+                    // sheet on mobile, so the panel carries its own copy.
+                    isMobile && onDeleteElement && !readOnly
+                        ? <DeleteElement
+                            description="Are you sure you want to delete this element(s)?"
+                            open={deleteOpen}
+                            setOpen={setDeleteOpen}
+                            onDeleteElement={onDeleteElement}
+                            label="Delete"
+                            testId="DataPanelDeleteElement"
+                        />
+                        : undefined
+                }
             />
         </div >
     );
