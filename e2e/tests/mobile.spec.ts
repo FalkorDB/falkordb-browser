@@ -247,6 +247,9 @@ test.describe("@admin Mobile layout", () => {
     // makes every tap additive — and while it is on the data panel has to stay
     // shut, since it covers the canvas the user is still picking from.
     test("Multi select stands in for Ctrl-click and keeps the data panel closed", async () => {
+        // Four canvas settles and two query runs put this within a couple of seconds
+        // of the default budget, which makes any CI hiccup a timeout.
+        test.setTimeout(60_000);
         const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
         await graph.waitForPageIdle();
         await graph.selectGraphByName(graphName);
@@ -281,7 +284,7 @@ test.describe("@admin Mobile layout", () => {
 
         // Selecting pans the canvas onto the selection, so the second node is no
         // longer where it was measured — re-read it by id before tapping it.
-        const secondNode = (await graph.getNodesScreenPositions()).find(n => n.id === nodes[1].id);
+        const secondNode = (await graph.readNodesScreenPositions()).find(n => n.id === nodes[1].id);
         expect(secondNode).toBeDefined();
         await graph.elementClick(secondNode.screenX, secondNode.screenY);
 
