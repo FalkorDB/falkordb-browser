@@ -1,5 +1,5 @@
 import { getResolvedCsvStorageMode } from "./csv-storage.ts";
-import { getLocalLoadUriMode } from "./csv-storage-local.ts";
+import { getLocalLoadUriScheme } from "./csv-storage-local.ts";
 
 /**
  * Whether a hand-written `LOAD CSV FROM 'file://…'` can resolve on this
@@ -25,19 +25,23 @@ export function isFileUriLoadSupported(): boolean {
  * Whether uploading a CSV through this deployment yields a source the database
  * can actually read — i.e. whether offering the upload is a fix at all.
  *
- * The one configuration where it is not: local storage handing back
- * `file://…` while the operator has declared `file://` unreadable. Every other
- * target emits an `https://` URL, and `assertFalkorFetchableCsvUrl` already
- * refuses the rest at upload time rather than letting a doomed URI through.
+ * Local storage is the only target whose scheme is configurable, so it is the
+ * only one asked: `file://` needs `file://` to be readable, and the HTTP serve
+ * route needs an HTTPS base, since FalkorDB refuses plain `http://`. S3 and
+ * Blob presign over HTTPS; an operator who forces `S3_READ_URL_PROTOCOL=http`
+ * gets a 422 from the upload route naming the URL, which is a better answer
+ * than a missing button — and re-deriving that endpoint here would be a second
+ * copy of the SigV4 rewrite rules to keep in step.
  *
  * A storage configuration broken badly enough to throw is not evidence that the
  * upload is futile, so it answers `true` and fails loudly in the upload flow.
  */
 export function uploadProducesLoadableSource(): boolean {
-    if (isFileUriLoadSupported()) return true;
-
     try {
-        return !(getResolvedCsvStorageMode() === "local" && getLocalLoadUriMode() === "file");
+        if (getResolvedCsvStorageMode() !== "local") return true;
+
+        const scheme = getLocalLoadUriScheme();
+        return scheme === "file" ? isFileUriLoadSupported() : scheme === "https";
     } catch {
         return true;
     }

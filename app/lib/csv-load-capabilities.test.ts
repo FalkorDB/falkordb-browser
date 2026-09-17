@@ -7,6 +7,9 @@ const OWNED = [
     "LOAD_CSV_FILE_URI",
     "CSV_STORAGE",
     "CSV_LOCAL_LOAD_URI_MODE",
+    "CSV_SERVE_BASE_URL",
+    "AUTH_URL",
+    "NEXTAUTH_URL",
     "S3_BUCKET",
     "BLOB_READ_WRITE_TOKEN",
 ] as const;
@@ -94,14 +97,18 @@ describe("uploadProducesLoadableSource", () => {
         assert.equal(uploadProducesLoadableSource(), false);
     });
 
-    it("answers yes for every upload target that serves over HTTPS", () => {
-        process.env.LOAD_CSV_FILE_URI = "false";
-
+    it("answers no when the served URL would be plain http, which FalkorDB refuses", () => {
         process.env.CSV_STORAGE = "local";
         process.env.CSV_LOCAL_LOAD_URI_MODE = "http";
-        assert.equal(uploadProducesLoadableSource(), true);
+        process.env.CSV_SERVE_BASE_URL = "http://localhost:3000";
+        assert.equal(uploadProducesLoadableSource(), false);
 
-        delete process.env.CSV_LOCAL_LOAD_URI_MODE;
+        process.env.CSV_SERVE_BASE_URL = "https://browser.example.com";
+        assert.equal(uploadProducesLoadableSource(), true);
+    });
+
+    it("answers yes for the cloud targets, which presign over https", () => {
+        process.env.LOAD_CSV_FILE_URI = "false";
         process.env.CSV_STORAGE = "blob";
         process.env.BLOB_READ_WRITE_TOKEN = "token";
         assert.equal(uploadProducesLoadableSource(), true);

@@ -70,20 +70,31 @@ const FALKOR_STRING_ESCAPES = new Map([
  * we say nothing.
  */
 function readSourceLiteral(original: string, masked: string, start: number): string | null {
-  const quote = masked[start];
+  // Parentheses around the whole source change nothing about what it evaluates
+  // to, so `FROM ('x.csv')` is still a literal source.
+  let cursor = start;
+  let depth = 0;
+  while (masked[cursor] === "(") {
+    depth += 1;
+    cursor += 1;
+    while (masked[cursor] === " " || masked[cursor] === "\t" || masked[cursor] === "\n" || masked[cursor] === "\r") cursor += 1;
+  }
+
+  const quote = masked[cursor];
   if (quote !== "'" && quote !== '"') return null;
 
-  const end = masked.indexOf(quote, start + 1);
+  const end = masked.indexOf(quote, cursor + 1);
   if (end === -1) return null;
 
   // The literal has to *be* the source expression, not merely start it: `FROM`
   // takes any expression, and FalkorDB happily evaluates `'http' + 's://…'` into
-  // a URI it can fetch. The clause's `AS` is what proves nothing else is left.
-  if (!/^\s*AS\b/i.test(masked.slice(end + 1))) return null;
+  // a URI it can fetch. The clause's `AS` — with every parenthesis we opened
+  // closed before it — is what proves nothing else is left.
+  if (!new RegExp(`^(?:\\s*\\)){${depth}}\\s*AS\\b`, "i").test(masked.slice(end + 1))) return null;
 
   // Decode exactly what the server decodes, so we inspect the value it will see.
   return original
-    .slice(start + 1, end)
+    .slice(cursor + 1, end)
     .replace(/\\(.)/gs, (escape, char: string) => FALKOR_STRING_ESCAPES.get(char) ?? escape);
 }
 

@@ -82,6 +82,12 @@ function serveBaseUrl(): string {
     ).replace(/\/$/, "");
 }
 
+/** The URI scheme a stored CSV is handed to `LOAD CSV` as. */
+export function getLocalLoadUriScheme(): "file" | "http" | "https" {
+    if (getLocalLoadUriMode() === "file") return "file";
+    return serveBaseUrl().toLowerCase().startsWith("https://") ? "https" : "http";
+}
+
 /** Open a stored temp CSV as a stream for the HTTP serve endpoint (or null). */
 export function openLocalCsvReadStream(owner: string, key: string): fs.ReadStream | null {
     const filePath = safeFilePath(owner, key);

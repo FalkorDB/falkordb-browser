@@ -69,6 +69,22 @@ describe("preflightQuery", () => {
     }
   });
 
+  it("reads a source the query wraps in parentheses", () => {
+    assert.deepEqual(
+      codes("LOAD CSV FROM ('ftp://example.com/a.csv') AS row RETURN row", FILE_UNAVAILABLE),
+      ["LOAD_CSV_UNSUPPORTED_URI"]
+    );
+    assert.deepEqual(
+      codes("LOAD CSV FROM ( ( 'file://a.csv' ) ) AS row RETURN row", FILE_UNAVAILABLE),
+      ["LOAD_CSV_FILE_URI_UNAVAILABLE"]
+    );
+
+    // Unbalanced parentheses mean something else is going on in there, and an
+    // expression is exactly what we must not judge.
+    assert.deepEqual(codes("LOAD CSV FROM ('a' + 'b.csv') AS row RETURN row", FILE_UNAVAILABLE), []);
+    assert.deepEqual(codes("LOAD CSV FROM (('ftp://a.csv') AS row RETURN row", FILE_UNAVAILABLE), []);
+  });
+
   it("ignores LOAD CSV that is only mentioned, not written", () => {
     const cases = [
       "// LOAD CSV FROM 'ftp://example.com/a.csv' AS row\nMATCH (n) RETURN n",
