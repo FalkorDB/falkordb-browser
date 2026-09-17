@@ -677,6 +677,9 @@ type CsvLoadContextType = {
   uploadEnabled: boolean;
   /** Open the Upload Data dialog on its Load CSV tab. */
   openCsvUpload: () => void;
+  /** The dialog belongs to the graph page; callers elsewhere in the tree reach
+   *  it through the opener the page registers here. Returns an unregister fn. */
+  registerCsvUpload: (open: () => void) => () => void;
 };
 
 export const CsvLoadContext = createContext<CsvLoadContextType>({
@@ -685,4 +688,5 @@ export const CsvLoadContext = createContext<CsvLoadContextType>({
   fileUriSupported: true,
   uploadEnabled: false,
   openCsvUpload: () => { },
+  registerCsvUpload: () => () => { },
 });

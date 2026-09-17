@@ -191,6 +191,26 @@ test.describe("Query pre-flight and FalkorDB grammar extensions", () => {
         await expect(graph.uploadTabTrigger("cypher")).toHaveAttribute("data-state", "active");
     });
 
+    test(`@admin A source only the server can reject still points at the upload`, async () => {
+        const graph = await openGraph();
+
+        // file:// passes pre-flight — the browser cannot know what the database's
+        // import folder holds — so this failure can only come back from the server.
+        await graph.insertQuery("LOAD CSV FROM 'file://e2e-no-such-file.csv' AS row RETURN row");
+        await graph.clickRunQuery(false);
+
+        expect(await graph.getErrorToastTitle()).toBe("Error");
+        expect(await graph.getErrorToastText()).toContain("Error opening CSV URI");
+        // The server's wording is opaque on its own; the hint is what explains it.
+        await expect(graph.errorToast.getByTestId("toast-hint")).toContainText("import folder");
+
+        const uploadAction = graph.errorToast.getByRole("button", { name: "Upload CSV" });
+        await expect(uploadAction).toBeVisible();
+        await uploadAction.click();
+        await expect(graph.loadCsvTabTrigger).toHaveAttribute("data-state", "active");
+        await graph.uploadGraphCancel.click();
+    });
+
     test(`@admin A LOAD CSV source the browser cannot evaluate is left to the server`, async () => {
         const graph = await openGraph();
 

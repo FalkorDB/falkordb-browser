@@ -147,46 +147,17 @@ export default function Page() {
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
 
-    // The Upload Data dialog lives in the toolbar, but the pre-flight check that
-    // offers it as a quick fix runs from the editor, the history panel and Chat —
-    // so the state and the context it feeds belong to their common ancestor.
+    // The Upload Data dialog lives in the toolbar, but the pre-flight check and
+    // the CSV error toast that offer it as a quick fix run from the editor, the
+    // history panel, Chat and the toaster — so its opener is published upward.
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploadMode, setUploadMode] = useState<"cypher" | "load-csv">("cypher");
-    // What this deployment can do with LOAD CSV. Assume file:// works until the
-    // server says otherwise, so a failed lookup never blocks a runnable query.
-    const [csvCapabilities, setCsvCapabilities] = useState({ fileUriSupported: true, uploadEnabled: false });
+    const { registerCsvUpload } = useContext(CsvLoadContext);
 
-    // Deployment-wide, so this is fetched once and needs no connection scoping:
-    // nothing in the answer changes when the active connection does.
-    useEffect(() => {
-        let cancelled = false;
-
-        fetch("/api/csv-temp/capabilities", { credentials: "same-origin" })
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data) => {
-                if (cancelled || !data) return;
-                setCsvCapabilities({
-                    fileUriSupported: data.fileUriSupported !== false,
-                    uploadEnabled: data.uploadEnabled === true,
-                });
-            })
-            .catch(() => undefined);
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    // The per-caller half of "can upload" lives here, where isReadOnly already
-    // follows the active connection — a switch re-evaluates it with no refetch.
-    const csvLoad = useMemo(() => ({
-        ...csvCapabilities,
-        uploadEnabled: csvCapabilities.uploadEnabled && !isReadOnly && Boolean(graphName),
-        openCsvUpload: () => {
-            setUploadMode("load-csv");
-            setUploadOpen(true);
-        },
-    }), [csvCapabilities, isReadOnly, graphName]);
+    useEffect(() => registerCsvUpload(() => {
+        setUploadMode("load-csv");
+        setUploadOpen(true);
+    }), [registerCsvUpload]);
 
     // Graph and Schema each have a selection of their own; the other tabs have
     // none. `panel` is shared by all of them, so it stays "data" across a tab
@@ -750,7 +721,6 @@ export default function Page() {
                     maxSize="100%"
                 >
                     <div className="h-full w-full flex flex-col">
-                        <CsvLoadContext.Provider value={csvLoad}>
                         <div className="Page p-3 gap-3">
                             <Selector
                                 graph={graph}
@@ -834,7 +804,6 @@ export default function Page() {
                                 }
                             </ResizablePanelGroup>
                         </div>
-                        </CsvLoadContext.Provider>
                         <div className="h-4 w-full Gradient" />
                     </div>
                 </ResizablePanel>
