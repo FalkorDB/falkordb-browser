@@ -2159,6 +2159,30 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // below is not readable synchronously.
     const urlParams = window.location.search;
 
+    // Pinned to `cid`: after a connection switch neither the retry nor the
+    // cleanup looks at the connection these graphs were created on.
+    const dropDemoGraphs = async () => {
+      await Promise.all(DEMO_GRAPH_NAMES.map(async name => {
+        const res = await securedFetch(`/api/graph/${name}`, {
+          method: "DELETE",
+        }, silentToast, setIndicator, cid);
+
+        // The route answers 400 for every failure including "no such graph",
+        // and securedFetch has already drained the body that would tell them
+        // apart — so 400 is the one status this rollback cannot act on.
+        if (!res.ok && res.status !== 400) console.error(`Failed to drop ${name} while rolling back the demo load: HTTP ${res.status}`);
+      }));
+    };
+
+    // Undoes the address bar and the snapshot this attempt took, so whoever
+    // comes next reads the URL the user arrived with, not the stripped one.
+    const restorePreTutorialState = () => {
+      if (urlParams) window.history.replaceState(null, "", `${window.location.pathname}${urlParams}`);
+      setUserGraphsBeforeTutorial([]);
+      setUserGraphBeforeTutorial("");
+      setUrlParamsBeforeTutorial("");
+    };
+
     try {
       // Store current user graphs and URL params. A previous tutorial session that
       // ended without cleanup leaves its demo graphs in the list; they are about to
@@ -2235,13 +2259,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (failedLoad) {
         // One graph can be loaded while the other failed, so drop both rather
         // than walk the tutorial into half a dataset.
-        await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
-          method: "DELETE",
-        }, silentToast, setIndicator, cid)));
+        await dropDemoGraphs();
         throw failedLoad.reason;
       }
 
-      if (getConnectionEpoch() !== startEpoch) return "cancelled";
+      if (getConnectionEpoch() !== startEpoch) {
+        // Nothing downstream will find these: the retry and the cleanup both
+        // run against the connection that has since become active.
+        await dropDemoGraphs();
+
+        // The retry re-reads window.location.search, which is stripped by now.
+        restorePreTutorialState();
+
+        return "cancelled";
+      }
 
       // A refresh that started before the tutorial opened is exempt from the
       // tutorialOpen guard and would put the user's graphs back in the list.
@@ -2267,10 +2298,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // The tutorial's failure path closes without running handleCleanupDemoGraphs,
       // so the history entry and the snapshot taken above would otherwise strand
       // the user on a stripped URL with a stale pre-tutorial state.
-      if (urlParams) window.history.replaceState(null, "", `${window.location.pathname}${urlParams}`);
-      setUserGraphsBeforeTutorial([]);
-      setUserGraphBeforeTutorial("");
-      setUrlParamsBeforeTutorial("");
+      restorePreTutorialState();
 
       // The tutorial takes a resolved promise as a loaded dataset and walks the
       // user into steps that query it, so a failure has to reach it.

@@ -3,7 +3,7 @@ import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
 import ApiCalls from "../logic/api/apiCalls";
-import { getRandomString } from "../infra/utils";
+import { delay, getRandomString } from "../infra/utils";
 
 /*
  * Full tutorial walkthrough test.
@@ -30,9 +30,11 @@ test.describe("Tutorial", () => {
     });
 
     test.afterEach(async () => {
-        // Cleanup: remove the user graph if it still exists
+        // Cleanup: remove the user graph if it still exists. Without the admin
+        // role the delete goes out unauthenticated, and the 401 it comes back
+        // with reads exactly like the graph having never been created.
         try {
-            await apiCall.removeGraph(userGraph);
+            await apiCall.removeGraph(userGraph, "admin");
         } catch {
             // Ignore if already removed
         }
@@ -414,14 +416,14 @@ test.describe("Tutorial", () => {
         await tutorial.changeLocalStorage("true");
         await tutorial.refreshPage();
         await tutorial.clickAtTopLeftCorner();
-        await new Promise((resolve) => {
-            setTimeout(resolve, 1000);
-        });
+        // Nothing to await on: the assertion is that a dismissal the click could
+        // have triggered has had time to happen and did not.
+        await delay(1000);
         expect(await tutorial.isTutorialVisible()).toBeTruthy();
         await tutorial.changeLocalStorage("false");
     });
 
-    test("@admin validate that clicking replay tutorial replay tutorial", async () => {
+    test("@admin validate that clicking replay tutorial reopens the tutorial", async () => {
         const tutorial = await browser.createNewPage(TutorialPanel, urls.settingsUrl);
         await tutorial.clickReplayTutorial();
         expect(await tutorial.isTutorialVisible()).toBeTruthy();
