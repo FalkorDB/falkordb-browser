@@ -1553,8 +1553,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Keep the module-level global in sync with React state on every render.
   // This is intentionally dependency-free so it runs after every render,
   // restoring _activeConnectionId even when Next.js HMR resets the module.
+  // A switch sets the global to its target and only updates React state once
+  // the JWT agrees, so during that window this effect would write the old id
+  // back over the target; skip it until the switch settles, which re-renders
+  // via `switchPending` and syncs whichever id won.
 
-  useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
+  useEffect(() => {
+    if (pendingSwitchesRef.current > 0) return;
+    setActiveConnectionIdGlobal(activeConnectionId);
+  });
 
   // Keep "Did you mean…?" function suggestions aware of the loaded UDFs.
   useEffect(() => { setFunctionCandidates(udfFunctionNames(udfList)); }, [udfList]);
@@ -1721,6 +1728,21 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     let cancelled = false;
 
+    // Everything session-derived -- role, host, storage prefix -- comes from the
+    // JWT, so a failed sync must not leave the id pinned to a connection the
+    // session never learned about. Unpin instead and let the JWT answer.
+    const pinAndSync = async (id: string) => {
+      setActiveConnectionId(id);
+      setActiveConnectionIdGlobal(id);
+      try {
+        await updateSessionRef.current({ activeConnectionId: id });
+      } catch (error) {
+        setActiveConnectionId(null);
+        setActiveConnectionIdGlobal(null);
+        throw error;
+      }
+    };
+
     (async () => {
       try {
         const result = await securedFetch("/api/connections", {
@@ -1745,15 +1767,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             const target = lastId && conns.find(c => c.id === lastId)
               ? lastId
               : conns[0].id;
-            setActiveConnectionId(target);
-            setActiveConnectionIdGlobal(target);
             // Sync activeConnectionId into the JWT so session.user reflects
             // the correct connection's role/host/port. The JWT callback looks
             // up the full connection details from Token DB.
             if (!cancelled) {
-              await updateSessionRef.current({
-                activeConnectionId: target,
-              });
+              await pinAndSync(target);
             }
 
           } else {
@@ -1785,12 +1803,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 const migratedConn: SessionConnection = migrateJson.connection;
                 const migratedConns = [migratedConn];
                 setAdditionalConnections(migratedConns);
-                setActiveConnectionId(migratedConn.id);
-                setActiveConnectionIdGlobal(migratedConn.id);
                 if (!cancelled) {
-                  await updateSessionRef.current({
-                    activeConnectionId: migratedConn.id,
-                  });
+                  await pinAndSync(migratedConn.id);
                 }
               }
             }
@@ -1967,9 +1981,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Compare the two ids directly so this load waits for them to agree.
     // A null global is not a disagreement: requests then carry no
     // `X-Connection-Id` and the server resolves the same identity from the JWT.
-    // If the session never catches up, refusing to load is the right answer --
-    // `connectionScope` is stale too, so loading would publish the wrong
-    // connection's keys.
+    // Whichever way the disagreement resolves -- the session catching up, or
+    // the bootstrap rolling the id back after a failed sync -- moves a
+    // dependency below, so this load is retried rather than abandoned.
     const pinnedConnectionId = getActiveConnectionIdGlobal();
     const sessionConnectionId = sessionData?.activeConnectionId ?? null;
     if (pinnedConnectionId !== null && pinnedConnectionId !== sessionConnectionId) return undefined;
@@ -2129,7 +2143,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     })();
 
     return () => { cancelled = true; };
-  }, [status, prefixReady, connectionScope, switchPending, sessionData?.activeConnectionId]);
+  }, [status, prefixReady, connectionScope, switchPending, sessionData?.activeConnectionId, activeConnectionId]);
 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.
