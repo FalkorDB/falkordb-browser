@@ -23,6 +23,7 @@ test.describe("Tutorial", () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
     const userGraph = getRandomString("tutorialTest");
+    const DEMO_GRAPHS = ["social-demo", "social-demo-test"];
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
@@ -30,15 +31,24 @@ test.describe("Tutorial", () => {
     });
 
     test.afterEach(async () => {
-        // Cleanup: remove the user graph if it still exists. Without the admin
-        // role the delete goes out unauthenticated, and the 401 it comes back
-        // with reads exactly like the graph having never been created.
-        try {
-            await apiCall.removeGraph(userGraph, "admin");
-        } catch {
-            // Ignore if already removed
-        }
+        // Close first: a live graph page polls graph info, and that poll
+        // re-creates a graph deleted out from under it.
         await browser.closeBrowser();
+
+        // Every test here opens the tutorial, which creates the demo graphs,
+        // but only the one that reaches Finish drops them again. Without the
+        // admin role the delete goes out unauthenticated, and the 401 it comes
+        // back with reads exactly like the graph having never been created.
+        await Promise.all(
+            [userGraph, ...DEMO_GRAPHS].map(async name => {
+                const { message } = await apiCall.removeGraph(name, "admin");
+                // A graph this test never created, or already dropped, is the
+                // one failure this teardown may ignore.
+                if (!message.includes("deleted") && !message.includes("empty key")) {
+                    throw new Error(`Failed to remove ${name}: ${message}`);
+                }
+            })
+        );
     });
 
     test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
@@ -70,20 +80,6 @@ test.describe("Tutorial", () => {
             expect(await countPeople()).toBe(9);
         } finally {
             await tutorial.changeLocalStorage("false");
-            // Navigate away first: a live graph page polls graph info, and that
-            // poll re-creates a graph deleted out from under it.
-            const page = await browser.getPage();
-            await page.goto("about:blank");
-            await Promise.all(
-                ["social-demo", "social-demo-test"].map(async name => {
-                    const { message } = await apiCall.removeGraph(name, "admin");
-                    // A graph the tutorial already dropped is the one failure
-                    // this teardown may ignore.
-                    if (!message.includes("deleted") && !message.includes("empty key")) {
-                        throw new Error(`Failed to remove ${name}: ${message}`);
-                    }
-                })
-            );
         }
     });
 
