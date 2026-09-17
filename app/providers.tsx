@@ -721,9 +721,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const csvUploadOpenerRef = useRef<(() => void) | null>(null);
   const [csvUploadRegistered, setCsvUploadRegistered] = useState(false);
 
-  // Deployment-wide, so this is fetched once and needs no connection scoping:
-  // nothing in the answer changes when the active connection does.
+  // Deployment-wide, so this needs no connection scoping: nothing in the answer
+  // changes when the active connection does. The route is session-guarded
+  // though, so it has to wait for a session — this component outlives the login
+  // redirect, and a 401 answered before sign-in would never be retried.
   useEffect(() => {
+    if (status !== "authenticated") return undefined;
+
     let cancelled = false;
 
     fetch("/api/csv-temp/capabilities", { credentials: "same-origin" })
@@ -740,7 +744,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [status]);
 
   const registerCsvUpload = useCallback((open: () => void) => {
     csvUploadOpenerRef.current = open;
