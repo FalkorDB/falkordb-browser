@@ -432,7 +432,7 @@ test.describe('Canvas Tests', () => {
         }
         expect(await graph.isDimControlChecked()).toBe(true);
 
-        // Right-click a node to select it (right-click triggers handleRightClick → setSelectedElements)
+        // Click a node to select it (click triggers handleSelect → setSelectedElements)
         const nodes = await graph.getNodesScreenPositions();
         expect(nodes.length).toBeGreaterThanOrEqual(2);
         await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
@@ -456,7 +456,7 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
 
-        // Ensure focus mode is enabled and then right-click a node to select it
+        // Ensure focus mode is enabled and then click a node to select it
         if (!(await graph.isDimControlChecked())) {
             await graph.clickDimControl();
         }
@@ -535,6 +535,87 @@ test.describe('Canvas Tests', () => {
             expect(nodes.filter(n => n.visible).length).toBe(3);
             const links = await graph.getLinksScreenPositions();
             expect(links.filter(l => l.visible).length).toBe(2);
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
+    test(`@admin Double-clicking a node expands its neighbors without selecting it`, async () => {
+        const graphName = getRandomString('expand');
+        await apicalls.addGraph(graphName);
+        try {
+            await apicalls.runQuery(graphName, "CREATE (:Person {name:'Alice'})-[:KNOWS]->(:Person {name:'Bob'})");
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            // Return Alice alone so Bob is only reachable by expanding her.
+            await graph.insertQuery("MATCH (a:Person {name:'Alice'}) RETURN a");
+            await graph.clickRunQuery();
+            await graph.clickCenterControl();
+
+            // getNodesScreenPositions already waits for the layout to settle.
+            const before = await graph.getNodesScreenPositions();
+            expect(before.length).toBe(1);
+
+            await graph.elementDoubleClick(before[0].screenX, before[0].screenY);
+
+            // The neighbor was pulled in, and the pending selection from the
+            // first click was cancelled by the second.
+            const after = await graph.getNodesScreenPositions();
+            expect(after.length).toBe(2);
+            expect(await graph.getSelectionCount()).toBe(0);
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
+    test(`@admin Double-clicking an expanded node collapses it back`, async () => {
+        test.slow();
+        const graphName = getRandomString('collapse');
+        await apicalls.addGraph(graphName);
+        try {
+            await apicalls.runQuery(graphName, "CREATE (:Person {name:'Alice'})-[:KNOWS]->(:Person {name:'Bob'})");
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH (a:Person {name:'Alice'}) RETURN a");
+            await graph.clickRunQuery();
+            await graph.clickCenterControl();
+
+            const before = await graph.getNodesScreenPositions();
+            await graph.elementDoubleClick(before[0].screenX, before[0].screenY);
+
+            // Alice moves while the layout settles, so re-read her position.
+            const expanded = await graph.getNodesScreenPositions();
+            expect(expanded.length).toBe(2);
+            const alice = expanded.find(n => n.id === before[0].id)!;
+
+            await graph.elementDoubleClick(alice.screenX, alice.screenY);
+            expect((await graph.getNodesScreenPositions()).length).toBe(1);
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
+    test(`@admin A single click selects the node without expanding it`, async () => {
+        const graphName = getRandomString('click-select');
+        await apicalls.addGraph(graphName);
+        try {
+            await apicalls.runQuery(graphName, "CREATE (:Person {name:'Alice'})-[:KNOWS]->(:Person {name:'Bob'})");
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH (a:Person {name:'Alice'}) RETURN a");
+            await graph.clickRunQuery();
+            await graph.clickCenterControl();
+
+            const nodes = await graph.getNodesScreenPositions();
+            // elementClick waits out the double-click window before asserting.
+            await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
+
+            expect(await graph.getSelectionCount()).toBe(1);
+            // A select must never expand.
+            expect((await graph.getNodesScreenPositions()).length).toBe(1);
         } finally {
             await apicalls.removeGraph(graphName);
         }

@@ -402,6 +402,13 @@ export default class GraphPage extends BasePage {
 
   async getNodesScreenPositions(): Promise<any[]> {
     await this.waitForCanvasAnimationToEnd();
+    return this.readNodesScreenPositions();
+  }
+
+  /** Positions without waiting out the force simulation. `waitForCanvasAnimationToEnd`
+   *  costs a flat five seconds once the graph has loaded — too much to spend again on a
+   *  re-read that only has a camera move to wait for. */
+  async readNodesScreenPositions(): Promise<any[]> {
     await this.page.waitForTimeout(500);
 
     await this.page.waitForFunction(
@@ -468,8 +475,25 @@ export default class GraphPage extends BasePage {
     });
   }
 
-  async elementClick(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y, { button: "right" });
+  /** Selects a canvas element. The app defers selection until the
+   *  double-click window has passed, so this waits it out. `additive` holds
+   *  Shift, which is what ForceGraph reads to extend a selection instead of
+   *  replacing it; `mouse.click` takes no modifiers, so the key is held. */
+  async elementClick(x: number, y: number, additive = false): Promise<void> {
+    if (additive) await this.page.keyboard.down("Shift");
+    try {
+      await this.page.mouse.click(x, y);
+    } finally {
+      if (additive) await this.page.keyboard.up("Shift");
+    }
+    await this.page.waitForTimeout(400);
+  }
+
+  /** Expands/collapses a node. The second click lands inside the double-click
+   *  window, so the pending selection is cancelled and only the expand runs. */
+  async elementDoubleClick(x: number, y: number): Promise<void> {
+    await this.page.mouse.dblclick(x, y);
+    await this.page.waitForTimeout(400);
   }
 
   async getNodesCount(): Promise<string | null> {
@@ -1687,9 +1711,12 @@ export default class GraphPage extends BasePage {
   async deleteElementsByPosition(
     positions: { x: number; y: number }[]
   ): Promise<void> {
-    positions.forEach(async (position) => {
-      await this.elementClick(position.x, position.y);
-    });
+    // Sequential: the delete control appears after the first selection, so an
+    // unawaited loop could open the dialog on a partial selection. Shift from the
+    // second click on, or each one would replace the selection instead of adding.
+    for (const [index, position] of positions.entries()) {
+      await this.elementClick(position.x, position.y, index > 0);
+    }
     await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
     await waitForElementToNotBeVisible(this.deleteElementConfirm);
@@ -1762,12 +1789,12 @@ export default class GraphPage extends BasePage {
     await this.page.mouse.up();
   }
 
-  async rightClickAtCanvasCenter(): Promise<void> {
+  async clickAtCanvasCenter(): Promise<void> {
     const boundingBox = await this.getBoundingBoxCanvasElement();
     if (!boundingBox) throw new Error("Canvas bounding box not found");
     const centerX = boundingBox.x + boundingBox.width / 2;
     const centerY = boundingBox.y + boundingBox.height / 2;
-    await this.page.mouse.click(centerX, centerY, { button: "right" });
+    await this.page.mouse.click(centerX, centerY);
   }
 
   async hoverAtCanvasCenter(): Promise<void> {
@@ -1799,8 +1826,8 @@ export default class GraphPage extends BasePage {
     return texts;
   }
 
-  async rightClickElement(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y, { button: "right" });
+  async clickElementAt(x: number, y: number): Promise<void> {
+    await this.page.mouse.click(x, y);
     await this.page.waitForTimeout(500);
   }
 

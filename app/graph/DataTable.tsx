@@ -4,7 +4,7 @@ import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Tra
 import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
 import { formatValue, getDefaultValue, inferValueType, isGeoPoint, parseValue, VALUE_PLACEHOLDERS, VALUE_TYPES, type ValueType } from "@/lib/graphValues";
 import { useToast } from "@/components/ui/use-toast";
-import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, MutableRefObject, ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getNodeDisplayKey } from "@falkordb/canvas";
@@ -95,9 +95,11 @@ interface Props {
     className?: string
     /** Schema elements have no values, only the type(s) each key holds. */
     schema?: boolean
+    /** Rendered next to the add-attribute button, at the foot of the table. */
+    actions?: ReactNode
 }
 
-export default function DataTable({ object, type, lastObjKey, canvasRef, className, schema }: Props) {
+export default function DataTable({ object, type, lastObjKey, canvasRef, className, schema, actions }: Props) {
 
     const { graph, setGraphInfo } = useContext(GraphContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
@@ -858,17 +860,24 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                     }
                 </div>
                 {
-                    !isReadOnly &&
-                    <Button
-                        className="mt-4"
-                        disabled={attributes.some((key) => key === editable)}
-                        variant="Primary"
-                        data-testid="DataPanelAddAttribute"
-                        title="Add a new attribute"
-                        onClick={() => setIsAddValue(true)}
-                    >
-                        <CirclePlus size={iconSize} />
-                    </Button>
+                    (!isReadOnly || actions) &&
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                        {
+                            !isReadOnly &&
+                            <Button
+                                className="gap-2"
+                                disabled={attributes.some((key) => key === editable)}
+                                variant="Primary"
+                                data-testid="DataPanelAddAttribute"
+                                title="Add a new attribute"
+                                label="Add Attribute"
+                                onClick={() => setIsAddValue(true)}
+                            >
+                                <CirclePlus size={iconSize} />
+                            </Button>
+                        }
+                        {actions}
+                    </div>
                 }
             </div>
         </div>
@@ -877,5 +886,6 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
 
 DataTable.defaultProps = {
     className: undefined,
-    schema: false
+    schema: false,
+    actions: undefined
 };
