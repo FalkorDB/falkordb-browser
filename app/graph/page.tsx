@@ -64,6 +64,12 @@ const GraphView = dynamicImport(() => import("./GraphView"), {
 /** Shared so a tab with no schema selection keeps a stable identity. */
 const EMPTY_SELECTION: (Node | Link)[] = [];
 
+// The mobile sheets, in no particular order — the order they open in is what
+// stacks them, and it is tracked at runtime.
+const SHEET_KEYS = ["info", "data", "chat"] as const;
+type SheetKey = typeof SHEET_KEYS[number];
+const SHEET_BASE_Z = 40;
+
 /**
  * Render the main Graph page UI that orchestrates the selector, graph view, and right-hand panels.
  *
@@ -190,6 +196,22 @@ export default function Page() {
     }, [currentTab, selectedElements, selectedSchemaElements]);
 
     const hasPanelContent = panel !== undefined && (panel !== "data" || activeSelection.length > 0);
+
+    // The mobile sheets stack rather than replacing one another, so the one
+    // opened last has to come out on top. The ref carries the order the sheets
+    // were opened in; a closed one ranks below every open sheet's overlay.
+    const sheetOpen: Record<SheetKey, boolean> = {
+        info: panelOpen,
+        data: hasPanelContent,
+        chat: chatOpen && !!graphName,
+    };
+    const sheetStack = useRef<SheetKey[]>([]);
+    sheetStack.current = [
+        ...sheetStack.current.filter(key => sheetOpen[key]),
+        ...SHEET_KEYS.filter(key => sheetOpen[key] && !sheetStack.current.includes(key)),
+    ];
+    // Two levels each: the sheet sits one above its own overlay.
+    const sheetZ = (key: SheetKey) => SHEET_BASE_Z + sheetStack.current.indexOf(key) * 2;
 
     // The side panel is shared by the Graph and the Schema tab, and each graph
     // tab sizes it for itself — so the width is remembered per tab AND per view.
@@ -444,13 +466,9 @@ export default function Page() {
         }
 
         openDataPanel();
-        setChatOpen(false);
         setIsAddEdge(false);
         setIsAddNode(false);
-        // The sheets share a stacking level on mobile, so the data sheet would
-        // otherwise open behind an already-open graph info sheet.
-        if (isMobile && panelOpen) onTogglePanel();
-    }, [openDataPanel, setPanel, setChatOpen, setSelectedParam, isMobile, panelOpen, onTogglePanel]);
+    }, [openDataPanel, setPanel, setSelectedParam]);
 
     // Keep selectedElementsRef in sync so the restore effect below can read the
     // full multi-selection without adding selectedElements as a dependency.
@@ -806,7 +824,8 @@ export default function Page() {
                     {selectorNode}
                     {/* The sheets are absolute inside this box, so they cover only the
                         graph — the header and navigation above stay visible, which is
-                        what makes the data read as nested inside the graph context. */}
+                        what makes the data read as nested inside the graph context.
+                        They stack rather than replace one another, newest on top. */}
                     <div className="h-1 grow min-h-0 relative overflow-hidden">
                         {graphViewNode}
                         {/* No sheet title: the info panel renders its own header and
@@ -815,6 +834,7 @@ export default function Page() {
                             open={panelOpen}
                             onClose={onTogglePanel}
                             height="full"
+                            zIndex={sheetZ("info")}
                             data-testid="mobileGraphInfoSheet"
                         >
                             {graphInfoNode}
@@ -825,6 +845,7 @@ export default function Page() {
                             open={hasPanelContent}
                             onClose={closeCurrentPanel}
                             height="full"
+                            zIndex={sheetZ("data")}
                             data-testid="mobileDataSheet"
                         >
                             {getCurrentPanel()}
@@ -834,6 +855,7 @@ export default function Page() {
                             open={chatOpen && !!graphName}
                             onClose={() => setChatOpen(false)}
                             height="full"
+                            zIndex={sheetZ("chat")}
                             data-testid="mobileChatSheet"
                         >
                             {graphName ? <Chat onClose={() => setChatOpen(false)} /> : null}

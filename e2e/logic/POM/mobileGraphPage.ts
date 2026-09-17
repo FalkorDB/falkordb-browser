@@ -266,4 +266,9 @@ export default class MobileGraphPage extends GraphPage {
   async isSheetOpen(sheet: Locator): Promise<boolean> {
     return (await sheet.getAttribute("data-state")) === "open";
   }
+
+  /** Where a sheet sits in the stack — the newest one opened is the highest. */
+  async sheetZIndex(sheet: Locator): Promise<number> {
+    return Number(await sheet.evaluate(el => getComputedStyle(el).zIndex));
+  }
 }

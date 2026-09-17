@@ -22,6 +22,12 @@ interface BottomSheetProps {
     push?: boolean;
     /** Catch taps outside the sheet and close it. Deliberately undimmed. */
     withOverlay?: boolean;
+    /**
+     * Stacking level for this sheet and its overlay, which sits one below it.
+     * Sheets that can be open at once pass ascending values so the newest covers
+     * the rest.
+     */
+    zIndex?: number;
     className?: string;
     "data-testid"?: string;
 }
@@ -49,6 +55,7 @@ export default function BottomSheet({
     height = "half",
     push = false,
     withOverlay = true,
+    zIndex = 40,
     className,
     "data-testid": testId,
 }: BottomSheetProps) {
@@ -62,7 +69,8 @@ export default function BottomSheet({
                     type="button"
                     aria-label="Close"
                     onClick={onClose}
-                    className="absolute inset-0 z-40"
+                    style={{ zIndex }}
+                    className="absolute inset-0"
                 />
             )}
             <div
@@ -71,6 +79,7 @@ export default function BottomSheet({
                 // `inert` keeps the off-screen content out of the tab order and the
                 // accessibility tree without unmounting it.
                 inert={!open}
+                style={push ? undefined : { zIndex: zIndex + 1 }}
                 className={cn(
                     "flex flex-col rounded-t-xl border-t border-border bg-background",
                     push
@@ -83,7 +92,7 @@ export default function BottomSheet({
                             open ? "pb-[env(safe-area-inset-bottom)]" : "h-0 overflow-hidden border-t-0",
                         ]
                         : [
-                            "absolute inset-x-0 bottom-0 z-40 shadow-2xl",
+                            "absolute inset-x-0 bottom-0 shadow-2xl",
                             "transition-transform duration-200 ease-out will-change-transform",
                             // `viewport-fit=cover` lets the layout run under the home
                             // indicator, so a sheet pinned to the bottom edge has to pad
