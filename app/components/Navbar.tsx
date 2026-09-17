@@ -223,6 +223,7 @@ export default function Navbar({ showUDF }: Props) {
                     open={logoutDialogOpen}
                     onOpenChange={(open) => { if (!loggingOut) setLogoutDialogOpen(open); }}
                     title="Logout All?"
+                    className="max-w-md"
                     description="In addition to logging out of every connection, this will end your FalkorDB Browser session, remove all stored connection credentials from this session, and require you to log in again to reconnect."
                     trigger={<span className="hidden" />}
                 >
@@ -383,6 +384,7 @@ export default function Navbar({ showUDF }: Props) {
                     open={logoutDialogOpen}
                     onOpenChange={(open) => { if (!loggingOut) setLogoutDialogOpen(open); }}
                     title="Logout All?"
+                    className="max-w-md"
                     description="In addition to logging out of every connection, this will end your FalkorDB Browser session, remove all stored connection credentials from this session, and require you to log in again to reconnect."
                     trigger={
                         <Button

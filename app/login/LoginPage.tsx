@@ -65,20 +65,23 @@ export default function LoginPage() {
 
   return (
     <div className="relative h-full w-full flex flex-col">
-      <div className="grow basis-0 flex items-center justify-center overflow-auto">
-        <div className="flex flex-col gap-2 items-center max-h-full w-[500px] mobile:w-full mobile:max-w-[500px] mobile:px-4">
-          {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
-          <LoginForm
-            onSubmit={handleLogin}
-            submitButtonLabel="Log in"
-            initialHost={initialHost}
-            initialPort={initialPort}
-            initialUsername={initialUsername}
-            initialTLS={initialTLS}
-          />
+      <div className="grow basis-0 min-h-0 flex items-center justify-center">
+        <div className="flex flex-col gap-2 items-center max-h-full min-h-0 w-[500px] mobile:w-full mobile:max-w-[500px] mobile:px-4">
+          {mounted && currentTheme && <Image className="h-20 short:h-14 w-auto shrink-0" priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
+          {/* Only the form scrolls, so the logo and the docs link stay put on a short viewport. */}
+          <div className="w-full min-h-0 overflow-y-auto flex flex-col gap-2 px-1">
+            <LoginForm
+              onSubmit={handleLogin}
+              submitButtonLabel="Log in"
+              initialHost={initialHost}
+              initialPort={initialPort}
+              initialUsername={initialUsername}
+              initialTLS={initialTLS}
+            />
+          </div>
           <Link
             href="/docs"
-            className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
+            className="shrink-0 flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
           >
             <FileText className="w-4 h-4" />
             API Documentation

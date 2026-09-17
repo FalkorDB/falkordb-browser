@@ -6,6 +6,10 @@
    desktop class has to change. Keep in sync with MOBILE_BREAKPOINT in lib/useIsMobile.ts. */
 @custom-variant mobile (@media (width < 1100px));
 
+/* Orthogonal to `mobile`: a viewport too short for a tall form, whatever its width.
+   A short desktop window needs the same vertical trimming as a phone. */
+@custom-variant short (@media (height < 800px));
+
 @layer base {
     :root {
         --background: 0 0% 100%;

@@ -258,7 +258,7 @@ export default function Selector({
                     onOpenChange={open => setQueriesOpen?.(open)}
                     title="Query history"
                     trigger={<span className="hidden" />}
-                    className="w-[94vw] max-w-none h-[80dvh]"
+                    className="w-[94vw] max-w-none h-[88dvh]"
                 >
                     <div className="h-1 grow min-h-0">
                         <QueryHistoryPanel

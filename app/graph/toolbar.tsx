@@ -1,4 +1,4 @@
-import { ArrowRight, Circle, CopyCheck, ScanEye, Search, X } from "lucide-react";
+import { ArrowRight, Circle, ScanEye, Search, X } from "lucide-react";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { cn, GraphRef, isSchemaReservedKey, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -26,8 +26,6 @@ interface Props {
     isAddNode: boolean
     isAddEdge: boolean
     multiSelect: boolean
-    /** Left out where the mode does not apply, which also hides the toggle. */
-    setMultiSelect?: Dispatch<SetStateAction<boolean>>
 }
 
 const ITEM_HEIGHT = 32;
@@ -49,7 +47,6 @@ export default function Toolbar({
     setExpand,
     expand,
     multiSelect,
-    setMultiSelect,
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
@@ -352,30 +349,6 @@ export default function Toolbar({
             </div>
             <div data-testid="elementCanvasToolbarActionGraph" className={cn("flex flex-row-reverse gap-2 pointer-events-auto", isMobile && "flex-row justify-start")}>
                 {isMobile && showAllButton}
-                {isMobile && setMultiSelect && graph.getElements().length > 0 && (
-                    <Button
-                        data-testid="elementCanvasMultiSelectGraph"
-                        className={cn("p-1 bg-background border-border mobile:min-h-11 mobile:min-w-11 mobile:justify-center", multiSelect && "!border-primary !text-primary")}
-                        variant="Secondary"
-                        tooltipVariant="Primary"
-                        tooltipSide="bottom"
-                        aria-pressed={multiSelect}
-                        title={multiSelect ? "Multi select on" : "Multi select"}
-                        onClick={() => {
-                            setMultiSelect(prev => {
-                                // Leaving the mode with a pile of elements selected would drop
-                                // the user into a data panel listing all of them.
-                                if (prev) setSelectedElements([]);
-                                return !prev;
-                            });
-                        }}
-                    >
-                        <CopyCheck size={20} />
-                        {multiSelect && selectedElements.length > 0 && (
-                            <span data-testid="multiSelectCount" className="text-xs tabular-nums">{selectedElements.length}</span>
-                        )}
-                    </Button>
-                )}
                 {
                     graphName && !isReadOnly &&
                     <>
@@ -422,5 +395,4 @@ export default function Toolbar({
 
 Toolbar.defaultProps = {
     setIsAddEdge: undefined,
-    setMultiSelect: undefined,
 };

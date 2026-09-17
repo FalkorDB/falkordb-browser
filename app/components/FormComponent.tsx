@@ -195,7 +195,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     };
 
     return (
-        <form className={cn("flex flex-col gap-4 w-full", className)} onSubmit={onHandleSubmit}>
+        <form className={cn("flex flex-col gap-4 short:gap-2 w-full", className)} onSubmit={onHandleSubmit}>
             {
                 fields.map((field) => {
                     const passwordType = show[field.label] ? "text" : "password";
@@ -267,7 +267,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                                 }
                                             }} />
                                 }
-                                <p className="text-sm text-gray-500">{field.description}</p>
+                                {field.description && <p className="text-sm text-gray-500">{field.description}</p>}
                                 {
                                     field.link &&
                                     <a

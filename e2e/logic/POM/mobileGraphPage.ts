@@ -63,6 +63,41 @@ export default class MobileGraphPage extends GraphPage {
     return this.page.getByTestId("DataPanel");
   }
 
+  public get multiSelectBar(): Locator {
+    return this.page.getByTestId("multiSelectBar");
+  }
+
+  public get multiSelectCount(): Locator {
+    return this.page.getByTestId("multiSelectCount");
+  }
+
+  public get multiSelectDone(): Locator {
+    return this.page.getByTestId("multiSelectDone");
+  }
+
+  /**
+   * Presses and holds on the canvas — the gesture that turns multi select on.
+   * Playwright's touchscreen only taps, so the hold is driven over CDP; a mouse
+   * press would not do, the gesture ignoring pointers that have a Ctrl key.
+   */
+  async longPressCanvas(x: number, y: number): Promise<void> {
+    const cdp = await this.page.context().newCDPSession(this.page);
+    try {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x, y }],
+      });
+      await this.page.waitForTimeout(800);
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+    } finally {
+      await cdp.detach();
+    }
+    await this.page.waitForTimeout(400);
+  }
+
   public get editorMore(): Locator {
     return this.page.getByTestId("editorMore");
   }

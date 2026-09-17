@@ -244,9 +244,11 @@ test.describe("@admin Mobile layout", () => {
     });
 
     // Touch has no Ctrl key, so the only way to build a selection is a mode that
-    // makes every tap additive — and while it is on the data panel has to stay
-    // shut, since it covers the canvas the user is still picking from.
-    test("Multi select stands in for Ctrl-click and keeps the data panel closed", async () => {
+    // makes every tap additive — entered by pressing and holding an element, the
+    // way every touch platform starts a bulk selection. While it is on the data
+    // panel has to stay shut, since it covers the canvas the user is still
+    // picking from.
+    test("Long press starts multi select and keeps the data panel closed", async () => {
         const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
         await graph.waitForPageIdle();
         await graph.selectGraphByName(graphName);
@@ -255,17 +257,6 @@ test.describe("@admin Mobile layout", () => {
         await graph.insertQuery("MATCH (n) RETURN n");
         await graph.clickRunQuery();
 
-        const toggle = graph.canvasToolsSheet.getByTestId("elementCanvasMultiSelectGraph");
-        await graph.canvasToolsToggle.click();
-        await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(true);
-        await expect(toggle).toHaveAttribute("aria-pressed", "false");
-        await toggle.click();
-        await expect(toggle).toHaveAttribute("aria-pressed", "true");
-
-        // The sheet pushes the canvas up, so read the positions only once it is out
-        // of the way and the nodes have settled where they will be tapped.
-        await graph.canvasToolsSheetClose.click();
-        await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(false);
         const allNodes = await graph.getNodesScreenPositions();
         // Positions are absolute page coordinates, and a node parked outside the
         // canvas cannot be tapped — pick from the ones actually on screen.
@@ -277,36 +268,40 @@ test.describe("@admin Mobile layout", () => {
         );
         expect(nodes.length).toBeGreaterThanOrEqual(2);
 
-        await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
-        await graph.elementClick(nodes[1].screenX, nodes[1].screenY);
+        await expect(graph.multiSelectBar).toHaveCount(0);
 
+        // The held element is the first of the pile, so the gesture never costs a
+        // tap of its own.
+        await graph.longPressCanvas(nodes[0].screenX, nodes[0].screenY);
+        await expect(graph.multiSelectBar).toBeVisible();
+        await expect(graph.multiSelectCount).toHaveText("1 selected");
         await expect(graph.dataPanel).toHaveCount(0);
 
-        await graph.canvasToolsToggle.click();
-        await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(true);
-        await expect(graph.canvasToolsSheet.getByTestId("multiSelectCount")).toHaveText("2");
+        await graph.elementClick(nodes[1].screenX, nodes[1].screenY);
+        await expect(graph.multiSelectCount).toHaveText("2 selected");
+        await expect(graph.dataPanel).toHaveCount(0);
+
         // Two selected nodes is exactly what an edge needs, and deleting is the
         // other reason to select in bulk — neither has another route on mobile
         // while the panel is suppressed.
+        await graph.canvasToolsToggle.click();
+        await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(true);
         await expect(graph.canvasToolsSheet.getByTestId("elementCanvasAddEdgeGraph")).toBeVisible();
         await expect(graph.canvasToolsSheet.getByTestId("deleteElementGraph")).toBeVisible();
+        await graph.canvasToolsSheetClose.click();
+        await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(false);
 
         // Re-running the query swaps in a fresh graph object and the selection is
         // re-resolved from it. That restore path has to honour the mode too —
         // otherwise it reopens the panel over the canvas the user is still picking from.
-        await graph.canvasToolsSheetClose.click();
-        await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(false);
         await graph.clickRunQuery();
-        await graph.canvasToolsToggle.click();
-        await expect.poll(() => graph.isSheetOpen(graph.canvasToolsSheet)).toBe(true);
-        await expect(graph.canvasToolsSheet.getByTestId("multiSelectCount")).toHaveText("2");
+        await expect(graph.multiSelectCount).toHaveText("2 selected");
         await expect(graph.dataPanel).toHaveCount(0);
 
-        // Turning the mode off drops the selection rather than dumping the user
-        // into a panel listing everything they picked.
-        await toggle.click();
-        await expect(toggle).toHaveAttribute("aria-pressed", "false");
-        await expect(graph.canvasToolsSheet.getByTestId("multiSelectCount")).toHaveCount(0);
+        // Done is the way out, and it drops the selection rather than dumping the
+        // user into a panel listing everything they picked.
+        await graph.multiSelectDone.click();
+        await expect(graph.multiSelectBar).toHaveCount(0);
         await expect(graph.dataPanel).toHaveCount(0);
     });
 });

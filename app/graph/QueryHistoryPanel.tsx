@@ -546,14 +546,14 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                 </div>
                 <PaginationList
                     label="Query"
-                    className="overflow-hidden h-[313px] max-h-[393px] mobile:h-[30dvh] mobile:max-h-[30dvh] p-1 border-b border-border"
+                    className="overflow-hidden h-[313px] max-h-[393px] mobile:h-[56dvh] mobile:max-h-[56dvh] p-1 border-b border-border"
                     isSelected={(item) => selectedSet.has(item.timestamp)}
                     afterSearchCallback={afterSearchCallback}
                     onToggleFav={handleToggleFav}
                     dataTestId="queryHistory"
                     list={filteredQueries}
                     actionButtons={
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-2 items-center shrink-0">
                             <Button
                                 variant="Delete"
                                 className="p-1"
@@ -655,44 +655,51 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                     }}
                     searchRef={searchQueryRef}
                 >
-                    <ul className="w-full flex flex-wrap  items-center gap-2 overflow-y-auto max-h-[80px] p-1">
-                        <li key="info" className="flex flex-col items-center">
-                            <HelpTip>
-                                Press graph name to see history of that graph
-                                <br />
-                                (show all queries if no graph name is selected).
-                            </HelpTip>
-                        </li>
-                        <li key="fav-filter" className="max-w-full">
-                            <Button
-                                data-testid="queryHistoryFavFilter"
-                                className={cn("bg-background py-0.5 px-2 rounded-full w-full flex items-center gap-1 text-xs", favFilter && "text-background bg-foreground")}
-                                title="Filter by favorites"
-                                onClick={() => handelSetFilteredQueries(undefined, !favFilter)}
-                            >
-                                <Star size={12} className={cn(favFilter ? "fill-fav text-fav" : "")} />
-                                Favorites
-                            </Button>
-                        </li>
-                        {
-                            filters.map(name => (
-                                <li key={name} className="max-w-full">
-                                    <Button
-                                        className={cn("bg-background py-0.5 px-2 rounded-full w-full text-xs", activeFilters.some(f => f === name) && "text-background bg-foreground")}
-                                        label={name}
-                                        onClick={() => handelSetFilteredQueries(name)}
-                                    />
-                                </li>
-                            ))
-                        }
-                    </ul>
+                    {/* The hint sits outside the scroller: its tap target is grown with a
+                        14px pseudo-element halo, and inside a scroll container that halo
+                        counts as overflow and pins a scrollbar over chips that already fit.
+                        Every chip is then pinned to h-6 so the list caps at an exact number
+                        of rows — two on a desktop, one on a phone. */}
+                    <div className="w-full flex items-start gap-2">
+                        <HelpTip className="h-6 shrink-0">
+                            Press graph name to see history of that graph
+                            <br />
+                            (show all queries if no graph name is selected).
+                        </HelpTip>
+                        <ul className="grow min-w-0 flex flex-wrap items-center gap-2 overflow-y-auto max-h-16 mobile:max-h-8 py-1">
+                            <li key="fav-filter" className="h-6 max-w-full">
+                                <Button
+                                    data-testid="queryHistoryFavFilter"
+                                    className={cn("bg-background h-full py-0.5 px-2 rounded-full w-full flex items-center gap-1 text-xs", favFilter && "text-background bg-foreground")}
+                                    title="Filter by favorites"
+                                    onClick={() => handelSetFilteredQueries(undefined, !favFilter)}
+                                >
+                                    <Star size={12} className={cn(favFilter ? "fill-fav text-fav" : "")} />
+                                    Favorites
+                                </Button>
+                            </li>
+                            {
+                                filters.map(name => (
+                                    <li key={name} className="h-6 max-w-full">
+                                        <Button
+                                            className={cn("bg-background h-full py-0.5 px-2 rounded-full w-full text-xs", activeFilters.some(f => f === name) && "text-background bg-foreground")}
+                                            label={name}
+                                            onClick={() => handelSetFilteredQueries(name)}
+                                        />
+                                    </li>
+                                ))
+                            }
+                        </ul>
+                    </div>
                 </PaginationList>
                 <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col items-center basis-0 grow min-h-0 overflow-hidden">
-                    <TabsList className="h-fit bg-background gap-1">
-                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
-                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
-                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
-                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
+                    {/* Centred tabs that outgrow the panel get clipped at both ends, so on a
+                        phone they tighten up rather than losing their first and last label. */}
+                    <TabsList className="h-fit max-w-full bg-background gap-1 mobile:gap-0">
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm mobile:px-1 mobile:text-xs border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm mobile:px-1 mobile:text-xs border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm mobile:px-1 mobile:text-xs border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm mobile:px-1 mobile:text-xs border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                     </TabsList>
                     <TabsContent value="text" className="mt-0 h-full w-full rounded-lg relative p-1 overflow-hidden">
                         {

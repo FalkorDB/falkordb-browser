@@ -125,10 +125,17 @@ export default function Page() {
     // Stands in for Ctrl-click, which a touch device has no way to produce. Only
     // offered on mobile, so widening past the breakpoint has to drop it or clicks
     // would stay additive with no toggle left on screen to turn off.
-    const [multiSelect, setMultiSelect] = useState(false);
+    const [multiSelect, setMultiSelectState] = useState(false);
+    // The long press turns the mode on and selects its first element in one go, so
+    // the selection handler cannot wait for the re-render to learn the mode is on.
+    const multiSelectRef = useRef(false);
+    const setMultiSelect = useCallback((value: boolean) => {
+        multiSelectRef.current = value;
+        setMultiSelectState(value);
+    }, []);
     useEffect(() => {
         if (!isMobile) setMultiSelect(false);
-    }, [isMobile]);
+    }, [isMobile, setMultiSelect]);
     // The Schema tab has a selection of its own — of labels and relationship
     // types, not elements — and it shares the panel with the graph's. It is kept
     // per graph tab, like everything else a tab remembers.
@@ -415,8 +422,8 @@ export default function Page() {
     // user is still picking the elements it would hide. Multi select is only
     // offered on mobile, so on desktop this is always a plain open.
     const openDataPanel = useCallback(() => {
-        setPanel(multiSelect ? undefined : "data");
-    }, [multiSelect, setPanel]);
+        setPanel(multiSelectRef.current ? undefined : "data");
+    }, [setPanel]);
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = [], fromSearch?: boolean) => {
         setSelectedElements(el);

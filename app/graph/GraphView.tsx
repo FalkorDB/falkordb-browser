@@ -21,7 +21,7 @@ interface Props {
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements?: (Node | Link)[], fromSearch?: boolean) => void
     multiSelect: boolean
-    setMultiSelect: Dispatch<SetStateAction<boolean>>
+    setMultiSelect: (value: boolean) => void
     selectedSchemaElements: (Node | Link)[]
     setSelectedSchemaElements: Dispatch<SetStateAction<(Node | Link)[]>>
     canvasRef: GraphRef
@@ -205,6 +205,7 @@ function GraphView({
                 selectedElements={selectedElements}
                 setSelectedElements={setSelectedElements}
                 multiSelect={multiSelect}
+                setMultiSelect={isMobile ? setMultiSelect : undefined}
                 setRelationships={setRelationships}
                 viewport={viewport}
                 setViewport={setViewport}
@@ -251,7 +252,6 @@ function GraphView({
                             isAddEdge={view.isAddEdge}
                             isAddNode={view.isAddNode}
                             multiSelect={multiSelect}
-                            setMultiSelect={view.mode === "graph" ? setMultiSelect : undefined}
                         />
                     );
 
