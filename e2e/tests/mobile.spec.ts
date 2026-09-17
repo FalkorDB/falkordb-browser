@@ -227,11 +227,10 @@ test.describe("@admin Mobile layout", () => {
         await expect(graph.editorMaximize).toBeVisible();
     });
 
-    // A sheet covers the whole graph region, so a second one opened over the
-    // first used to close it — losing the context the user opened it from. They
-    // stack instead, in the order they were opened, so stepping back through them
-    // reveals the one underneath.
-    test("Sheets stack in the order they were opened", async () => {
+    // Every sheet covers the same region at the same stacking level, so a second
+    // one opened over the first would only hide it — with no hint that the first
+    // is still there. Opening one therefore closes whichever is up.
+    test("Only one sheet covers the canvas at a time", async () => {
         const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
         await graph.waitForPageIdle();
         await graph.selectGraphByName(graphName);
@@ -253,46 +252,10 @@ test.describe("@admin Mobile layout", () => {
         await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(true);
 
         await graph.openGraphInfoSheet();
-        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(true);
-        expect(await graph.sheetZIndex(graph.graphInfoSheet))
-            .toBeGreaterThan(await graph.sheetZIndex(graph.dataSheet));
+        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(false);
 
         await graph.chatToggle.click();
         await expect.poll(() => graph.isSheetOpen(graph.chatSheet)).toBe(true);
-        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(true);
-        expect(await graph.sheetZIndex(graph.chatSheet))
-            .toBeGreaterThan(await graph.sheetZIndex(graph.graphInfoSheet));
-
-        // Closing the top one drops it back under the rest, so re-opening the
-        // data sheet later still puts it on top.
-        await graph.chatToggle.click();
-        await expect.poll(() => graph.isSheetOpen(graph.chatSheet)).toBe(false);
-        expect(await graph.sheetZIndex(graph.graphInfoSheet))
-            .toBeGreaterThan(await graph.sheetZIndex(graph.chatSheet));
-    });
-
-    // A trigger whose sheet is open but buried is how the user asks to see it
-    // again, so it raises that sheet rather than closing something they cannot
-    // even see. Only the sheet already on top toggles shut.
-    test("A buried sheet's trigger brings it forward instead of closing it", async () => {
-        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
-        await graph.waitForPageIdle();
-        await graph.selectGraphByName(graphName);
-        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(true);
-
-        await graph.chatToggle.click();
-        await expect.poll(() => graph.isSheetOpen(graph.chatSheet)).toBe(true);
-        expect(await graph.sheetZIndex(graph.chatSheet))
-            .toBeGreaterThan(await graph.sheetZIndex(graph.graphInfoSheet));
-
-        await graph.infoToggle.click();
-        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(true);
-        await expect.poll(() => graph.isSheetOpen(graph.chatSheet)).toBe(true);
-        expect(await graph.sheetZIndex(graph.graphInfoSheet))
-            .toBeGreaterThan(await graph.sheetZIndex(graph.chatSheet));
-
-        // Now that it is on top the same trigger closes it.
-        await graph.infoToggle.click();
         await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(false);
     });
 

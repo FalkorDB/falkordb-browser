@@ -204,10 +204,6 @@ type IndicatorContextType = {
   setIndicator: Dispatch<SetStateAction<"online" | "offline">>;
 };
 
-/** The mobile sheets that share the graph region and stack over one another. */
-export const SHEET_KEYS = ["info", "data", "chat"] as const;
-export type SheetKey = typeof SHEET_KEYS[number];
-
 type PanelContextType = {
   panel: Panel;
   setPanel: Dispatch<SetStateAction<Panel>>;
@@ -240,14 +236,6 @@ type PanelContextType = {
    * toolbar actions, so they do not cost a row of their own. Null on desktop.
    */
   mobileToolbarSlot: HTMLDivElement | null;
-  /**
-   * Mobile only. The open sheets, oldest first — they stack rather than replace
-   * one another, so the last one is the one on top. Empty on desktop.
-   */
-  sheetStack: SheetKey[];
-  setSheetStack: Dispatch<SetStateAction<SheetKey[]>>;
-  /** Bring an already-open sheet to the front of the stack. */
-  raiseSheet: (key: SheetKey) => void;
 };
 
 type QueryLoadingContextType = {
@@ -594,9 +582,6 @@ export const PanelContext = createContext<PanelContextType>({
   setCustomizingLabel: () => { },
   mobileNavSlot: null,
   mobileToolbarSlot: null,
-  sheetStack: [],
-  setSheetStack: () => { },
-  raiseSheet: () => { },
 });
 
 export const QueryLoadingContext = createContext<QueryLoadingContextType>({

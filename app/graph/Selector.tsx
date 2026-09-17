@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
-import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext, SheetKey } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
@@ -58,13 +58,8 @@ export default function Selector({
     const { settings: { querySettings: { limitSettings: { limit, lastLimit } }, userExperienceSettings: { captionKeysSettings: { showPropertyKeyPrefix } } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { cypherLanguageConfig, setCypherLanguageConfig } = useContext(CypherLanguageContext);
-    const { panelOpen, onTogglePanel, mobileToolbarSlot, sheetStack, raiseSheet } = useContext(PanelContext);
+    const { panelOpen, onTogglePanel, setPanel, mobileToolbarSlot } = useContext(PanelContext);
     const isMobile = useIsMobile();
-
-    // A sheet the user can see only the edge of comes forward on its trigger:
-    // the tap that reveals it should not be the one that throws it away.
-    const isBuried = (key: SheetKey) =>
-        sheetStack.includes(key) && sheetStack[sheetStack.length - 1] !== key;
 
     const [maximize, setMaximize] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
@@ -129,7 +124,18 @@ export default function Selector({
                 panelOpen && "!text-primary"
             )}
             title="Graph info"
-            onClick={() => (isBuried("info") ? raiseSheet("info") : onTogglePanel())}
+            onClick={() => {
+                // On mobile the three sheets share a stacking level and all cover
+                // the canvas, so a second one opened on top of the first would just
+                // hide it. Dropping `panel` closes the data sheet without touching
+                // the selection, which is still there when the user comes back.
+                if (isMobile && !panelOpen) {
+                    setPanel(undefined);
+                    setChatOpen?.(false);
+                }
+
+                onTogglePanel();
+            }}
             data-testid="graphInfoToggle"
         >
             <Network className="mobile:size-[18px]" />
@@ -148,7 +154,18 @@ export default function Selector({
             indicator={indicator}
             title="Chat"
             disabled={!graphName}
-            onClick={() => (isBuried("chat") ? raiseSheet("chat") : setChatOpen?.(!chatOpen))}
+            onClick={() => {
+                // Computed here rather than inside the updater: the other sheets
+                // have to be closed too, and a state updater must stay pure.
+                const next = !chatOpen;
+
+                if (isMobile && next) {
+                    setPanel(undefined);
+                    if (panelOpen) onTogglePanel();
+                }
+
+                setChatOpen?.(next);
+            }}
         >
             <Sparkles className="mobile:size-[18px]" />
         </Button>

@@ -580,4 +580,32 @@ test.describe("Data panel Tests", () => {
     expect(parseInt(nodesCount ?? "0", 10)).toBe(2);
     await apicalls.removeGraph(graphName);
   });
+
+  // The mobile sheets close one another because they all cover the same region.
+  // Desktop has the room to show them at once, so opening one leaves the rest.
+  test(`@readwrite Validate selecting a node keeps the chat and graph info open`, async () => {
+    const graphName = getRandomString("datapanel");
+    await apicalls.addGraph(graphName);
+    await apicalls.runQuery(
+      graphName,
+      'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})'
+    );
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+
+    const page = await browser.getPage();
+    await page.getByTestId("chatToggleButton").click();
+    await expect(page.getByTestId("chatPanel")).toBeVisible();
+    await expect(page.getByTestId("graphInfoPanel")).toBeVisible();
+
+    await graph.searchElementInCanvas("Bob");
+    expect(await graph.isVisibleDataPanel()).toBe(true);
+    await expect(page.getByTestId("chatPanel")).toBeVisible();
+    await expect(page.getByTestId("graphInfoPanel")).toBeVisible();
+
+    await apicalls.removeGraph(graphName);
+  });
 });
