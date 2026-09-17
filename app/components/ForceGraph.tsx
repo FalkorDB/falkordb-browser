@@ -3,24 +3,16 @@
 
 "use client";
 
-import { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection, NodeShape } from "@falkordb/canvas";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import useLongPress from "@/lib/useLongPress";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
 
 const DOUBLE_CLICK_MS = 300;
-// A press-and-hold on an element turns multi-select on. 500 ms is the platform
-// convention (Android's long-press, iOS's context menu) and is long enough not to
-// fire on a tap that lingers.
-const LONG_PRESS_MS = 500;
-// A hold that wanders further than this is a pan or a node drag, not a long press.
-const LONG_PRESS_MOVE_PX = 10;
-// The browser still delivers a click when the finger comes off after a long press,
-// and in multi-select that click would immediately toggle the element back off.
-const CLICK_SUPPRESS_MS = 700;
 
 interface Props {
     graph: Graph
@@ -143,10 +135,6 @@ export default function ForceGraph({
     // resolves what a pointer is over on pointer*down*, so the hover callback has
     // already fired by the time the hold starts.
     const hoverElementRef = useRef<Node | Link | undefined>(undefined);
-    const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-    const longPressOrigin = useRef<{ x: number, y: number } | undefined>(undefined);
-    const suppressClick = useRef(false);
-    const suppressClickTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     // Load falkordb-canvas web component on client side only
     useEffect(() => {
@@ -336,6 +324,20 @@ export default function ForceGraph({
         if (additive && nextSelection.length === 0) setMultiSelect?.(false);
     }, [setSelectedElements, centerOnSelection, setMultiSelect]);
 
+    const handleLongPress = useCallback(() => {
+        if (multiSelect) return false;
+
+        const element = hoverElementRef.current;
+        // A hold on empty background has nothing to start the selection with.
+        if (!element) return false;
+
+        setMultiSelect?.(true);
+        commitSelection(element, false);
+        return true;
+    }, [multiSelect, setMultiSelect, commitSelection]);
+
+    const { handlers: longPressHandlers, consumeClick } = useLongPress(setMultiSelect ? handleLongPress : undefined);
+
     const handleSelect = useCallback((element: GraphNode | GraphLink, additive: boolean) => {
         let fullElement: Node | Link | undefined;
         if ('source' in element) {
@@ -349,10 +351,7 @@ export default function ForceGraph({
     }, [graph, commitSelection]);
 
     const handleNodeClick = useCallback(async (node: GraphNode, event: MouseEvent) => {
-        if (suppressClick.current) {
-            suppressClick.current = false;
-            return;
-        }
+        if (consumeClick()) return;
 
         const fullNode = graph.NodesMap.get(node.id);
         if (!fullNode) return;
@@ -409,17 +408,14 @@ export default function ForceGraph({
         } else {
             deleteNeighbors([fullNode]);
         }
-    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand, handleSelect, clearPendingClick, flushPendingClick, multiSelect]);
+    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand, handleSelect, clearPendingClick, flushPendingClick, multiSelect, consumeClick]);
 
     // Links have nothing to expand, so their click selects straight away.
     const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
-        if (suppressClick.current) {
-            suppressClick.current = false;
-            return;
-        }
+        if (consumeClick()) return;
         flushPendingClick();
         handleSelect(link, event.shiftKey || event.ctrlKey || multiSelect);
-    }, [handleSelect, flushPendingClick, multiSelect]);
+    }, [handleSelect, flushPendingClick, multiSelect, consumeClick]);
 
     const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
         if (element === null) {
@@ -445,10 +441,7 @@ export default function ForceGraph({
     }, [graph]);
 
     const handleUnselected = useCallback((evt?: MouseEvent) => {
-        if (suppressClick.current) {
-            suppressClick.current = false;
-            return;
-        }
+        if (consumeClick()) return;
         // A stray tap on the background must not wipe a selection built up one
         // element at a time, exactly as Ctrl-click protects it on desktop. Commit
         // the pending pick rather than dropping it — additive is the mode that
@@ -466,50 +459,7 @@ export default function ForceGraph({
         } else if (selectedElements.length === 0) return;
         selectedElementsRef.current = [];
         setSelectedElements([]);
-    }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, setMultiSelect]);
-
-    const cancelLongPress = useCallback(() => {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = undefined;
-        longPressOrigin.current = undefined;
-    }, []);
-
-    useEffect(() => () => {
-        clearTimeout(longPressTimer.current);
-        clearTimeout(suppressClickTimer.current);
-    }, []);
-
-    const handlePointerDown = useCallback((e: ReactPointerEvent) => {
-        // Mouse users have Ctrl-click, and a hold with the button down is a pan.
-        if (!setMultiSelect || multiSelect || e.pointerType === "mouse") return;
-
-        longPressOrigin.current = { x: e.clientX, y: e.clientY };
-        longPressTimer.current = setTimeout(() => {
-            longPressTimer.current = undefined;
-
-            const element = hoverElementRef.current;
-            // A hold on empty background has nothing to start the selection with.
-            if (!element) return;
-
-            setMultiSelect(true);
-            commitSelection(element, false);
-
-            suppressClick.current = true;
-            clearTimeout(suppressClickTimer.current);
-            suppressClickTimer.current = setTimeout(() => {
-                suppressClick.current = false;
-            }, CLICK_SUPPRESS_MS);
-
-            navigator.vibrate?.(10);
-        }, LONG_PRESS_MS);
-    }, [setMultiSelect, multiSelect, commitSelection]);
-
-    const handlePointerMove = useCallback((e: ReactPointerEvent) => {
-        const origin = longPressOrigin.current;
-        if (!origin) return;
-        if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < LONG_PRESS_MOVE_PX) return;
-        cancelLongPress();
-    }, [cancelLongPress]);
+    }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, setMultiSelect, consumeClick]);
 
     const checkIsNodeSelected = useCallback((node: GraphNode) =>
         selectedElements.some(el => el.id === node.id && !('source' in el)) ||
@@ -744,10 +694,7 @@ export default function ForceGraph({
             data-testid={testId}
             data-focus-active={String(dimmed && selectedElements.length > 0)}
             data-selection-count={String(selectedElements.length)}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={cancelLongPress}
-            onPointerCancel={cancelLongPress}
+            {...longPressHandlers}
             onContextMenu={(e) => {
                 // Android raises its own menu on a long press, which would cancel
                 // the gesture's pointer sequence.
@@ -759,15 +706,17 @@ export default function ForceGraph({
                 setMultiSelect && multiSelect &&
                 <div
                     data-testid="multiSelectBar"
-                    className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3 rounded-full border border-primary bg-background/95 px-4 py-2 shadow-lg"
+                    // Just clear of the tab row it sits above, and out of the way of
+                    // the elements being picked.
+                    className="absolute bottom-11 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-full border border-primary bg-background/95 px-2.5 py-1 shadow-lg"
                 >
-                    <span data-testid="multiSelectCount" className="text-sm tabular-nums">
+                    <span data-testid="multiSelectCount" className="text-xs tabular-nums">
                         {selectedElements.length} selected
                     </span>
                     <button
                         type="button"
                         data-testid="multiSelectDone"
-                        className="text-sm font-medium text-primary"
+                        className="text-xs font-medium text-primary"
                         onClick={() => {
                             setMultiSelect(false);
                             selectedElementsRef.current = [];

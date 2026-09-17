@@ -1,11 +1,12 @@
 import { cn, Query } from "@/lib/utils";
 import { getCypherErrorHint } from "@/lib/cypherErrors";
 import { suggestForError } from "@/lib/cypherSuggestions";
-import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
+import { Fragment, KeyboardEvent, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Check, Circle, Loader2, Star, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import useIsMobile from "@/lib/useIsMobile";
+import useLongPress from "@/lib/useLongPress";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 
@@ -143,6 +144,8 @@ interface Props<T extends Item> {
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
     onDoubleClick?: (item: T, evt: MouseEvent<HTMLButtonElement>) => void
+    /** Press and hold on a row, the phone's way into a multi-selection. */
+    onLongPress?: (item: T) => void
     onToggleFav?: (item: T, name?: string) => void
     searchRef: React.RefObject<HTMLInputElement | null>
     isLoading?: boolean
@@ -152,7 +155,7 @@ interface Props<T extends Item> {
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons, itemIndicator }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, onLongPress, dataTestId, afterSearchCallback, isSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons, itemIndicator }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list]);
     const [hoverIndex, setHoverIndex] = useState<number>(0);
@@ -167,6 +170,17 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
     const isMobile = useIsMobile();
 
     const containerRef = useRef<HTMLUListElement>(null);
+    // Only one row can be held at a time, so the gesture is shared and the row it
+    // started on is remembered on the way down.
+    const pressedItem = useRef<T | undefined>(undefined);
+
+    const handleLongPress = useCallback(() => {
+        if (!onLongPress || !pressedItem.current) return false;
+        onLongPress(pressedItem.current);
+        return true;
+    }, [onLongPress]);
+
+    const { handlers: longPressHandlers, consumeClick } = useLongPress(onLongPress ? handleLongPress : undefined);
 
     const startIndex = stepCounter * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, filteredList.length);
@@ -359,6 +373,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                             onMouseEnter={() => setHoverIndex(index)}
                                             onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                             onClick={(e) => {
+                                                if (consumeClick()) return;
                                                 onClick(item, e);
                                             }}
                                             onDoubleClick={(e) => {
@@ -380,11 +395,22 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                 className={cn(
                                     "border-b cursor-pointer relative",
                                     isMobile && "shrink-0 py-1",
+                                    onLongPress && "select-none",
                                     getItemClassName(selected, hover)
                                 )}
                                 data-testid={`${dataTestId}${text}`}
                                 style={isMobile ? { minHeight: `${itemHeight}px` } : { height: `${itemHeight}px` }}
                                 key={text}
+                                {...longPressHandlers}
+                                onPointerDown={(e) => {
+                                    pressedItem.current = item;
+                                    longPressHandlers.onPointerDown(e);
+                                }}
+                                onContextMenu={(e) => {
+                                    // Android raises its own menu on a long press, which would
+                                    // cancel the gesture's pointer sequence.
+                                    if (onLongPress) e.preventDefault();
+                                }}
                             >
                                 {
                                     // The indicator sits beside the row button rather than inside

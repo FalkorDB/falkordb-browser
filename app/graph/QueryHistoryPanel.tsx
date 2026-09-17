@@ -83,6 +83,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     // selection makes delete/export/un-fav hit every repeat. `timestamp` is already the
     // entry identity used by handleToggleFav and is present on every stored record.
     const [selectedQueries, setSelectedQueries] = useState<number[]>([]);
+    // Touch has no Ctrl-click, so a press and hold opens multi-select and every tap
+    // toggles until the selection empties — the same gesture the canvas uses.
+    const [multiSelect, setMultiSelect] = useState(false);
     const [wrapLines, setWrapLines] = useState(false);
 
     const filters = useMemo(() => {
@@ -456,6 +459,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             query: nextQuery
         }));
         setSelectedQueries([]);
+        setMultiSelect(false);
         setFilteredQueries(current => current.filter(query => !selected.has(query.timestamp)));
     }, [historyQuery, setHistoryQuery, selectedQueries]);
 
@@ -530,6 +534,17 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const isAllSelected = visibleQueries.length > 0 && visibleQueries.every(q => selectedSet.has(q.timestamp));
     const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedSet.has(q.timestamp));
 
+    const toggleSelected = (timestamp: number) => {
+        const next = selectedQueries.includes(timestamp)
+            ? selectedQueries.filter(t => t !== timestamp)
+            : [...selectedQueries, timestamp];
+
+        setSelectedQueries(next);
+        // Untoggling the last row leaves the mode with nothing to act on, so treat
+        // it as the way out rather than stranding the user in it.
+        if (next.length === 0) setMultiSelect(false);
+    };
+
     return (
         <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background mobile:border-none mobile:rounded-none">
             <div className="relative h-full w-full flex flex-col rounded-lg p-3 overflow-y-auto mobile:p-0">
@@ -591,7 +606,10 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                 variant="Primary"
                                 data-testid="queryHistorySelectAll"
                                 title={isAllSelected ? "Deselect all queries" : "Select all queries"}
-                                onClick={() => setSelectedQueries(isAllSelected ? [] : visibleQueries.map(q => q.timestamp))}
+                                onClick={() => {
+                                    setSelectedQueries(isAllSelected ? [] : visibleQueries.map(q => q.timestamp));
+                                    if (isAllSelected) setMultiSelect(false);
+                                }}
                                 disabled={visibleQueries.length === 0}
                             >
                                 {
@@ -614,11 +632,15 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                 }
                             >
                                 {isMobile
-                                    ? `${selectedQueries.length} selected\nTap to select a query\nPick several with the select-all button`
+                                    ? `${selectedQueries.length} selected\nTap to select a query\nPress and hold for multi select`
                                     : `${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl/Cmd + Left Click) for multi select`}
                             </HelpTip>
                         </div>
                     }
+                    onLongPress={(item) => {
+                        setMultiSelect(true);
+                        setSelectedQueries([item.timestamp]);
+                    }}
                     onClick={(item, evt) => {
                         const index = historyQuery.queries.findIndex(q => q.timestamp === item.timestamp);
 
@@ -628,8 +650,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
                         const isCurrent = index + 1 === historyQuery.counter;
 
-                        if (evt.ctrlKey || evt.metaKey) {
-                            setSelectedQueries(prev => prev.includes(timestamp) ? prev.filter(t => t !== timestamp) : [...prev, timestamp]);
+                        if (evt.ctrlKey || evt.metaKey || multiSelect) {
+                            toggleSelected(timestamp);
                         } else {
                             setSelectedQueries(isCurrent ? [] : [timestamp]);
                         }

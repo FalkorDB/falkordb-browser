@@ -20,8 +20,8 @@ const LAYOUTS: { value: LayoutMode; label: string }[] = [
 ];
 
 // The icons are 18px, so the tap area has to come from the control itself to
-// clear the ~44px touch minimum. Desktop keeps the compact size.
-const CONTROL_CLASS = "text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary mobile:min-h-11 mobile:min-w-11 mobile:justify-center";
+// clear the touch minimum. Desktop keeps the compact size.
+const CONTROL_CLASS = "text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary mobile:min-h-10 mobile:min-w-10 mobile:justify-center";
 
 const HIERARCHY_DIRECTIONS: { value: HierarchyDirection; label: string }[] = [
     { value: 'td', label: 'Top → Down' },

@@ -288,13 +288,15 @@ function GraphView({
                                 chrome below still positions against Tabs exactly as before.
                                 On mobile it is the region the tools sheet shrinks. */}
                             <div className={cn(isMobile ? "relative h-1 grow min-h-0 w-full flex flex-col" : "contents")}>
-                            <div className="h-full w-full flex flex-col gap-4 absolute p-2 pointer-events-none z-10 justify-between">
+                            <div className="h-full w-full flex flex-col gap-4 absolute p-2 mobile:p-1 pointer-events-none z-10 justify-between">
                                 <div className="grow basis-0 flex flex-col gap-2 overflow-hidden">
                                     {!isMobile && toolbarNode}
                                     {!isMobile && legendNode}
                                 </div>
-                                <div className="flex gap-2 items-center">
-                                    <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
+                                {/* The row has to hold tabs, zoom and tools across a phone's
+                                    width, so the spacing there is as tight as the taps allow. */}
+                                <div className="flex gap-2 mobile:gap-1 items-center">
+                                    <TabsList className="bg-transparent flex gap-2 mobile:gap-0.5 pointer-events-auto p-0">
                                         <TabsTrigger
                                             data-testid="graphTab"
                                             asChild
