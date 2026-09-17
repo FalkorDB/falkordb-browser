@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -27,6 +27,7 @@ import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } f
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -74,6 +75,12 @@ const defaultQueryHistory: HistoryQuery = {
 const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
 const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
 const LOCAL_LLM_ENDPOINT_STORAGE_KEY = "localLlmEndpoint";
+// Shared instance so an unresolved stub probe hands consumers a stable array.
+const NO_OFFLOADED_GRAPHS: string[] = [];
+
+// The graph list waits on the stub probe, so this bounds how long a hung
+// GRAPH.STUBS can hold the selector empty.
+const STUBS_PROBE_TIMEOUT = 10000;
 const DEFAULT_LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
   ollama: "http://localhost:11434",
   lmstudio: "http://localhost:1234/v1",
@@ -177,15 +184,21 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // Set connection prefix for scoped localStorage
   const [prefixReady, setPrefixReady] = useState(false);
+  // Which connection the prefix above currently points at. The prefix follows
+  // the session, which lags `activeConnectionId` through a switch, so anything
+  // writing connection-scoped storage has to know whether the two agree yet.
+  const [prefixConnectionId, setPrefixConnectionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
       setConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default");
       migrateToScopedStorage();
       setPrefixReady(true);
+      setPrefixConnectionId(sessionData.activeConnectionId ?? null);
     } else if (status === "unauthenticated") {
       clearConnectionPrefix();
       setPrefixReady(false);
+      setPrefixConnectionId(null);
     }
   }, [status, sessionData]);
 
@@ -297,6 +310,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newRefreshInterval, setNewRefreshInterval] = useState(0);
   const [maxTabs, setMaxTabs] = useState(DEFAULT_GRAPH_TABS);
   const [newMaxTabs, setNewMaxTabs] = useState(DEFAULT_GRAPH_TABS);
+  const [graphsSortOrder, setGraphsSortOrder] = useState<GraphSortOrder>(DEFAULT_GRAPH_SORT_ORDER);
+  const [newGraphsSortOrder, setNewGraphsSortOrder] = useState<GraphSortOrder>(DEFAULT_GRAPH_SORT_ORDER);
   const [currentTab, setCurrentTab] = useState<Tab>("Graph");
   const [newSecretKey, setNewSecretKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
@@ -328,7 +343,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [supportsOffload, setSupportsOffload] = useState(false);
-  const [offloadedGraphs, setOffloadedGraphs] = useState<string[]>([]);
+  // Keyed by the connection the stubs were read from: a probe answer describes
+  // one server only, so after a switch the previous server's stubs must read as
+  // "unknown" rather than as this server's offloaded graphs.
+  const [offloadStubs, setOffloadStubs] = useState<{ connectionId: string | null; names: string[] } | null>(null);
   const [ldapProbe, setLdapProbe] = useState<{ connectionId: string | null; usesLdap: boolean } | null>(null);
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
@@ -441,6 +459,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setNewRefreshInterval,
         newMaxTabs,
         setNewMaxTabs,
+        newGraphsSortOrder,
+        setNewGraphsSortOrder,
       },
       chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
       graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
@@ -460,6 +480,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setRefreshInterval,
         maxTabs,
         setMaxTabs,
+        graphsSortOrder,
+        setGraphsSortOrder,
         captionKeysSettings: { captionsKeys, setCaptionsKeys, showPropertyKeyPrefix, setShowPropertyKeyPrefix },
         tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple },
       },
@@ -478,6 +500,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
       localStorage.setItem("maxTabs", clampMaxTabs(newMaxTabs).toString());
+      localStorage.setItem("graphsSortOrder", newGraphsSortOrder);
       localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
       localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
       localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
@@ -495,6 +518,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLastLimit(limit);
       setRefreshInterval(newRefreshInterval);
       setMaxTabs(clampMaxTabs(newMaxTabs));
+      setGraphsSortOrder(newGraphsSortOrder);
       setMaxSavedMessages(newMaxSavedMessages);
       setCaptionsKeys(newCaptionsKeys);
       setShowPropertyKeyPrefix(newShowPropertyKeyPrefix);
@@ -534,6 +558,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewSecretKey(secretKey);
       setNewRefreshInterval(refreshInterval);
       setNewMaxTabs(maxTabs);
+      setNewGraphsSortOrder(graphsSortOrder);
       setNewMaxSavedMessages(maxSavedMessages);
       setNewCaptionsKeys(captionsKeys);
       setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
@@ -549,7 +574,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHasChanges(false);
     }
 
-  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
+  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, graphsSortOrder, newGraphsSortOrder, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -721,29 +746,63 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const statusRef = useRef(status);
   statusRef.current = status;
 
+  const stubsSeqRef = useRef(0);
+
+  // Every probe already in flight was read before whatever is about to be
+  // applied, so it must not land afterwards and undo it. The sequence is what
+  // `isCurrent` checks, so bumping it discards all of them.
+  const invalidateStubProbes = useCallback(() => { stubsSeqRef.current += 1; }, []);
+
   // GRAPH.STUBS lists the graphs offloaded from memory. It is registered by the
   // enterprise module only and needs a recent enough core, so the fetch is gated
-  // on `supportsOffload`. The ref holds the connection the result must still
-  // belong to when it resolves, so a superseded connection can't overwrite the
-  // current one's indicators.
-  const activeConnectionIdRef = useRef(activeConnectionId);
-  useEffect(() => { activeConnectionIdRef.current = activeConnectionId; }, [activeConnectionId]);
-
-  const refreshOffloadedGraphs = useCallback(async () => {
+  // on `supportsOffload`.
+  const refreshOffloadedGraphs = useCallback(async (pinnedConnectionId?: string | null) => {
     if (!supportsOffload) return;
 
-    const connectionId = activeConnectionIdRef.current;
-    const isCurrent = () => activeConnectionIdRef.current === connectionId;
+    // `activeConnectionId` changes before the JWT catches up, so the request is
+    // pinned to it by header the same way /api/DBVersion and /api/ldap are —
+    // otherwise the stubs can describe the connection being switched away from.
+    // Callers that are about to publish a graph list pass the connection THAT
+    // list was read for, so a round trip cannot merge one connection's stubs
+    // into another's list. A `null` pin is not a connection: it is the
+    // bootstrap list, read with no header and resolved from the JWT, so the
+    // probe has to resolve the same way rather than be pinned to nothing.
+    const connectionId = pinnedConnectionId ?? getActiveConnectionIdGlobal();
+
+    // Bail before claiming a sequence: a pinned probe whose connection has
+    // already moved on would otherwise discard the probe made for the new one.
+    if (getActiveConnectionIdGlobal() !== connectionId) return;
+
+    // The epoch additionally catches A→B→A, where the id alone repeats. The
+    // sequence orders probes WITHIN one connection: the list refresh, the
+    // periodic effect and the selector all call this, so two can overlap and
+    // the slower one must not resurrect the names the newer one dropped. It is
+    // also what a confirmed delete/rename bumps to discard probes in flight.
+    const epoch = getConnectionEpoch();
+    const seq = (stubsSeqRef.current += 1);
+    const isCurrent = () => getActiveConnectionIdGlobal() === connectionId
+      && getConnectionEpoch() === epoch
+      && stubsSeqRef.current === seq;
 
     try {
-      const result = await fetch("/api/graph/stubs", { method: "GET" });
+      const result = await fetch("/api/graph/stubs", {
+        method: "GET",
+        headers: connectionId ? { "X-Connection-Id": connectionId } : undefined,
+        // The graph list waits on this probe so the offloaded graphs can be
+        // merged into it in one step. That makes a hung enterprise endpoint a
+        // blank selector, so the wait is bounded: timing out is handled like
+        // any other failed probe, and the list goes out without the stubs.
+        signal: AbortSignal.timeout(STUBS_PROBE_TIMEOUT),
+      });
 
       if (!isCurrent()) return;
 
-      if (!result.ok) {
-        setOffloadedGraphs([]);
-        return;
-      }
+      // A failed probe says nothing about what is offloaded, so the last known
+      // stubs are kept rather than published as "nothing is offloaded": that
+      // would drop the graph out of the merged list and make the first-seen
+      // history forget it, so it would come back stamped as brand new. They are
+      // kept under this connection's id, so they can never surface on another.
+      if (!result.ok) return;
 
       const { stubs } = (await result.json()) as StubsResponse;
 
@@ -751,13 +810,78 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       // Keep the same array when nothing changed, so the periodic refresh
       // doesn't re-render every consumer of the indicators.
-      setOffloadedGraphs((prev) => (
-        prev.length === stubs.length && prev.every((name, i) => name === stubs[i]) ? prev : stubs
+      setOffloadStubs((prev) => (
+        prev?.connectionId === connectionId
+          && prev.names.length === stubs.length
+          && prev.names.every((name, i) => name === stubs[i])
+          ? prev
+          : { connectionId, names: stubs }
       ));
     } catch {
-      if (isCurrent()) setOffloadedGraphs([]);
+      // Same as a failed response: a transient error is not an observation.
     }
   }, [supportsOffload]);
+
+  // A stub list describes one connection only, so anything read from another
+  // one (including the render right after a switch) reads as "nothing known".
+  const offloadedGraphs = useMemo(
+    () => (offloadStubs !== null && offloadStubs.connectionId === activeConnectionId ? offloadStubs.names : NO_OFFLOADED_GRAPHS),
+    [offloadStubs, activeConnectionId]
+  );
+
+  // A confirmed graph list outranks the stubs: a graph deleted through the UI
+  // stays in the last probe's answer until the next one, and the selector merges
+  // the stubs back into the list — so without this the deleted graph reappears
+  // and its first-seen timestamp survives to be reused by a graph recreated
+  // under the same name.
+  const pruneOffloadedGraphs = useCallback((confirmed: string[]) => {
+    // A probe read before the delete would otherwise still satisfy `isCurrent`
+    // and write the deleted name straight back in.
+    invalidateStubProbes();
+
+    // Stubs are kept under the connection they were read from, so a list
+    // confirmed against another one says nothing about them — applying it would
+    // empty the connection being switched away from and lose its indicators
+    // (and its first-seen entries) on the way back.
+    const connectionId = getActiveConnectionIdGlobal();
+
+    setOffloadStubs((prev) => {
+      if (prev === null || prev.connectionId !== connectionId) return prev;
+
+      const names = prev.names.filter((name) => confirmed.includes(name));
+
+      return names.length === prev.names.length ? prev : { ...prev, names };
+    });
+  }, [invalidateStubProbes]);
+
+  // A renamed graph is still offloaded, but the probe that would say so is up to
+  // a refresh interval away. Until then the old name is not in the published
+  // list, so the selector would merge the stale stub back in beside the new one
+  // and show the graph twice — the second one stamped as brand new.
+  const renameOffloadedGraph = useCallback((from: string, to: string) => {
+    // Same as the prune: a probe that read the old name must not land after the
+    // rename and overwrite the mapping with it.
+    invalidateStubProbes();
+
+    const connectionId = getActiveConnectionIdGlobal();
+
+    setOffloadStubs((prev) => {
+      if (prev === null || prev.connectionId !== connectionId || !prev.names.includes(from)) return prev;
+
+      return { ...prev, names: prev.names.map((name) => (name === from ? to : name)) };
+    });
+  }, [invalidateStubProbes]);
+
+  // A graph list the server handed back for an explicit create/delete/rename is
+  // confirmed, and outranks every refresh already in flight: one read before the
+  // mutation would otherwise land after it and put the old names back, taking
+  // the first-seen history with them. The generation is module-level because the
+  // list has more than one publisher and the mutation does not always share a
+  // component with the refresh it has to discard.
+  const supersedeGraphRefreshes = useCallback(() => {
+    supersedeGraphLists();
+    invalidateStubProbes();
+  }, [invalidateStubProbes]);
 
   // A probe answer only describes the connection it was made for; anything else
   // (including the render right after a switch) reads as unresolved.
@@ -776,16 +900,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     supportsOffload,
     offloadedGraphs,
     refreshOffloadedGraphs,
+    pruneOffloadedGraphs,
+    renameOffloadedGraph,
+    supersedeGraphRefreshes,
     usesLdap,
     additionalConnections,
     setAdditionalConnections,
     activeConnectionId,
     setActiveConnectionId,
+    prefixConnectionId,
     updateSession,
     beginConnectionSwitch,
     endConnectionSwitch,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, usesLdap, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -1452,7 +1580,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         if (!result.ok) {
           setShowMemoryUsage(false);
           setSupportsOffload(false);
-          setOffloadedGraphs([]);
+          invalidateStubProbes();
+          setOffloadStubs(null);
           resolveClosed();
           return;
         }
@@ -1493,16 +1622,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Stop a response for the previous connection (or a signed-out session) from
     // landing on the current one.
     return () => { cancelled = true; };
-  }, [status, activeConnectionId]);
+  }, [status, activeConnectionId, invalidateStubProbes]);
 
   useEffect(() => {
     if (status !== "authenticated" || !supportsOffload) {
-      setOffloadedGraphs([]);
+      // A probe sent while this connection still looked capable can outlive the
+      // answer that says it is not, so discard it rather than let it repopulate
+      // stubs for a connection that cannot have any.
+      invalidateStubProbes();
+      setOffloadStubs(null);
       return;
     }
 
     refreshOffloadedGraphs();
-  }, [status, activeConnectionId, supportsOffload, refreshOffloadedGraphs]);
+  }, [status, activeConnectionId, supportsOffload, refreshOffloadedGraphs, invalidateStubProbes]);
   useEffect(() => {
     if (status !== "authenticated") {
       setConnectionType("Standalone");
@@ -1746,6 +1879,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // Seed the settings-form value too, otherwise the form keeps showing the
       // default and reads as "changed" against the value actually in effect.
       setNewMaxTabs(loadedMaxTabs);
+      const loadedGraphsSortOrder = normalizeGraphSortOrder(localStorage.getItem("graphsSortOrder"));
+      setGraphsSortOrder(loadedGraphsSortOrder);
+      setNewGraphsSortOrder(loadedGraphsSortOrder);
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
       setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
       setCypherOnly(localStorage.getItem("cypherOnly") === "true");
@@ -1893,7 +2029,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const ctx = contextGenRef.current;
     const cid = getActiveConnectionIdGlobal();
     const epoch = getConnectionEpoch();
-    const isCurrent = () => getConnectionEpoch() === epoch && optionsSeqRef.current === oseq;
+    // A mutation that happened while this was in flight already published a list
+    // it knows to be correct, so this one is stale however recent it is.
+    const generation = getGraphListGeneration();
+    const isCurrent = () => getConnectionEpoch() === epoch
+      && getGraphListGeneration() === generation
+      && optionsSeqRef.current === oseq;
     const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
     const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
 
@@ -1902,6 +2043,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (options?.clear) setGraphNames(undefined);
 
     const res = await fetchOptions(gToast, gInd, indicator, cid);
+
+    // GRAPH.LIST omits offloaded graphs and the selector merges the stubs back
+    // in, so settle the stubs first: publishing the list on its own would take
+    // a newly offloaded graph out of the merged list until they land. The probe
+    // is pinned to the connection this list was read for, so the two can never
+    // describe different servers.
+    if (res) await refreshOffloadedGraphs(cid);
 
     // The list is connection-scoped: apply only if this is still the newest
     // refresh for the same connection (a later switch/refresh owns it otherwise).
@@ -1914,7 +2062,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphNamesLoaded(true);
     // Auto-select is graph-scoped: only apply if the graph context is unchanged.
     if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
-  }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName]);
+  }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName, refreshOffloadedGraphs]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
