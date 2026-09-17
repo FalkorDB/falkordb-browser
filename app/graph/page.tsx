@@ -156,6 +156,8 @@ export default function Page() {
     // server says otherwise, so a failed lookup never blocks a runnable query.
     const [csvCapabilities, setCsvCapabilities] = useState({ fileUriSupported: true, uploadEnabled: false });
 
+    // Deployment-wide, so this is fetched once and needs no connection scoping:
+    // nothing in the answer changes when the active connection does.
     useEffect(() => {
         let cancelled = false;
 
@@ -175,6 +177,8 @@ export default function Page() {
         };
     }, []);
 
+    // The per-caller half of "can upload" lives here, where isReadOnly already
+    // follows the active connection — a switch re-evaluates it with no refetch.
     const csvLoad = useMemo(() => ({
         ...csvCapabilities,
         uploadEnabled: csvCapabilities.uploadEnabled && !isReadOnly && Boolean(graphName),
