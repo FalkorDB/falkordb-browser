@@ -26,6 +26,7 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
+import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
 
 /**
@@ -2002,9 +2003,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setTutorialOpen(false);
   };
 
-  const handleLoadDemoGraphs = useCallback(async () => {
+  const handleLoadDemoGraphs = useCallback(async (): Promise<DemoLoadOutcome> => {
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
+
+    // Read once: the failure path has to put this back, and the state setter
+    // below is not readable synchronously.
+    const urlParams = window.location.search;
 
     try {
       // Store current user graphs and URL params. A previous tutorial session that
@@ -2012,7 +2017,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // be dropped, so they must not come back when the list is restored.
       setUserGraphsBeforeTutorial(graphNames?.filter(name => !DEMO_GRAPH_NAMES.includes(name)));
       setUserGraphBeforeTutorial(graphName);
-      setUrlParamsBeforeTutorial(window.location.search);
+      setUrlParamsBeforeTutorial(urlParams);
 
       // Clear the visible URL params for the tutorial, but push a new history
       // entry (rather than replacing) so the user's pre-tutorial URL stays in
@@ -2067,19 +2072,28 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       (eve)-[:FOLLOWS]->(frank)
       `;
 
-      await Promise.all([
-        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator, { connectionId: cid }),
-        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator, { connectionId: cid })
-      ]).catch(async error => {
+      // allSettled, not all: a rejection from one load would leave the other
+      // still streaming, and in FalkorDB any query re-creates its graph — so a
+      // rollback delete issued while that create is in flight gets undone by it.
+      // Both queries are hardcoded, so the SSE layer's parse/connection detail is
+      // for the console, not the user — silence it and report once, below.
+      const loads = await Promise.allSettled([
+        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid }),
+        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid })
+      ]);
+
+      const failedLoad = loads.find((load): load is PromiseRejectedResult => load.status === "rejected");
+
+      if (failedLoad) {
         // One graph can be loaded while the other failed, so drop both rather
         // than walk the tutorial into half a dataset.
         await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
           method: "DELETE",
         }, silentToast, setIndicator, cid)));
-        throw error;
-      });
+        throw failedLoad.reason;
+      }
 
-      if (getConnectionEpoch() !== startEpoch) return;
+      if (getConnectionEpoch() !== startEpoch) return "cancelled";
 
       // Update graph list to only show demo graphs
       setGraphNames([...DEMO_GRAPH_NAMES]);
@@ -2087,6 +2101,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       setGraph(Graph.empty());
       setData({ nodes: [], links: [] });
+
+      return "loaded";
     } catch (error) {
 
       console.error("Failed to load demo graphs", error);
@@ -2095,6 +2111,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         description: "Failed to load demo graphs",
         variant: "destructive",
       });
+
+      // The tutorial's failure path closes without running handleCleanupDemoGraphs,
+      // so the history entry and the snapshot taken above would otherwise strand
+      // the user on a stripped URL with a stale pre-tutorial state.
+      if (urlParams) window.history.replaceState(null, "", `${window.location.pathname}${urlParams}`);
+      setUserGraphsBeforeTutorial([]);
+      setUserGraphBeforeTutorial("");
+      setUrlParamsBeforeTutorial("");
+
       // The tutorial takes a resolved promise as a loaded dataset and walks the
       // user into steps that query it, so a failure has to reach it.
       throw error;

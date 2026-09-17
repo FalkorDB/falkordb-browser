@@ -1648,10 +1648,14 @@ function TutorialPortal({
 
 
 
+// A load that is superseded by a connection switch is neither a success nor an
+// error: the caller must not advance, and must not close the tutorial either.
+export type DemoLoadOutcome = "loaded" | "cancelled";
+
 interface TutorialProps {
     open: boolean;
     onClose: () => void;
-    onLoadDemoGraphs?: () => Promise<void>;
+    onLoadDemoGraphs?: () => Promise<DemoLoadOutcome>;
     onCleanupDemoGraphs?: () => Promise<void>;
 }
 
@@ -1781,7 +1785,17 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
 
             if (onLoadDemoGraphs) {
                 onLoadDemoGraphs()
-                    .then(() => {
+                    .then(outcome => {
+                        // A connection switch cancels the load without publishing the
+                        // demo graphs; advancing then walks the user into steps that
+                        // query a dataset that was never loaded.
+                        if (outcome === "cancelled") {
+                            // Let the effect try again once the new connection settles,
+                            // rather than leave the tutorial parked on step 0.
+                            demoLoadStartedRef.current = false;
+                            return;
+                        }
+
                         setDemoLoaded(true);
                         // Auto-advance to the welcome step after loading
                         setStep(1);

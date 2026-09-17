@@ -14,9 +14,10 @@ import { getRandomString } from "../infra/utils";
  * original graphs are restored.
  */
 
-test.describe("Tutorial Walkthrough", () => {
-    // Both tests drive the tutorial, which loads and drops the same fixed
-    // `social-demo` graphs, so they cannot run against the server at once.
+test.describe("Tutorial", () => {
+    // Every test here drives the tutorial, which loads and drops the same fixed
+    // `social-demo` graphs. `fullyParallel` would otherwise run them against one
+    // server at once, so they all live in this one file and run in order.
     test.describe.configure({ mode: "default" });
 
     let browser: BrowserWrapper;
@@ -49,7 +50,8 @@ test.describe("Tutorial Walkthrough", () => {
                 "social-demo",
                 "MATCH (n:Person) RETURN count(n) AS cnt"
             );
-            return result.data[0]?.cnt;
+            const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
+            return Number(cnt);
         };
 
         try {
@@ -405,5 +407,23 @@ test.describe("Tutorial Walkthrough", () => {
             localStorage.getItem("tutorial")
         );
         expect(tutorialFlag).toBe("false");
+    });
+
+    test("@admin validate that clicking away doesn't dismiss the tutorial", async () => {
+        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
+        await tutorial.changeLocalStorage("true");
+        await tutorial.refreshPage();
+        await tutorial.clickAtTopLeftCorner();
+        await new Promise((resolve) => {
+            setTimeout(resolve, 1000);
+        });
+        expect(await tutorial.isTutorialVisible()).toBeTruthy();
+        await tutorial.changeLocalStorage("false");
+    });
+
+    test("@admin validate that clicking replay tutorial replay tutorial", async () => {
+        const tutorial = await browser.createNewPage(TutorialPanel, urls.settingsUrl);
+        await tutorial.clickReplayTutorial();
+        expect(await tutorial.isTutorialVisible()).toBeTruthy();
     });
 });
