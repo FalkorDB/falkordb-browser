@@ -62,14 +62,14 @@ test("store rejects an invalid owner or key (path-traversal safe)", async () => 
 // An explicit mode must win over the Docker/HTTPS guess, and whitespace around
 // it is an operator's typo — not a request to fall back to guessing.
 test("getLocalLoadUriMode honours an explicit mode whatever its padding and case", () => {
-    const configured = process.env.CSV_LOCAL_LOAD_URI_MODE;
     try {
         process.env.CSV_LOCAL_LOAD_URI_MODE = " File ";
         assert.equal(getLocalLoadUriMode(), "file");
         process.env.CSV_LOCAL_LOAD_URI_MODE = "\tHTTP\n";
         assert.equal(getLocalLoadUriMode(), "http");
     } finally {
-        process.env.CSV_LOCAL_LOAD_URI_MODE = configured;
+        // Back to the file mode the rest of this file is set up with.
+        process.env.CSV_LOCAL_LOAD_URI_MODE = "file";
     }
 });
 
