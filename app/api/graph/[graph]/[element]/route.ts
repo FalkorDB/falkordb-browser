@@ -119,7 +119,7 @@ export async function POST(
               : ""
           }${properties}) RETURN n`
         : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${quoteCypherIdentifier(
-            label![0]
+            label[0]
           )}${properties}]->(b) RETURN e`;
 
       const queryParams: Record<string, string | number | boolean> = {};

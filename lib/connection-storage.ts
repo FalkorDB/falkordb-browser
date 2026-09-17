@@ -15,13 +15,22 @@ let _port = 0;
 let _migrated = new Set<string>();
 
 /**
+ * The storage prefix for a connection. Exported because the staleness checks in
+ * `providers.tsx` compare against it — building the string twice would let the
+ * two drift and silently disable those checks.
+ */
+export function buildConnectionPrefix(host: string, port: number, username: string): string {
+  return `${host}:${port}:${username}:`;
+}
+
+/**
  * Build and cache the prefix.
  * Call once when the session becomes available (host, port & username known).
  */
 export function setConnectionPrefix(host: string, port: number, username: string): void {
   _host = host;
   _port = port;
-  _prefix = `${host}:${port}:${username}:`;
+  _prefix = buildConnectionPrefix(host, port, username);
 }
 
 /**

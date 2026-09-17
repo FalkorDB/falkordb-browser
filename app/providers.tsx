@@ -6,7 +6,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey, ServerDecryptError } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
-import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
+import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, buildConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
@@ -1927,11 +1927,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // under a single global key meant the last connection to save wiped the
   // others, and keeping them out of this effect's dependencies meant a
   // connection switch left the previous connection's decrypted keys in state.
-  // `connectionIdentity` mirrors the scoped-storage prefix, which uses the same
-  // host/port/username triple as the server-side binding.
-  const connectionIdentity = useMemo(
+  // `connectionScope` is built with the same helper the storage module uses, so
+  // the comparison below cannot drift from the prefix it is checking against.
+  const connectionScope = useMemo(
     () => (status === "authenticated" && sessionData?.user
-      ? `${sessionData.user.host}:${sessionData.user.port}:${sessionData.user.username || "default"}`
+      ? buildConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default")
       : ""),
     [status, sessionData?.user]
   );
@@ -1947,7 +1947,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedChatApiKeyId("");
     setSecretKey("");
 
-    // `connectionIdentity` and the storage prefix both come from the session,
+    // `connectionScope` and the storage prefix both come from the session,
     // which only catches up once `updateSession` resolves -- while the global
     // connection id every request is tagged with changed at the start of the
     // switch. Reloading against the old identity in that window would republish
@@ -1957,15 +1957,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // rolled-back switch restores the keys it just cleared.
     if (switchPending) return undefined;
 
-    if (status !== "authenticated" || !prefixReady || !connectionIdentity) return undefined;
+    if (status !== "authenticated" || !prefixReady || !connectionScope) return undefined;
 
     // The storage prefix is module-global and every step below awaits the
     // server, so a connection switch mid-flight could publish this
     // connection's keys into the next one's state, or write its ciphertext
     // under the next one's prefix. Nothing commits once the run is superseded.
     let cancelled = false;
-    const scope = `${connectionIdentity}:`;
-    const stale = () => cancelled || getConnectionPrefix() !== scope;
+    const stale = () => cancelled || getConnectionPrefix() !== connectionScope;
 
     (async () => {
       let loadedChatApiKeys: ChatApiKey[] = [];
@@ -2103,7 +2102,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     })();
 
     return () => { cancelled = true; };
-  }, [status, prefixReady, connectionIdentity, switchPending]);
+  }, [status, prefixReady, connectionScope, switchPending]);
 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.

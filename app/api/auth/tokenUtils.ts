@@ -22,7 +22,7 @@ export function validateJWTSecret(): { valid: boolean; secret?: Uint8Array; erro
   const authSecret = getAuthSecret();
   if (!authSecret) {
     // eslint-disable-next-line no-console
-    console.error("AUTH_SECRET environment variable is required");
+    console.error("AUTH_SECRET (or NEXTAUTH_SECRET) environment variable is required");
     return {
       valid: false,
       error: NextResponse.json(
