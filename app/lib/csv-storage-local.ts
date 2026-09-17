@@ -62,7 +62,7 @@ function relativeImportPath(owner: string, key: string): string {
 }
 
 export function getLocalLoadUriMode(): "file" | "http" {
-    const configured = process.env.CSV_LOCAL_LOAD_URI_MODE?.toLowerCase();
+    const configured = process.env.CSV_LOCAL_LOAD_URI_MODE?.trim().toLowerCase();
     if (configured === "file") return "file";
     if (configured === "http") return "http";
 
