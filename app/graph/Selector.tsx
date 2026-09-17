@@ -74,13 +74,14 @@ export default function Selector({
         setGraphName(formatName(name));
     };
 
+    // Touch has no Ctrl key and no double click, and the long press that replaces
+    // them is invisible — this list is the only place it is spelled out.
     const canvasTips = (
         <div className="text-primary">
-            <p>Select And Show Properties (Click)</p>
-            {/* Touch has no Ctrl key, so the toolbar toggle is the only way in. */}
-            <p>{isMobile ? "Select Multiple Entities (Turn On Multi Select)" : "Select Multiple Entities (Click + Shift or Ctrl)"}</p>
+            <p>Select And Show Properties ({isMobile ? "Tap" : "Click"})</p>
+            <p>{isMobile ? "Select Multiple Entities (Press And Hold)" : "Select Multiple Entities (Click + Shift or Ctrl)"}</p>
             <p>Select 2 Nodes to Create Edge</p>
-            <p>Expand And Collapse Neighbors (Double Click)</p>
+            <p>Expand And Collapse Neighbors ({isMobile ? "Double Tap" : "Double Click"})</p>
         </div>
     );
 

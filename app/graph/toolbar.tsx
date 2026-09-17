@@ -25,7 +25,6 @@ interface Props {
     expand: boolean
     isAddNode: boolean
     isAddEdge: boolean
-    multiSelect: boolean
 }
 
 const ITEM_HEIGHT = 32;
@@ -46,14 +45,11 @@ export default function Toolbar({
     isAddNode,
     setExpand,
     expand,
-    multiSelect,
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
-    // Delete moves into the data panel there, since this toolbar sits in a sheet
-    // that cannot be open while an element is selected.
     const isMobile = useIsMobile();
 
 
@@ -378,7 +374,7 @@ export default function Toolbar({
                             </Button>
                         }
                         {
-                            selectedElements.length !== 0 && (!isMobile || multiSelect) &&
+                            selectedElements.length !== 0 &&
                             <DeleteElement
                                 description="Are you sure you want to delete this element(s)?"
                                 open={deleteOpen}

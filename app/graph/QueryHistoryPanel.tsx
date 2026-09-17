@@ -18,6 +18,7 @@ import { LanguageConfig } from "../components/EditorComponent";
 import { CYPHER_LANGUAGE_NAME, STATIC_SUGGESTIONS } from "../components/CypherEditor";
 import { extractVariableCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
+import useIsMobile from "@/lib/useIsMobile";
 import { createFalkorCypherEngine, attachGrammarLinting, registerGrammarCodeActions, getGrammarDiagnostics, toCompletionItems, type FalkorSchema } from "@/lib/falkordb-cypher";
 import PaginationList from "../components/PaginationList";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext, AiFixContext } from "../components/provider";
@@ -50,6 +51,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const { indicator } = useContext(IndicatorContext);
     const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
     const { toast } = useToast();
+    const isMobile = useIsMobile();
 
     const { theme } = useTheme();
     const { background } = getTheme(theme);
@@ -611,7 +613,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     </>
                                 }
                             >
-                                {`${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl/Cmd + Left Click) for multi select`}
+                                {isMobile
+                                    ? `${selectedQueries.length} selected\nTap to select a query\nPick several with the select-all button`
+                                    : `${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl/Cmd + Left Click) for multi select`}
                             </HelpTip>
                         </div>
                     }

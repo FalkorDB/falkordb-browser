@@ -251,7 +251,6 @@ function GraphView({
                             setExpand={view.setExpand}
                             isAddEdge={view.isAddEdge}
                             isAddNode={view.isAddNode}
-                            multiSelect={multiSelect}
                         />
                     );
 
