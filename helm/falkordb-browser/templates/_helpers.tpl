@@ -145,3 +145,42 @@ Validate existing Secret based ENCRYPTION_KEY configuration.
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Render one env entry for a secret part of the preconfigured connection.
+Prefers connection.existingSecret when that key is named, falls back to the
+chart-managed Secret, and renders nothing when neither supplies a value.
+Call with (dict "root" $ "name" "FALKORDB_PASSWORD" "value" ... "existingKey" ...)
+*/}}
+{{- define "falkordb-browser.connectionSecretEnv" -}}
+{{- $existingName := .root.Values.connection.existingSecret.name | default "" -}}
+{{- if and .existingKey $existingName -}}
+- name: {{ .name }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ $existingName | quote }}
+      key: {{ .existingKey | quote }}
+{{- else if .value -}}
+- name: {{ .name }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "falkordb-browser.fullname" .root }}
+      key: {{ .name }}
+{{- end -}}
+{{- end }}
+
+{{/*
+Validate the preconfigured connection.
+Without a URL or a host the browser finds no connection at all, so an enabled
+but empty connection would install cleanly and then quietly show the login
+form — fail the render instead of shipping that. Values are trimmed first,
+because the browser trims them too and would read "   " as unconfigured.
+*/}}
+{{- define "falkordb-browser.validateConnection" -}}
+{{- $connection := .Values.connection -}}
+{{- $existing := $connection.existingSecret | default dict -}}
+{{- $externalUrl := and ($existing.name | default "" | trim) ($existing.urlKey | default "" | trim) -}}
+{{- if not (or ($connection.url | default "" | trim) ($connection.host | default "" | trim) $externalUrl) -}}
+{{- fail "connection.enabled requires connection.url, connection.host, or connection.existingSecret.name together with connection.existingSecret.urlKey" -}}
+{{- end -}}
+{{- end }}

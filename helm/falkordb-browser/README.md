@@ -91,6 +91,19 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `persistence.enabled` | Enable persistence for API tokens | `false` |
 | `persistence.size` | Size of persistent volume | `1Gi` |
 | `persistence.accessMode` | Access mode for persistent volume | `ReadWriteOnce` |
+| `connection.enabled` | Ship a preconfigured FalkorDB connection so the browser does not need a manual login | `false` |
+| `connection.url` | `falkor://`, `falkors://`, `redis://` or `rediss://` URL; the `s` variants imply TLS | `""` |
+| `connection.host` | Hostname. Required unless `connection.url` is set | `""` |
+| `connection.port` | Port. Empty falls back to the URL, then `6379` | `""` |
+| `connection.username` | Username. Empty falls back to the URL, then `default` | `""` |
+| `connection.password` | Password. Stored in the chart-managed Secret. Omitted or empty keeps the password from `connection.url`; only a non-empty value overrides it | unset |
+| `connection.tls` | `"true"`/`"false"`; empty takes TLS from the URL scheme | `""` |
+| `connection.ca` | Base64-encoded CA certificate | `""` |
+| `connection.autoConnect` | Sign in automatically on load. `false` only prefills the login form | `true` |
+| `connection.existingSecret.name` | Existing Secret holding the connection secrets | `""` |
+| `connection.existingSecret.urlKey` | Key in that Secret for `FALKORDB_CONNECTION_URL` | `""` |
+| `connection.existingSecret.passwordKey` | Key in that Secret for `FALKORDB_PASSWORD` | `""` |
+| `connection.existingSecret.caKey` | Key in that Secret for `FALKORDB_CA` | `""` |
 
 > **Note:** The default security contexts require an image that runs as non-root, which the chart `appVersion` image does. Some older images (for example `v1.6.7` and `v2.0.0`) start as root and drop privileges themselves, so pinning `image.tag` to one of those also requires relaxing `podSecurityContext`/`securityContext`.
 
@@ -176,6 +189,52 @@ helm install falkordb-browser ./falkordb-browser \
 ```
 
 Do not rotate this key unless you are prepared to invalidate or migrate data encrypted with the previous key.
+
+### Preconfigured connection
+
+Ship the FalkorDB connection with the release so the browser opens straight onto the graph list instead of the login form:
+
+```yaml
+connection:
+  enabled: true
+  url: falkor://default:password@falkordb:6379
+```
+
+Or with discrete fields instead of a URL:
+
+```yaml
+connection:
+  enabled: true
+  host: falkordb
+  port: "6379"
+  username: default
+  password: password
+```
+
+To keep the secrets out of the values file, reference an existing Secret. Read
+the URL rather than typing it into the command, so the credential stays out of
+the shell history and out of the argument list `ps` shows every user on the box:
+
+```bash
+read -rs -p 'FalkorDB URL: ' FALKORDB_URL
+(umask 077 && printf '%s' "$FALKORDB_URL" > falkordb-url) && unset FALKORDB_URL
+
+kubectl create secret generic falkordb-browser-connection \
+  --from-file=url=falkordb-url
+rm falkordb-url
+
+helm install falkordb-browser ./falkordb-browser \
+  --set connection.enabled=true \
+  --set connection.existingSecret.name=falkordb-browser-connection \
+  --set connection.existingSecret.urlKey=url
+```
+
+Notes:
+
+- The discrete fields override `connection.url` field by field. Leave a field empty to keep the value from the URL.
+- Set `connection.autoConnect: false` to prefill the login form without signing in automatically. The password is then never handed out by the server, so leave `connection.password` unset and omit the password from `connection.url` — otherwise the form is prefilled but the credential still only lives on the server.
+- Changing a Secret referenced through `connection.existingSecret` (or `encryption.existingSecret`) does **not** restart the pod: those values are resolved when the container starts and the deployment's checksum annotations only cover chart-managed objects. Roll it yourself with `kubectl rollout restart deployment/<release>-falkordb-browser`.
+- **Security:** with `autoConnect` enabled, anyone who can reach the browser reaches the database with these credentials. Enable it only where the browser itself is access-controlled, and prefer a read-only FalkorDB user.
 
 ### Installation with resource limits
 
