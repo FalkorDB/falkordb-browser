@@ -609,9 +609,26 @@ function createUserFromJWTPayload(payload: CustomJWTPayload): AuthenticatedUser 
 }
 
 /**
+ * The outcome of reading an `Authorization: Bearer` credential.
+ *
+ * `rejected` is kept apart from `absent` because the caller must not fall
+ * through to the cookie session on a refused token: the request would then run
+ * under whatever identity the browser happens to hold rather than the one it
+ * named, and a revoked access token would keep working for as long as its
+ * holder is signed in.
+ */
+type JWTAuthResult =
+  | { status: "authenticated"; client: FalkorDB; user: AuthenticatedUserWithPassword }
+  | { status: "rejected" }
+  | { status: "absent" };
+
+const JWT_ABSENT: JWTAuthResult = { status: "absent" };
+const JWT_REJECTED: JWTAuthResult = { status: "rejected" };
+
+/**
  * Attempts JWT authentication and returns client and user if successful
  */
-async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: AuthenticatedUserWithPassword } | null> {
+async function tryJWTAuthentication(): Promise<JWTAuthResult> {
   // Try to get authorization header
   const authorizationHeader = await getAuthorizationHeader();
 
@@ -622,7 +639,9 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       const payload = await verifyJWTToken(token);
       // Validate JWT payload structure
       if (!isValidJWTPayload(payload)) {
-        return null;
+        // `getToken` accepts a session token from this same header, so one sent
+        // that way is a credential for the path below, not a refusal here.
+        return isEndpointBound(payload as unknown as Record<string, unknown>) ? JWT_ABSENT : JWT_REJECTED;
       }
 
       // Validate token is active in FalkorDB (not revoked)
@@ -643,7 +662,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
             console.warn("Failed to close revoked JWT connection", closeError);
           }
         }
-        return null;
+        return JWT_REJECTED;
       }
 
       // Resolve password server-side from Token DB (never from the JWT payload).
@@ -660,7 +679,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         }
         // eslint-disable-next-line no-console
         console.warn("Failed to resolve JWT credential from Token DB:", pwErr);
-        return null;
+        return JWT_REJECTED;
       }
 
       // Try to reuse existing connection (performance optimization)
@@ -677,7 +696,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
             ...createUserFromJWTPayload(payload),
             password,
           };
-          return { client, user };
+          return { status: "authenticated", client, user };
         } catch (pingError) {
           // Connection is dead, remove from pool and recreate
           // eslint-disable-next-line no-console
@@ -720,7 +739,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         // eslint-disable-next-line no-console
         console.error("Failed to create connection from Token DB:", connectionError);
 
-        return null;
+        return JWT_REJECTED;
       }
 
       // At this point, client is guaranteed to be defined (either reused or recreated)
@@ -729,21 +748,20 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         password,
       };
 
-      return { client, user };
+      return { status: "authenticated", client, user };
     } catch (error) {
       // Surface server misconfiguration errors instead of silently falling back
       if (error instanceof Error && (error.message.includes("AUTH_SECRET") || error.message.includes("NEXTAUTH_SECRET") || error.message.includes("ENCRYPTION_KEY"))) {
         throw error;
       }
-      // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
-      console.warn("JWT authentication failed, falling back to session:", error);
+      console.warn("JWT authentication failed:", error);
 
-      return null;
+      return JWT_REJECTED;
     }
   }
 
-  return null;
+  return JWT_ABSENT;
 }
 
 const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60; // 24 hours; keep in sync with session.maxAge below
@@ -1186,8 +1204,19 @@ export async function getClient(
 
   // Try JWT authentication first
   const jwtResult = await tryJWTAuthentication();
-  if (jwtResult) {
-    return jwtResult;
+  if (jwtResult.status === "authenticated") {
+    const { client, user } = jwtResult;
+    return { client, user };
+  }
+
+  // A token that was presented and refused ends the request here. Falling
+  // through would run it under the browser's cookie instead, which keeps a
+  // revoked or pre-binding token working and reports success for an identity
+  // the caller never asked for.
+  if (jwtResult.status === "rejected") {
+    return NextResponse.json({
+      message: "Invalid or revoked access token"
+    }, { status: 401, headers: getCorsHeaders(request) });
   }
 
   // If JWT-only is required and JWT failed, return 401 immediately
