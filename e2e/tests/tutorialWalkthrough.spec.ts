@@ -3,7 +3,7 @@ import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
 import ApiCalls from "../logic/api/apiCalls";
-import { getRandomString } from "../infra/utils";
+import { delay, getRandomString } from "../infra/utils";
 
 /*
  * Full tutorial walkthrough test.
@@ -14,10 +14,16 @@ import { getRandomString } from "../infra/utils";
  * original graphs are restored.
  */
 
-test.describe("Tutorial Walkthrough", () => {
+test.describe("Tutorial", () => {
+    // Every test here drives the tutorial, which loads and drops the same fixed
+    // `social-demo` graphs. `fullyParallel` would otherwise run them against one
+    // server at once, so they all live in this one file and run in order.
+    test.describe.configure({ mode: "default" });
+
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
     const userGraph = getRandomString("tutorialTest");
+    const DEMO_GRAPHS = ["social-demo", "social-demo-test"];
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
@@ -25,13 +31,56 @@ test.describe("Tutorial Walkthrough", () => {
     });
 
     test.afterEach(async () => {
-        // Cleanup: remove the user graph if it still exists
-        try {
-            await apiCall.removeGraph(userGraph);
-        } catch {
-            // Ignore if already removed
-        }
+        // Close first: a live graph page polls graph info, and that poll
+        // re-creates a graph deleted out from under it.
         await browser.closeBrowser();
+
+        // Every test here opens the tutorial, which creates the demo graphs,
+        // but only the one that reaches Finish drops them again. Without the
+        // admin role the delete goes out unauthenticated, and the 401 it comes
+        // back with reads exactly like the graph having never been created.
+        await Promise.all(
+            [userGraph, ...DEMO_GRAPHS].map(async name => {
+                const { message } = await apiCall.removeGraph(name, "admin");
+                // A graph this test never created, or already dropped, is the
+                // one failure this teardown may ignore.
+                if (!message.includes("deleted") && !message.includes("empty key")) {
+                    throw new Error(`Failed to remove ${name}: ${message}`);
+                }
+            })
+        );
+    });
+
+    test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
+        test.setTimeout(120_000);
+
+        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+
+        const countPeople = async () => {
+            const result = await apiCall.runQuery(
+                "social-demo",
+                "MATCH (n:Person) RETURN count(n) AS cnt"
+            );
+            const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
+            return Number(cnt);
+        };
+
+        try {
+            await tutorial.changeLocalStorage("true");
+            await tutorial.refreshPage();
+            await tutorial.waitForStep("Welcome to FalkorDB Browser");
+            expect(await countPeople()).toBe(9);
+
+            // Leaving mid-tutorial skips the cleanup, and the tutorial re-opens by
+            // itself on the next load and loads the demo data again — which used to
+            // stack another copy of the dataset on top of the old one (#2087).
+            await tutorial.refreshPage();
+            await tutorial.waitForStep("Welcome to FalkorDB Browser");
+            expect(await countPeople()).toBe(9);
+        } finally {
+            await tutorial.changeLocalStorage("false");
+        }
     });
 
     test("@admin walk through the entire tutorial and verify user data is restored", async () => {
@@ -356,5 +405,23 @@ test.describe("Tutorial Walkthrough", () => {
             localStorage.getItem("tutorial")
         );
         expect(tutorialFlag).toBe("false");
+    });
+
+    test("@admin validate that clicking away doesn't dismiss the tutorial", async () => {
+        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
+        await tutorial.changeLocalStorage("true");
+        await tutorial.refreshPage();
+        await tutorial.clickAtTopLeftCorner();
+        // Nothing to await on: the assertion is that a dismissal the click could
+        // have triggered has had time to happen and did not.
+        await delay(1000);
+        expect(await tutorial.isTutorialVisible()).toBeTruthy();
+        await tutorial.changeLocalStorage("false");
+    });
+
+    test("@admin validate that clicking replay tutorial reopens the tutorial", async () => {
+        const tutorial = await browser.createNewPage(TutorialPanel, urls.settingsUrl);
+        await tutorial.clickReplayTutorial();
+        expect(await tutorial.isTutorialVisible()).toBeTruthy();
     });
 });

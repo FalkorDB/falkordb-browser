@@ -12,7 +12,7 @@ import BottomSheet from "@/components/ui/BottomSheet";
 import { PanelContext } from "./provider";
 import Header from "./Header";
 import Navbar from "./Navbar";
-import Tutorial from "./Tutorial";
+import Tutorial, { DemoLoadOutcome } from "./Tutorial";
 
 const UdfPanel = dynamic(() => import("../udf/udfPanel"), {
   ssr: false,
@@ -26,7 +26,7 @@ interface ProviderLayoutProps {
   setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>>;
   tutorialOpen: boolean;
   onCloseTutorial: () => void;
-  onLoadDemoGraphs: () => Promise<void>;
+  onLoadDemoGraphs: () => Promise<DemoLoadOutcome>;
   onCleanupDemoGraphs: () => Promise<void>;
   showUDF: boolean;
 }
