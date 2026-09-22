@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout, ToastFn } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey, ServerDecryptError } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, buildConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -22,10 +22,11 @@ import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
 import type { LanguageConfig } from "./components/EditorComponent";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider, type UDFFunctionSelection } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CsvLoadContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider, type UDFFunctionSelection } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
+import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
 import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
 
@@ -71,6 +72,11 @@ const defaultQueryHistory: HistoryQuery = {
   },
   counter: 0
 };
+
+const DEMO_GRAPH_NAMES = ["social-demo", "social-demo-test"];
+
+// Swallows the "graph does not exist" error the demo pre-clean expects to get.
+const silentToast = (() => { }) as ToastFn;
 
 const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
 const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
@@ -746,6 +752,58 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // dependency arrays, which avoids cascading effect re-fires.
   const isReadOnlyRef = useRef(isReadOnly);
   isReadOnlyRef.current = isReadOnly;
+
+  // What this deployment can do with LOAD CSV. Assume file:// works until the
+  // server says otherwise, so a failed lookup never blocks a runnable query.
+  const [csvCapabilities, setCsvCapabilities] = useState({ fileUriSupported: true, uploadEnabled: false });
+  const csvUploadOpenerRef = useRef<(() => void) | null>(null);
+  const [csvUploadRegistered, setCsvUploadRegistered] = useState(false);
+
+  // Deployment-wide, so this needs no connection scoping: nothing in the answer
+  // changes when the active connection does. The route is session-guarded
+  // though, so it has to wait for a session — this component outlives the login
+  // redirect, and a 401 answered before sign-in would never be retried.
+  useEffect(() => {
+    if (status !== "authenticated") return undefined;
+
+    let cancelled = false;
+
+    fetch("/api/csv-temp/capabilities", { credentials: "same-origin" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        setCsvCapabilities({
+          fileUriSupported: data.fileUriSupported !== false,
+          uploadEnabled: data.uploadEnabled === true,
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
+  const registerCsvUpload = useCallback((open: () => void) => {
+    csvUploadOpenerRef.current = open;
+    setCsvUploadRegistered(true);
+    return () => {
+      if (csvUploadOpenerRef.current !== open) return;
+      csvUploadOpenerRef.current = null;
+      setCsvUploadRegistered(false);
+    };
+  }, []);
+
+  // The per-caller half of "can upload": the server has to allow it, the
+  // connection has to be writable, a graph has to be selected, and the dialog
+  // has to be mounted — offering the upload anywhere else would go nowhere.
+  const csvLoadContext = useMemo(() => ({
+    fileUriSupported: csvCapabilities.fileUriSupported,
+    uploadEnabled: csvCapabilities.uploadEnabled && csvUploadRegistered && !isReadOnly && Boolean(graphName),
+    openCsvUpload: () => csvUploadOpenerRef.current?.(),
+    registerCsvUpload,
+  }), [csvCapabilities, csvUploadRegistered, isReadOnly, graphName, registerCsvUpload]);
+
   const activeGraphNameRef = useRef(graphName);
   activeGraphNameRef.current = graphName;
   // Ref for the auth status so fetchCount reads the latest value without adding
@@ -2313,15 +2371,45 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setTutorialOpen(false);
   };
 
-  const handleLoadDemoGraphs = useCallback(async () => {
+  const handleLoadDemoGraphs = useCallback(async (): Promise<DemoLoadOutcome> => {
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
 
+    // Read once: the failure path has to put this back, and the state setter
+    // below is not readable synchronously.
+    const urlParams = window.location.search;
+
+    // Pinned to `cid`: after a connection switch neither the retry nor the
+    // cleanup looks at the connection these graphs were created on.
+    const dropDemoGraphs = async () => {
+      await Promise.all(DEMO_GRAPH_NAMES.map(async name => {
+        const res = await securedFetch(`/api/graph/${name}`, {
+          method: "DELETE",
+        }, silentToast, setIndicator, cid);
+
+        // The route answers 400 for every failure including "no such graph",
+        // and securedFetch has already drained the body that would tell them
+        // apart — so 400 is the one status this rollback cannot act on.
+        if (!res.ok && res.status !== 400) console.error(`Failed to drop ${name} while rolling back the demo load: HTTP ${res.status}`);
+      }));
+    };
+
+    // Undoes the address bar and the snapshot this attempt took, so whoever
+    // comes next reads the URL the user arrived with, not the stripped one.
+    const restorePreTutorialState = () => {
+      if (urlParams) window.history.replaceState(null, "", `${window.location.pathname}${urlParams}`);
+      setUserGraphsBeforeTutorial([]);
+      setUserGraphBeforeTutorial("");
+      setUrlParamsBeforeTutorial("");
+    };
+
     try {
-      // Store current user graphs and URL params
-      setUserGraphsBeforeTutorial(graphNames);
+      // Store current user graphs and URL params. A previous tutorial session that
+      // ended without cleanup leaves its demo graphs in the list; they are about to
+      // be dropped, so they must not come back when the list is restored.
+      setUserGraphsBeforeTutorial(graphNames?.filter(name => !DEMO_GRAPH_NAMES.includes(name)));
       setUserGraphBeforeTutorial(graphName);
-      setUrlParamsBeforeTutorial(window.location.search);
+      setUrlParamsBeforeTutorial(urlParams);
 
       // Clear the visible URL params for the tutorial, but push a new history
       // entry (rather than replacing) so the user's pre-tutorial URL stays in
@@ -2332,8 +2420,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLayout('force');
       setDirection('');
 
+      // CREATE only appends, and the tutorial re-opens by itself on every load
+      // until it is dismissed, so a demo graph left behind by a refresh or a closed
+      // tab used to gain another full copy of the dataset (#2087). Purging in the
+      // same query keeps the reset atomic: two tabs racing each other still end up
+      // with exactly one copy, and there is no delete response to interpret.
+      const purge = "MATCH (n) DETACH DELETE n WITH count(n) AS purged";
+
       // Create social demo graph
       const socialQuery = `
+        ${purge}
         CREATE 
           (alice:Person {name: 'Alice', age: 30, role: 'CEO'}),
           (bob:Person {name: 'Bob', age: 25, role: 'VP Engineering'}),
@@ -2361,34 +2457,55 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       // Create social-test demo graph
       const socialTestQuery = `
+      ${purge}
       CREATE 
       (eve:Person {name: 'Eve', age: 32}),
       (frank:Person {name: 'Frank', age: 29}),
       (eve)-[:FOLLOWS]->(frank)
       `;
 
-      await Promise.all([
-        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator, { connectionId: cid }),
-        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator, { connectionId: cid })
-      ]).catch(async () => {
-        await Promise.all([
-          securedFetch("/api/graph/social-demo", {
-            method: "DELETE",
-          }, toast, setIndicator, cid),
-          securedFetch("/api/graph/social-demo-test", {
-            method: "DELETE",
-          }, toast, setIndicator, cid)
-        ]);
-      });
+      // allSettled, not all: a rejection from one load would leave the other
+      // still streaming, and in FalkorDB any query re-creates its graph — so a
+      // rollback delete issued while that create is in flight gets undone by it.
+      // Both queries are hardcoded, so the SSE layer's parse/connection detail is
+      // for the console, not the user — silence it and report once, below.
+      const loads = await Promise.allSettled([
+        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid }),
+        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid })
+      ]);
 
-      if (getConnectionEpoch() !== startEpoch) return;
+      const failedLoad = loads.find((load): load is PromiseRejectedResult => load.status === "rejected");
+
+      if (failedLoad) {
+        // One graph can be loaded while the other failed, so drop both rather
+        // than walk the tutorial into half a dataset.
+        await dropDemoGraphs();
+        throw failedLoad.reason;
+      }
+
+      if (getConnectionEpoch() !== startEpoch) {
+        // Nothing downstream will find these: the retry and the cleanup both
+        // run against the connection that has since become active.
+        await dropDemoGraphs();
+
+        // The retry re-reads window.location.search, which is stripped by now.
+        restorePreTutorialState();
+
+        return "cancelled";
+      }
+
+      // A refresh that started before the tutorial opened is exempt from the
+      // tutorialOpen guard and would put the user's graphs back in the list.
+      supersedeGraphRefreshes();
 
       // Update graph list to only show demo graphs
-      setGraphNames(["social-demo", "social-demo-test"]);
+      setGraphNames([...DEMO_GRAPH_NAMES]);
       handleSetGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       setGraph(Graph.empty());
       setData({ nodes: [], links: [] });
+
+      return "loaded";
     } catch (error) {
 
       console.error("Failed to load demo graphs", error);
@@ -2397,22 +2514,26 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         description: "Failed to load demo graphs",
         variant: "destructive",
       });
+
+      // The tutorial's failure path closes without running handleCleanupDemoGraphs,
+      // so the history entry and the snapshot taken above would otherwise strand
+      // the user on a stripped URL with a stale pre-tutorial state.
+      restorePreTutorialState();
+
+      // The tutorial takes a resolved promise as a loaded dataset and walks the
+      // user into steps that query it, so a failure has to reach it.
+      throw error;
     }
-  }, [graphName, graphNames, toast]);
+  }, [graphName, graphNames, toast, supersedeGraphRefreshes]);
 
   const handleCleanupDemoGraphs = useCallback(async () => {
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
 
     try {
-      await Promise.all([
-        securedFetch("/api/graph/social-demo", {
-          method: "DELETE",
-        }, toast, setIndicator, cid),
-        securedFetch("/api/graph/social-demo-test", {
-          method: "DELETE",
-        }, toast, setIndicator, cid)
-      ]);
+      await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
+        method: "DELETE",
+      }, toast, setIndicator, cid)));
     } catch (error) {
 
       console.error("Failed to cleanup demo graphs", error);
@@ -2446,6 +2567,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     }
 
+    // The deletes above make every refresh still in flight stale, demo graphs
+    // included; this restored list is the confirmed one.
+    supersedeGraphRefreshes();
+
     setGraphNames(userGraphsBeforeTutorial);
     setUserGraphsBeforeTutorial([]);
     setUserGraphBeforeTutorial("");
@@ -2455,7 +2580,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       window.history.replaceState(null, "", `${window.location.pathname}${urlParamsBeforeTutorial}`);
     }
     setUrlParamsBeforeTutorial("");
-  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial]);
+  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial, supersedeGraphRefreshes]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>
@@ -2472,23 +2597,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                           <ConnectionContext.Provider value={connectionContext}>
                             <UDFContext.Provider value={udfContext}>
                               <CypherLanguageContext.Provider value={cypherLanguageContext}>
-                                <AiFixContext.Provider value={aiFixContext}>
-                                  <GraphTabsContext.Provider value={graphTabsContext}>
-                                    <ProviderLayout
-                                      panelRef={panelRef}
-                                      customizingLabel={customizingLabel}
-                                      setCustomizingLabel={setCustomizingLabel}
-                                      tutorialOpen={tutorialOpen}
-                                      onCloseTutorial={handleCloseTutorial}
-                                      onLoadDemoGraphs={handleLoadDemoGraphs}
-                                      onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                      showUDF={showUDF}
-                                    >
-                                      {children}
-                                    </ProviderLayout>
-                                  </GraphTabsContext.Provider>
-                                  <AiFixDialogs />
-                                </AiFixContext.Provider>
+                                <CsvLoadContext.Provider value={csvLoadContext}>
+                                  <AiFixContext.Provider value={aiFixContext}>
+                                    <GraphTabsContext.Provider value={graphTabsContext}>
+                                      <ProviderLayout
+                                        panelRef={panelRef}
+                                        customizingLabel={customizingLabel}
+                                        setCustomizingLabel={setCustomizingLabel}
+                                        tutorialOpen={tutorialOpen}
+                                        onCloseTutorial={handleCloseTutorial}
+                                        onLoadDemoGraphs={handleLoadDemoGraphs}
+                                        onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                        showUDF={showUDF}
+                                      >
+                                        {children}
+                                      </ProviderLayout>
+                                    </GraphTabsContext.Provider>
+                                    <AiFixDialogs />
+                                  </AiFixContext.Provider>
+                                </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>
                             </UDFContext.Provider>
                           </ConnectionContext.Provider>

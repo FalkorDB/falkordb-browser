@@ -7,7 +7,9 @@
  * import or an opaque database error.
  */
 
-/** The URI schemes FalkorDB's `LOAD CSV` can actually fetch. */
+/** The URI schemes FalkorDB's `LOAD CSV` can actually fetch. Also consumed by the
+ *  browser-side pre-flight check in `lib/queryPreflight`, so the client refuses
+ *  exactly the sources this server-side guard would. */
 export const FALKOR_FETCHABLE_SCHEMES = ["https", "file"] as const;
 
 /** Thrown when the CSV storage resolved a URL FalkorDB cannot fetch. */
