@@ -160,7 +160,7 @@ Call with (dict "root" $ "name" "FALKORDB_PASSWORD" "value" ... "existingKey" ..
     secretKeyRef:
       name: {{ $existingName | quote }}
       key: {{ .existingKey | quote }}
-{{- else if .value -}}
+{{- else if (.value | default "" | toString | trim) -}}
 - name: {{ .name }}
   valueFrom:
     secretKeyRef:

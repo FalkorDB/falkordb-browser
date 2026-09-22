@@ -101,9 +101,10 @@ type ParsedConnectionUrl = {
 };
 
 /**
- * Parses `falkor(s)://[user[:password]@]host[:port]`. Written by hand rather
- * than with `new URL()` because a password may contain characters `URL`
- * rejects, and because a missing or unknown scheme has to be a hard error here.
+ * Parses `scheme://[user[:password]@]host[:port]` for the four accepted
+ * schemes. Written by hand rather than with `new URL()` because a password may
+ * contain characters `URL` rejects, and because a missing or unknown scheme
+ * has to be a hard error here.
  */
 export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_URL"): ParsedConnectionUrl {
     let rest = raw.trim();

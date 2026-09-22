@@ -57,6 +57,14 @@ export default function LoginPage() {
   useEffect(() => {
     let active = true;
 
+    // A failed lookup is reported rather than read as "nothing configured": an
+    // operator who did configure a connection would otherwise be left staring
+    // at an empty form with no idea why.
+    const reportFailure = (message: string) => {
+      setLookupError(message);
+      setPreconfigured({ configured: false, autoConnect: false });
+    };
+
     const lookup = async () => {
       try {
         const res = await fetch("/api/connections/preconfigured", {
@@ -65,18 +73,17 @@ export default function LoginPage() {
 
         if (!res.ok) {
           const body = (await res.json().catch(() => null)) as { message?: unknown } | null;
-          throw new Error(typeof body?.message === "string" ? body.message : LOOKUP_FAILED);
+          if (active) reportFailure(typeof body?.message === "string" ? body.message : LOOKUP_FAILED);
+          return;
         }
 
         const info = (await res.json()) as PreconfiguredConnectionInfo;
         if (active) setPreconfigured(info);
-      } catch (err) {
-        if (!active) return;
-        // A failed lookup is reported rather than read as "nothing configured":
-        // an operator who did configure a connection would otherwise be left
-        // staring at an empty form with no idea why.
-        setLookupError(err instanceof Error && err.message ? err.message : LOOKUP_FAILED);
-        setPreconfigured({ configured: false, autoConnect: false });
+      } catch {
+        // Only the route's own message names something an operator can act on.
+        // A throw here is the timeout or the network, and "The operation was
+        // aborted" would send them looking in the wrong place.
+        if (active) reportFailure(LOOKUP_FAILED);
       }
     };
 
