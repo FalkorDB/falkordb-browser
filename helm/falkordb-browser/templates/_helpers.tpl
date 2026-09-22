@@ -119,7 +119,7 @@ known to everyone. Anyone holding one can forge a session cookie, so they are
 rejected wherever a session-signing secret is accepted.
 */}}
 {{- define "falkordb-browser.wellKnownSecrets" -}}
-{{- list "CHANGE_ME_IN_PRODUCTION" "SECRET" "secret" "changeme" "your-secret-here" "test-secret-for-ci" | join "," -}}
+{{- list "CHANGE_ME_IN_PRODUCTION" "SECRET" "secret" "changeme" "your-secret-here" "your-secure-secret-here" "test-secret-for-ci" | join "," -}}
 {{- end }}
 
 {{/*

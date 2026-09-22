@@ -2043,6 +2043,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // the bootstrap rolling the id back after a failed sync -- moves a
     // dependency below, so this load is retried rather than abandoned.
     const pinnedConnectionId = getActiveConnectionIdGlobal();
+    const pinnedEpoch = getConnectionEpoch();
     const sessionConnectionId = sessionData?.activeConnectionId ?? null;
     if (pinnedConnectionId !== null && pinnedConnectionId !== sessionConnectionId) return undefined;
 
@@ -2050,11 +2051,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // server, so a connection switch mid-flight could publish this
     // connection's keys into the next one's state, or write its ciphertext
     // under the next one's prefix. Nothing commits once the run is superseded.
+    // The id being back where it started is not proof it never left: an A→B→A
+    // round trip restores it, and anything this run sent while it was at B was
+    // answered by B. The epoch counts the departures, so check that too.
     let cancelled = false;
     const stale = () =>
       cancelled ||
       getConnectionPrefix() !== connectionScope ||
-      getActiveConnectionIdGlobal() !== pinnedConnectionId;
+      getActiveConnectionIdGlobal() !== pinnedConnectionId ||
+      getConnectionEpoch() !== pinnedEpoch;
 
     (async () => {
       let loadedChatApiKeys: ChatApiKey[] = [];
