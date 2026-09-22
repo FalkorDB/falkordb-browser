@@ -31,6 +31,12 @@ interface Props {
     historyQuery: HistoryQuery;
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>;
     isQueryLoading: boolean;
+    /** Owned by the page, because the Chat panel is outside this toolbar but needs
+     *  the same `CsvLoadContext`. */
+    uploadOpen: boolean;
+    setUploadOpen: Dispatch<SetStateAction<boolean>>;
+    uploadMode: "cypher" | "load-csv";
+    setUploadMode: Dispatch<SetStateAction<"cypher" | "load-csv">>;
 }
 
 export default function Selector({
@@ -47,7 +53,11 @@ export default function Selector({
     chatOpen,
     setChatOpen,
     queriesOpen,
-    setQueriesOpen
+    setQueriesOpen,
+    uploadOpen,
+    setUploadOpen,
+    uploadMode,
+    setUploadMode
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -57,7 +67,6 @@ export default function Selector({
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
 
     const [maximize, setMaximize] = useState(false);
-    const [uploadOpen, setUploadOpen] = useState(false);
     const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
         setCypherLanguageConfig(config);
     }, [setCypherLanguageConfig]);
@@ -70,7 +79,7 @@ export default function Selector({
         setGraphName(formatName(name));
     };
 
-    return (
+    const toolbar = (
         <div className="z-20 w-full h-[44px] flex flex-row gap-3 items-center">
             <Button
                 aria-label="Graph info panel"
@@ -95,7 +104,12 @@ export default function Selector({
                 )}
                 title="Upload data"
                 disabled={isReadOnly || !graphName}
-                onClick={() => setUploadOpen(true)}
+                onClick={() => {
+                    // The quick-fix path leaves the dialog on Load CSV; the toolbar is the
+                    // ordinary Cypher upload, so it has to say which tab it wants.
+                    setUploadMode("cypher");
+                    setUploadOpen(true);
+                }}
                 data-testid="uploadGraphToolbarTrigger"
             >
                 <Upload size={20} />
@@ -105,6 +119,8 @@ export default function Selector({
                 disabled={isReadOnly || !graphName}
                 open={uploadOpen}
                 onOpenChange={setUploadOpen}
+                mode={uploadMode}
+                onModeChange={setUploadMode}
             />
             <div className="h-full w-1 grow relative overflow-visible">
                 <CypherEditor
@@ -241,4 +257,6 @@ export default function Selector({
             </Button>
         </div >
     );
+
+    return toolbar;
 }

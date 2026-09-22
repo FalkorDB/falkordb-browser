@@ -47,15 +47,23 @@ oC_FalkorCommand
                  | oC_DropConstraint
                  ;
 
+// FalkorDB accepts a qualifier (FULLTEXT / VECTOR) only on the `FOR` form, and an
+// `OPTIONS` map only on a qualified `CREATE`. `CREATE INDEX FOR … OPTIONS { … }`,
+// `CREATE VECTOR INDEX ON :Label(prop)` and `DROP … OPTIONS { … }` are all parse
+// errors in the server, so they must not parse here either.
 oC_CreateIndex
-           :  CREATE SP ( FULLTEXT SP )? INDEX SP?
-              ( ( FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties )
-                | ( ON SP? ':' SP? oC_LabelName SP? oC_IndexProperties ) ) ;
+           :  CREATE SP oC_IndexQualifier SP INDEX SP? FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties ( SP? OPTIONS SP? oC_MapLiteral )?
+               | CREATE SP INDEX SP? FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties
+               | CREATE SP INDEX SP? ON SP? ':' SP? oC_LabelName SP? oC_IndexProperties ;
 
 oC_DropIndex
-         :  DROP SP ( FULLTEXT SP )? INDEX SP?
-            ( ( FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties )
-              | ( ON SP? ':' SP? oC_LabelName SP? oC_IndexProperties ) ) ;
+         :  DROP SP oC_IndexQualifier SP INDEX SP? FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties
+             | DROP SP INDEX SP? FOR SP? oC_IndexEntity SP? ON SP? oC_IndexProperties
+             | DROP SP INDEX SP? ON SP? ':' SP? oC_LabelName SP? oC_IndexProperties ;
+
+oC_IndexQualifier
+              :  FULLTEXT
+                  | VECTOR ;
 
 oC_IndexEntity
            :  oC_NodePattern
@@ -79,6 +87,10 @@ INDEX : ( 'I' | 'i' ) ( 'N' | 'n' ) ( 'D' | 'd' ) ( 'E' | 'e' ) ( 'X' | 'x' ) ;
 ASSERT : ( 'A' | 'a' ) ( 'S' | 's' ) ( 'S' | 's' ) ( 'E' | 'e' ) ( 'R' | 'r' ) ( 'T' | 't' ) ;
 
 FULLTEXT : ( 'F' | 'f' ) ( 'U' | 'u' ) ( 'L' | 'l' ) ( 'L' | 'l' ) ( 'T' | 't' ) ( 'E' | 'e' ) ( 'X' | 'x' ) ( 'T' | 't' ) ;
+
+VECTOR : ( 'V' | 'v' ) ( 'E' | 'e' ) ( 'C' | 'c' ) ( 'T' | 't' ) ( 'O' | 'o' ) ( 'R' | 'r' ) ;
+
+OPTIONS : ( 'O' | 'o' ) ( 'P' | 'p' ) ( 'T' | 't' ) ( 'I' | 'i' ) ( 'O' | 'o' ) ( 'N' | 'n' ) ( 'S' | 's' ) ;
 
 oC_RegularQuery
             :  oC_SingleQuery ( SP? oC_Union )* ;
@@ -120,7 +132,22 @@ oC_ReadingClause
                  | oC_Unwind
                  | oC_InQueryCall
                  | oC_CallSubquery
+                 | oC_LoadCsv
                  ;
+
+// FalkorDB extension: LOAD CSV [WITH HEADERS] FROM <uri> AS <var> [FIELDTERMINATOR '<c>']
+oC_LoadCsv
+       :  LOAD SP CSV ( SP WITH SP HEADERS )? SP FROM SP oC_Expression SP AS SP oC_Variable ( SP FIELDTERMINATOR SP StringLiteral )? ;
+
+LOAD : ( 'L' | 'l' ) ( 'O' | 'o' ) ( 'A' | 'a' ) ( 'D' | 'd' ) ;
+
+CSV : ( 'C' | 'c' ) ( 'S' | 's' ) ( 'V' | 'v' ) ;
+
+HEADERS : ( 'H' | 'h' ) ( 'E' | 'e' ) ( 'A' | 'a' ) ( 'D' | 'd' ) ( 'E' | 'e' ) ( 'R' | 'r' ) ( 'S' | 's' ) ;
+
+FROM : ( 'F' | 'f' ) ( 'R' | 'r' ) ( 'O' | 'o' ) ( 'M' | 'm' ) ;
+
+FIELDTERMINATOR : ( 'F' | 'f' ) ( 'I' | 'i' ) ( 'E' | 'e' ) ( 'L' | 'l' ) ( 'D' | 'd' ) ( 'T' | 't' ) ( 'E' | 'e' ) ( 'R' | 'r' ) ( 'M' | 'm' ) ( 'I' | 'i' ) ( 'N' | 'n' ) ( 'A' | 'a' ) ( 'T' | 't' ) ( 'O' | 'o' ) ( 'R' | 'r' ) ;
 
 // FalkorDB extension: FOREACH updates each element of a list.
 oC_Foreach
@@ -737,6 +764,13 @@ oC_SymbolicName
                 | INDEX
                 | ASSERT
                 | FULLTEXT
+                | VECTOR
+                | OPTIONS
+                | LOAD
+                | CSV
+                | HEADERS
+                | FROM
+                | FIELDTERMINATOR
                 ;
 
 FILTER : ( 'F' | 'f' ) ( 'I' | 'i' ) ( 'L' | 'l' ) ( 'T' | 't' ) ( 'E' | 'e' ) ( 'R' | 'r' ) ;
