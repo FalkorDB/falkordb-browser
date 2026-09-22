@@ -32,6 +32,9 @@ export type CypherErrorHint = {
   hint: string;
   /** Optional "learn more" / deep-link shown beside the hint. */
   link?: HintLink;
+  /** An in-app remedy the UI can offer for this error. Named rather than a
+   *  component so this module stays free of React. */
+  action?: "upload-csv";
 };
 
 // Base URL for the FalkorDB documentation (each linked entry points at a verified page).
@@ -302,6 +305,32 @@ const CATALOG: CatalogEntry[] = [
     test: /Exactly one relationship type must be specified/i,
     hint: "Each relationship in a CREATE pattern needs exactly one type, e.g. (a)-[:KNOWS]->(b).",
   },
+  {
+    // EMSG_INVALID_CSV_URI "URI to CSV must be a string"
+    id: "csv-uri-not-string",
+    test: /^URI to CSV must be a string$/i,
+    hint: "The expression after LOAD CSV FROM has to evaluate to a string, e.g. FROM 'https://example.com/data.csv'.",
+  },
+  {
+    // EMSG_UNSUPPORTED_CSV_URI "Unsupported URI" (op_load_csv.c)
+    id: "csv-unsupported-uri",
+    test: /^Unsupported URI$/i,
+    hint: "LOAD CSV reads only https:// and file:// sources.",
+    action: "upload-csv",
+  },
+  {
+    // "Error opening CSV URI: %s" (op_load_csv.c) — the source could not be opened at all.
+    id: "csv-open-failed",
+    test: /^Error opening CSV URI:/i,
+    hint: "The database could not open that source. A file:// path is resolved inside the database's own import folder, not on this computer, and an https:// URL has to be reachable from the database.",
+    action: "upload-csv",
+  },
+  {
+    // "Failed reading CSV header row" (csv_reader.c) — the source opened, its first row did not parse.
+    id: "csv-header-read-failed",
+    test: /^Failed reading CSV header row$/i,
+    hint: "The source was reached but its first row could not be read as a header. Check that the file is not empty and that its separator matches FIELDTERMINATOR.",
+  },
 ];
 
 /** All catalog ids, in catalog order. Exposed (instead of the mutable CATALOG) so the
@@ -340,7 +369,9 @@ export const HINT_LINKS: Record<string, HintLink> = {
 export function getCypherErrorHint(raw: string): CypherErrorHint | undefined {
   if (!raw) return undefined;
   const entry = CATALOG.find(({ test }) => test.test(raw));
-  return entry ? { id: entry.id, hint: entry.hint, link: HINT_LINKS[entry.id] } : undefined;
+  return entry
+    ? { id: entry.id, hint: entry.hint, link: HINT_LINKS[entry.id], action: entry.action }
+    : undefined;
 }
 
 // Generic hint for Cypher syntax/parse errors. These carry a position (so they are
