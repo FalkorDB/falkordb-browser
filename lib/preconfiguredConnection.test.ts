@@ -5,7 +5,6 @@ import {
     preconfiguredLoginCredentials,
     readPreconfiguredConnection,
     toPreconfiguredConnectionInfo,
-    DEFAULT_PRECONFIGURED_HOST,
     DEFAULT_PRECONFIGURED_PORT,
 } from "./preconfiguredConnection.ts";
 
@@ -123,14 +122,14 @@ test("url parsing handles credentials, escaping and a trailing database path", (
 
     // Username with no password.
     assert.equal(parsePreconfiguredUrl("falkor://alice@db.internal").password, undefined);
-
-    // No scheme at all still parses; TLS is then left to FALKORDB_TLS.
-    assert.equal(parsePreconfiguredUrl("db.internal:6380").tls, undefined);
 });
 
-test("a url without a host falls back to the default host", () => {
-    const conn = readPreconfiguredConnection({ FALKORDB_HOST: DEFAULT_PRECONFIGURED_HOST });
-    assert.equal(conn?.host, DEFAULT_PRECONFIGURED_HOST);
+test("a url without a scheme is rejected rather than assumed to be plaintext", () => {
+    assert.throws(() => parsePreconfiguredUrl("db.internal:6380"), /must start with falkor:\/\//);
+    assert.throws(
+        () => readPreconfiguredConnection({ FALKORDB_CONNECTION_URL: "db.internal" }),
+        /must start with falkor:\/\//
+    );
 });
 
 test("the public info shape never carries the password or ca", () => {

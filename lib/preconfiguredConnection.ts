@@ -103,23 +103,24 @@ type ParsedConnectionUrl = {
 /**
  * Parses `falkor(s)://[user[:password]@]host[:port]`. Written by hand rather
  * than with `new URL()` because a password may contain characters `URL`
- * rejects, and because an unknown scheme has to be a hard error here.
+ * rejects, and because a missing or unknown scheme has to be a hard error here.
  */
 export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_URL"): ParsedConnectionUrl {
     let rest = raw.trim();
-    let tls: boolean | undefined;
 
     const schemeEnd = rest.indexOf("://");
-    if (schemeEnd >= 0) {
-        const protocol = rest.slice(0, schemeEnd).toLowerCase();
-        if (!KNOWN_PROTOCOLS.has(protocol)) {
-            throw new Error(
-                `${name} must use one of falkor://, falkors://, redis:// or rediss:// (got "${protocol}://")`
-            );
-        }
-        tls = TLS_PROTOCOLS.has(protocol);
-        rest = rest.slice(schemeEnd + 3);
+    if (schemeEnd < 0) {
+        // The scheme is what decides TLS, so a bare "host:port" would pick
+        // plaintext on the operator's behalf. That spelling belongs in
+        // FALKORDB_HOST/FALKORDB_PORT, where it makes no such claim.
+        throw new Error(`${name} must start with falkor://, falkors://, redis:// or rediss://`);
     }
+    const protocol = rest.slice(0, schemeEnd).toLowerCase();
+    if (!KNOWN_PROTOCOLS.has(protocol)) {
+        throw new Error(`${name} must use one of falkor://, falkors://, redis:// or rediss:// (got "${protocol}://")`);
+    }
+    const tls = TLS_PROTOCOLS.has(protocol);
+    rest = rest.slice(schemeEnd + 3);
 
     // A password may itself contain "@", so split on the LAST one.
     let username: string | undefined;
