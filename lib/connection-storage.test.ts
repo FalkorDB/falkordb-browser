@@ -168,6 +168,17 @@ test("migrateToScopedStorage leaves another user's scoped keys alone", () => {
     assert.equal(getConnectionItem("chat-bob:query history"), null);
 });
 
+test("migrateToScopedStorage recognises a scope whose username contains a colon", () => {
+    setConnectionPrefix("localhost", 6379, "chat-bob:prod");
+    storage.setItem("localhost:6379:chat-bob:prod:chat-social", "bob's chat");
+
+    setConnectionPrefix("localhost", 6379, "chat-alice");
+    migrateToScopedStorage();
+
+    assert.equal(storage.getItem("localhost:6379:chat-bob:prod:chat-social"), "bob's chat");
+    assert.equal(getConnectionItem("chat-bob:prod:chat-social"), null);
+});
+
 test("migrateToScopedStorage still upgrades a graph name that looks like a username", () => {
     // No `chat-ns` scope has ever signed in, so this is a legacy key for a
     // graph named `ns:social`, not one of that user's.

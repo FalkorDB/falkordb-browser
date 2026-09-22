@@ -123,14 +123,18 @@ function isRecognizedScopedKey(suffix: string): boolean {
  * stamps `SCOPE_MARKER_KEY` into its own prefix, and only a scope that exists
  * has one. A graph name that merely looks like a username still migrates.
  *
+ * A username may itself contain colons, so every boundary is a candidate, not
+ * just the first.
+ *
  * The residual case is a user who last signed in before this marker existed and
  * has not signed in since, which is the behaviour that shipped before it.
  */
 function belongsToAnotherUserScope(suffix: string): boolean {
-  const sep = suffix.indexOf(":");
-  if (sep === -1) return false;
-  const scope = buildConnectionPrefix(_host, _port, suffix.slice(0, sep));
-  return localStorage.getItem(`${scope}${SCOPE_MARKER_KEY}`) !== null;
+  for (let sep = suffix.indexOf(":"); sep !== -1; sep = suffix.indexOf(":", sep + 1)) {
+    const scope = buildConnectionPrefix(_host, _port, suffix.slice(0, sep));
+    if (localStorage.getItem(`${scope}${SCOPE_MARKER_KEY}`) !== null) return true;
+  }
+  return false;
 }
 
 export function migrateToScopedStorage(): void {
