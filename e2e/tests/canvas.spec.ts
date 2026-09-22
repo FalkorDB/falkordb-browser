@@ -273,6 +273,28 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    test(`@admin Validate show all stays reachable with Search & Filter collapsed`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+
+        await graph.clickLabelsButtonByLabel("Labels", "person1");
+        expect(await graph.getVisibleElementCounts()).toEqual({ nodes: 1, links: 0 });
+
+        // Collapsing the panel must not take Show All with it.
+        await graph.clickSearchAndFilterToggle();
+        await expect(graph.elementCanvasSearch).toBeHidden();
+        await expect(graph.elementCanvasShowAll).toBeVisible();
+
+        await graph.clickShowAll();
+        expect(await graph.getVisibleElementCounts()).toEqual({ nodes: 2, links: 1 });
+        await apicalls.removeGraph(graphName);
+    });
+
     test(`@admin Validate label toggle does not hide multi-labeled node`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);

@@ -210,6 +210,16 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("elementCanvasShowAllGraph");
   }
 
+  /** The toggle that opens and closes the Search & Filter panel (desktop only). */
+  public get searchAndFilterToggle(): Locator {
+    // `Button` turns its `title` prop into an aria-label, not a title attribute.
+    return this.page.getByLabel(/(Open|Close) Search & Filter/);
+  }
+
+  async clickSearchAndFilterToggle(): Promise<void> {
+    await interactWhenVisible(this.searchAndFilterToggle, (el) => el.click(), "search & filter toggle");
+  }
+
   async clickShowAll(): Promise<void> {
     await interactWhenVisible(this.elementCanvasShowAll, (el) => el.click(), "show all");
   }

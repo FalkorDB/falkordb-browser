@@ -200,7 +200,8 @@ export default function Toolbar({
                         }
                     </Button>
                 }
-                {!isMobile && expand && showAllButton}
+                {/* Not gated on `expand`: collapsing Search & Filter must not take Show All with it. */}
+                {!isMobile && showAllButton}
                 <div className={cn("basis-0 grow relative pointer-events-auto min-w-[20dvw] max-w-[55dvw]", isMobile && "max-w-none")}>
                     {
                         expand && graph.getElements().length > 0 && !isLoading &&
