@@ -22,7 +22,7 @@ import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
 import type { LanguageConfig } from "./components/EditorComponent";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider, type UDFFunctionSelection } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CsvLoadContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider, type UDFFunctionSelection } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
@@ -755,6 +755,58 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // dependency arrays, which avoids cascading effect re-fires.
   const isReadOnlyRef = useRef(isReadOnly);
   isReadOnlyRef.current = isReadOnly;
+
+  // What this deployment can do with LOAD CSV. Assume file:// works until the
+  // server says otherwise, so a failed lookup never blocks a runnable query.
+  const [csvCapabilities, setCsvCapabilities] = useState({ fileUriSupported: true, uploadEnabled: false });
+  const csvUploadOpenerRef = useRef<(() => void) | null>(null);
+  const [csvUploadRegistered, setCsvUploadRegistered] = useState(false);
+
+  // Deployment-wide, so this needs no connection scoping: nothing in the answer
+  // changes when the active connection does. The route is session-guarded
+  // though, so it has to wait for a session — this component outlives the login
+  // redirect, and a 401 answered before sign-in would never be retried.
+  useEffect(() => {
+    if (status !== "authenticated") return undefined;
+
+    let cancelled = false;
+
+    fetch("/api/csv-temp/capabilities", { credentials: "same-origin" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        setCsvCapabilities({
+          fileUriSupported: data.fileUriSupported !== false,
+          uploadEnabled: data.uploadEnabled === true,
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
+  const registerCsvUpload = useCallback((open: () => void) => {
+    csvUploadOpenerRef.current = open;
+    setCsvUploadRegistered(true);
+    return () => {
+      if (csvUploadOpenerRef.current !== open) return;
+      csvUploadOpenerRef.current = null;
+      setCsvUploadRegistered(false);
+    };
+  }, []);
+
+  // The per-caller half of "can upload": the server has to allow it, the
+  // connection has to be writable, a graph has to be selected, and the dialog
+  // has to be mounted — offering the upload anywhere else would go nowhere.
+  const csvLoadContext = useMemo(() => ({
+    fileUriSupported: csvCapabilities.fileUriSupported,
+    uploadEnabled: csvCapabilities.uploadEnabled && csvUploadRegistered && !isReadOnly && Boolean(graphName),
+    openCsvUpload: () => csvUploadOpenerRef.current?.(),
+    registerCsvUpload,
+  }), [csvCapabilities, csvUploadRegistered, isReadOnly, graphName, registerCsvUpload]);
+
   const activeGraphNameRef = useRef(graphName);
   activeGraphNameRef.current = graphName;
   // Ref for the auth status so fetchCount reads the latest value without adding
@@ -2390,27 +2442,29 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                           <ConnectionContext.Provider value={connectionContext}>
                             <UDFContext.Provider value={udfContext}>
                               <CypherLanguageContext.Provider value={cypherLanguageContext}>
-                                <AiFixContext.Provider value={aiFixContext}>
-                                  <GraphTabsContext.Provider value={graphTabsContext}>
-                                    {
-                                      viewportResolved
-                                        ? <ProviderLayout
-                                          panelRef={panelRef}
-                                          customizingLabel={customizingLabel}
-                                          setCustomizingLabel={setCustomizingLabel}
-                                          tutorialOpen={tutorialOpen}
-                                          onCloseTutorial={handleCloseTutorial}
-                                          onLoadDemoGraphs={handleLoadDemoGraphs}
-                                          onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                          showUDF={showUDF}
-                                        >
-                                          {children}
-                                        </ProviderLayout>
-                                        : <div className="h-full w-full bg-background" />
-                                    }
-                                  </GraphTabsContext.Provider>
-                                  <AiFixDialogs />
-                                </AiFixContext.Provider>
+                                <CsvLoadContext.Provider value={csvLoadContext}>
+                                  <AiFixContext.Provider value={aiFixContext}>
+                                    <GraphTabsContext.Provider value={graphTabsContext}>
+                                      {
+                                        viewportResolved
+                                          ? <ProviderLayout
+                                            panelRef={panelRef}
+                                            customizingLabel={customizingLabel}
+                                            setCustomizingLabel={setCustomizingLabel}
+                                            tutorialOpen={tutorialOpen}
+                                            onCloseTutorial={handleCloseTutorial}
+                                            onLoadDemoGraphs={handleLoadDemoGraphs}
+                                            onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                            showUDF={showUDF}
+                                          >
+                                            {children}
+                                          </ProviderLayout>
+                                          : <div className="h-full w-full bg-background" />
+                                      }
+                                    </GraphTabsContext.Provider>
+                                    <AiFixDialogs />
+                                  </AiFixContext.Provider>
+                                </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>
                             </UDFContext.Provider>
                           </ConnectionContext.Provider>

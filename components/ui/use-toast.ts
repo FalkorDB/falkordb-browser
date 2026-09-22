@@ -5,7 +5,7 @@ import type {
   ToastActionElement,
   ToastProps,
 } from "@/components/ui/toast"
-import type { HintLink } from "@/lib/cypherErrors"
+import type { HintLink, CypherErrorHint } from "@/lib/cypherErrors"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
@@ -18,6 +18,7 @@ type ToasterToast = ToastProps & {
   rawMessage?: string
   hint?: string
   hintLink?: HintLink
+  hintAction?: CypherErrorHint["action"]
   query?: string
 }
 

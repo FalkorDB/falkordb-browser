@@ -132,15 +132,23 @@ async function uploadCsvToS3PresignedUrl(
     });
 }
 
-export default function UploadGraph({ graphName, disabled, open, onOpenChange, onSuccess }: {
+export default function UploadGraph({ graphName, disabled, open, onOpenChange, onSuccess, mode: controlledMode, onModeChange }: {
     graphName: string
     disabled?: boolean
     open?: boolean
     onOpenChange?: (open: boolean) => void
     onSuccess?: () => void
+    /** Optional controlled tab, so a caller can deep-link into "Load CSV". */
+    mode?: UploadMode
+    onModeChange?: (mode: UploadMode) => void
 }) {
     // ── shared ──────────────────────────────────────────────────────────────
-    const [mode, setMode] = useState<UploadMode>("cypher");
+    const [internalMode, setInternalMode] = useState<UploadMode>("cypher");
+    const mode = controlledMode ?? internalMode;
+    const setMode = useCallback((next: UploadMode) => {
+        setInternalMode(next);
+        onModeChange?.(next);
+    }, [onModeChange]);
     const [isLoading, setIsLoading] = useState(false);
     const [phase, setPhase] = useState<"uploading" | "processing" | null>(null);
     const [uploadPct, setUploadPct] = useState(0);

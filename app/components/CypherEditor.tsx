@@ -22,6 +22,7 @@ import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
 import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, DiagnosticsContext, AiFixContext } from "./provider";
+import useQueryPreflight from "./useQueryPreflight";
 import { Graph } from "../api/graph/model";
 
 interface Props {
@@ -168,6 +169,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const { isReadOnly } = useContext(ConnectionContext);
     const { diagnostics, setDiagnostics } = useContext(DiagnosticsContext);
     const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
+    const checkPreflight = useQueryPreflight();
 
     const { toast } = useToast();
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -1017,7 +1019,15 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             toast({ title: "Syntax Error", description: message, variant: "destructive", query });
             return;
         }
-        runQuery(historyQuery.query.trim());
+
+        const query = historyQuery.query.trim();
+
+        // The query parses, but we may already know the server will reject it.
+        // Unlike a syntax error this does not disable Run — it only stops the
+        // request here, where we can still offer the upload flow as the fix.
+        if (checkPreflight(query)) return;
+
+        runQuery(query);
     };
 
     const handleMonacoReady = (monacoI: Monaco) => {

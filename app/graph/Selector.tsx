@@ -35,6 +35,12 @@ interface Props {
     historyQuery: HistoryQuery;
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>;
     isQueryLoading: boolean;
+    /** Owned by the page, because the Chat panel is outside this toolbar but needs
+     *  the same `CsvLoadContext`. */
+    uploadOpen: boolean;
+    setUploadOpen: Dispatch<SetStateAction<boolean>>;
+    uploadMode: "cypher" | "load-csv";
+    setUploadMode: Dispatch<SetStateAction<"cypher" | "load-csv">>;
 }
 
 export default function Selector({
@@ -51,7 +57,11 @@ export default function Selector({
     chatOpen,
     setChatOpen,
     queriesOpen,
-    setQueriesOpen
+    setQueriesOpen,
+    uploadOpen,
+    setUploadOpen,
+    uploadMode,
+    setUploadMode
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -62,7 +72,6 @@ export default function Selector({
     const isMobile = useIsMobile();
 
     const [maximize, setMaximize] = useState(false);
-    const [uploadOpen, setUploadOpen] = useState(false);
     const [actionsOpen, setActionsOpen] = useState(false);
     const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
         setCypherLanguageConfig(config);
@@ -194,6 +203,8 @@ export default function Selector({
             disabled={isReadOnly || !graphName}
             open={uploadOpen}
             onOpenChange={setUploadOpen}
+            mode={uploadMode}
+            onModeChange={setUploadMode}
         />
     );
 
@@ -224,7 +235,10 @@ export default function Selector({
                             data-testid="uploadGraphToolbarTrigger"
                             className="gap-3 rounded-lg px-3 py-2.5 text-sm cursor-pointer"
                             disabled={isReadOnly || !graphName}
-                            onSelect={() => setUploadOpen(true)}
+                            onSelect={() => {
+                                setUploadMode("cypher");
+                                setUploadOpen(true);
+                            }}
                         >
                             <Upload size={18} />
                             <span>Upload data</span>
@@ -279,7 +293,7 @@ export default function Selector({
         );
     }
 
-    return (
+    const toolbar = (
         <div className="z-20 w-full h-[44px] flex flex-row gap-3 items-center">
             {graphInfoButton}
             <Button
@@ -289,7 +303,12 @@ export default function Selector({
                 )}
                 title="Upload data"
                 disabled={isReadOnly || !graphName}
-                onClick={() => setUploadOpen(true)}
+                onClick={() => {
+                    // The quick-fix path leaves the dialog on Load CSV; the toolbar is the
+                    // ordinary Cypher upload, so it has to say which tab it wants.
+                    setUploadMode("cypher");
+                    setUploadOpen(true);
+                }}
                 data-testid="uploadGraphToolbarTrigger"
             >
                 <Upload size={20} />
@@ -373,4 +392,6 @@ export default function Selector({
             {chatButton}
         </div >
     );
+
+    return toolbar;
 }
