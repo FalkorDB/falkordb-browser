@@ -7,7 +7,7 @@ import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, GraphInfo } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, GraphTabsContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
+import { BrowserSettingsContext, CsvLoadContext, GraphContext, GraphTabsContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import ResizableBox from "@/components/ui/ResizableBox";
@@ -146,6 +146,18 @@ export default function Page() {
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
+
+    // The Upload Data dialog lives in the toolbar, but the pre-flight check and
+    // the CSV error toast that offer it as a quick fix run from the editor, the
+    // history panel, Chat and the toaster — so its opener is published upward.
+    const [uploadOpen, setUploadOpen] = useState(false);
+    const [uploadMode, setUploadMode] = useState<"cypher" | "load-csv">("cypher");
+    const { registerCsvUpload } = useContext(CsvLoadContext);
+
+    useEffect(() => registerCsvUpload(() => {
+        setUploadMode("load-csv");
+        setUploadOpen(true);
+    }), [registerCsvUpload]);
 
     // Graph and Schema each have a selection of their own; the other tabs have
     // none. `panel` is shared by all of them, so it stays "data" across a tab
@@ -729,6 +741,10 @@ export default function Page() {
                                 setChatOpen={setChatOpen}
                                 queriesOpen={queriesOpen}
                                 setQueriesOpen={setQueriesOpen}
+                                uploadOpen={uploadOpen}
+                                setUploadOpen={setUploadOpen}
+                                uploadMode={uploadMode}
+                                setUploadMode={setUploadMode}
                             />
                             <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
                                 <ResizablePanel

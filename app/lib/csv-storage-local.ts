@@ -61,8 +61,8 @@ function relativeImportPath(owner: string, key: string): string {
     return `${CSV_TEMP_SUBDIR}/${requireOwner(owner)}/${normalizeCsvKey(key)}.csv`;
 }
 
-function getLocalLoadUriMode(): "file" | "http" {
-    const configured = process.env.CSV_LOCAL_LOAD_URI_MODE?.toLowerCase();
+export function getLocalLoadUriMode(): "file" | "http" {
+    const configured = process.env.CSV_LOCAL_LOAD_URI_MODE?.trim().toLowerCase();
     if (configured === "file") return "file";
     if (configured === "http") return "http";
 
@@ -80,6 +80,12 @@ function serveBaseUrl(): string {
         process.env.NEXTAUTH_URL ??
         "http://localhost:3000"
     ).replace(/\/$/, "");
+}
+
+/** The URI scheme a stored CSV is handed to `LOAD CSV` as. */
+export function getLocalLoadUriScheme(): "file" | "http" | "https" {
+    if (getLocalLoadUriMode() === "file") return "file";
+    return serveBaseUrl().toLowerCase().startsWith("https://") ? "https" : "http";
 }
 
 /** Open a stored temp CSV as a stream for the HTTP serve endpoint (or null). */
