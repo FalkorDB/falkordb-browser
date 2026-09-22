@@ -100,6 +100,28 @@ const SCOPED_KEYS = ["query history"];
 /** Prefixes used by keys scoped to a single graph entity, e.g. `chat-<graphName>` or `labelStyle_<label>`. */
 const SCOPED_KEY_PREFIXES = ["chat-", "cypherOnly-", "labelStyle_", "relationshipStyle_"];
 
+function isRecognizedScopedKey(suffix: string): boolean {
+  return SCOPED_KEYS.includes(suffix) || SCOPED_KEY_PREFIXES.some(p => suffix.startsWith(p));
+}
+
+/**
+ * True when `suffix` reads as `<username>:<scoped key>` — the *current* format,
+ * just under somebody else's username.
+ *
+ * Usernames are unconstrained, so one like `chat-bob` makes that user's
+ * `host:port:chat-bob:chat-graph` indistinguishable from a legacy `chat-` key
+ * by shape alone; migrating it would copy their data into this scope and delete
+ * their original. The nested suffix being a recognized key in its own right is
+ * the tell. It is a heuristic, but a fail-safe one: a legacy key it misreads
+ * (a graph literally named `a:chat-b`) is merely left where it is, never
+ * destroyed.
+ */
+function belongsToAnotherUserScope(suffix: string): boolean {
+  const sep = suffix.indexOf(":");
+  if (sep === -1) return false;
+  return isRecognizedScopedKey(suffix.slice(sep + 1));
+}
+
 export function migrateToScopedStorage(): void {
   if (!isBrowser() || !_prefix) return;
   // Only run migration once per prefix to avoid repeating work on every
@@ -120,10 +142,9 @@ export function migrateToScopedStorage(): void {
       // Skip keys that already use the current prefix
       if (key.startsWith(_prefix)) continue;
       const suffix = key.slice(legacyPrefix.length);
-      // Only migrate keys we recognize (exact scoped keys or graph-prefixed keys)
-      const isExactScopedKey = SCOPED_KEYS.includes(suffix);
-      const isPrefixedKey = SCOPED_KEY_PREFIXES.some(p => suffix.startsWith(p));
-      if (isExactScopedKey || isPrefixedKey) {
+      // Only migrate keys we recognize (exact scoped keys or graph-prefixed keys),
+      // and only when they are not already another user's scoped key.
+      if (isRecognizedScopedKey(suffix) && !belongsToAnotherUserScope(suffix)) {
         toMigrate.push([key, prefixed(suffix)]);
       }
     }

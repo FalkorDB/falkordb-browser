@@ -64,11 +64,27 @@ export class ServerDecryptError extends Error {
  * but still recognised so it is never mistaken for plain text and shown to the
  * user as a hex blob.
  * Avoids sending plain-text values to the decrypt API (which would result in a 400).
+ *
+ * The AES-256-GCM lengths are part of the check, not decoration: the server has
+ * always used a 12-byte IV (24 hex chars) and GCM's 16-byte tag (32 hex chars),
+ * in every version of the format. Matching three hex runs of any length instead
+ * would claim a colon-separated plain-text credential such as `dead:beef:cafe`,
+ * which then gets posted to the decrypt API, refused as legacy ciphertext and
+ * cleared out from under the user.
  */
+const IV_HEX_LENGTH = 24;
+const AUTH_TAG_HEX_LENGTH = 32;
+const HEX = /^[0-9a-fA-F]+$/;
+
 export function looksServerEncrypted(value: string): boolean {
   const parts = value.split(':');
   const hexParts = parts[0] === 'v2' ? parts.slice(1) : parts;
-  return hexParts.length === 3 && hexParts.every(p => p.length > 0 && /^[0-9a-fA-F]+$/.test(p));
+  if (hexParts.length !== 3) return false;
+  const [iv, authTag, data] = hexParts;
+  return iv.length === IV_HEX_LENGTH
+    && authTag.length === AUTH_TAG_HEX_LENGTH
+    && data.length > 0
+    && HEX.test(iv) && HEX.test(authTag) && HEX.test(data);
 }
 
 export async function serverDecrypt(encryptedValue: string): Promise<string> {

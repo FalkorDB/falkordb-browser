@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server, Minus, Plus } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
-import { areCaptionKeysEqual, cn, getConnectionEpoch, getDefaultQuery } from "@/lib/utils";
+import { areCaptionKeysEqual, cn, getActiveConnectionIdGlobal, getConnectionEpoch, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -19,7 +19,7 @@ import { getConnectionPrefix, removeConnectionItem, setConnectionItem } from "@/
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
 import { GRAPH_SORT_ORDERS, GRAPH_SORT_ORDER_LABELS, type GraphSortOrder } from "@/lib/graphSortOrder";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import ModelSelector from "./ModelSelector";
@@ -86,6 +86,8 @@ export default function BrowserSettings() {
         saveSettings,
         replayTutorial,
     } = useContext(BrowserSettingsContext);
+
+    const { prefixConnectionId } = useContext(ConnectionContext);
 
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -481,6 +483,21 @@ export default function BrowserSettings() {
         // The prefix alone cannot tell: an A→B→A switch restores it, so a promise
         // that settles after the round trip would still match. The epoch only
         // moves forward, so pair the two.
+        //
+        // Both are still only self-consistent: the prefix follows the session,
+        // which lags the pinned connection, so a switch already under way leaves
+        // the prefix naming A while the request binds the blob to B — and a pair
+        // captured after that point never moves again, so the checks below pass
+        // and B's ciphertext lands under A's key. Refuse unless the prefix and
+        // the pinned connection agree before any of it starts.
+        if (prefixConnectionId !== getActiveConnectionIdGlobal()) {
+            toast({
+                title: "Error",
+                description: "The connection is still switching. Please try again.",
+                variant: "destructive",
+            });
+            return false;
+        }
         const scope = getConnectionPrefix();
         const epoch = getConnectionEpoch();
 

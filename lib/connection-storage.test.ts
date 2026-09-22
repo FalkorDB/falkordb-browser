@@ -150,3 +150,29 @@ test("migrateToScopedStorage never overwrites an existing scoped value", () => {
 
     assert.equal(getConnectionItem("query history"), "[current]");
 });
+
+test("migrateToScopedStorage leaves another user's scoped keys alone", () => {
+    // A username may itself look like a scoped-key prefix, so `chat-bob`'s own
+    // keys read as legacy `chat-` keys by shape. Stealing them would both leak
+    // his data into this scope and delete his copy.
+    setConnectionPrefix("localhost", 6379, "chat-alice");
+    storage.setItem("localhost:6379:chat-bob:chat-social", "bob's chat");
+    storage.setItem("localhost:6379:chat-bob:query history", "bob's history");
+
+    migrateToScopedStorage();
+
+    assert.equal(storage.getItem("localhost:6379:chat-bob:chat-social"), "bob's chat");
+    assert.equal(storage.getItem("localhost:6379:chat-bob:query history"), "bob's history");
+    assert.equal(getConnectionItem("chat-bob:chat-social"), null);
+    assert.equal(getConnectionItem("chat-bob:query history"), null);
+});
+
+test("migrateToScopedStorage still upgrades a graph name containing a colon", () => {
+    setConnectionPrefix("localhost", 6379, "migrate-colon");
+    storage.setItem("localhost:6379:chat-ns:social", "old");
+
+    migrateToScopedStorage();
+
+    assert.equal(getConnectionItem("chat-ns:social"), "old");
+    assert.equal(storage.getItem("localhost:6379:chat-ns:social"), null);
+});

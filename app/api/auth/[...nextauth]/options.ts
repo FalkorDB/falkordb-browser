@@ -1422,6 +1422,9 @@ export async function getClient(
           host: tokenData.host,
           port: tokenData.port,
           tls: tokenData.tls ?? false,
+          // Carried because callers mint PATs from this user, and a token
+          // without the CA cannot reconnect to a server behind a private one.
+          ca: tokenData.ca || undefined,
           password: undefined,
         };
         if (tokenData.encrypted_password) {
@@ -1451,6 +1454,7 @@ export async function getClient(
         host: connResult.connInfo.host,
         port: connResult.connInfo.port,
         tls: connResult.connInfo.tls,
+        ca: connResult.connInfo.ca,
         password: undefined,
       };
       try {
