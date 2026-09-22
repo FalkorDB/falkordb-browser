@@ -9,7 +9,7 @@ import { twMerge } from "tailwind-merge";
 import React, { type RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData, NodeShape } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
-import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink, type CypherErrorHint } from "./cypherErrors.ts";
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 import { quoteCypherIdentifier } from "./cypher.ts";
 import type { PropertyValue } from "./graphValues.ts";
@@ -24,6 +24,7 @@ export type ToastArguments = {
   rawMessage?: string;
   hint?: string;
   hintLink?: HintLink;
+  hintAction?: CypherErrorHint["action"];
   query?: string;
 };
 
@@ -335,6 +336,7 @@ export type UserFriendlyMessage = {
   rawMessage?: string;
   hint?: string;
   hintLink?: HintLink;
+  hintAction?: CypherErrorHint["action"];
   syntaxError?: SyntaxErrorInfo;
 };
 
@@ -485,7 +487,7 @@ export async function getSSEGraphResult(
       }
 
       const friendly = toUserFriendlyMessage(message, status, options?.query ? { query: options.query } : undefined);
-      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: options?.query });
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, hintAction: friendly.hintAction, query: options?.query });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -696,7 +698,7 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
   // For user-readable errors, description IS the raw message — skip rawMessage
   // to avoid a duplicate "See more" section.
   if (isAllowlistedUserError(rawMessage) || hint) {
-    return { title: "Error", description: rawMessage, hint, hintLink };
+    return { title: "Error", description: rawMessage, hint, hintLink, hintAction: catalog?.action };
   }
 
   const lower = rawMessage.toLowerCase();
@@ -859,6 +861,7 @@ export async function securedFetch(
       rawMessage: friendly.rawMessage,
       hint: friendly.hint,
       hintLink: friendly.hintLink,
+      hintAction: friendly.hintAction,
     });
 
     if (status === 401 || status >= 500) {
@@ -953,6 +956,7 @@ export function uploadFileWithProgress(
           rawMessage: friendly.rawMessage,
           hint: friendly.hint,
           hintLink: friendly.hintLink,
+          hintAction: friendly.hintAction,
         });
         if (status === 401 || status >= 500) setIndicator("offline");
         resolve({ ok: false, status, body });
