@@ -56,6 +56,10 @@ const DialogContent = React.forwardRef<
         // Without a cap, a dialog taller than a phone is centred so that its footer buttons
         // and close control sit outside the viewport with no way to scroll to them.
         "mobile:max-h-[90dvh] mobile:overflow-y-auto mobile:p-4 mobile:z-[51]",
+        // `left-50%` leaves an auto-width dialog only the right half of the screen to
+        // shrink-to-fit into, so anything wider spills off the left edge. Give it the
+        // width outright on a phone instead of letting it be inferred.
+        "mobile:w-[calc(100vw-2rem)] mobile:max-w-[calc(100vw-2rem)]",
         className
       )}
       onInteractOutside={preventOutsideClose ? (e) => e.preventDefault() : onInteractOutside}

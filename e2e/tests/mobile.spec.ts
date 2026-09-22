@@ -343,4 +343,53 @@ test.describe("@admin Mobile layout", () => {
         await expect(graph.multiSelectBar).toHaveCount(0);
         await expect(graph.dataPanel).toHaveCount(0);
     });
+
+    test("Manage Graphs wraps its actions instead of stacking them", async () => {
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+        // The picker lives in the info sheet on mobile, so it has to be opened first.
+        await graph.openGraphInfoSheet();
+        await graph.clickSelect();
+        await graph.clickManage();
+
+        const { panel, actions, search } = await graph.manageToolbarLayout();
+
+        // One action per line spent four rows on buttons and pushed the table
+        // itself off the bottom of the phone. They share a row; the search box
+        // is the only control allowed to drop below them.
+        expect(new Set(actions.map(a => Math.round(a.y))).size).toBe(1);
+        expect(search.y).toBeGreaterThanOrEqual(actions[0].y + actions[0].height);
+
+        // The panel clips rather than scrolls, so an edge crossed is a control lost.
+        actions.forEach(action => {
+            expect(action.x).toBeGreaterThanOrEqual(panel.x);
+            expect(action.x + action.width).toBeLessThanOrEqual(panel.x + panel.width);
+        });
+    });
+
+    test("The Delete Graph dialog keeps its buttons on screen", async () => {
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+        // The picker lives in the info sheet on mobile, so it has to be opened first.
+        await graph.openGraphInfoSheet();
+        await graph.clickSelect();
+        await graph.clickManage();
+        await graph.clickTableCheckboxByName(graphName);
+        await graph.clickDelete();
+
+        const { dialog, buttons, viewport } = await graph.deleteDialogLayout();
+
+        // `left-50%` leaves an auto-width dialog only the right half of the screen
+        // to fit into, and `justify-end` sends whatever does not fit off the left
+        // edge — Delete Graph used to start at a negative x, half of it unreadable
+        // and none of it tappable.
+        expect(dialog.x).toBeGreaterThanOrEqual(0);
+        expect(dialog.x + dialog.width).toBeLessThanOrEqual(viewport.width);
+        buttons.forEach(button => {
+            expect(button.x).toBeGreaterThanOrEqual(dialog.x);
+            expect(button.x + button.width).toBeLessThanOrEqual(dialog.x + dialog.width);
+        });
+
+        await graph.clickDeleteCancel();
+    });
 });

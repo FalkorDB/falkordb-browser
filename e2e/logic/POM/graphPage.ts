@@ -12,6 +12,13 @@ import BasePage from "@/e2e/infra/ui/basePage";
 
 export type Element = "Node" | "Relation";
 
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export type ElementLabel = "Relationships" | "Labels";
 
 export type Type = "Graph" | "Role" | "Type" | "Model" | "Theme" | "Query";
@@ -127,6 +134,10 @@ export default class GraphPage extends BasePage {
   // MANAGE
   public get manage(): Locator {
     return this.page.getByTestId("manageGraphs");
+  }
+
+  public get manageContent(): Locator {
+    return this.page.getByTestId("manageContent");
   }
 
   /** A column header of the Manage Graphs table, by its visible name. */
@@ -1849,5 +1860,52 @@ export default class GraphPage extends BasePage {
       ([k, v]) => localStorage.setItem(k, v),
       [key, value],
     );
+  }
+
+  private static async boxOf(locator: Locator, name: string): Promise<Box> {
+    const box = await locator.boundingBox();
+    if (!box) throw new Error(`${name} is not laid out`);
+    return box;
+  }
+
+  /**
+   * Geometry of the Manage Graphs toolbar: the panel that clips it, its action
+   * buttons in render order, and the search box that follows them.
+   */
+  async manageToolbarLayout(): Promise<{
+    panel: Box;
+    actions: Box[];
+    search: Box;
+  }> {
+    const actions: Box[] = [];
+    for (const id of ["deleteGraph", "exportGraph", "uploadGraph", "duplicateGraph"]) {
+      actions.push(await GraphPage.boxOf(this.page.getByTestId(id), id));
+    }
+    return {
+      panel: await GraphPage.boxOf(this.manageContent, "Manage Graphs panel"),
+      actions,
+      search: await GraphPage.boxOf(
+        this.page.getByTestId("searchInputGraphs"),
+        "Graphs search box",
+      ),
+    };
+  }
+
+  /** Geometry of the Delete Graph dialog, the two buttons in its footer, and the viewport holding them. */
+  async deleteDialogLayout(): Promise<{
+    dialog: Box;
+    buttons: Box[];
+    viewport: { width: number; height: number };
+  }> {
+    const viewport = this.page.viewportSize();
+    if (!viewport) throw new Error("Headless page has no viewport");
+    return {
+      dialog: await GraphPage.boxOf(this.page.locator("#dialog"), "Delete Graph dialog"),
+      buttons: [
+        await GraphPage.boxOf(this.deleteConfirm, "Delete Graph confirm"),
+        await GraphPage.boxOf(this.deleteCancel, "Delete Graph cancel"),
+      ],
+      viewport,
+    };
   }
 }
