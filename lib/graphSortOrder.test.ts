@@ -163,6 +163,8 @@ test("unreadable stored timestamps are ignored", () => {
 
 test("nothing is stored before a connection prefix is set", () => {
     clearConnectionPrefix();
+    // Drop the scope marker the prefix left behind, so any key here is ours.
+    storage.clear();
 
     assert.deepEqual(plain(recordGraphsFirstSeen(["a"], 100)), { a: 100 });
     assert.equal(storage.length, 0);

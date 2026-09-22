@@ -24,6 +24,13 @@ export function buildConnectionPrefix(host: string, port: number, username: stri
 }
 
 /**
+ * Written into every scope the browser has actually authenticated as, so the
+ * migration below can tell one apart from a legacy key that merely looks like
+ * one. See `belongsToAnotherUserScope`.
+ */
+const SCOPE_MARKER_KEY = "__scope";
+
+/**
  * Build and cache the prefix.
  * Call once when the session becomes available (host, port & username known).
  */
@@ -31,6 +38,7 @@ export function setConnectionPrefix(host: string, port: number, username: string
   _host = host;
   _port = port;
   _prefix = buildConnectionPrefix(host, port, username);
+  if (isBrowser()) localStorage.setItem(`${_prefix}${SCOPE_MARKER_KEY}`, "1");
 }
 
 /**
@@ -105,21 +113,24 @@ function isRecognizedScopedKey(suffix: string): boolean {
 }
 
 /**
- * True when `suffix` reads as `<username>:<scoped key>` — the *current* format,
- * just under somebody else's username.
+ * True when `suffix` is `<username>:<key>` for a username this browser has
+ * actually signed in as.
  *
- * Usernames are unconstrained, so one like `chat-bob` makes that user's
- * `host:port:chat-bob:chat-graph` indistinguishable from a legacy `chat-` key
- * by shape alone; migrating it would copy their data into this scope and delete
- * their original. The nested suffix being a recognized key in its own right is
- * the tell. It is a heuristic, but a fail-safe one: a legacy key it misreads
- * (a graph literally named `a:chat-b`) is merely left where it is, never
- * destroyed.
+ * Usernames are unconstrained, so `chat-bob`'s `host:port:chat-bob:chat-social`
+ * is indistinguishable by shape from a legacy key for a graph named
+ * `bob:chat-social` — and migrating it would copy his data into this scope and
+ * delete his original. Shape cannot settle it, so ask the scope: every session
+ * stamps `SCOPE_MARKER_KEY` into its own prefix, and only a scope that exists
+ * has one. A graph name that merely looks like a username still migrates.
+ *
+ * The residual case is a user who last signed in before this marker existed and
+ * has not signed in since, which is the behaviour that shipped before it.
  */
 function belongsToAnotherUserScope(suffix: string): boolean {
   const sep = suffix.indexOf(":");
   if (sep === -1) return false;
-  return isRecognizedScopedKey(suffix.slice(sep + 1));
+  const scope = buildConnectionPrefix(_host, _port, suffix.slice(0, sep));
+  return localStorage.getItem(`${scope}${SCOPE_MARKER_KEY}`) !== null;
 }
 
 export function migrateToScopedStorage(): void {
