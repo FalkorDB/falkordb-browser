@@ -210,6 +210,28 @@ function belongsToAnotherUserScope(suffix: string): boolean {
   return false;
 }
 
+/**
+ * True when `suffix` reads just as well as `<some other username>:<key>`: one of
+ * its colon boundaries leaves a key we recognize behind it.
+ *
+ * The marker above only speaks for scopes that have signed in since it existed,
+ * which leaves the pre-marker ones to shape alone — and shape is genuinely
+ * ambiguous: `chat-bob:query history` is `chat-bob`'s query history as readily
+ * as it is a graph named `bob:query history`. Migrating is not a neutral guess,
+ * it copies the value into this scope and deletes the original, so the tie goes
+ * to leaving it alone: untouched, it is still there for `chat-bob` to claim
+ * correctly when he next signs in.
+ *
+ * Only a genuine tie is declined. `chat-ns:social` has no second reading —
+ * `social` is not a key this app writes — so it still migrates.
+ */
+function couldBeAnotherUserScopedKey(suffix: string): boolean {
+  for (let sep = suffix.indexOf(":"); sep !== -1; sep = suffix.indexOf(":", sep + 1)) {
+    if (isRecognizedScopedKey(suffix.slice(sep + 1))) return true;
+  }
+  return false;
+}
+
 export function migrateToScopedStorage(): void {
   if (!isBrowser() || !_prefix) return;
   // Only run migration once per prefix to avoid repeating work on every
@@ -239,12 +261,15 @@ export function migrateToScopedStorage(): void {
       // user's own keys carry it inside the suffix — `alice:chat-bob:chat-social`,
       // never the bare key. Drop that segment before the shape check, or the
       // key is unrecognizable and the data it holds is stranded for good.
-      const scopedKey = suffix.startsWith(rawScope) ? suffix.slice(rawScope.length) : suffix;
-      // Only migrate keys we recognize (exact scoped keys or graph-prefixed keys),
-      // and only when they are not already another user's scoped key.
-      if (isRecognizedScopedKey(scopedKey) && !belongsToAnotherUserScope(suffix)) {
-        toMigrate.push([key, prefixed(scopedKey)]);
-      }
+      const ownScope = suffix.startsWith(rawScope);
+      const scopedKey = ownScope ? suffix.slice(rawScope.length) : suffix;
+      if (!isRecognizedScopedKey(scopedKey)) continue;
+      // Our own username is the one positive ownership signal there is, so a
+      // suffix that carries it is ours whatever else it could spell. Anything
+      // else that could be another user's key is left where it is.
+      if (!ownScope && couldBeAnotherUserScopedKey(suffix)) continue;
+      if (belongsToAnotherUserScope(suffix)) continue;
+      toMigrate.push([key, prefixed(scopedKey)]);
     }
     for (const [oldKey, newKey] of toMigrate) {
       if (localStorage.getItem(newKey) === null) {

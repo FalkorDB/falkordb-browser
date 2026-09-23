@@ -195,17 +195,29 @@ test("migrateToScopedStorage recognises a scope whose username contains a colon"
 });
 
 test("migrateToScopedStorage still upgrades a graph name that looks like a username", () => {
-    // No `chat-ns` scope has ever signed in, so this is a legacy key for a
-    // graph named `ns:social`, not one of that user's.
+    // `social` is not a key this app writes, so `chat-ns:social` has only one
+    // reading: a legacy key for a graph named `ns:social`.
     setConnectionPrefix("localhost", 6379, "migrate-colon");
     storage.setItem("localhost:6379:chat-ns:social", "old");
-    storage.setItem("localhost:6379:chat-bob:query history", "also legacy");
 
     migrateToScopedStorage();
 
     assert.equal(getConnectionItem("chat-ns:social"), "old");
-    assert.equal(getConnectionItem("chat-bob:query history"), "also legacy");
     assert.equal(storage.getItem("localhost:6379:chat-ns:social"), null);
+});
+
+test("migrateToScopedStorage leaves a key that reads as another user's alone", () => {
+    // `chat-bob:query history` is `chat-bob`'s query history as readily as it is
+    // a graph named `bob:query history`, and he has not signed in since the
+    // marker existed, so nothing vouches for either reading. Left in place it is
+    // still his to claim; migrated, it is copied here and deleted there.
+    setConnectionPrefix("localhost", 6379, "migrate-tie");
+    storage.setItem("localhost:6379:chat-bob:query history", "whose?");
+
+    migrateToScopedStorage();
+
+    assert.equal(storage.getItem("localhost:6379:chat-bob:query history"), "whose?");
+    assert.equal(getConnectionItem("chat-bob:query history"), null);
 });
 
 test("migrateToScopedStorage rescues keys written under an unescaped username", () => {

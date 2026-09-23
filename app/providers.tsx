@@ -2372,7 +2372,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     prevActiveConnectionIdRef.current = activeConnectionId;
 
     // Skip the very first selection (initial mount / login) and null resets
-    if (prev === null || activeConnectionId === null) return;
+    if (prev === null || activeConnectionId === null) {
+      // A switch that took a gate slot can still land here: a failed bootstrap
+      // pin leaves the id null, so the user's next click is a null → B
+      // transition. There is no previous connection's state to clear, but the
+      // slot still has to be released or graph ops stay blocked until the
+      // switch after this one.
+      if (activeConnectionId !== null && pendingSwitchesRef.current > 0) {
+        pendingSwitchesRef.current = 0;
+        setSwitchPending(false);
+      }
+      return;
+    }
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
