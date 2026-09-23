@@ -12,6 +12,7 @@
 let _prefix = "";
 let _host = "";
 let _port = 0;
+let _username = "";
 let _migrated = new Set<string>();
 
 /**
@@ -49,6 +50,7 @@ const SCOPE_MARKER_KEY = "__scope";
 export function setConnectionPrefix(host: string, port: number, username: string): void {
   _host = host;
   _port = port;
+  _username = username;
   _prefix = buildConnectionPrefix(host, port, username);
   if (isBrowser()) localStorage.setItem(`${_prefix}${SCOPE_MARKER_KEY}`, "1");
 }
@@ -135,11 +137,11 @@ function isRecognizedScopedKey(suffix: string): boolean {
  * stamps `SCOPE_MARKER_KEY` into its own prefix, and only a scope that exists
  * has one. A graph name that merely looks like a username still migrates.
  *
- * `suffix` is key text that already carries an escaped username, so the segment
- * is compared verbatim rather than re-escaped through `buildConnectionPrefix`.
- * Escaping leaves no colon in a username, so the first boundary is the only one
- * that can name a live scope; the later ones are still scanned because a marker
- * written before the escape existed spells its colons out.
+ * `suffix` is key text as it was written, so the segment is compared verbatim
+ * rather than re-escaped through `buildConnectionPrefix`. Escaping leaves no
+ * colon in a username, so for a key written since it the first boundary is the
+ * only one that can name a live scope; the later ones are still scanned because
+ * a key — or a marker — written before the escape existed spells its colons out.
  *
  * The residual case is a user who last signed in before this marker existed and
  * has not signed in since, which is the behaviour that shipped before it.
@@ -160,11 +162,16 @@ export function migrateToScopedStorage(): void {
   _migrated.add(_prefix);
 
   // ── Phase 1: migrate old host:port: prefix → current host:port:username: prefix ──
-  // Legacy format: "host:port:key"             (before username was added)
-  // Current format: "host:port:username:key"   (escaped username, "default" when anonymous)
+  // Legacy format: "host:port:key"                  (before username was added)
+  //                "host:port:<raw username>:key"   (before the username was escaped)
+  // Current format: "host:port:username:key"        (escaped username, "default" when anonymous)
   const legacyPrefix = `${_host}:${_port}:`;
 
   if (legacyPrefix !== _prefix) {
+    // Only ever non-empty for a username holding `:` or `%`; for any other
+    // username the escaped prefix is the raw one, and those keys are already
+    // skipped above as current.
+    const rawScope = `${_username}:`;
     const toMigrate: [string, string][] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -172,10 +179,15 @@ export function migrateToScopedStorage(): void {
       // Skip keys that already use the current prefix
       if (key.startsWith(_prefix)) continue;
       const suffix = key.slice(legacyPrefix.length);
+      // The previous release spelled the username out unescaped, so this
+      // user's own keys carry it inside the suffix — `alice:chat-bob:chat-social`,
+      // never the bare key. Drop that segment before the shape check, or the
+      // key is unrecognizable and the data it holds is stranded for good.
+      const scopedKey = suffix.startsWith(rawScope) ? suffix.slice(rawScope.length) : suffix;
       // Only migrate keys we recognize (exact scoped keys or graph-prefixed keys),
       // and only when they are not already another user's scoped key.
-      if (isRecognizedScopedKey(suffix) && !belongsToAnotherUserScope(suffix)) {
-        toMigrate.push([key, prefixed(suffix)]);
+      if (isRecognizedScopedKey(scopedKey) && !belongsToAnotherUserScope(suffix)) {
+        toMigrate.push([key, prefixed(scopedKey)]);
       }
     }
     for (const [oldKey, newKey] of toMigrate) {

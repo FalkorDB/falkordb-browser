@@ -207,3 +207,34 @@ test("migrateToScopedStorage still upgrades a graph name that looks like a usern
     assert.equal(getConnectionItem("chat-bob:query history"), "also legacy");
     assert.equal(storage.getItem("localhost:6379:chat-ns:social"), null);
 });
+
+test("migrateToScopedStorage rescues keys written under an unescaped username", () => {
+    // The release before the escape wrote this user's prefix out raw, so the
+    // suffix carries the username. Left unrecognized, the data is stranded.
+    setConnectionPrefix("localhost", 6379, "migrate:raw");
+    storage.setItem("localhost:6379:migrate:raw:query history", "[3]");
+    storage.setItem("localhost:6379:migrate:raw:chat-social", "old");
+
+    migrateToScopedStorage();
+
+    assert.equal(getConnectionItem("query history"), "[3]");
+    assert.equal(getConnectionItem("chat-social"), "old");
+    assert.equal(storage.getItem("localhost:6379:migrate:raw:query history"), null);
+    assert.equal(storage.getItem("localhost:6379:migrate:raw:chat-social"), null);
+});
+
+test("migrateToScopedStorage leaves an unescaped-username key a live scope could own", () => {
+    // By shape `localhost:6379:live:chat-bob:chat-social` is this user's legacy
+    // key, but it is just as likely `live`'s key for a graph named
+    // `chat-bob:chat-social` — and `live` has signed in, so that scope exists.
+    // Ambiguity resolves in favour of the scope that is known to be real.
+    setConnectionPrefix("localhost", 6379, "live");
+    setConnectionItem("keep", "1");
+    storage.setItem("localhost:6379:live:chat-bob:chat-social", "whose?");
+
+    setConnectionPrefix("localhost", 6379, "live:chat-bob");
+    migrateToScopedStorage();
+
+    assert.equal(storage.getItem("localhost:6379:live:chat-bob:chat-social"), "whose?");
+    assert.equal(getConnectionItem("chat-social"), null);
+});

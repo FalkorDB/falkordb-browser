@@ -244,8 +244,9 @@ export function generateConsistentUserId(
  * fields' empty `tls`/`password` would describe a plaintext, unauthenticated
  * connection that the user never asked for.
  *
- * Returns an empty object when the string does not parse; the caller then keeps
- * its previous defaults.
+ * Returns an empty object when the string does not parse, or names no host at
+ * all (`unix://`, or a `redis://` with an empty authority); the caller refuses
+ * the login rather than recording it under the defaults.
  */
 export function parseConnectionUrl(url: string): {
   host?: string;
@@ -258,7 +259,13 @@ export function parseConnectionUrl(url: string): {
     const parsed = new URL(url);
     if (!parsed.hostname) return {};
     return {
-      host: parsed.hostname,
+      // `URL` keeps the brackets around an IPv6 literal, but they are URL
+      // syntax rather than part of the address: node-redis strips them before
+      // handing the host to `net.connect` (same expression), so a record
+      // holding `[::1]` would be recreated as a hostname that never resolves,
+      // and would hash into a different identity than the very same server
+      // reached through the discrete fields.
+      host: parsed.hostname.replace(/^\[([0-9a-f:]+)\]$/i, "$1"),
       port: parsed.port || undefined,
       username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
       password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
@@ -846,13 +853,21 @@ const authOptions: NextAuthConfig = {
         // and would let two different URLs share one identity.
         if (creds.url) {
           const fromUrl = parseConnectionUrl(creds.url);
-          if (fromUrl.host) {
-            creds.host = fromUrl.host;
-            creds.port = fromUrl.port;
-            creds.username = fromUrl.username;
-            creds.password = fromUrl.password;
-            creds.tls = fromUrl.tls ? "true" : "false";
+          // A URL naming no host still connects — `unix:///run/redis.sock`
+          // reaches a real server — but leaves nothing to record it as, so it
+          // would be filed under the localhost:6379 defaults and share that
+          // identity, and hence its AAD binding, with every other such login.
+          // There is no honest record to write, so refuse the login instead.
+          if (!fromUrl.host) {
+            // eslint-disable-next-line no-console
+            console.error("Rejected login: the connection URL names no host");
+            return null;
           }
+          creds.host = fromUrl.host;
+          creds.port = fromUrl.port;
+          creds.username = fromUrl.username;
+          creds.password = fromUrl.password;
+          creds.tls = fromUrl.tls ? "true" : "false";
         }
 
         try {
