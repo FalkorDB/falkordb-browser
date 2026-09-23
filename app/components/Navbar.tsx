@@ -53,7 +53,8 @@ export default function Navbar({ showUDF }: Props) {
         try {
             await signOut({ redirect: false });
             setLogoutDialogOpen(false);
-            router.push("/login");
+            // The marker stops a preconfigured connection logging the user straight back in.
+            router.push("/login?signedOut=true");
         } catch {
             toast({ title: "Failed to sign out", description: "Please try again.", variant: "destructive" });
         } finally {
