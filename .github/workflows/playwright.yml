@@ -186,6 +186,7 @@ jobs:
             --project="[Read-Write] - Chromium" \
             --project="[Read-Only] - Chromium" \
             --project="[Admin: Settings - Chromium]" \
+            --project="[Admin: Mobile] Chromium" \
             --shard=${{ matrix.shard }}/6 \
             --workers=2 \
             --reporter=dot,list

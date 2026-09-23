@@ -156,7 +156,7 @@ export default function Users() {
                     setRows={setRows}
                     itemHeight={40}
                 >
-                    <div className="flex flex-row-reverse gap-2">
+                    <div className="flex flex-row-reverse gap-2 mobile:flex-wrap mobile:justify-end">
                         <AddUser onAddUser={handleAddUser} />
                         <EditUser
                             username={selectedUserData?.username || ""}

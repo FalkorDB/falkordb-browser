@@ -881,13 +881,16 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     : <Button className="hidden" />
             }
             title="Upload Data"
-            className="h-[min(86vh,680px)] w-[min(94vw,760px)]"
+            // A fixed height leaves a large void on a phone and pushes the footer off-screen
+            // once a preview is open, so let the dialog hug its content there and rely on the
+            // base `mobile:max-h-[90dvh] mobile:overflow-y-auto` cap instead.
+            className="h-[min(86vh,680px)] w-[min(94vw,760px)] mobile:h-auto mobile:w-[94vw]"
         >
-            <div className="h-full p-3 flex flex-col gap-3 overflow-hidden">
+            <div className="h-full p-3 flex flex-col gap-3 overflow-hidden mobile:overflow-visible mobile:p-1">
                 <Tabs
                     value={mode}
                     onValueChange={(v) => { setMode(v as UploadMode); resetMode(); }}
-                    className="w-full h-full flex flex-col overflow-hidden"
+                    className="w-full h-full flex flex-col overflow-hidden mobile:overflow-visible"
                 >
                     <TabsList className="h-fit shrink-0 bg-background gap-1">
                         <TabsTrigger
@@ -909,7 +912,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     </TabsList>
 
                     {/* ── Cypher batch ─────────────────────────────────── */}
-                    <TabsContent value="cypher" className="mt-2 flex-1 overflow-hidden">
+                    <TabsContent value="cypher" className="mt-2 flex-1 overflow-hidden mobile:overflow-visible">
                         <form ref={cypherFormRef} onSubmit={onUploadCypher} className="flex h-full flex-col gap-4">
                             <p className="text-sm text-muted-foreground">
                                 Upload a .txt or .cypher file and execute each statement sequentially into the existing graph.
@@ -962,7 +965,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                             Hide preview
                                         </button>
                                     </div>
-                                    <div className="h-44 w-full rounded-md border border-border overflow-hidden">
+                                    <div className="h-44 mobile:h-32 w-full rounded-md border border-border overflow-hidden">
                                         <EditorComponent
                                             className="SofiaSans"
                                             language={CYPHER_LANGUAGE_NAME}
@@ -986,7 +989,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
                     {/* ── Load CSV ─────────────────────────────────────── */}
                     {CSV_UPLOAD_ENABLED && (
-                        <TabsContent value="load-csv" className="mt-2 flex-1 overflow-hidden">
+                        <TabsContent value="load-csv" className="mt-2 flex-1 overflow-hidden mobile:overflow-visible">
                             {/* Step 1: pick and upload the CSV file */}
                             {!csvKey && (
                                 <form ref={uploadCsvFormRef} onSubmit={onUploadCsvToTemp} className="flex h-full flex-col gap-4">
@@ -1043,7 +1046,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                                     Hide preview
                                                 </button>
                                             </div>
-                                            <div className="h-44 w-full rounded-md border border-border overflow-hidden">
+                                            <div className="h-44 mobile:h-32 w-full rounded-md border border-border overflow-hidden">
                                                 <EditorComponent
                                                     className="SofiaSans"
                                                     language="plaintext"
@@ -1090,7 +1093,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                                     Hide preview
                                                 </button>
                                             </div>
-                                            <div className="h-44 w-full rounded-md border border-border overflow-hidden">
+                                            <div className="h-44 mobile:h-32 w-full rounded-md border border-border overflow-hidden">
                                                 <EditorComponent
                                                     className="SofiaSans"
                                                     language="plaintext"
@@ -1128,10 +1131,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                             />
                                             Use CSV headers
                                         </label>
-                                        <div className="rounded-md border bg-muted/40 px-3 py-2">
-                                            <code className="font-mono text-xs">{loadCsvPrefix}</code>
+                                        <div className="rounded-md border bg-muted/40 px-3 py-2 overflow-x-auto">
+                                            <code className="font-mono text-xs whitespace-pre">{loadCsvPrefix}</code>
                                         </div>
-                                        <div className="h-36 w-full rounded-lg border border-border overflow-hidden" data-testid="loadCsvQuery">
+                                        <div className="h-36 mobile:h-32 w-full rounded-lg border border-border overflow-hidden" data-testid="loadCsvQuery">
                                             <EditorComponent
                                                 className="SofiaSans"
                                                 height="100%"
@@ -1224,14 +1227,16 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     </div>
                 )}
                 <div className="mt-3 border-t border-border/60" />
-                <div className="mt-3 flex justify-end gap-3">
+                {/* Three buttons do not fit side by side on a phone, so stack them
+                    with the primary action last (closest to the thumb). */}
+                <div className="mt-3 flex flex-wrap justify-end gap-3 mobile:flex-col mobile:gap-2">
                     {
                         footerViewAction && (
                             <Button
                                 type="button"
                                 label="View file"
                                 title={footerViewAction.title}
-                                className="rounded-lg border border-border px-4 py-[10px] hover:bg-background/60"
+                                className="rounded-lg border border-border px-4 py-[10px] hover:bg-background/60 mobile:w-full"
                                 disabled={footerViewAction.disabled}
                                 isLoading={footerViewAction.loading}
                                 onClick={() => {
@@ -1242,9 +1247,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                             />
                         )
                     }
-                    <CloseDialog label="Cancel" title="Cancel upload" data-testid="uploadGraphCancel" disabled={isLoading} onClick={() => handleOpenChange(false)} />
+                    <CloseDialog className="mobile:w-full mobile:px-4" label="Cancel" title="Cancel upload" data-testid="uploadGraphCancel" disabled={isLoading} onClick={() => handleOpenChange(false)} />
                     <Button
                         type="button"
+                        className="mobile:w-full mobile:px-4"
                         label={primaryAction.label}
                         title={primaryAction.title}
                         variant="Primary"

@@ -20,6 +20,7 @@ import { GRAPH_SORT_ORDERS, GRAPH_SORT_ORDER_LABELS, type GraphSortOrder } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
+import HelpTip from "../components/ui/HelpTip";
 import Input from "../components/ui/Input";
 import ModelSelector from "./ModelSelector";
 
@@ -662,17 +663,19 @@ export default function BrowserSettings() {
 
     return (
         <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
-            <div className="flex items-start justify-between gap-2 px-2">
-                <div className="flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar">
-                    <h1 className="text-3xl font-semibold">Browser Settings</h1>
-                    <p className="text-base text-muted-foreground">Customize your browser experience and manage configurations</p>
+            <div className="flex items-start justify-between gap-2 px-2 mobile:items-center">
+                <div className="min-w-0 flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar mobile:max-h-none mobile:overflow-visible">
+                    <h1 className="text-3xl font-semibold mobile:text-xl">Browser Settings</h1>
+                    {/* The tab strip already names the page; on a phone the strapline is just chrome. */}
+                    <p className="text-base text-muted-foreground mobile:hidden">Customize your browser experience and manage configurations</p>
                 </div>
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
                             data-testid="replayTutorial"
-                            className="w-fit"
+                            className="w-fit shrink-0 mobile:hidden"
                             variant="Primary"
+                            title="Replay Tutorial"
                             onClick={replayTutorial}
                             label="Replay Tutorial"
                         >
@@ -698,7 +701,7 @@ export default function BrowserSettings() {
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Chat</CardTitle>
+                                <CardTitle className="text-2xl font-semibold mobile:text-xl">Chat</CardTitle>
                                 <CardDescription className="text-sm">Chat Panel Settings</CardDescription>
                             </div>
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.chat && "rotate-90")} />
@@ -1092,7 +1095,7 @@ export default function BrowserSettings() {
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Graph Info</CardTitle>
+                                <CardTitle className="text-2xl font-semibold mobile:text-xl">Graph Info</CardTitle>
                                 <CardDescription className="text-sm">Configure graph visualization and data refresh settings</CardDescription>
                             </div>
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.graphInfo && "rotate-90")} />
@@ -1163,7 +1166,7 @@ export default function BrowserSettings() {
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Query Execution</CardTitle>
+                                <CardTitle className="text-2xl font-semibold mobile:text-xl">Query Execution</CardTitle>
                                 <CardDescription className="text-sm">Control query execution behavior and performance limits</CardDescription>
                             </div>
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.queryExecution && "rotate-90")} />
@@ -1172,7 +1175,8 @@ export default function BrowserSettings() {
                     {expandedSections.queryExecution && (
                         <CardContent>
                             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-                                <div className="flex gap-2">
+                                {/* The two columns each have a wider min-content size than a phone, so stack them. */}
+                                <div className="flex gap-2 mobile:flex-col mobile:[&>div]:basis-auto mobile:[&>div]:grow-0">
                                     {/* Timeout Setting */}
                                     <div className="flex-1 basis-0 flex flex-col items-center sm:flex-row sm:justify-between gap-2 p-2 bg-muted/10 rounded-lg">
                                         <div className="flex flex-col gap-2 flex-1">
@@ -1202,14 +1206,9 @@ export default function BrowserSettings() {
                                         <div className="flex flex-col gap-2 flex-1">
                                             <div className="flex flex gap-1 items-center">
                                                 <h3 className="text-lg font-semibold">Limit</h3>
-                                                <Tooltip>
-                                                    <TooltipTrigger>
-                                                        <Info size={16} />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Be aware that &quot;RESULTSET_SIZE&quot; caps the maximum number of rows returned by a query. (you can modify this configuration in the &quot;DB Configurations&quot; tab)</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
+                                                <HelpTip>
+                                                    <p>Be aware that &quot;RESULTSET_SIZE&quot; caps the maximum number of rows returned by a query. (you can modify this configuration in the &quot;DB Configurations&quot; tab)</p>
+                                                </HelpTip>
                                             </div>
                                             <p className="text-sm text-muted-foreground">
                                                 Limits the number of rows returned by the query.
@@ -1303,7 +1302,7 @@ export default function BrowserSettings() {
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">User Experience</CardTitle>
+                                <CardTitle className="text-2xl font-semibold mobile:text-xl">User Experience</CardTitle>
                                 <CardDescription className="text-sm">Customize browser behavior and visual preferences</CardDescription>
                             </div>
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.userExperience && "rotate-90")} />
@@ -1312,7 +1311,7 @@ export default function BrowserSettings() {
                     {
                         expandedSections.userExperience &&
                         <CardContent>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 mobile:flex-col mobile:[&>div]:basis-auto mobile:[&>div]:grow-0">
                                 <div className="flex-1 basis-0 flex flex-col gap-2">
                                     {/* Captions Keys */}
                                     <div className="flex-1 basis-0 flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
@@ -1375,7 +1374,7 @@ export default function BrowserSettings() {
                                                 </ul>
                                                 : <p className="text-sm text-muted-foreground">No caption keys added. Add keys to display them on the nodes.</p>
                                         }
-                                        <form className="flex gap-2 items-center" onSubmit={handleAddCaptionKey}>
+                                        <form className="flex gap-2 items-center mobile:flex-col mobile:items-stretch" onSubmit={handleAddCaptionKey}>
                                             <Input
                                                 id="captionKeyInput"
                                                 className="flex-1 h-fit"

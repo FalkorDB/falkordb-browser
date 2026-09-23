@@ -12,6 +12,13 @@ import BasePage from "@/e2e/infra/ui/basePage";
 
 export type Element = "Node" | "Relation";
 
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export type ElementLabel = "Relationships" | "Labels";
 
 export type Type = "Graph" | "Role" | "Type" | "Model" | "Theme" | "Query";
@@ -133,6 +140,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("manageGraphs");
   }
 
+  public get manageContent(): Locator {
+    return this.page.getByTestId("manageContent");
+  }
+
   /** A column header of the Manage Graphs table, by its visible name. */
   public manageTableHeader(name: string): Locator {
     return this.page
@@ -201,6 +212,16 @@ export default class GraphPage extends BasePage {
   // VISIBILITY
   public get elementCanvasShowAll(): Locator {
     return this.page.getByTestId("elementCanvasShowAllGraph");
+  }
+
+  /** The toggle that opens and closes the Search & Filter panel (desktop only). */
+  public get searchAndFilterToggle(): Locator {
+    // `Button` turns its `title` prop into an aria-label, not a title attribute.
+    return this.page.getByLabel(/(Open|Close) Search & Filter/);
+  }
+
+  async clickSearchAndFilterToggle(): Promise<void> {
+    await interactWhenVisible(this.searchAndFilterToggle, (el) => el.click(), "search & filter toggle");
   }
 
   async clickShowAll(): Promise<void> {
@@ -406,6 +427,13 @@ export default class GraphPage extends BasePage {
 
   async getNodesScreenPositions(): Promise<any[]> {
     await this.waitForCanvasAnimationToEnd();
+    return this.readNodesScreenPositions();
+  }
+
+  /** Positions without waiting out the force simulation. `waitForCanvasAnimationToEnd`
+   *  costs a flat five seconds once the graph has loaded — too much to spend again on a
+   *  re-read that only has a camera move to wait for. */
+  async readNodesScreenPositions(): Promise<any[]> {
     await this.page.waitForTimeout(500);
 
     await this.page.waitForFunction(
@@ -472,8 +500,25 @@ export default class GraphPage extends BasePage {
     });
   }
 
-  async elementClick(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y, { button: "right" });
+  /** Selects a canvas element. The app defers selection until the
+   *  double-click window has passed, so this waits it out. `additive` holds
+   *  Shift, which is what ForceGraph reads to extend a selection instead of
+   *  replacing it; `mouse.click` takes no modifiers, so the key is held. */
+  async elementClick(x: number, y: number, additive = false): Promise<void> {
+    if (additive) await this.page.keyboard.down("Shift");
+    try {
+      await this.page.mouse.click(x, y);
+    } finally {
+      if (additive) await this.page.keyboard.up("Shift");
+    }
+    await this.page.waitForTimeout(400);
+  }
+
+  /** Expands/collapses a node. The second click lands inside the double-click
+   *  window, so the pending selection is cancelled and only the expand runs. */
+  async elementDoubleClick(x: number, y: number): Promise<void> {
+    await this.page.mouse.dblclick(x, y);
+    await this.page.waitForTimeout(400);
   }
 
   async getNodesCount(): Promise<string | null> {
@@ -1691,9 +1736,12 @@ export default class GraphPage extends BasePage {
   async deleteElementsByPosition(
     positions: { x: number; y: number }[]
   ): Promise<void> {
-    positions.forEach(async (position) => {
-      await this.elementClick(position.x, position.y);
-    });
+    // Sequential: the delete control appears after the first selection, so an
+    // unawaited loop could open the dialog on a partial selection. Shift from the
+    // second click on, or each one would replace the selection instead of adding.
+    for (const [index, position] of positions.entries()) {
+      await this.elementClick(position.x, position.y, index > 0);
+    }
     await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
     await waitForElementToNotBeVisible(this.deleteElementConfirm);
@@ -1766,12 +1814,12 @@ export default class GraphPage extends BasePage {
     await this.page.mouse.up();
   }
 
-  async rightClickAtCanvasCenter(): Promise<void> {
+  async clickAtCanvasCenter(): Promise<void> {
     const boundingBox = await this.getBoundingBoxCanvasElement();
     if (!boundingBox) throw new Error("Canvas bounding box not found");
     const centerX = boundingBox.x + boundingBox.width / 2;
     const centerY = boundingBox.y + boundingBox.height / 2;
-    await this.page.mouse.click(centerX, centerY, { button: "right" });
+    await this.page.mouse.click(centerX, centerY);
   }
 
   async hoverAtCanvasCenter(): Promise<void> {
@@ -1803,8 +1851,8 @@ export default class GraphPage extends BasePage {
     return texts;
   }
 
-  async rightClickElement(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y, { button: "right" });
+  async clickElementAt(x: number, y: number): Promise<void> {
+    await this.page.mouse.click(x, y);
     await this.page.waitForTimeout(500);
   }
 
@@ -1826,5 +1874,73 @@ export default class GraphPage extends BasePage {
       ([k, v]) => localStorage.setItem(k, v),
       [key, value],
     );
+  }
+
+  private static async boxOf(locator: Locator, name: string): Promise<Box> {
+    const box = await locator.boundingBox();
+    if (!box) throw new Error(`${name} is not laid out`);
+    return box;
+  }
+
+  /**
+   * Geometry of the Manage Graphs toolbar: the panel that clips it, its action
+   * buttons in render order, and the search box that follows them.
+   */
+  async manageToolbarLayout(): Promise<{
+    panel: Box;
+    actions: Box[];
+    search: Box;
+  }> {
+    const actions: Box[] = [];
+    for (const id of ["deleteGraph", "exportGraph", "uploadGraph", "duplicateGraph"]) {
+      actions.push(await GraphPage.boxOf(this.page.getByTestId(id), id));
+    }
+    return {
+      panel: await GraphPage.boxOf(this.manageContent, "Manage Graphs panel"),
+      actions,
+      search: await GraphPage.boxOf(
+        this.page.getByTestId("searchInputGraphs"),
+        "Graphs search box",
+      ),
+    };
+  }
+
+  /** Geometry of the Delete Graph dialog, the two buttons in its footer, and the viewport holding them. */
+  async deleteDialogLayout(): Promise<{
+    dialog: Box;
+    buttons: Box[];
+    viewport: { width: number; height: number };
+  }> {
+    const viewport = this.page.viewportSize();
+    if (!viewport) throw new Error("Headless page has no viewport");
+    return {
+      dialog: await GraphPage.boxOf(this.page.locator("#dialog"), "Delete Graph dialog"),
+      buttons: [
+        await GraphPage.boxOf(this.deleteConfirm, "Delete Graph confirm"),
+        await GraphPage.boxOf(this.deleteCancel, "Delete Graph cancel"),
+      ],
+      viewport,
+    };
+  }
+
+  /** Geometry of the maximized query editor and the viewport it has to fit into. */
+  async maximizedEditorLayout(): Promise<{
+    dialog: Box;
+    viewport: { width: number; height: number };
+  }> {
+    const viewport = this.page.viewportSize();
+    if (!viewport) throw new Error("Headless page has no viewport");
+    return {
+      dialog: await GraphPage.boxOf(this.page.locator("#dialog"), "Maximized editor"),
+      viewport,
+    };
+  }
+
+  /**
+   * How many visual lines the maximized editor renders. More than one for a
+   * one-line query means the text wrapped rather than running off the side.
+   */
+  async maximizedEditorVisualLines(): Promise<number> {
+    return this.page.locator("#dialog .view-line").count();
   }
 }
