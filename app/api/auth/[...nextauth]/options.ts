@@ -1072,21 +1072,35 @@ const authOptions: NextAuthConfig = {
       if (trigger === "update" && updateData) {
         if (updateData.activeConnectionId !== undefined) {
           const newConnId = updateData.activeConnectionId as string;
-          token.activeConnectionId = newConnId;
 
-          // Look up the connection details from Token DB
+          // The id and the host/port/username it resolves to are one value, not
+          // two: the client derives its connection-scoped storage prefix from
+          // those fields and pairs it with this id, and ciphertext is bound to
+          // the same triple server-side. Committing the id while the lookup
+          // fails would leave the session naming connection B with A's host,
+          // port and username — the client's "prefix and id agree" checks would
+          // then pass on a pairing that is actually crossed, and a save would
+          // file B-owned ciphertext under A's key. So switch both together or
+          // neither, and let an unresolvable record leave the token untouched;
+          // the client sees the session still naming the old connection and
+          // rolls its pin back.
           try {
             const storage = StorageFactory.getStorage();
             const tokenData = await storage.fetchTokenById(newConnId);
-            if (tokenData && tokenData.name.startsWith("connection:")) {
+            if (isUsableConnectionRecord(tokenData, token.id as string)) {
+              token.activeConnectionId = newConnId;
               token.host = tokenData.host;
               token.port = tokenData.port;
               token.username = tokenData.username || "default";
               token.role = tokenData.role;
               token.tls = tokenData.tls ?? false;
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn("JWT update: ignoring switch to a connection that is not usable for this session");
             }
           } catch (lookupErr) {
-            // Non-fatal: session.user will use stale values until next refresh
+            // Non-fatal: the token keeps naming the previous connection, which
+            // is the pairing its host/port/username still describe.
             // eslint-disable-next-line no-console
             console.warn("JWT update: failed to look up connection from Token DB:", lookupErr);
           }

@@ -44,6 +44,58 @@ export function buildConnectionPrefix(host: string, port: number, username: stri
 const SCOPE_MARKER_KEY = "__scope";
 
 /**
+ * Holds the raw, unescaped username of the scope's owner. `SCOPE_MARKER_KEY`
+ * cannot do this job: it predates the escaping, so a legacy session may have
+ * written one into a prefix that now belongs to somebody else. This key is only
+ * ever written by a build that escapes, which is what makes its absence
+ * meaningful. See `quarantineForeignScope`.
+ */
+const SCOPE_OWNER_KEY = "__scopeOwner";
+
+/**
+ * Where keys found squatting in an escaped prefix are parked. Prefixed rather
+ * than deleted: they are somebody's data, just not this session's.
+ */
+const SCOPE_CONFLICT_PREFIX = "__scope-conflict:";
+
+/**
+ * Escaping is injective over the prefixes this build writes, but its image
+ * overlaps the prefixes older builds wrote: `alice:prod` escapes to
+ * `host:port:alice%3Aprod:`, which is character for character the prefix a
+ * pre-escape build gave a user literally named `alice%3Aprod`. Shape cannot
+ * separate them and `SCOPE_MARKER_KEY` cannot either — the legacy session
+ * stamped that marker itself.
+ *
+ * What does separate them: a build that escapes is the only thing that writes
+ * `SCOPE_OWNER_KEY`, and no such build has ever written to this prefix if the
+ * key is missing. So when the username actually needs escaping (it holds `%`
+ * or `:`), anything already sitting in the prefix without that key predates
+ * escaping and belongs to the other user. Park it and start clean rather than
+ * read it as our own.
+ *
+ * Usernames that escape to themselves — every username without `%` or `:` — are
+ * untouched: their escaped prefix is the prefix they have always had, and its
+ * contents are genuinely theirs.
+ */
+function quarantineForeignScope(prefix: string, username: string): void {
+  if (escapeScopeSegment(username) === username) return;
+  if (localStorage.getItem(`${prefix}${SCOPE_OWNER_KEY}`) === username) return;
+
+  const squatting: string[] = [];
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(prefix)) squatting.push(key);
+  }
+  for (const key of squatting) {
+    const parked = `${SCOPE_CONFLICT_PREFIX}${key}`;
+    if (localStorage.getItem(parked) === null) {
+      localStorage.setItem(parked, localStorage.getItem(key)!);
+    }
+    localStorage.removeItem(key);
+  }
+}
+
+/**
  * Build and cache the prefix.
  * Call once when the session becomes available (host, port & username known).
  */
@@ -52,7 +104,11 @@ export function setConnectionPrefix(host: string, port: number, username: string
   _port = port;
   _username = username;
   _prefix = buildConnectionPrefix(host, port, username);
-  if (isBrowser()) localStorage.setItem(`${_prefix}${SCOPE_MARKER_KEY}`, "1");
+  if (isBrowser()) {
+    quarantineForeignScope(_prefix, username);
+    localStorage.setItem(`${_prefix}${SCOPE_MARKER_KEY}`, "1");
+    localStorage.setItem(`${_prefix}${SCOPE_OWNER_KEY}`, username);
+  }
 }
 
 /**

@@ -238,3 +238,39 @@ test("migrateToScopedStorage leaves an unescaped-username key a live scope could
     assert.equal(storage.getItem("localhost:6379:live:chat-bob:chat-social"), "whose?");
     assert.equal(getConnectionItem("chat-social"), null);
 });
+
+test("an escaped prefix does not inherit a pre-escape user's keys", () => {
+    // A legacy build gave a user literally named `alice%3Aprod` the prefix
+    // `localhost:6379:alice%3Aprod:` — character for character the prefix this
+    // build hands `alice:prod`. Its scope marker is no help: the legacy session
+    // wrote one itself. The keys are parked, not read.
+    storage.setItem("localhost:6379:alice%3Aprod:__scope", "1");
+    storage.setItem("localhost:6379:alice%3Aprod:query history", "[legacy]");
+
+    setConnectionPrefix("localhost", 6379, "alice:prod");
+
+    assert.equal(getConnectionPrefix(), "localhost:6379:alice%3Aprod:");
+    assert.equal(getConnectionItem("query history"), null);
+    assert.equal(
+        storage.getItem("__scope-conflict:localhost:6379:alice%3Aprod:query history"),
+        "[legacy]"
+    );
+});
+
+test("a scope this build owns survives re-entering it", () => {
+    setConnectionPrefix("localhost", 6379, "carol:prod");
+    setConnectionItem("query history", "[mine]");
+
+    setConnectionPrefix("localhost", 6379, "someone-else");
+    setConnectionPrefix("localhost", 6379, "carol:prod");
+
+    assert.equal(getConnectionItem("query history"), "[mine]");
+});
+
+test("a username that needs no escaping keeps the keys already in its scope", () => {
+    storage.setItem("localhost:6379:dave:query history", "[dave's]");
+
+    setConnectionPrefix("localhost", 6379, "dave");
+
+    assert.equal(getConnectionItem("query history"), "[dave's]");
+});

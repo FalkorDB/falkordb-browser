@@ -7,6 +7,7 @@ import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, pr
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey, ServerDecryptError } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, buildConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
+import switchSessionConnection from "@/lib/connection-switch";
 import { usePathname, useRouter } from "next/navigation";
 import { syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
@@ -1798,13 +1799,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // Everything session-derived -- role, host, storage prefix -- comes from the
     // JWT, so a failed sync must not leave the id pinned to a connection the
-    // session never learned about. Unpin instead and let the JWT answer.
+    // session never learned about. Unpin instead and let the JWT answer. A
+    // session that resolves without adopting the id counts as a failure too:
+    // the server declined the switch, so the prefix still describes the other
+    // connection.
     const pinAndSync = async (id: string) => {
       setActiveConnectionId(id);
       setActiveConnectionIdGlobal(id);
       const pinnedEpoch = getConnectionEpoch();
       try {
-        await updateSessionRef.current({ activeConnectionId: id });
+        await switchSessionConnection(updateSessionRef.current, id);
       } catch (error) {
         // Undo only our own pin. A switch started during the await has already
         // moved the id on and is waiting for the reset effect to release its
@@ -2084,9 +2088,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     (async () => {
       let loadedChatApiKeys: ChatApiKey[] = [];
       let stored = getConnectionItem(CHAT_API_KEYS_STORAGE_KEY) || "";
-      // Before scoping, every connection shared one unscoped entry. Claim it
-      // for whichever connection can actually decrypt it; the others leave it
-      // in place so its owner still finds it.
+      // Before scoping, every connection shared one unscoped entry. Two paths
+      // out of that, and they differ: ciphertext is owner-bound, so only the
+      // connection it decrypts for claims it and the rest hit 403 and leave it
+      // alone. Plain text names no owner, so the first connection to load it
+      // claims it — and the others, which used to read that same entry, lose
+      // it. That is a narrowing of access, not a crossing of a boundary: the
+      // entry was readable by every connection in this browser a moment ago.
+      // The alternative, leaving it unclaimed, keeps a plaintext secret at rest
+      // for everyone forever, and makes every user re-enter their keys to spare
+      // the multi-connection minority a re-entry.
       const legacyStored = stored ? "" : localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
       let claimingLegacy = false;
       if (legacyStored) {
