@@ -346,15 +346,15 @@ export default function LoginForm({
           }
           clearError();
         }}
-        className="flex items-center justify-center gap-8 p-4 border border-primary rounded-lg w-full"
+        className="flex items-center justify-center gap-8 p-4 short:gap-3 short:p-2 border border-primary rounded-lg w-full"
       >
         <div className="grow basis-0 flex items-center space-x-2">
           <RadioGroupItem value="manual" id="manual" />
-          <label htmlFor="manual" className="text-base font-medium cursor-pointer">Manual Configuration</label>
+          <label htmlFor="manual" className="text-base short:text-sm font-medium cursor-pointer">Manual Configuration</label>
         </div>
         <div className="grow basis-0 flex items-center space-x-2">
           <RadioGroupItem value="url" id="url" />
-          <label htmlFor="url" className="text-base font-medium cursor-pointer">FalkorDB URL</label>
+          <label htmlFor="url" className="text-base short:text-sm font-medium cursor-pointer">FalkorDB URL</label>
         </div>
       </RadioGroup>
       <FormComponent

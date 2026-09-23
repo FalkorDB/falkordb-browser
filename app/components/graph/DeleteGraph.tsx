@@ -114,7 +114,7 @@ export default function DeleteGraph({
       }
       description={`Are you sure you want to delete the selected graph(s)? (${selectedGraphs.map(opt => opt.cells[0].value as string).join(", ")})`}
     >
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Button
           data-testid="deleteGraphConfirm"
           indicator={indicator}

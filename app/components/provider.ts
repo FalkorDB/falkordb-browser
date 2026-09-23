@@ -225,6 +225,17 @@ type PanelContextType = {
    */
   customizingLabel: CustomizingRef | null;
   setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>>;
+  /**
+   * Mobile only. The nav row rendered by `ProviderLayout` reserves a slot so a
+   * route can portal its own switcher (e.g. the /graph tab dropdown) beside the
+   * hamburger, keeping navigation to a single row. Null on desktop.
+   */
+  mobileNavSlot: HTMLDivElement | null;
+  /**
+   * Mobile only. Trailing slot in the same nav row for the active route's
+   * toolbar actions, so they do not cost a row of their own. Null on desktop.
+   */
+  mobileToolbarSlot: HTMLDivElement | null;
 };
 
 type QueryLoadingContextType = {
@@ -569,6 +580,8 @@ export const PanelContext = createContext<PanelContextType>({
   onInfoPanelResize: () => { },
   customizingLabel: null,
   setCustomizingLabel: () => { },
+  mobileNavSlot: null,
+  mobileToolbarSlot: null,
 });
 
 export const QueryLoadingContext = createContext<QueryLoadingContextType>({
