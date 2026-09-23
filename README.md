@@ -124,6 +124,9 @@ Notes:
 - The discrete fields override the URL field by field. An **empty**
   `FALKORDB_PASSWORD` also overrides it, so omit the variable entirely to keep
   the password from `FALKORDB_CONNECTION_URL`.
+- The URL carries a host, a port and credentials and nothing else. A database
+  selector other than `/0`, or any query string, is rejected at startup rather
+  than dropped — the browser only ever talks to database 0.
 - The password never reaches the browser: the client only asks to log in with
   "the preconfigured connection" and the server substitutes the credentials.
 - `FALKORDB_AUTO_CONNECT=false` is enforced server-side, not just in the UI: the

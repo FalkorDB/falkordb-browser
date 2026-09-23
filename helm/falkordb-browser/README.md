@@ -100,7 +100,7 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `connection.tls` | `"true"`/`"false"`; empty takes TLS from the URL scheme | `""` |
 | `connection.ca` | Base64-encoded CA certificate | `""` |
 | `connection.autoConnect` | Sign in automatically on load. `false` only prefills the login form | `true` |
-| `connection.existingSecret.name` | Existing Secret holding the connection secrets | `""` |
+| `connection.existingSecret.name` | Existing Secret holding the connection secrets. Must not be the chart's own Secret | `""` |
 | `connection.existingSecret.urlKey` | Key in that Secret for `FALKORDB_CONNECTION_URL` | `""` |
 | `connection.existingSecret.passwordKey` | Key in that Secret for `FALKORDB_PASSWORD` | `""` |
 | `connection.existingSecret.caKey` | Key in that Secret for `FALKORDB_CA` | `""` |
@@ -232,6 +232,8 @@ helm install falkordb-browser ./falkordb-browser \
 Notes:
 
 - The discrete fields override `connection.url` field by field. Leave a field empty to keep the value from the URL.
+- `connection.url` carries a host, a port and credentials and nothing else. A database selector other than `/0`, or any query string, is rejected at startup rather than dropped — the browser only ever talks to database 0.
+- `connection.existingSecret.name` has to name a Secret this chart does not manage. Pointing it at `<release>-falkordb-browser` makes the chart skip the key it would have written while still referencing it, leaving the pod stuck on a key that exists nowhere; the render fails instead.
 - Set `connection.autoConnect: false` to prefill the login form without signing in automatically. The password is then never handed out by the server, so leave `connection.password` unset and omit the password from `connection.url` — otherwise the form is prefilled but the credential still only lives on the server.
 - Changing a Secret referenced through `connection.existingSecret` (or `encryption.existingSecret`) does **not** restart the pod: those values are resolved when the container starts and the deployment's checksum annotations only cover chart-managed objects. Roll it yourself with `kubectl rollout restart deployment/<release>-falkordb-browser`.
 - **Security:** with `autoConnect` enabled, anyone who can reach the browser reaches the database with these credentials. Enable it only where the browser itself is access-controlled, and prefer a read-only FalkorDB user.

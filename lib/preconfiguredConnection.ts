@@ -101,10 +101,11 @@ type ParsedConnectionUrl = {
 };
 
 /**
- * Parses `scheme://[user[:password]@]host[:port]` for the four accepted
+ * Parses `scheme://[user[:password]@]host[:port][/0]` for the four accepted
  * schemes. Written by hand rather than with `new URL()` because a password may
  * contain characters `URL` rejects, and because a missing or unknown scheme
- * has to be a hard error here.
+ * has to be a hard error here. Any other trailing path or query is rejected:
+ * the browser has nowhere to carry it.
  */
 export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_URL"): ParsedConnectionUrl {
     let rest = raw.trim();
@@ -144,9 +145,21 @@ export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_U
         }
     }
 
-    // Strip a path/query suffix such as the Redis database selector in "/0".
+    // The connection carries a host, a port and credentials, and nothing else
+    // survives into the socket — so a suffix is only tolerated when it asks
+    // for what the browser already does. "/1" used to be stripped in silence,
+    // which connected to database 0 while the url said otherwise: the one
+    // failure an operator has no way to see.
     const pathStart = rest.search(/[/?]/);
-    if (pathStart >= 0) rest = rest.slice(0, pathStart);
+    if (pathStart >= 0) {
+        const suffix = rest.slice(pathStart);
+        if (suffix !== "/" && suffix !== "/0") {
+            throw new Error(
+                `${name} ends in "${suffix}", which the browser cannot honour — it connects to database 0 with no query options`
+            );
+        }
+        rest = rest.slice(0, pathStart);
+    }
 
     let host = rest;
     let port: number | undefined;

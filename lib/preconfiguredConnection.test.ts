@@ -122,6 +122,21 @@ test("url parsing handles credentials, escaping and a trailing database path", (
 
     // Username with no password.
     assert.equal(parsePreconfiguredUrl("falkor://alice@db.internal").password, undefined);
+
+    // A bare "/" asks for nothing beyond the default either.
+    assert.equal(parsePreconfiguredUrl("redis://db.internal/").host, "db.internal");
+});
+
+test("a url that asks for something the connection cannot carry is rejected", () => {
+    // Accepting this would connect to database 0 while the operator reads the
+    // url and believes they are on database 1.
+    assert.throws(() => parsePreconfiguredUrl("redis://db.internal:6379/1"), /\/1/);
+    assert.throws(() => parsePreconfiguredUrl("falkors://alice:s3cr3t@db.internal/2"), /database 0/);
+    assert.throws(() => parsePreconfiguredUrl("redis://db.internal?timeout=5"), /\?timeout=5/);
+    assert.throws(
+        () => readPreconfiguredConnection({ FALKORDB_CONNECTION_URL: "redis://db.internal:6379/1" }),
+        /FALKORDB_CONNECTION_URL/
+    );
 });
 
 test("a url without a scheme is rejected rather than assumed to be plaintext", () => {

@@ -3,7 +3,10 @@ import urls from "../config/urls.json";
 import LoginPage from "../logic/POM/loginPage";
 
 const DISCOVERY_ROUTE = "**/api/connections/preconfigured";
-const SIGN_IN_ROUTE = "**/api/auth/callback/credentials";
+// next-auth appends the authorization params to the callback, so the pattern
+// has to survive the empty "?" it leaves behind on a plain credentials sign-in.
+const SIGN_IN_ROUTE = "**/api/auth/callback/credentials*";
+const SESSION_ROUTE = "**/api/auth/session";
 
 // The preconfigured connection is an operator-side environment setting, so the
 // server under test has none. Mocking the discovery endpoint is what lets the
@@ -28,6 +31,50 @@ test.describe("@admin Preconfigured connection", () => {
         await expect(loginPage.autoConnectError).toBeVisible();
         // The failure hands the visitor back to the manual form.
         await expect(loginPage.logInButton).toBeVisible();
+    });
+
+    test("carries a successful automatic login through to the graph", async ({ page }) => {
+        // The server under test has no preconfigured connection, so the real
+        // callback can only refuse — standing in for it is the only way to
+        // reach the branch that redirects. `signedIn` flips with it because
+        // next-auth re-reads the session before signIn() resolves, and the
+        // page would otherwise be bounced straight back here.
+        let signedIn = false;
+
+        await page.route(DISCOVERY_ROUTE, (route) =>
+            route.fulfill({
+                json: { configured: true, autoConnect: true, host: "localhost", port: 6379, tls: false },
+            })
+        );
+        await page.route(SESSION_ROUTE, (route) =>
+            route.fulfill({
+                json: signedIn
+                    ? {
+                          user: {
+                              id: "preconfigured",
+                              role: "Admin",
+                              host: "localhost",
+                              port: 6379,
+                              tls: false,
+                              url: "falkor://localhost:6379",
+                          },
+                          expires: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+                      }
+                    : null,
+            })
+        );
+        await page.route(SIGN_IN_ROUTE, (route) => {
+            signedIn = true;
+            // What the next-auth client reads as success: a url it can parse
+            // that carries no "error" query param.
+            return route.fulfill({ json: { url: urls.graphUrl } });
+        });
+
+        const loginPage = new LoginPage(page);
+        await page.goto(urls.loginUrl);
+
+        await expect(page).toHaveURL(/\/graph/);
+        await expect(loginPage.autoConnectError).toBeHidden();
     });
 
     test("an explicit sign-out is not undone by the automatic login", async ({ page }) => {

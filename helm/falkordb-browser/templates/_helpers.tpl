@@ -179,7 +179,18 @@ because the browser trims them too and would read "   " as unconfigured.
 {{- define "falkordb-browser.validateConnection" -}}
 {{- $connection := .Values.connection -}}
 {{- $existing := $connection.existingSecret | default dict -}}
-{{- $externalUrl := and ($existing.name | default "" | trim) ($existing.urlKey | default "" | trim) -}}
+{{- $existingName := $existing.name | default "" | toString -}}
+{{- $chartSecretName := include "falkordb-browser.fullname" . -}}
+{{- /*
+Naming the chart's own Secret here points the Deployment at a key that will
+never exist: secret.yaml drops every chart-managed key the existingSecret
+claims, while connectionSecretEnv sends the env var to that same Secret. The
+pod would then be stuck on a missing key, so refuse the name outright.
+*/ -}}
+{{- if eq $existingName $chartSecretName -}}
+{{- fail "connection.existingSecret.name must reference a Secret not managed by this chart" -}}
+{{- end -}}
+{{- $externalUrl := and ($existingName | trim) ($existing.urlKey | default "" | trim) -}}
 {{- if not (or ($connection.url | default "" | trim) ($connection.host | default "" | trim) $externalUrl) -}}
 {{- fail "connection.enabled requires connection.url, connection.host, or connection.existingSecret.name together with connection.existingSecret.urlKey" -}}
 {{- end -}}
