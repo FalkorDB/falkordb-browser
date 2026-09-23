@@ -1,13 +1,11 @@
-/* eslint-disable react/jsx-props-no-spreading */
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Button as UIButton } from "@falkordb/ui";
+import { Button as UIButton, type ButtonProps as UIButtonProps } from "@falkordb/ui";
 import { Loader2 } from "lucide-react";
 import React, { forwardRef } from "react";
 
-export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "Delete" | "button";
+export type Variant = "Primary" | "Secondary" | "Cancel" | "Delete" | "button";
 
-/* eslint-disable react/require-default-props */
 export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
     label?: string
     variant?: Variant
@@ -21,41 +19,13 @@ export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttribute
     tooltipSide?: "top" | "bottom" | "left" | "right"
 }
 
-/**
- * The design system's button owns the behaviour; these are the looks this app
- * has of its own, handed over as a class name because `variant="none"` and
- * `size="none"` leave the geometry entirely to the consumer.
- */
-const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, isLoading: boolean, classN: string | undefined) => {
-
-    let className = cn(
-        "disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all duration-150",
-        variant !== "button" && "rounded-lg",
-        open !== undefined && "gap-4",
-        isLoading && "flex items-center justify-center",
-        classN,
-    );
-
-    switch (variant) {
-        case "Primary":
-            className = cn(
-                "px-4 py-[10px] bg-primary",
-                !disable && "hover:bg-primary/80",
-                className
-            );
-            break;
-        case "Secondary":
-            className = cn("px-12 py-2 bg-transparent border-2 border-primary text-primary", className);
-            break;
-        case "Cancel":
-            className = cn("px-12 py-2 bg-transparent border-2 border-border", className);
-            break;
-        case "Delete":
-            className = cn("px-4 py-[10px] bg-transparent border-2 border-destructive text-destructive", className);
-            break;
-        default:
-    }
-    return className;
+/** This app's names for the looks the design system ships. */
+const LOOKS: Record<Variant, Pick<UIButtonProps, "variant" | "size">> = {
+    Primary: { variant: "default", size: "default" },
+    Secondary: { variant: "secondary", size: "wide" },
+    Cancel: { variant: "cancel", size: "wide" },
+    Delete: { variant: "destructive", size: "default" },
+    button: { variant: "none", size: "none" },
 };
 
 const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, loaderSize = 16, indicator, tooltipVariant = variant, tooltipSide, ...props }, ref) =>
@@ -64,9 +34,8 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
             <TooltipTrigger asChild>
                 <UIButton
                     ref={ref}
-                    variant="none"
-                    size="none"
-                    className={getClassName(variant, disabled, open, isLoading, className)}
+                    {...LOOKS[variant]}
+                    className={cn(open !== undefined && "gap-4", className)}
                     disabled={disabled || isLoading || indicator === "offline"}
                     aria-label={title}
                     type={type}
@@ -98,9 +67,8 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
         // `isLoading` to the design system.
         <UIButton
             ref={ref}
-            variant="none"
-            size="none"
-            className={getClassName(variant, disabled, open, isLoading, className)}
+            {...LOOKS[variant]}
+            className={cn(open !== undefined && "gap-4", isLoading && "justify-center", className)}
             disabled={disabled || isLoading}
             type={type}
             {...props}
