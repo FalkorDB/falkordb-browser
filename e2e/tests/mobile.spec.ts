@@ -344,6 +344,120 @@ test.describe("@admin Mobile layout", () => {
         await expect(graph.dataPanel).toHaveCount(0);
     });
 
+    // The data sheet is the selection made visible, so it has no open state of
+    // its own: it is up for exactly as long as something is selected. Another
+    // sheet taking the screen only covers it, and closing it deselects — a
+    // sheet that could be dismissed on its own would leave the element picked
+    // on the canvas with nothing on screen saying so.
+    test("The data sheet follows the selection", async () => {
+        // Two canvas settles plus four sheet transitions put this close to the
+        // default budget, which makes any CI hiccup a timeout.
+        test.setTimeout(60_000);
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+        await graph.selectGraphByName(graphName);
+        await graph.closeGraphInfoSheet();
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(false);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.clickRunQuery();
+
+        await graph.tapFirstNodeOnCanvas();
+        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(true);
+
+        // The info sheet covers the same region, so the data sheet steps aside
+        // — but the node stays selected, and uncovering brings the sheet back.
+        await graph.openGraphInfoSheet();
+        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(false);
+        await graph.closeGraphInfoSheet();
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(false);
+        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(true);
+        await expect(graph.dataPanel).toBeVisible();
+
+        // Closing the panel is the only way to drop a single selection here:
+        // the sheet covers the canvas, so there is no background left to tap.
+        await graph.dataPanelClose.click();
+        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(false);
+
+        // And it stays shut. Had it only been hidden, the selection would still
+        // be live and the next uncovering would bring the sheet back up.
+        await graph.openGraphInfoSheet();
+        await graph.closeGraphInfoSheet();
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(false);
+        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(false);
+    });
+
+    // Touch has no hover, so the row actions cannot hide behind one — they are
+    // always on screen. That leaves the value cell redundant as an edit
+    // trigger, and it is the one thing the table scrolls sideways by, so a tap
+    // meant to read the rest of a value must not open an editor instead.
+    test("The attribute value is not an edit trigger", async () => {
+        test.setTimeout(60_000);
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+        await graph.selectGraphByName(graphName);
+        await graph.closeGraphInfoSheet();
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(false);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.clickRunQuery();
+
+        await graph.tapFirstNodeOnCanvas();
+        await expect.poll(() => graph.isSheetOpen(graph.dataSheet)).toBe(true);
+
+        // The pencil is what replaces it, and it is there without a hover.
+        await expect(graph.dataPanelSetAttribute).toBeVisible();
+        await expect(graph.dataPanelValueSetAttribute).toBeDisabled();
+        await graph.dataPanelValueSetAttribute.click({ force: true });
+        await expect(graph.dataPanelSetAttributeConfirm).toHaveCount(0);
+
+        await graph.dataPanelSetAttribute.click();
+        await expect(graph.dataPanelSetAttributeConfirm).toBeVisible();
+        await graph.dataPanelSetAttributeCancel.click();
+    });
+
+    // Maximizing is what a phone needs most and was what it fitted worst: the
+    // dialog kept its desktop margins and the query ran off the right edge.
+    test("The maximized editor fills the screen and wraps", async () => {
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+        await graph.insertQuery("MATCH (n:MobileSeed) WHERE n.name = 'seed' RETURN n.name AS name");
+
+        await graph.editorMore.click();
+        await graph.editorMaximize.click();
+
+        const { dialog, viewport } = await graph.maximizedEditorLayout();
+        expect(Math.round(dialog.width)).toBe(viewport.width);
+        expect(Math.round(dialog.x)).toBe(0);
+        expect(Math.round(dialog.y)).toBe(0);
+        expect(Math.round(dialog.height)).toBe(viewport.height);
+
+        // Filling the screen is only half of it — a line longer than the screen
+        // has to wrap, because there is no room to scroll sideways for the rest.
+        await expect.poll(() => graph.maximizedEditorVisualLines()).toBeGreaterThan(1);
+    });
+
+    // `group-hover` never fires on a touch screen, so the close button was
+    // invisible while staying tappable: the toast could only be dismissed by
+    // guessing where its X was.
+    test("The toast close button shows without a hover", async () => {
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+        await graph.selectGraphByName(graphName);
+        await graph.closeGraphInfoSheet();
+        await expect.poll(() => graph.isSheetOpen(graph.graphInfoSheet)).toBe(false);
+        await graph.insertQuery("MATCH (n RETURN n");
+        await graph.clickRunQuery(false);
+
+        await expect(graph.errorToast).toBeVisible();
+        // `toBeVisible` passes at `opacity: 0` — which is exactly the bug, so
+        // the assertion has to be on the computed opacity itself.
+        await expect
+            .poll(() => graph.toastClose.evaluate(el => getComputedStyle(el).opacity))
+            .toBe("1");
+
+        await graph.toastClose.click();
+        await expect(graph.errorToast).toBeHidden();
+    });
+
     test("Manage Graphs wraps its actions instead of stacking them", async () => {
         const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
         await graph.waitForPageIdle();

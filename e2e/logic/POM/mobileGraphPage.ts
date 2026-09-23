@@ -63,6 +63,33 @@ export default class MobileGraphPage extends GraphPage {
     return this.page.getByTestId("DataPanel");
   }
 
+  public get dataPanelClose(): Locator {
+    return this.page.getByTestId("DataPanelClose");
+  }
+
+  /** The attribute's value cell, which doubles as an edit trigger on desktop. */
+  public get dataPanelValueSetAttribute(): Locator {
+    return this.page.getByTestId("DataPanelValueSetAttribute");
+  }
+
+  /** The pencil — on desktop only on hover, on mobile always. */
+  public get dataPanelSetAttribute(): Locator {
+    return this.page.getByTestId("DataPanelSetAttribute");
+  }
+
+  public get dataPanelSetAttributeCancel(): Locator {
+    return this.page.getByTestId("DataPanelSetAttributeCancel");
+  }
+
+  /** Only rendered while a row is being edited, so it doubles as "is editing". */
+  public get dataPanelSetAttributeConfirm(): Locator {
+    return this.page.getByTestId("DataPanelSetAttributeConfirm");
+  }
+
+  public get toastClose(): Locator {
+    return this.page.locator("[toast-close]");
+  }
+
   public get multiSelectBar(): Locator {
     return this.page.getByTestId("multiSelectBar");
   }
@@ -265,5 +292,24 @@ export default class MobileGraphPage extends GraphPage {
    */
   async isSheetOpen(sheet: Locator): Promise<boolean> {
     return (await sheet.getAttribute("data-state")) === "open";
+  }
+
+  /**
+   * Taps the first node that is actually on screen. Node positions are absolute
+   * page coordinates, and one parked outside the canvas cannot be tapped, so
+   * the off-screen ones are filtered out first.
+   */
+  async tapFirstNodeOnCanvas(): Promise<void> {
+    const canvasBox = await this.canvasElement.boundingBox();
+    if (!canvasBox) throw new Error("the canvas has no box to tap");
+    const node = (await this.getNodesScreenPositions()).find(
+      (n) =>
+        n.screenX >= canvasBox.x &&
+        n.screenX <= canvasBox.x + canvasBox.width &&
+        n.screenY >= canvasBox.y &&
+        n.screenY <= canvasBox.y + canvasBox.height
+    );
+    if (!node) throw new Error("no node landed inside the canvas");
+    await this.elementClick(node.screenX, node.screenY);
   }
 }

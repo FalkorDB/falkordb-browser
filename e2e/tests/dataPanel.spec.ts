@@ -608,4 +608,25 @@ test.describe("Data panel Tests", () => {
 
     await apicalls.removeGraph(graphName);
   });
+
+  // A phone has no hover, so there the pencil is always out and the value cell
+  // is left alone to scroll the row. Desktop keeps the shortcut: clicking the
+  // value is how most edits start.
+  test(`@readwrite Validate clicking an attribute value starts an edit`, async () => {
+    const graphName = getRandomString("datapanel");
+    await apicalls.addGraph(graphName);
+    await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"})');
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+    await graph.searchElementInCanvas("Alice");
+
+    await graph.clickDataPanelValueSetAttribute();
+    expect(await graph.isEditingAttribute()).toBe(true);
+
+    await graph.clickDataPanelSetAttributeCancel();
+    await apicalls.removeGraph(graphName);
+  });
 });

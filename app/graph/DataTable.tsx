@@ -8,6 +8,7 @@ import { Fragment, MutableRefObject, ReactNode, useCallback, useContext, useEffe
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getNodeDisplayKey } from "@falkordb/canvas";
+import useIsMobile from "@/lib/useIsMobile";
 import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
@@ -105,6 +106,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { toast } = useToast();
+    const isMobile = useIsMobile();
 
     const setInputRef = useRef<HTMLInputElement>(null);
     const setTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -628,7 +630,10 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
     return (
         <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
             <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden">
-                <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_38px]">
+                {/* The actions column is sized for the icons it holds: one at a
+                    time on hover, but both at once on a phone, where they are
+                    always on screen because there is no hover to reveal them. */}
+                <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_38px] mobile:grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_72px]">
                     <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Key</div>
                     <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Value</div>
                     <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Type</div>
@@ -641,7 +646,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                             const isExpanded = expandedAttributes[key];
                             const shouldShowToggle = valueNeedsExpansion(key);
                             const cellClass = cn("flex items-center px-1 border-b border-border min-h-6");
-                            const buttonTitle = isReadOnly ? undefined : (isComplex && "Complex values cannot be edited") || "Click to edit the attribute value";
+                            const buttonTitle = isReadOnly || isMobile ? undefined : (isComplex && "Complex values cannot be edited") || "Click to edit the attribute value";
 
                             return (
                                 <Fragment key={key}>
@@ -672,7 +677,10 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                                                             title={buttonTitle}
                                                             variant="button"
                                                             onClick={() => handleSetEditable(key, value)}
-                                                            disabled={isAddValue || isComplex || isReadOnly}
+                                                            // On a phone the value is also the only thing that scrolls
+                                                            // the table sideways, so a tap on it must not start an
+                                                            // edit — the pencil, shown unconditionally there, does.
+                                                            disabled={isAddValue || isComplex || isReadOnly || isMobile}
                                                         >
                                                             <p
                                                                 ref={setValueParagraphRef(key)}
@@ -749,7 +757,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                                                             </Button>
                                                         }
                                                     </>
-                                                    : hover === key &&
+                                                    : (isMobile || hover === key) &&
                                                     <>
                                                         {isComplex ? (
                                                             <Tooltip>

@@ -1922,4 +1922,25 @@ export default class GraphPage extends BasePage {
       viewport,
     };
   }
+
+  /** Geometry of the maximized query editor and the viewport it has to fit into. */
+  async maximizedEditorLayout(): Promise<{
+    dialog: Box;
+    viewport: { width: number; height: number };
+  }> {
+    const viewport = this.page.viewportSize();
+    if (!viewport) throw new Error("Headless page has no viewport");
+    return {
+      dialog: await GraphPage.boxOf(this.page.locator("#dialog"), "Maximized editor"),
+      viewport,
+    };
+  }
+
+  /**
+   * How many visual lines the maximized editor renders. More than one for a
+   * one-line query means the text wrapped rather than running off the side.
+   */
+  async maximizedEditorVisualLines(): Promise<number> {
+    return this.page.locator("#dialog .view-line").count();
+  }
 }

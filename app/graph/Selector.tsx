@@ -68,7 +68,7 @@ export default function Selector({
     const { settings: { querySettings: { limitSettings: { limit, lastLimit } }, userExperienceSettings: { captionKeysSettings: { showPropertyKeyPrefix } } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { cypherLanguageConfig, setCypherLanguageConfig } = useContext(CypherLanguageContext);
-    const { panelOpen, onTogglePanel, setPanel, mobileToolbarSlot } = useContext(PanelContext);
+    const { panelOpen, onTogglePanel, mobileToolbarSlot } = useContext(PanelContext);
     const isMobile = useIsMobile();
 
     const [maximize, setMaximize] = useState(false);
@@ -134,12 +134,12 @@ export default function Selector({
             )}
             title="Graph info"
             onClick={() => {
-                // On mobile the three sheets share a stacking level and all cover
-                // the canvas, so a second one opened on top of the first would just
-                // hide it. Dropping `panel` closes the data sheet without touching
-                // the selection, which is still there when the user comes back.
+                // On mobile the three sheets all cover the canvas, so only one of
+                // them can be the one on top. The data sheet is not closed here:
+                // it belongs to the selection, and dropping it would leave the
+                // element selected with nothing on screen saying so — it is
+                // simply covered, and is back when this one closes.
                 if (isMobile && !panelOpen) {
-                    setPanel(undefined);
                     setChatOpen?.(false);
                 }
 
@@ -169,7 +169,6 @@ export default function Selector({
                 const next = !chatOpen;
 
                 if (isMobile && next) {
-                    setPanel(undefined);
                     if (panelOpen) onTogglePanel();
                 }
 

@@ -1390,7 +1390,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 </div>
             </div>
             <Dialog open={maximize} onOpenChange={setMaximize}>
-                <DialogContent hideClose className="w-full h-full" onEscapeKeyDown={(e) => {
+                <DialogContent hideClose className="w-full h-full mobile:w-screen mobile:max-w-none mobile:h-[100dvh] mobile:max-h-[100dvh] mobile:rounded-none mobile:p-2" onEscapeKeyDown={(e) => {
                     // When Monaco has focus, let it handle Escape (closes suggestions or blurs).
                     // Only allow the Dialog to handle Escape if Monaco is not focused.
                     if ((e.target as HTMLElement)?.closest?.('.monaco-editor')) e.preventDefault();
@@ -1400,7 +1400,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             <DialogTitle />
                             <DialogDescription />
                         </VisuallyHidden>
-                        <div className="z-10 absolute right-0 top-0 bottom-0 p-2 flex flex-col items-end justify-between pointer-events-none">
+                        {/* The controls float over the editor. On a phone that would
+                            put the minimize button on top of the wrapped first line,
+                            so there they join the run button on the bottom row. */}
+                        <div className="z-10 absolute right-0 top-0 bottom-0 p-2 flex flex-col items-end justify-between pointer-events-none mobile:top-auto mobile:flex-row mobile:items-center mobile:gap-2">
                             <CloseDialog
                                 className="pointer-events-auto"
                             >
@@ -1444,7 +1447,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             options={{
                                 lineNumbersMinChars: 3,
                                 fontSize: isMobile ? 16 : 25,
-                                minimap: { enabled: true },
+                                // A phone has no room to scroll sideways for the rest
+                                // of a line, and none to spare for a minimap.
+                                wordWrap: isMobile ? "on" : "off",
+                                minimap: { enabled: !isMobile },
                                 scrollbar: { vertical: 'auto', horizontal: 'auto' },
                                 overviewRulerLanes: 3,
                                 overviewRulerBorder: true,

@@ -255,20 +255,23 @@ export default function Page() {
 
     }, [getPanelSize, hasPanelContent]);
 
-    // Keeps the element panel in step with the selection. This re-asserts
-    // `expand()` on every selection change — not just when the count changes —
-    // because switching tabs can swap one selected element for another while
-    // `panel` stays "data", which on its own would leave the panel collapsed.
+    // Keeps the element panel in step with the selection: it is open exactly
+    // while something is selected, on both layouts. This re-asserts `expand()`
+    // on every selection change — not just when the count changes — because
+    // switching tabs can swap one selected element for another while `panel`
+    // stays "data", which on its own would leave the panel collapsed.
+    // `panelRef` is the desktop panel and is absent on mobile, where the sheet
+    // takes its open state from `hasPanelContent` instead; the `panel` half of
+    // this has to run there too, or a sheet that something else closed could
+    // never come back and the element would stay selected with nothing to
+    // show it. Multi select is the one thing that keeps it shut, since on a
+    // phone the sheet covers the canvas the next tap has to reach.
     useEffect(() => {
-        const currentPanel = panelRef.current;
-
-        if (!currentPanel) return;
-
         if (activeSelection.length !== 0) {
-            currentPanel.expand();
-            if (panel === undefined) setPanel("data");
+            panelRef.current?.expand();
+            if (panel === undefined && !multiSelectRef.current) setPanel("data");
         } else if (panel === "data") {
-            currentPanel.collapse();
+            panelRef.current?.collapse();
         }
     }, [activeSelection, panel, setPanel]);
 
@@ -839,10 +842,15 @@ export default function Page() {
                         >
                             {graphInfoNode}
                         </BottomSheet>
-                        {/* No sheet title: DataPanel and CreateElementPanel both render
-                            their own header and close button. */}
+                        {/* Open for as long as there is a selection to show — the
+                            other two sheets cover the whole canvas, so this one steps
+                            aside while either is up rather than closing: closing it
+                            drops the selection, and the element would stay picked on
+                            the canvas with nothing on screen saying so.
+                            No sheet title: DataPanel and CreateElementPanel both
+                            render their own header and close button. */}
                         <BottomSheet
-                            open={hasPanelContent}
+                            open={hasPanelContent && !panelOpen && !chatOpen}
                             onClose={closeCurrentPanel}
                             height="full"
                             data-testid="mobileDataSheet"
