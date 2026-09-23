@@ -168,15 +168,30 @@ test("migrateToScopedStorage leaves another user's scoped keys alone", () => {
     assert.equal(getConnectionItem("chat-bob:query history"), null);
 });
 
+test("a colon in the username cannot collide with another scope's key", () => {
+    // `alice`'s graph is named `bob:chat-social`; `alice:chat-bob`'s is `social`.
+    // Spelled out raw, both would be localhost:6379:alice:chat-bob:chat-social.
+    setConnectionPrefix("localhost", 6379, "alice");
+    setConnectionItem("chat-bob:chat-social", "alice's chat");
+
+    setConnectionPrefix("localhost", 6379, "alice:chat-bob");
+    assert.equal(getConnectionItem("chat-social"), null);
+    setConnectionItem("chat-social", "the other alice's chat");
+
+    setConnectionPrefix("localhost", 6379, "alice");
+    assert.equal(getConnectionItem("chat-bob:chat-social"), "alice's chat");
+});
+
 test("migrateToScopedStorage recognises a scope whose username contains a colon", () => {
     setConnectionPrefix("localhost", 6379, "chat-bob:prod");
-    storage.setItem("localhost:6379:chat-bob:prod:chat-social", "bob's chat");
+    setConnectionItem("chat-social", "bob's chat");
+    assert.equal(storage.getItem("localhost:6379:chat-bob%3Aprod:chat-social"), "bob's chat");
 
     setConnectionPrefix("localhost", 6379, "chat-alice");
     migrateToScopedStorage();
 
-    assert.equal(storage.getItem("localhost:6379:chat-bob:prod:chat-social"), "bob's chat");
-    assert.equal(getConnectionItem("chat-bob:prod:chat-social"), null);
+    assert.equal(storage.getItem("localhost:6379:chat-bob%3Aprod:chat-social"), "bob's chat");
+    assert.equal(getConnectionItem("chat-bob%3Aprod:chat-social"), null);
 });
 
 test("migrateToScopedStorage still upgrades a graph name that looks like a username", () => {

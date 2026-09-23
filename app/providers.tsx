@@ -1792,11 +1792,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const pinAndSync = async (id: string) => {
       setActiveConnectionId(id);
       setActiveConnectionIdGlobal(id);
+      const pinnedEpoch = getConnectionEpoch();
       try {
         await updateSessionRef.current({ activeConnectionId: id });
       } catch (error) {
-        setActiveConnectionId(null);
-        setActiveConnectionIdGlobal(null);
+        // Undo only our own pin. A switch started during the await has already
+        // moved the id on and is waiting for the reset effect to release its
+        // gate slot; clearing the id here makes that effect see A→null→B, and
+        // it skips both transitions, so the gate never reopens.
+        if (getConnectionEpoch() === pinnedEpoch) {
+          setActiveConnectionId(null);
+          setActiveConnectionIdGlobal(null);
+        }
         throw error;
       }
     };

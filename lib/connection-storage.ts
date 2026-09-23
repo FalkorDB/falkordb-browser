@@ -15,12 +15,24 @@ let _port = 0;
 let _migrated = new Set<string>();
 
 /**
+ * `:` separates the segments and `%` introduces an escape, so escaping both
+ * keeps the username inside its own segment. Without it the prefix is not
+ * injective: user `alice` reading `chat-bob:chat-social` (a graph named
+ * `bob:chat-social`) and user `alice:chat-bob` reading `chat-social` land on
+ * the same key. Every username free of `:` and `%` encodes to itself, so no
+ * existing scope moves.
+ */
+function escapeScopeSegment(value: string): string {
+  return value.replace(/%/g, "%25").replace(/:/g, "%3A");
+}
+
+/**
  * The storage prefix for a connection. Exported because the staleness checks in
  * `providers.tsx` compare against it — building the string twice would let the
  * two drift and silently disable those checks.
  */
 export function buildConnectionPrefix(host: string, port: number, username: string): string {
-  return `${host}:${port}:${username}:`;
+  return `${host}:${port}:${escapeScopeSegment(username)}:`;
 }
 
 /**
@@ -123,15 +135,18 @@ function isRecognizedScopedKey(suffix: string): boolean {
  * stamps `SCOPE_MARKER_KEY` into its own prefix, and only a scope that exists
  * has one. A graph name that merely looks like a username still migrates.
  *
- * A username may itself contain colons, so every boundary is a candidate, not
- * just the first.
+ * `suffix` is key text that already carries an escaped username, so the segment
+ * is compared verbatim rather than re-escaped through `buildConnectionPrefix`.
+ * Escaping leaves no colon in a username, so the first boundary is the only one
+ * that can name a live scope; the later ones are still scanned because a marker
+ * written before the escape existed spells its colons out.
  *
  * The residual case is a user who last signed in before this marker existed and
  * has not signed in since, which is the behaviour that shipped before it.
  */
 function belongsToAnotherUserScope(suffix: string): boolean {
   for (let sep = suffix.indexOf(":"); sep !== -1; sep = suffix.indexOf(":", sep + 1)) {
-    const scope = buildConnectionPrefix(_host, _port, suffix.slice(0, sep));
+    const scope = `${_host}:${_port}:${suffix.slice(0, sep)}:`;
     if (localStorage.getItem(`${scope}${SCOPE_MARKER_KEY}`) !== null) return true;
   }
   return false;
@@ -146,7 +161,7 @@ export function migrateToScopedStorage(): void {
 
   // ── Phase 1: migrate old host:port: prefix → current host:port:username: prefix ──
   // Legacy format: "host:port:key"             (before username was added)
-  // Current format: "host:port:username:key"   (username is always "default" or a real name)
+  // Current format: "host:port:username:key"   (escaped username, "default" when anonymous)
   const legacyPrefix = `${_host}:${_port}:`;
 
   if (legacyPrefix !== _prefix) {
