@@ -1,0 +1,284 @@
+/**
+ * A single FalkorDB connection supplied by the operator through the
+ * environment (Helm values, a Kubernetes Secret, `docker run -e …`) instead of
+ * being typed into the login form.
+ *
+ * This module is deliberately pure — no `next/*`, no `@/` alias — so it stays
+ * loadable by `node --test`.
+ */
+
+export const DEFAULT_PRECONFIGURED_HOST = "localhost";
+export const DEFAULT_PRECONFIGURED_PORT = 6379;
+
+/** What the server knows. `password` and `ca` never leave the server. */
+export type PreconfiguredConnection = {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    tls: boolean;
+    ca?: string;
+    /** Log the operator in automatically instead of showing the login form. */
+    autoConnect: boolean;
+};
+
+/** What the browser is allowed to see before anyone has authenticated. */
+export type PreconfiguredConnectionInfo = {
+    configured: boolean;
+    autoConnect: boolean;
+    host?: string;
+    port?: number;
+    username?: string;
+    tls?: boolean;
+};
+
+/** The subset of `process.env` this module reads. */
+export type PreconfiguredEnv = Record<string, string | undefined>;
+
+const TLS_PROTOCOLS = new Set(["falkors", "rediss"]);
+const KNOWN_PROTOCOLS = new Set(["falkor", "falkors", "redis", "rediss"]);
+
+function trimmed(value: string | undefined): string | undefined {
+    const text = value?.trim();
+    return text ? text : undefined;
+}
+
+/**
+ * Environment booleans are operator input, so anything that is not recognisably
+ * true or false is a typo — report it rather than silently picking a side.
+ */
+function parseBoolean(value: string | undefined, fallback: boolean, name: string): boolean {
+    const text = trimmed(value)?.toLowerCase();
+    if (text === undefined) return fallback;
+    if (text === "true" || text === "1" || text === "yes") return true;
+    if (text === "false" || text === "0" || text === "no") return false;
+    throw new Error(`${name} must be one of true/false, 1/0 or yes/no (got "${value}")`);
+}
+
+function parsePort(value: string | undefined, fallback: number, name: string): number {
+    const text = trimmed(value);
+    if (text === undefined) return fallback;
+    const port = Number(text);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error(`${name} must be an integer between 1 and 65535 (got "${value}")`);
+    }
+    return port;
+}
+
+function decodeUrlPart(value: string, part: string, name: string): string {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        // The value itself is not reported — this is reached for the password.
+        throw new Error(`${name} has a malformed percent-escape in its ${part}`);
+    }
+}
+
+/**
+ * Validates an IPv6 literal and returns it in canonical form, without brackets.
+ *
+ * Borrows the URL parser rather than hand-rolling a regex: it is the same
+ * grammar the address came from, it normalises the address the socket gets, and
+ * it is what makes "host:6379:extra" a reported typo instead of a hostname that
+ * only fails much later, at DNS.
+ */
+function parseIpv6(address: string, name: string): string {
+    let hostname: string;
+    try {
+        ({ hostname } = new URL(`http://[${address}]`));
+    } catch {
+        throw new Error(`${name} has "${address}" where an IPv6 address is expected`);
+    }
+    return hostname.slice(1, -1);
+}
+
+type ParsedConnectionUrl = {
+    host?: string;
+    port?: number;
+    username?: string;
+    password?: string;
+    tls?: boolean;
+};
+
+/**
+ * Parses `scheme://[user[:password]@]host[:port][/0]` for the four accepted
+ * schemes. Written by hand rather than with `new URL()` because a password may
+ * contain characters `URL` rejects, and because a missing or unknown scheme
+ * has to be a hard error here. Any other trailing path or query is rejected:
+ * the browser has nowhere to carry it.
+ */
+export function parsePreconfiguredUrl(raw: string, name = "FALKORDB_CONNECTION_URL"): ParsedConnectionUrl {
+    let rest = raw.trim();
+
+    const schemeEnd = rest.indexOf("://");
+    if (schemeEnd < 0) {
+        // The scheme is what decides TLS, so a bare "host:port" would pick
+        // plaintext on the operator's behalf. That spelling belongs in
+        // FALKORDB_HOST/FALKORDB_PORT, where it makes no such claim.
+        throw new Error(`${name} must start with falkor://, falkors://, redis:// or rediss://`);
+    }
+    const protocol = rest.slice(0, schemeEnd).toLowerCase();
+    if (!KNOWN_PROTOCOLS.has(protocol)) {
+        throw new Error(`${name} must use one of falkor://, falkors://, redis:// or rediss:// (got "${protocol}://")`);
+    }
+    const tls = TLS_PROTOCOLS.has(protocol);
+    rest = rest.slice(schemeEnd + 3);
+
+    // A password may itself contain "@", so split on the LAST one.
+    let username: string | undefined;
+    let password: string | undefined;
+    const at = rest.lastIndexOf("@");
+    if (at >= 0) {
+        const creds = rest.slice(0, at);
+        rest = rest.slice(at + 1);
+        const colon = creds.indexOf(":");
+        if (colon >= 0) {
+            username = decodeUrlPart(creds.slice(0, colon), "username", name);
+            password = decodeUrlPart(creds.slice(colon + 1), "password", name);
+        } else {
+            username = decodeUrlPart(creds, "username", name);
+        }
+        // An "@" with nothing before it is a typo, not a request for an
+        // anonymous connection — that one is spelled without the "@".
+        if (!username && !password) {
+            throw new Error(`${name} has an "@" with no username or password before it`);
+        }
+    }
+
+    // The connection carries a host, a port and credentials, and nothing else
+    // survives into the socket — so a suffix is only tolerated when it asks
+    // for what the browser already does. "/1" used to be stripped in silence,
+    // which connected to database 0 while the url said otherwise: the one
+    // failure an operator has no way to see.
+    const pathStart = rest.search(/[/?]/);
+    if (pathStart >= 0) {
+        const suffix = rest.slice(pathStart);
+        if (suffix !== "/" && suffix !== "/0") {
+            throw new Error(
+                `${name} ends in "${suffix}", which the browser cannot honour — it connects to database 0 with no query options`
+            );
+        }
+        rest = rest.slice(0, pathStart);
+    }
+
+    let host = rest;
+    let port: number | undefined;
+    let portColon: number;
+
+    if (rest.startsWith("[")) {
+        // A bracketed IPv6 literal owns every colon inside the brackets, so the
+        // last-colon rule below would read "::1]" as a port. The brackets are
+        // URL syntax and not part of the address the socket wants.
+        const bracketEnd = rest.indexOf("]");
+        if (bracketEnd < 0) throw new Error(`${name} has a "[" with no matching "]"`);
+        host = parseIpv6(rest.slice(1, bracketEnd), name);
+        const afterBracket = rest.slice(bracketEnd + 1);
+        if (afterBracket && !afterBracket.startsWith(":")) {
+            throw new Error(`${name} has unexpected text after the host's "]" ("${afterBracket}")`);
+        }
+        portColon = afterBracket ? bracketEnd + 1 : -1;
+    } else if (rest.indexOf(":") !== rest.lastIndexOf(":")) {
+        // Two colons and no brackets: a hostname or an IPv4 address can hold
+        // none at all, so this is meant to be an IPv6 literal. Splitting on the
+        // last colon would invent a port out of its final group — brackets are
+        // what separate an IPv6 address from a port, so without them there is
+        // none, and anything that is not an address is a typo.
+        host = parseIpv6(rest, name);
+        portColon = -1;
+    } else {
+        portColon = rest.lastIndexOf(":");
+        if (portColon >= 0) host = rest.slice(0, portColon);
+    }
+
+    if (portColon >= 0) {
+        const portText = rest.slice(portColon + 1);
+        // A trailing ":" is a typo, not a request for the default port.
+        if (!portText.trim()) throw new Error(`${name} has a ":" with no port after it`);
+        port = parsePort(portText, DEFAULT_PRECONFIGURED_PORT, `${name} port`);
+    }
+
+    if (!host) throw new Error(`${name} is missing a host`);
+
+    return { host, port, username: username || undefined, password: password || undefined, tls };
+}
+
+/**
+ * Reads the operator-supplied connection, or `null` when none is configured.
+ *
+ * `FALKORDB_CONNECTION_URL` seeds the values; the discrete `FALKORDB_*` vars
+ * override it, so a Helm chart can put the URL in a Secret and still override
+ * a single field from plain values. Throws on malformed input — a deployment
+ * that half-parsed its own configuration should fail loudly at the first
+ * request, not connect somewhere unintended.
+ */
+export function readPreconfiguredConnection(env: PreconfiguredEnv): PreconfiguredConnection | null {
+    const url = trimmed(env.FALKORDB_CONNECTION_URL);
+    const host = trimmed(env.FALKORDB_HOST);
+
+    if (!url && !host) return null;
+
+    const fromUrl = url ? parsePreconfiguredUrl(url) : {};
+
+    return {
+        host: host ?? fromUrl.host ?? DEFAULT_PRECONFIGURED_HOST,
+        port: parsePort(env.FALKORDB_PORT, fromUrl.port ?? DEFAULT_PRECONFIGURED_PORT, "FALKORDB_PORT"),
+        username: trimmed(env.FALKORDB_USERNAME) ?? fromUrl.username ?? "default",
+        password: env.FALKORDB_PASSWORD ?? fromUrl.password ?? "",
+        tls: parseBoolean(env.FALKORDB_TLS, fromUrl.tls ?? false, "FALKORDB_TLS"),
+        ca: trimmed(env.FALKORDB_CA),
+        autoConnect: parseBoolean(env.FALKORDB_AUTO_CONNECT, true, "FALKORDB_AUTO_CONNECT"),
+    };
+}
+
+/** Strips the secrets, leaving only what the login form would prefill anyway. */
+export function toPreconfiguredConnectionInfo(
+    connection: PreconfiguredConnection | null
+): PreconfiguredConnectionInfo {
+    if (!connection) return { configured: false, autoConnect: false };
+
+    return {
+        configured: true,
+        autoConnect: connection.autoConnect,
+        host: connection.host,
+        port: connection.port,
+        username: connection.username,
+        tls: connection.tls,
+    };
+}
+
+/** The credentials shape the credentials provider hands to `newClient`. */
+export type PreconfiguredLoginCredentials = {
+    host: string;
+    port: string;
+    username?: string;
+    password?: string;
+    tls: string;
+    ca?: string;
+};
+
+/**
+ * The credentials to substitute for a client that asks to log in with "the
+ * preconfigured connection", or `null` when it may not have them.
+ *
+ * `autoConnect: false` is an access decision, not a UI hint: it means the
+ * operator wants the form prefilled but the password typed, so the server must
+ * refuse to hand the password out — otherwise anyone can POST
+ * `preconfigured=true` to the credentials callback and skip the prompt.
+ */
+export function preconfiguredLoginCredentials(env: PreconfiguredEnv): PreconfiguredLoginCredentials | null {
+    const connection = readPreconfiguredConnection(env);
+    if (!connection || !connection.autoConnect) return null;
+
+    const password = connection.password || undefined;
+
+    return {
+        host: connection.host,
+        port: String(connection.port),
+        // Mirrors the Token DB reconnect path: with no password both
+        // credentials are omitted, so no AUTH command is sent to FalkorDB.
+        username: password ? connection.username : undefined,
+        password,
+        tls: connection.tls ? "true" : "false",
+        ca: connection.ca,
+    };
+}

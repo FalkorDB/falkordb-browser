@@ -14,6 +14,35 @@ export default class LoginPage extends HeaderComponent {
     return this.page.getByRole("button", { name: "Log in" });
   }
 
+  public get logInButton(): Locator {
+    return this.connectBtn;
+  }
+
+  public get hostField(): Locator {
+    return this.hostInput;
+  }
+
+  public get portField(): Locator {
+    return this.portInput;
+  }
+
+  public get usernameField(): Locator {
+    return this.usernameInput;
+  }
+
+  // Preconfigured connection markers.
+  public get autoConnecting(): Locator {
+    return this.page.getByTestId("loginAutoConnecting");
+  }
+
+  public get autoConnectError(): Locator {
+    return this.page.getByTestId("loginAutoConnectError");
+  }
+
+  public get preconfiguredError(): Locator {
+    return this.page.getByTestId("loginPreconfiguredError");
+  }
+
   private get usernameInput(): Locator {
     return this.page.locator("//input[@id='Username']");
   }

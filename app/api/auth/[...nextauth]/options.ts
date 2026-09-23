@@ -10,6 +10,7 @@ import { getToken } from "next-auth/jwt";
 import { LRUCache } from "lru-cache";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import type { TokenData } from "@/lib/token-storage/ITokenStorage";
+import { preconfiguredLoginCredentials } from "@/lib/preconfiguredConnection";
 import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
@@ -786,6 +787,7 @@ const authOptions: NextAuthConfig = {
         tls: { label: "tls", type: "boolean" },
         ca: { label: "ca", type: "string" },
         url: { label: "url", type: "string" },
+        preconfigured: { label: "preconfigured", type: "string" },
       },
       async authorize(credentials) {
         if (!credentials) {
@@ -793,7 +795,7 @@ const authOptions: NextAuthConfig = {
         }
 
         // In next-auth v5, credential values are `unknown`. Cast to strings.
-        const creds = {
+        let creds = {
           host: (credentials.host as string) || undefined,
           port: (credentials.port as string) || undefined,
           password: (credentials.password as string) || undefined,
@@ -802,6 +804,36 @@ const authOptions: NextAuthConfig = {
           ca: (credentials.ca as string) || undefined,
           url: (credentials.url as string) || undefined,
         };
+
+        // The client may ask to log in with the operator's preconfigured
+        // connection, but it may not influence it: every field is replaced by
+        // the server-side value, so the password never crosses the wire.
+        if (credentials.preconfigured === "true") {
+          let preconfigured;
+          try {
+            preconfigured = preconfiguredLoginCredentials(process.env);
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error("Invalid preconfigured connection environment:", err);
+            return null;
+          }
+
+          // Also null when FALKORDB_AUTO_CONNECT is false — the operator wants
+          // the password typed, so the server does not substitute it.
+          if (!preconfigured) return null;
+
+          // Discrete fields only, so the URL normalisation below is a no-op
+          // for this path by construction.
+          creds = {
+            host: preconfigured.host,
+            port: preconfigured.port,
+            password: preconfigured.password,
+            username: preconfigured.username,
+            tls: preconfigured.tls,
+            ca: preconfigured.ca,
+            url: undefined,
+          };
+        }
 
         // A URL login carries the endpoint only inside `url`, and `newClient`
         // ignores host/port/username entirely when a URL is present. Record

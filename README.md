@@ -96,6 +96,61 @@ When FalkorDB runs in a different container, mount the same `falkordb-import`
 volume to `/var/lib/FalkorDB/import` there as well and configure
 `IMPORT_FOLDER /var/lib/FalkorDB/import` on the DB side.
 
+### Start already connected (preconfigured connection)
+
+For GitOps-style deployments the connection can be baked into the environment,
+so the browser opens straight onto the graph list instead of the login form:
+
+```bash
+docker run -p 3000:3000 --rm \
+  -e FALKORDB_CONNECTION_URL=falkor://default:password@falkordb:6379 \
+  falkordb/falkordb-browser:latest
+```
+
+or with discrete fields instead of a URL:
+
+```bash
+docker run -p 3000:3000 --rm \
+  -e FALKORDB_HOST=falkordb \
+  -e FALKORDB_PORT=6379 \
+  -e FALKORDB_USERNAME=default \
+  -e FALKORDB_PASSWORD=password \
+  falkordb/falkordb-browser:latest
+```
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `FALKORDB_CONNECTION_URL` | `falkor://`, `falkors://`, `redis://` or `rediss://` URL; the `s` variants imply TLS | `""` |
+| `FALKORDB_HOST` | Hostname. Required unless the URL is set | `""` |
+| `FALKORDB_PORT` | Port | `6379` |
+| `FALKORDB_USERNAME` | Username | `default` |
+| `FALKORDB_PASSWORD` | Password | `""` |
+| `FALKORDB_TLS` | `true`/`false`; overrides the URL scheme | from the URL |
+| `FALKORDB_CA` | Base64-encoded CA certificate | `""` |
+| `FALKORDB_AUTO_CONNECT` | Sign in automatically on load. `false` only prefills the login form | `true` |
+
+Notes:
+
+- The discrete fields override the URL field by field. An **empty**
+  `FALKORDB_PASSWORD` also overrides it, so omit the variable entirely to keep
+  the password from `FALKORDB_CONNECTION_URL`.
+- The URL carries a host, a port and credentials and nothing else. A database
+  selector other than `/0`, or any query string, is rejected at startup rather
+  than dropped — the browser only ever talks to database 0.
+- The password never reaches the browser: the client only asks to log in with
+  "the preconfigured connection" and the server substitutes the credentials.
+- `FALKORDB_AUTO_CONNECT=false` is enforced server-side, not just in the UI: the
+  server refuses to substitute the credentials at all, so the prefilled form
+  needs a password the user knows.
+- Signing out explicitly returns to the login form and stays there; only a
+  reload after an expired session reconnects automatically.
+- **Security:** with `FALKORDB_AUTO_CONNECT=true`, anyone who can reach the
+  browser reaches the database with these credentials. Enable it only where the
+  browser itself is access-controlled, and prefer a read-only FalkorDB user.
+
+The Helm chart exposes the same settings under `connection.*` — see
+[Deploy to Kubernetes with Helm](#deploy-to-kubernetes-with-helm).
+
 ### Use MinIO for CSV temp uploads (S3-compatible)
 
 The CSV upload flow supports any S3-compatible backend, including MinIO. This
