@@ -24,6 +24,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1131.0",
     "@falkordb/canvas": "^0.2.8",
     "@falkordb/text-to-cypher": "^0.2.4",
+    "@falkordb/ui": "github:FalkorDB/falkordb-ui#feat/browser-alignment",
     "@hookform/resolvers": "^5.9.1",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-alert-dialog": "^1.1.23",
