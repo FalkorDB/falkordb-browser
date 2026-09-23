@@ -1,7 +1,7 @@
-/* eslint-disable react/button-has-type */
 /* eslint-disable react/jsx-props-no-spreading */
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Button as UIButton } from "@falkordb/ui";
 import { Loader2 } from "lucide-react";
 import React, { forwardRef } from "react";
 
@@ -21,6 +21,11 @@ export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttribute
     tooltipSide?: "top" | "bottom" | "left" | "right"
 }
 
+/**
+ * The design system's button owns the behaviour; these are the looks this app
+ * has of its own, handed over as a class name because `variant="none"` and
+ * `size="none"` leave the geometry entirely to the consumer.
+ */
 const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, isLoading: boolean, classN: string | undefined) => {
 
     let className = cn(
@@ -57,28 +62,22 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
     title !== "" && (title || label || indicator === "offline") && variant !== "Cancel" ? (
         <Tooltip>
             <TooltipTrigger asChild>
-                <button
+                <UIButton
                     ref={ref}
+                    variant="none"
+                    size="none"
                     className={getClassName(variant, disabled, open, isLoading, className)}
                     disabled={disabled || isLoading || indicator === "offline"}
                     aria-label={title}
                     type={type}
+                    isLoading={isLoading}
+                    loaderSize={loaderSize}
+                    label={label || undefined}
+                    labelClassName="text-center"
                     {...props}
                 >
-                    {
-                        isLoading ?
-                            <Loader2 size={loaderSize} className="animate-spin" />
-                            : <>
-                                {children}
-                                {
-                                    label &&
-                                    <p className="truncate text-center">
-                                        {label}
-                                    </p>
-                                }
-                            </>
-                    }
-                </button>
+                    {children}
+                </UIButton>
             </TooltipTrigger>
             <TooltipContent side={tooltipSide} className={cn(tooltipVariant === "Delete" && "bg-destructive border-destructive text-foreground", "whitespace-pre-line")}>
                 {
@@ -94,8 +93,13 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
             </TooltipContent>
         </Tooltip>
     ) : (
-        <button
+        // Without a tooltip the spinner joins the children rather than replacing
+        // them, so this branch composes its own content instead of handing
+        // `isLoading` to the design system.
+        <UIButton
             ref={ref}
+            variant="none"
+            size="none"
             className={getClassName(variant, disabled, open, isLoading, className)}
             disabled={disabled || isLoading}
             type={type}
@@ -103,7 +107,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
         >
             {children}
             {isLoading ? <Loader2 className="animate-spin" /> : label}
-        </button>
+        </UIButton>
     ));
 
 Button.displayName = "Button";
