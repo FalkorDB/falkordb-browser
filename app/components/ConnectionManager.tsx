@@ -93,7 +93,7 @@ export default function ConnectionManager() {
     try {
       // If this is the last connection, sign out instead.
       if (isLast) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: "/login?signedOut=true" });
         return;
       }
 
