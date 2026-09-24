@@ -4,9 +4,10 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout, ToastFn } from "@/lib/utils";
-import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
+import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey, ServerDecryptError } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
-import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
+import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, buildConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
+import switchSessionConnection from "@/lib/connection-switch";
 import { usePathname, useRouter } from "next/navigation";
 import { syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
@@ -139,7 +140,9 @@ const parseChatApiKeys = (value: string): ChatApiKey[] => {
 };
 
 const loadSelectedChatApiKeyId = () =>
-  localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
+  getConnectionItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY)
+  || localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY)
+  || "";
 
 /**
  * Validates and normalises a model identifier before it is persisted.
@@ -407,6 +410,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // can tell whether it is still the latest (out-of-order completions are ignored).
   const pendingSwitchesRef = useRef(0);
   const switchTicketRef = useRef(0);
+  // Rendered mirror of `pendingSwitchesRef`, for effects that must hold off
+  // until a switch settles. The ref alone cannot wake them.
+  const [switchPending, setSwitchPending] = useState(false);
 
   const bumpContextGen = useCallback(() => {
     contextGenRef.current += 1;
@@ -425,12 +431,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const beginConnectionSwitch = useCallback(() => {
     pendingSwitchesRef.current += 1;
     switchTicketRef.current += 1;
+    setSwitchPending(true);
     bumpContextGen();
     return switchTicketRef.current;
   }, [bumpContextGen]);
 
   const endConnectionSwitch = useCallback(() => {
     pendingSwitchesRef.current = Math.max(0, pendingSwitchesRef.current - 1);
+    setSwitchPending(pendingSwitchesRef.current > 0);
   }, []);
 
   // True if `ticket` is still the most recently started switch (so a stale,
@@ -1614,8 +1622,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Keep the module-level global in sync with React state on every render.
   // This is intentionally dependency-free so it runs after every render,
   // restoring _activeConnectionId even when Next.js HMR resets the module.
+  // A switch sets the global to its target and only updates React state once
+  // the JWT agrees, so during that window this effect would write the old id
+  // back over the target; skip it until the switch settles, which re-renders
+  // via `switchPending` and syncs whichever id won.
 
-  useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
+  useEffect(() => {
+    if (pendingSwitchesRef.current > 0) return;
+    setActiveConnectionIdGlobal(activeConnectionId);
+  });
 
   // Keep "Did you mean…?" function suggestions aware of the loaded UDFs.
   useEffect(() => { setFunctionCandidates(udfFunctionNames(udfList)); }, [udfList]);
@@ -1782,6 +1797,31 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     let cancelled = false;
 
+    // Everything session-derived -- role, host, storage prefix -- comes from the
+    // JWT, so a failed sync must not leave the id pinned to a connection the
+    // session never learned about. Unpin instead and let the JWT answer. A
+    // session that resolves without adopting the id counts as a failure too:
+    // the server declined the switch, so the prefix still describes the other
+    // connection.
+    const pinAndSync = async (id: string) => {
+      setActiveConnectionId(id);
+      setActiveConnectionIdGlobal(id);
+      const pinnedEpoch = getConnectionEpoch();
+      try {
+        await switchSessionConnection(updateSessionRef.current, id);
+      } catch (error) {
+        // Undo only our own pin. A switch started during the await has already
+        // moved the id on and is waiting for the reset effect to release its
+        // gate slot; clearing the id here makes that effect see A→null→B, and
+        // it skips both transitions, so the gate never reopens.
+        if (getConnectionEpoch() === pinnedEpoch) {
+          setActiveConnectionId(null);
+          setActiveConnectionIdGlobal(null);
+        }
+        throw error;
+      }
+    };
+
     (async () => {
       try {
         const result = await securedFetch("/api/connections", {
@@ -1806,15 +1846,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             const target = lastId && conns.find(c => c.id === lastId)
               ? lastId
               : conns[0].id;
-            setActiveConnectionId(target);
-            setActiveConnectionIdGlobal(target);
             // Sync activeConnectionId into the JWT so session.user reflects
             // the correct connection's role/host/port. The JWT callback looks
             // up the full connection details from Token DB.
             if (!cancelled) {
-              await updateSessionRef.current({
-                activeConnectionId: target,
-              });
+              await pinAndSync(target);
             }
 
           } else {
@@ -1846,12 +1882,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 const migratedConn: SessionConnection = migrateJson.connection;
                 const migratedConns = [migratedConn];
                 setAdditionalConnections(migratedConns);
-                setActiveConnectionId(migratedConn.id);
-                setActiveConnectionIdGlobal(migratedConn.id);
                 if (!cancelled) {
-                  await updateSessionRef.current({
-                    activeConnectionId: migratedConn.id,
-                  });
+                  await pinAndSync(migratedConn.id);
                 }
               }
             }
@@ -1974,70 +2006,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewLocalLlmProvider(loadedLocalLlmProvider);
       setLocalLlmEndpoint(loadedLocalLlmEndpoint);
       setNewLocalLlmEndpoint(loadedLocalLlmEndpoint);
-      let loadedChatApiKeys: ChatApiKey[] = [];
-      const storedChatApiKeys = localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
-      if (storedChatApiKeys) {
-        try {
-          // Validate format before decrypting - only decrypt if looks server-encrypted
-          if (looksServerEncrypted(storedChatApiKeys)) {
-            const decryptedKeys = await serverDecrypt(storedChatApiKeys);
-            loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
-          } else {
-            // Try to parse directly as plaintext JSON for legacy or test values
-            try {
-              loadedChatApiKeys = parseChatApiKeys(storedChatApiKeys);
-            } catch {
-              console.warn('Stored API keys format unrecognized, clearing corrupted data');
-              localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
-            }
-          }
-        } catch (error) {
-          console.error('Failed to decrypt API keys:', error);
-          localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
-        }
-      }
-
-      // Migrate the legacy single-key setting into the new key list.
-      const storedSecretKey = localStorage.getItem("secretKey") || "";
-      if (loadedChatApiKeys.length === 0 && storedSecretKey) {
-        let migratedKey = "";
-        if (isLegacyEncrypted(storedSecretKey)) {
-          try {
-            migratedKey = await legacyDecrypt(storedSecretKey);
-            clearLegacyEncryptionKey();
-          } catch (error) {
-            console.error('Failed to migrate legacy secret key:', error);
-          }
-        } else {
-          try {
-            migratedKey = await serverDecrypt(storedSecretKey);
-          } catch {
-            migratedKey = storedSecretKey;
-          }
-        }
-
-        if (migratedKey) {
-          const migratedChatApiKeys = [createChatApiKey(migratedKey)];
-          const encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
-          if (encryptedKeys) {
-            loadedChatApiKeys = migratedChatApiKeys;
-            localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
-            localStorage.removeItem("secretKey");
-          }
-        } else if (isLegacyEncrypted(storedSecretKey)) {
-          localStorage.removeItem("secretKey");
-        }
-      }
-
-      const storedSelectedId = loadSelectedChatApiKeyId();
-      const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
-      // selectedApiKey.id is a UUID identifier, not the API key value itself
-      const selectedId = String(selectedApiKey?.id ?? "");
-      persistSelectedChatApiKeyId(selectedId);
-      setChatApiKeys(loadedChatApiKeys);
-      setSelectedChatApiKeyId(selectedId);
-      setSecretKey(selectedApiKey?.key ?? "");
-
       const rawModel = localStorage.getItem("model") || "";
       const loadedModel = looksServerEncrypted(rawModel) ? "" : rawModel;
       setModel(loadedModel);
@@ -2048,6 +2016,228 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       } catch { /* ignore corrupted data */ }
     })();
   }, [status, prefixReady, toast]);
+
+  // Chat API keys are loaded separately from the settings above because they
+  // are connection-scoped: /api/encrypt binds each blob to `username@host:port`,
+  // so a blob written by one connection is unreadable by another. Storing them
+  // under a single global key meant the last connection to save wiped the
+  // others, and keeping them out of this effect's dependencies meant a
+  // connection switch left the previous connection's decrypted keys in state.
+  // `connectionScope` is built with the same helper the storage module uses, so
+  // the comparison below cannot drift from the prefix it is checking against.
+  const connectionScope = useMemo(
+    () => (status === "authenticated" && sessionData?.user
+      ? buildConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default")
+      : ""),
+    [status, sessionData?.user]
+  );
+
+  useEffect(() => {
+    // Drop the previous connection's credentials before anything awaits. The
+    // global connection id changes as soon as the switch starts, so a chat sent
+    // while this load is still in flight would otherwise carry connection A's
+    // key to connection B. Only the React state is cleared -- the stored values
+    // stay put under their own prefix and are re-read below. This runs on every
+    // identity change, including the one to "" on sign-out.
+    setChatApiKeys([]);
+    setSelectedChatApiKeyId("");
+    setSecretKey("");
+
+    // `connectionScope` and the storage prefix both come from the session,
+    // which only catches up once `updateSession` resolves -- while the global
+    // connection id every request is tagged with changed at the start of the
+    // switch. Reloading against the old identity in that window would republish
+    // connection A's key for requests already addressed to B, so wait it out.
+    // `endConnectionSwitch` (and the reset effect, which zeroes the counter
+    // once React agrees) re-runs this with whichever identity won, so a
+    // rolled-back switch restores the keys it just cleared.
+    if (switchPending) return undefined;
+
+    if (status !== "authenticated" || !prefixReady || !connectionScope) return undefined;
+
+    // `switchPending` only covers switches that went through
+    // `beginConnectionSwitch`. The bootstrap restore does not -- it moves the
+    // global connection id straight to the stored one -- so it opens the same
+    // window with the flag false: requests are already tagged with connection
+    // B while the session, and with it `connectionScope`, still names A.
+    // Compare the two ids directly so this load waits for them to agree.
+    // A null global is not a disagreement: requests then carry no
+    // `X-Connection-Id` and the server resolves the same identity from the JWT.
+    // Whichever way the disagreement resolves -- the session catching up, or
+    // the bootstrap rolling the id back after a failed sync -- moves a
+    // dependency below, so this load is retried rather than abandoned.
+    const pinnedConnectionId = getActiveConnectionIdGlobal();
+    const pinnedEpoch = getConnectionEpoch();
+    const sessionConnectionId = sessionData?.activeConnectionId ?? null;
+    if (pinnedConnectionId !== null && pinnedConnectionId !== sessionConnectionId) return undefined;
+
+    // The storage prefix is module-global and every step below awaits the
+    // server, so a connection switch mid-flight could publish this
+    // connection's keys into the next one's state, or write its ciphertext
+    // under the next one's prefix. Nothing commits once the run is superseded.
+    // The id being back where it started is not proof it never left: an A→B→A
+    // round trip restores it, and anything this run sent while it was at B was
+    // answered by B. The epoch counts the departures, so check that too.
+    let cancelled = false;
+    const stale = () =>
+      cancelled ||
+      getConnectionPrefix() !== connectionScope ||
+      getActiveConnectionIdGlobal() !== pinnedConnectionId ||
+      getConnectionEpoch() !== pinnedEpoch;
+
+    (async () => {
+      let loadedChatApiKeys: ChatApiKey[] = [];
+      let stored = getConnectionItem(CHAT_API_KEYS_STORAGE_KEY) || "";
+      // Before scoping, every connection shared one unscoped entry. Two paths
+      // out of that, and they differ: ciphertext is owner-bound, so only the
+      // connection it decrypts for claims it and the rest hit 403 and leave it
+      // alone. Plain text names no owner, so the first connection to load it
+      // claims it — and the others, which used to read that same entry, lose
+      // it. That is a narrowing of access, not a crossing of a boundary: the
+      // entry was readable by every connection in this browser a moment ago.
+      // The alternative, leaving it unclaimed, keeps a plaintext secret at rest
+      // for everyone forever, and makes every user re-enter their keys to spare
+      // the multi-connection minority a re-entry.
+      const legacyStored = stored ? "" : localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
+      let claimingLegacy = false;
+      if (legacyStored) {
+        stored = legacyStored;
+        claimingLegacy = true;
+      }
+
+      if (stored) {
+        try {
+          // Validate format before decrypting - only decrypt if looks server-encrypted
+          if (looksServerEncrypted(stored)) {
+            const decryptedKeys = await serverDecrypt(stored);
+            if (stale()) return;
+            loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
+          } else {
+            // Try to parse directly as plaintext JSON for legacy or test values
+            try {
+              loadedChatApiKeys = parseChatApiKeys(stored);
+            } catch {
+              console.warn('Stored API keys format unrecognized, clearing corrupted data');
+              if (claimingLegacy) localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+              else removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
+              claimingLegacy = false;
+            }
+          }
+          if (claimingLegacy) {
+            // The unscoped entry predates server encryption, so it may still be
+            // plain text. Encrypt it on the way in rather than carrying the
+            // plaintext forward until the user happens to edit a key. A failure
+            // here throws to the catch below, which leaves the unscoped entry
+            // where it is — nothing is lost, the migration just retries later.
+            const toStore = looksServerEncrypted(stored) ? stored : await serverEncrypt(stored);
+            if (stale()) return;
+            if (toStore) {
+              setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, toStore);
+              localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            }
+          }
+        } catch (error) {
+          if (stale()) return;
+          if (error instanceof ServerDecryptError && error.status === 403) {
+            // The value belongs to another connection. Keep it: switching back
+            // to that connection restores access.
+            console.warn('Stored API keys belong to a different connection, leaving them untouched');
+          } else if (error instanceof ServerDecryptError && error.status === 400) {
+            // The only permanent refusal: the value predates owner binding and
+            // can never be read again.
+            console.error('Stored API keys are unreadable, clearing them:', error);
+            if (claimingLegacy) localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            else removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
+          } else {
+            // A 5xx or a dropped request says nothing about the value itself;
+            // deleting on one would destroy a perfectly good key.
+            console.error('Failed to decrypt API keys, keeping them for a later attempt:', error);
+          }
+        }
+      }
+
+      // Migrate the legacy single-key setting into the new key list.
+      const storedSecretKey = localStorage.getItem("secretKey") || "";
+      if (loadedChatApiKeys.length === 0 && storedSecretKey) {
+        let migratedKey = "";
+        // The legacy key is the only way back into `secretKey`, and it is
+        // shared rather than connection-scoped. Dropping it the moment the
+        // decrypt succeeds would strand the ciphertext if the migration then
+        // failed to commit -- or if a connection switch superseded this run
+        // before it got the chance. Clear it only once `secretKey` itself is
+        // gone, at which point nothing is left for it to open.
+        let legacyKeySpent = false;
+        if (isLegacyEncrypted(storedSecretKey)) {
+          try {
+            migratedKey = await legacyDecrypt(storedSecretKey);
+            legacyKeySpent = true;
+          } catch (error) {
+            console.error('Failed to migrate legacy secret key:', error);
+          }
+          if (stale()) return;
+        } else if (looksServerEncrypted(storedSecretKey)) {
+          try {
+            migratedKey = await serverDecrypt(storedSecretKey);
+          } catch (error) {
+            // A superseded run must not touch storage, even to delete: the
+            // verdict below is acted on, not merely logged.
+            if (stale()) return;
+            // A refusal must not fall through to treating the ciphertext as the
+            // key itself: that would re-encrypt the blob as a bogus API key and
+            // delete the original.
+            if (error instanceof ServerDecryptError && error.status === 403) {
+              console.warn('Legacy secret key belongs to a different connection, leaving it untouched');
+            } else if (error instanceof ServerDecryptError && error.status === 400) {
+              // The one permanent refusal: predates owner binding, unreadable.
+              localStorage.removeItem("secretKey");
+            } else {
+              console.error('Failed to decrypt legacy secret key, keeping it:', error);
+            }
+          }
+          if (stale()) return;
+        } else {
+          // Never encrypted — the value is the key.
+          migratedKey = storedSecretKey;
+        }
+
+        if (migratedKey) {
+          const migratedChatApiKeys = [createChatApiKey(migratedKey)];
+          // `serverEncrypt` throws on a refusal, and an unhandled rejection
+          // here would abandon the run before the keys below are published.
+          // A failure says nothing about the value, so leave `secretKey` where
+          // it is and let the next run retry the migration.
+          let encryptedKeys = "";
+          try {
+            encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
+          } catch (error) {
+            console.error('Failed to encrypt the migrated secret key, keeping it for a later attempt:', error);
+          }
+          if (stale()) return;
+          if (encryptedKeys) {
+            loadedChatApiKeys = migratedChatApiKeys;
+            setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+            localStorage.removeItem("secretKey");
+            if (legacyKeySpent) clearLegacyEncryptionKey();
+          }
+        } else if (isLegacyEncrypted(storedSecretKey)) {
+          localStorage.removeItem("secretKey");
+          if (legacyKeySpent) clearLegacyEncryptionKey();
+        }
+      }
+
+      const storedSelectedId = loadSelectedChatApiKeyId();
+      const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
+      // selectedApiKey.id is a UUID identifier, not the API key value itself
+      const selectedId = String(selectedApiKey?.id ?? "");
+      if (stale()) return;
+      persistSelectedChatApiKeyId(selectedId);
+      setChatApiKeys(loadedChatApiKeys);
+      setSelectedChatApiKeyId(selectedId);
+      setSecretKey(selectedApiKey?.key ?? "");
+    })();
+
+    return () => { cancelled = true; };
+  }, [status, prefixReady, connectionScope, switchPending, sessionData?.activeConnectionId, activeConnectionId]);
 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.
@@ -2182,7 +2372,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     prevActiveConnectionIdRef.current = activeConnectionId;
 
     // Skip the very first selection (initial mount / login) and null resets
-    if (prev === null || activeConnectionId === null) return;
+    if (prev === null || activeConnectionId === null) {
+      // A switch that took a gate slot can still land here: a failed bootstrap
+      // pin leaves the id null, so the user's next click is a null → B
+      // transition. There is no previous connection's state to clear, but the
+      // slot still has to be released or graph ops stay blocked until the
+      // switch after this one.
+      if (activeConnectionId !== null && pendingSwitchesRef.current > 0) {
+        pendingSwitchesRef.current = 0;
+        setSwitchPending(false);
+      }
+      return;
+    }
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
@@ -2192,6 +2393,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     bumpContextGen();
     activeGraphNameRef.current = "";
     pendingSwitchesRef.current = 0;
+    setSwitchPending(false);
 
     // Clear graph data so stale results from the old connection are gone.
     // Build the empty graph with the real toast/setIndicator callbacks up front

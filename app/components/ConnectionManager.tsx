@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
 import { securedFetch, setActiveConnectionIdGlobal } from "@/lib/utils";
+import switchSessionConnection from "@/lib/connection-switch";
 
 import { ConnectionContext, IndicatorContext, SessionConnection } from "./provider";
 import Button from "./ui/Button";
@@ -47,14 +48,19 @@ export default function ConnectionManager() {
     localStorage.setItem("lastActiveConnectionId", connId);
     // Update the JWT so session.user.role is correct before React effects
     // (graph-list reload, query execution) fire. The JWT callback looks up
-    // the connection details from Token DB.
+    // the connection details from Token DB, and declines the switch when it
+    // cannot — which the helper surfaces as a rejection so we roll back rather
+    // than run on a session still describing the previous connection.
     try {
-      await updateSession({ activeConnectionId: connId });
+      await switchSessionConnection(updateSession, connId);
     } catch (error) {
       // Roll back so ids stay consistent and graph ops are unblocked again.
       if (isLatestSwitch(ticket)) setActiveConnectionIdGlobal(activeConnectionId);
       endConnectionSwitch();
       console.error("Failed to switch connection:", error);
+      // The menu still shows the old connection, which is now the truth; say so
+      // rather than leave the click looking ignored.
+      toast({ title: "Failed to switch connection", variant: "destructive" });
       return;
     }
     if (!isLatestSwitch(ticket)) {
@@ -67,7 +73,7 @@ export default function ConnectionManager() {
     // effect fires with the correct role already in sessionData; that reset
     // effect also clears this switch's gate slot.
     setActiveConnectionId(connId);
-  }, [activeConnectionId, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }, [activeConnectionId, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch, toast]);
 
   // Determine whether the user only has one connection. The session always
   // has at least one (the primary), so we treat an empty additionalConnections
@@ -112,7 +118,7 @@ export default function ConnectionManager() {
           setActiveConnectionIdGlobal(newActive);
           localStorage.setItem("lastActiveConnectionId", newActive);
           try {
-            await updateSession({ activeConnectionId: newActive });
+            await switchSessionConnection(updateSession, newActive);
           } catch (error) {
             if (isLatestSwitch(ticket)) setActiveConnectionIdGlobal(activeConnectionId);
             endConnectionSwitch();
@@ -167,7 +173,7 @@ export default function ConnectionManager() {
       setActiveConnectionIdGlobal(newConn.id);
       localStorage.setItem("lastActiveConnectionId", newConn.id);
       try {
-        await updateSession({ activeConnectionId: newConn.id });
+        await switchSessionConnection(updateSession, newConn.id);
       } catch (error) {
         if (isLatestSwitch(ticket)) setActiveConnectionIdGlobal(activeConnectionId);
         endConnectionSwitch();

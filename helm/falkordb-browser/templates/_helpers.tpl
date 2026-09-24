@@ -114,6 +114,49 @@ Secret value or generates a new key for first install.
 {{- end }}
 
 {{/*
+Secrets that are published in this repository, its docs or its CI, and so are
+known to everyone. Anyone holding one can forge a session cookie, so they are
+rejected wherever a session-signing secret is accepted.
+*/}}
+{{- define "falkordb-browser.wellKnownSecrets" -}}
+{{- list "CHANGE_ME_IN_PRODUCTION" "SECRET" "secret" "changeme" "your-secret-here" "your-secure-secret-here" "test-secret-for-ci" | join "," -}}
+{{- end }}
+
+{{/*
+Return the NEXTAUTH_SECRET used to sign sessions.
+Uses .Values.env.nextauthSecret when set, otherwise reuses the existing release
+Secret value or generates a new secret for first install. A known placeholder is
+rejected outright: anyone who knows it can forge a session cookie. The reuse path
+is checked too, so a release that was first installed with a placeholder is not
+allowed to keep it across an upgrade.
+*/}}
+{{- define "falkordb-browser.nextauthSecret" -}}
+{{- $wellKnown := splitList "," (include "falkordb-browser.wellKnownSecrets" .) -}}
+{{- $provided := .Values.env.nextauthSecret | default "" -}}
+{{- if $provided -}}
+{{- if has $provided $wellKnown -}}
+{{- fail "env.nextauthSecret is a well-known placeholder; leave it empty to generate one, or set a random value (openssl rand -base64 32)" -}}
+{{- end -}}
+{{- $provided -}}
+{{- else -}}
+{{- $secretName := include "falkordb-browser.fullname" . -}}
+{{- $existingSecret := lookup "v1" "Secret" .Release.Namespace $secretName -}}
+{{- $existing := "" -}}
+{{- if and $existingSecret (hasKey ($existingSecret.data | default dict) "NEXTAUTH_SECRET") -}}
+{{- $existing = index $existingSecret.data "NEXTAUTH_SECRET" | b64dec -}}
+{{- end -}}
+{{- if and $existing (has $existing $wellKnown) -}}
+{{- fail "the existing release Secret holds a well-known placeholder NEXTAUTH_SECRET; rotate it by setting env.nextauthSecret to a random value (openssl rand -base64 32), or delete the Secret to have one generated" -}}
+{{- end -}}
+{{- if $existing -}}
+{{- $existing -}}
+{{- else -}}
+{{- randBytes 32 | sha256sum -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Validate existing Secret based ENCRYPTION_KEY configuration.
 */}}
 {{- define "falkordb-browser.validateEncryptionKeySecret" -}}
