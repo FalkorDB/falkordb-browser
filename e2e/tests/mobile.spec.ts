@@ -506,4 +506,24 @@ test.describe("@admin Mobile layout", () => {
 
         await graph.clickDeleteCancel();
     });
+
+    test("The Create New Graph dialog keeps its contents on screen", async () => {
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+        await graph.openGraphInfoSheet();
+        await graph.clickCreateGraph();
+
+        const { dialog, children, viewport } = await graph.createGraphDialogLayout();
+
+        // An input will not shrink below its intrinsic width, so the name row was
+        // wider than the dialog and the footer's two buttons sent the confirm one
+        // off the left edge. Both wrap now.
+        expect(dialog.x).toBeGreaterThanOrEqual(0);
+        expect(dialog.x + dialog.width).toBeLessThanOrEqual(viewport.width);
+        expect(children.length).toBeGreaterThan(0);
+        children.forEach(child => {
+            expect(child.x).toBeGreaterThanOrEqual(dialog.x);
+            expect(child.x + child.width).toBeLessThanOrEqual(dialog.x + dialog.width);
+        });
+    });
 });

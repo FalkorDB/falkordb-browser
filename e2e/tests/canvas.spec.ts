@@ -273,7 +273,7 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate show all stays reachable with Search & Filter collapsed`, async () => {
+    test(`@admin Validate show all collapses with Search & Filter`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -285,13 +285,38 @@ test.describe('Canvas Tests', () => {
         await graph.clickLabelsButtonByLabel("Labels", "person1");
         expect(await graph.getVisibleElementCounts()).toEqual({ nodes: 1, links: 0 });
 
-        // Collapsing the panel must not take Show All with it.
         await graph.clickSearchAndFilterToggle();
         await expect(graph.elementCanvasSearch).toBeHidden();
+        await expect(graph.elementCanvasShowAll).toBeHidden();
+
+        await graph.clickSearchAndFilterToggle();
         await expect(graph.elementCanvasShowAll).toBeVisible();
 
         await graph.clickShowAll();
         expect(await graph.getVisibleElementCounts()).toEqual({ nodes: 2, links: 1 });
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate toolbar actions stay grouped after the search`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+
+        const { row, actions } = await graph.canvasToolbarActionLayout();
+
+        // Same order as mobile: Show All leads, and the group follows the search
+        // rather than being reversed and pinned to the far right of the canvas.
+        expect(actions.map(action => action.id).slice(0, 2)).toEqual([
+            "elementCanvasShowAllGraph",
+            "elementCanvasAddNodeGraph",
+        ]);
+        const last = actions[actions.length - 1]!.box;
+        expect(last.x + last.width).toBeLessThan(row.x + row.width);
+
         await apicalls.removeGraph(graphName);
     });
 
