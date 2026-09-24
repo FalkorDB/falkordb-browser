@@ -291,13 +291,13 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "View Node / Edge Details",
-        description: "Now let's explore node or edge data. Right-click on any node or edge in the graph to open the data panel and view its properties, labels, and relationships.",
+        description: "Now let's explore node or edge data. Click on any node or edge in the graph to open the data panel and view its properties, labels, and relationships.",
         placementAxis: "x",
         targetSelector: 'falkordb-canvas',
         spotlightSelector: '[data-testid="graphView"]',
-        advanceOn: "contextmenu",
+        advanceOn: "click",
         advanceCondition: () => !!document.querySelector('[data-testid="DataPanel"]'),
-        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "click", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
     },
     {
         title: "Data Panel",
@@ -352,11 +352,11 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Label Properties",
-        description: "Right-click a label or a relationship to open its data panel. It lists the property keys that label carries and the type of each one, so you can learn a graph you have never seen before without writing a single query.",
+        description: "Click a label or a relationship to open its data panel. It lists the property keys that label carries and the type of each one, so you can learn a graph you have never seen before without writing a single query.",
         placementAxis: "x",
         targetSelector: 'falkordb-canvas',
         spotlightSelector: '[data-testid="schemaView"]',
-        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "click", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
     },
     {
         title: "Query History",

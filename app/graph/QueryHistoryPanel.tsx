@@ -12,11 +12,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
+import HelpTip from "../components/ui/HelpTip";
 import EditorComponent from "../components/EditorComponent";
 import { LanguageConfig } from "../components/EditorComponent";
 import { CYPHER_LANGUAGE_NAME, STATIC_SUGGESTIONS } from "../components/CypherEditor";
 import { extractVariableCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
+import useIsMobile from "@/lib/useIsMobile";
 import { createFalkorCypherEngine, attachGrammarLinting, registerGrammarCodeActions, getGrammarDiagnostics, toCompletionItems, type FalkorSchema } from "@/lib/falkordb-cypher";
 import PaginationList from "../components/PaginationList";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext, AiFixContext } from "../components/provider";
@@ -51,6 +53,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
     const checkPreflight = useQueryPreflight();
     const { toast } = useToast();
+    const isMobile = useIsMobile();
 
     const { theme } = useTheme();
     const { background } = getTheme(theme);
@@ -82,6 +85,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     // selection makes delete/export/un-fav hit every repeat. `timestamp` is already the
     // entry identity used by handleToggleFav and is present on every stored record.
     const [selectedQueries, setSelectedQueries] = useState<number[]>([]);
+    // Touch has no Ctrl-click, so a press and hold opens multi-select and every tap
+    // toggles until the selection empties — the same gesture the canvas uses.
+    const [multiSelect, setMultiSelect] = useState(false);
     const [wrapLines, setWrapLines] = useState(false);
 
     const filters = useMemo(() => {
@@ -465,6 +471,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             query: nextQuery
         }));
         setSelectedQueries([]);
+        setMultiSelect(false);
         setFilteredQueries(current => current.filter(query => !selected.has(query.timestamp)));
     }, [historyQuery, setHistoryQuery, selectedQueries]);
 
@@ -539,31 +546,43 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const isAllSelected = visibleQueries.length > 0 && visibleQueries.every(q => selectedSet.has(q.timestamp));
     const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedSet.has(q.timestamp));
 
+    const toggleSelected = (timestamp: number) => {
+        const next = selectedQueries.includes(timestamp)
+            ? selectedQueries.filter(t => t !== timestamp)
+            : [...selectedQueries, timestamp];
+
+        setSelectedQueries(next);
+        // Untoggling the last row leaves the mode with nothing to act on, so treat
+        // it as the way out rather than stranding the user in it.
+        if (next.length === 0) setMultiSelect(false);
+    };
+
     return (
-        <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background">
-            <div className="relative h-full w-full flex flex-col rounded-lg p-3 overflow-y-auto">
+        <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background mobile:border-none mobile:rounded-none">
+            <div className="relative h-full w-full flex flex-col rounded-lg p-3 overflow-y-auto mobile:p-0">
+                {/* On mobile the panel fills a dialog that already has a title and close. */}
                 <Button
                     data-testid="queryHistoryCloseButton"
-                    className="absolute top-2 right-2"
+                    className="absolute top-2 right-2 mobile:hidden"
                     title="Close"
                     onClick={onClose}
                 >
                     <X className="h-4 w-4" />
                 </Button>
-                <div className="w-full flex justify-between items-center pr-8">
+                <div className="w-full flex justify-between items-center pr-8 mobile:hidden">
                     <h1 className="text-lg font-semibold">Query History</h1>
                     <History size={20} className="text-foreground/50" />
                 </div>
                 <PaginationList
                     label="Query"
-                    className="overflow-hidden h-[313px] max-h-[393px] p-1 border-b border-border"
+                    className="overflow-hidden h-[313px] max-h-[393px] mobile:h-[56dvh] mobile:max-h-[56dvh] p-1 border-b border-border"
                     isSelected={(item) => selectedSet.has(item.timestamp)}
                     afterSearchCallback={afterSearchCallback}
                     onToggleFav={handleToggleFav}
                     dataTestId="queryHistory"
                     list={filteredQueries}
                     actionButtons={
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-2 items-center shrink-0">
                             <Button
                                 variant="Delete"
                                 className="p-1"
@@ -599,7 +618,10 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                 variant="Primary"
                                 data-testid="queryHistorySelectAll"
                                 title={isAllSelected ? "Deselect all queries" : "Select all queries"}
-                                onClick={() => setSelectedQueries(isAllSelected ? [] : visibleQueries.map(q => q.timestamp))}
+                                onClick={() => {
+                                    setSelectedQueries(isAllSelected ? [] : visibleQueries.map(q => q.timestamp));
+                                    if (isAllSelected) setMultiSelect(false);
+                                }}
                                 disabled={visibleQueries.length === 0}
                             >
                                 {
@@ -608,20 +630,29 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                         : <ListX size={16} />
                                 }
                             </Button>
-                            <Tooltip>
-                                <TooltipTrigger data-testid="queryHistorySelectInfo" className="flex items-center gap-1 text-foreground/60">
-                                    <Info size={16} />
-                                    {/* Fixed two-digit slot keeps the row from shifting; longer counts are clipped */}
-                                    <span data-testid="queryHistorySelectedCount" className="text-xs tabular-nums w-[2ch] text-left overflow-hidden whitespace-nowrap">
-                                        {selectedQueries.length || ""}
-                                    </span>
-                                </TooltipTrigger>
-                                <TooltipContent className="whitespace-pre-line">
-                                    {`${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl/Cmd + Left Click) for multi select`}
-                                </TooltipContent>
-                            </Tooltip>
+                            <HelpTip
+                                data-testid="queryHistorySelectInfo"
+                                contentClassName="whitespace-pre-line"
+                                trigger={
+                                    <>
+                                        <Info size={16} />
+                                        {/* Fixed two-digit slot keeps the row from shifting; longer counts are clipped */}
+                                        <span data-testid="queryHistorySelectedCount" className="text-xs tabular-nums w-[2ch] text-left overflow-hidden whitespace-nowrap">
+                                            {selectedQueries.length || ""}
+                                        </span>
+                                    </>
+                                }
+                            >
+                                {isMobile
+                                    ? `${selectedQueries.length} selected\nTap to select a query\nPress and hold for multi select`
+                                    : `${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl/Cmd + Left Click) for multi select`}
+                            </HelpTip>
                         </div>
                     }
+                    onLongPress={(item) => {
+                        setMultiSelect(true);
+                        setSelectedQueries([item.timestamp]);
+                    }}
                     onClick={(item, evt) => {
                         const index = historyQuery.queries.findIndex(q => q.timestamp === item.timestamp);
 
@@ -631,8 +662,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
                         const isCurrent = index + 1 === historyQuery.counter;
 
-                        if (evt.ctrlKey || evt.metaKey) {
-                            setSelectedQueries(prev => prev.includes(timestamp) ? prev.filter(t => t !== timestamp) : [...prev, timestamp]);
+                        if (evt.ctrlKey || evt.metaKey || multiSelect) {
+                            toggleSelected(timestamp);
                         } else {
                             setSelectedQueries(isCurrent ? [] : [timestamp]);
                         }
@@ -654,49 +685,51 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                     }}
                     searchRef={searchQueryRef}
                 >
-                    <ul className="w-full flex flex-wrap  items-center gap-2 overflow-y-auto max-h-[80px] p-1">
-                        <li key="info" className="flex flex-col items-center">
-                            <Tooltip>
-                                <TooltipTrigger className="flex items-center text-foreground/60">
-                                    <Info size={16} />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    Press graph name to see history of that graph
-                                    <br />
-                                    (show all queries if no graph name is selected).
-                                </TooltipContent>
-                            </Tooltip>
-                        </li>
-                        <li key="fav-filter" className="max-w-full">
-                            <Button
-                                data-testid="queryHistoryFavFilter"
-                                className={cn("bg-background py-0.5 px-2 rounded-full w-full flex items-center gap-1 text-xs", favFilter && "text-background bg-foreground")}
-                                title="Filter by favorites"
-                                onClick={() => handelSetFilteredQueries(undefined, !favFilter)}
-                            >
-                                <Star size={12} className={cn(favFilter ? "fill-fav text-fav" : "")} />
-                                Favorites
-                            </Button>
-                        </li>
-                        {
-                            filters.map(name => (
-                                <li key={name} className="max-w-full">
-                                    <Button
-                                        className={cn("bg-background py-0.5 px-2 rounded-full w-full text-xs", activeFilters.some(f => f === name) && "text-background bg-foreground")}
-                                        label={name}
-                                        onClick={() => handelSetFilteredQueries(name)}
-                                    />
-                                </li>
-                            ))
-                        }
-                    </ul>
+                    {/* The hint sits outside the scroller: its tap target is grown with a
+                        14px pseudo-element halo, and inside a scroll container that halo
+                        counts as overflow and pins a scrollbar over chips that already fit.
+                        Every chip is then pinned to h-6 so the list caps at an exact number
+                        of rows — two on a desktop, one on a phone. */}
+                    <div className="w-full flex items-start gap-2">
+                        <HelpTip className="h-6 shrink-0">
+                            Press graph name to see history of that graph
+                            <br />
+                            (show all queries if no graph name is selected).
+                        </HelpTip>
+                        <ul className="grow min-w-0 flex flex-wrap items-center gap-2 overflow-y-auto max-h-16 mobile:max-h-8 py-1">
+                            <li key="fav-filter" className="h-6 max-w-full">
+                                <Button
+                                    data-testid="queryHistoryFavFilter"
+                                    className={cn("bg-background h-full py-0.5 px-2 rounded-full w-full flex items-center gap-1 text-xs", favFilter && "text-background bg-foreground")}
+                                    title="Filter by favorites"
+                                    onClick={() => handelSetFilteredQueries(undefined, !favFilter)}
+                                >
+                                    <Star size={12} className={cn(favFilter ? "fill-fav text-fav" : "")} />
+                                    Favorites
+                                </Button>
+                            </li>
+                            {
+                                filters.map(name => (
+                                    <li key={name} className="h-6 max-w-full">
+                                        <Button
+                                            className={cn("bg-background h-full py-0.5 px-2 rounded-full w-full text-xs", activeFilters.some(f => f === name) && "text-background bg-foreground")}
+                                            label={name}
+                                            onClick={() => handelSetFilteredQueries(name)}
+                                        />
+                                    </li>
+                                ))
+                            }
+                        </ul>
+                    </div>
                 </PaginationList>
                 <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col items-center basis-0 grow min-h-0 overflow-hidden">
-                    <TabsList className="h-fit bg-background gap-1">
-                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
-                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
-                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
-                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
+                    {/* Centred tabs that outgrow the panel get clipped at both ends, so on a
+                        phone they tighten up rather than losing their first and last label. */}
+                    <TabsList className="h-fit max-w-full bg-background gap-1 mobile:gap-0">
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm mobile:px-1 mobile:text-xs border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm mobile:px-1 mobile:text-xs border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm mobile:px-1 mobile:text-xs border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm mobile:px-1 mobile:text-xs border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                     </TabsList>
                     <TabsContent value="text" className="mt-0 h-full w-full rounded-lg relative p-1 overflow-hidden">
                         {

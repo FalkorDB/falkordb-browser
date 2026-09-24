@@ -35,6 +35,38 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@admin Validate that the Manage Graphs toolbar and the Delete dialog stay on one row`, async () => {
+    const graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.clickSelect();
+      await graph.clickManage();
+
+      // The wrapping the phone needs must not cost the desktop its single row:
+      // here the search box sits beside the actions, not under them.
+      const { panel, actions, search } = await graph.manageToolbarLayout();
+      const row = [...actions, search];
+      expect(new Set(row.map((box) => Math.round(box.y))).size).toBe(1);
+      row.forEach((box) => {
+        expect(box.x).toBeGreaterThanOrEqual(panel.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width);
+      });
+
+      await graph.clickTableCheckboxByName(graphName);
+      await graph.clickDelete();
+      const { dialog, buttons } = await graph.deleteDialogLayout();
+      expect(new Set(buttons.map((box) => Math.round(box.y))).size).toBe(1);
+      buttons.forEach((box) => {
+        expect(box.x).toBeGreaterThanOrEqual(dialog.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(dialog.x + dialog.width);
+      });
+      await graph.clickDeleteCancel();
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
+  });
+
   test(`@admin Validate that the graphs table hides the Status column when offload is unsupported`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);

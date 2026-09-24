@@ -3,6 +3,7 @@ import { Loader2, X, Palette, Play, Plus, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/components/ui/popover";
 import { cn, formatName, CustomizingItem, CustomizingRef } from "@/lib/utils";
+import { quoteCypherIdentifier } from "@/lib/cypher";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, ConnectionContext, GraphContext, GraphInfoContext, QueryLoadingContext } from "../components/provider";
 import Input from "../components/ui/Input";
@@ -10,11 +11,6 @@ import SelectGraph from "./selectGraph";
 import { Graph } from "../api/graph/model";
 import CreateGraph from "../components/CreateGraph";
 import CustomizeStylePanel from "./CustomizeStylePanel";
-
-/** Escape a Cypher identifier by wrapping it in backticks (doubles any internal backticks). */
-function escapeIdentifier(id: string): string {
-    return `\`${id.replace(/`/g, '``')}\``;
-}
 
 /**
  * Render a side panel showing graph metadata and interactive controls to run representative queries.
@@ -241,7 +237,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                     </Button>
                                                 </PopoverTrigger>
                                                 <PopoverContent
-                                    className="z-30 w-fit p-1 flex flex-col gap-1"
+                                    // Mobile renders this panel inside the z-40 graph info sheet,
+                                    // so at z-30 the popover opens behind it.
+                                    className="z-30 mobile:z-50 w-fit p-1 flex flex-col gap-1"
                                     align="start"
                                     onInteractOutside={(e) => {
                                         if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
@@ -259,7 +257,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
                                                             data-testid={`runLabel${name}`}
                                                             title={isEmptyLabel ? "Nodes without a label cannot be matched by label" : undefined}
-                                                            onClick={() => runQuery(`MATCH (n:${escapeIdentifier(name)}) RETURN n`)}
+                                                            onClick={() => runQuery(`MATCH (n:${quoteCypherIdentifier(name)}) RETURN n`)}
                                                             disabled={isQueryLoading || isEmptyLabel}
                                                         >
                                                             <Play size={12} />
@@ -353,7 +351,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                     </Button>
                                                 </PopoverTrigger>
                                                 <PopoverContent
-                                                    className="z-30 w-fit p-1 flex flex-col gap-1"
+                                                    className="z-30 mobile:z-50 w-fit p-1 flex flex-col gap-1"
                                                     align="start"
                                                     onInteractOutside={(e) => {
                                                         if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
@@ -370,8 +368,8 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
                                                             data-testid={`runRelationship${relationship.name}`}
-                                                            title={`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`}
-                                                            onClick={() => runQuery(`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`)}
+                                                            title={`MATCH p=()-[:${quoteCypherIdentifier(relationship.name)}]-() RETURN p`}
+                                                            onClick={() => runQuery(`MATCH p=()-[:${quoteCypherIdentifier(relationship.name)}]-() RETURN p`)}
                                                             disabled={isQueryLoading}
                                                         >
                                                             <Play size={12} />
@@ -443,10 +441,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         PropertyKeys && PropertyKeys.filter(key => key.toLowerCase().includes(propertyKeysSearch.toLowerCase())).sort((a, b) => a.localeCompare(b)).map((key, index, arr) => (
                                             <li key={key} className="inline">
                                                 <Button
-                                                    title={`MATCH (e) WHERE e.${escapeIdentifier(key)} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${escapeIdentifier(key)} IS NOT NULL RETURN e`}
+                                                    title={`MATCH (e) WHERE e.${quoteCypherIdentifier(key)} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${quoteCypherIdentifier(key)} IS NOT NULL RETURN e`}
                                                     className="inline text-foreground/80 hover:text-primary transition-colors"
                                                     onClick={() => runQuery(
-                                                        `MATCH (e) WHERE e.${escapeIdentifier(key)} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${escapeIdentifier(key)} IS NOT NULL RETURN e`
+                                                        `MATCH (e) WHERE e.${quoteCypherIdentifier(key)} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${quoteCypherIdentifier(key)} IS NOT NULL RETURN e`
                                                     )}
                                                     disabled={isQueryLoading}
                                                     label={index < arr.length - 1 ? `${key}, ` : key}

@@ -135,28 +135,17 @@ export default class TutorialPanel extends GraphPage {
   }
 
   /**
-   * Right-click on the tutorial canvas target.
+   * Click on the canvas at multiple positions attempting to hit a node.
+   * Returns true if the DataPanel appeared (i.e. a node/edge was clicked).
    */
-  async rightClickTutorialTarget(selector: string): Promise<void> {
-    const target = this.page.locator(selector).first();
-    await waitForElementToBeVisible(target);
-    const box = await target.boundingBox();
-    if (!box) throw new Error(`Target ${selector} has no bounding box`);
-    await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: "right" });
-  }
-
-  /**
-   * Right-click on the canvas at multiple positions attempting to hit a node.
-   * Returns true if the DataPanel appeared (i.e. a node/edge was right-clicked).
-   */
-  async rightClickCanvasUntilDataPanel(): Promise<boolean> {
+  async clickCanvasUntilDataPanel(): Promise<boolean> {
     // Use actual node screen positions from the graph so we always hit a node.
     const nodes = await this.getNodesScreenPositions();
     const visibleNodes = nodes.filter((n) => n.isVisible);
     const targets = visibleNodes.length > 0 ? visibleNodes : nodes;
 
     for (const node of targets) {
-      await this.page.mouse.click(node.screenX, node.screenY, { button: "right" });
+      await this.page.mouse.click(node.screenX, node.screenY);
       const dataPanel = this.page.getByTestId("DataPanel");
       const appeared = await waitForElementToBeVisible(dataPanel, 500, 4);
       if (appeared) return true;

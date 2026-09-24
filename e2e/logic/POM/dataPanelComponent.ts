@@ -343,6 +343,14 @@ export default class DataPanel extends GraphPage {
     );
   }
 
+  /**
+   * Confirm only exists while a row is being edited, so its presence is what
+   * "the editor is open" means.
+   */
+  async isEditingAttribute(): Promise<boolean> {
+    return waitForElementToBeVisible(this.dataPanelSetAttributeConfirm);
+  }
+
   async clickDataPanelDeleteAttribute(): Promise<void> {
     await interactWhenVisible(
       this.dataPanelDeleteAttribute,

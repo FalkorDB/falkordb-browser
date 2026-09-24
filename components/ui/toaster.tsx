@@ -123,7 +123,8 @@ export function Toaster() {
       {toasts.map(function ({ id, title, description, action, variant, rawMessage, hint, hintLink, hintAction, query, ...props }) {
         return (
           <Toast data-testid={variant === "destructive" ? "toast-destructive" : "toast"} variant={variant} key={id} {...props}>
-            <div className="grid gap-1">
+            {/* The toast root is capped, so a long raw error scrolls here instead of growing off-screen. */}
+            <div className="grid max-h-[calc(60vh-3rem)] min-w-0 gap-1 overflow-y-auto overscroll-contain" data-testid="toast-content">
               {title && <ToastTitle data-testid="toast-title">{title}</ToastTitle>}
               {(description || hint || hintLink || rawMessage) && (
                 <ToastDescription data-testid="toast-description">

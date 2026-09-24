@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import Button from "./ui/Button";
+import HelpTip from "./ui/HelpTip";
 import Combobox from "./ui/combobox";
 import Input from "./ui/Input";
 
@@ -194,7 +195,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     };
 
     return (
-        <form className={cn("flex flex-col gap-4 w-full", className)} onSubmit={onHandleSubmit}>
+        <form className={cn("flex flex-col gap-4 short:gap-2 w-full", className)} onSubmit={onHandleSubmit}>
             {
                 fields.map((field) => {
                     const passwordType = show[field.label] ? "text" : "password";
@@ -204,14 +205,9 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 <label className={cn(errors[field.label] && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
                                 {
                                     field.info &&
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <InfoIcon size={20} />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            {field.info}
-                                        </TooltipContent>
-                                    </Tooltip>
+                                    <HelpTip trigger={<InfoIcon size={20} />}>
+                                        {field.info}
+                                    </HelpTip>
                                 }
                             </div>
                             <div className="relative flex flex-col gap-1">
@@ -271,7 +267,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                                 }
                                             }} />
                                 }
-                                <p className="text-sm text-gray-500">{field.description}</p>
+                                {field.description && <p className="text-sm text-gray-500">{field.description}</p>}
                                 {
                                     field.link &&
                                     <a

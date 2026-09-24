@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server, Minus, Plus } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
-import { areCaptionKeysEqual, cn, getDefaultQuery } from "@/lib/utils";
+import { areCaptionKeysEqual, cn, getActiveConnectionIdGlobal, getConnectionEpoch, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -13,13 +13,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
-import { serverEncrypt } from "@/lib/server-encryption";
+import { looksServerEncrypted, serverEncrypt } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
+import { getConnectionPrefix, removeConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
 import { GRAPH_SORT_ORDERS, GRAPH_SORT_ORDER_LABELS, type GraphSortOrder } from "@/lib/graphSortOrder";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
+import HelpTip from "../components/ui/HelpTip";
 import Input from "../components/ui/Input";
 import ModelSelector from "./ModelSelector";
 
@@ -85,6 +87,8 @@ export default function BrowserSettings() {
         saveSettings,
         replayTutorial,
     } = useContext(BrowserSettingsContext);
+
+    const { prefixConnectionId } = useContext(ConnectionContext);
 
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -472,6 +476,31 @@ export default function BrowserSettings() {
     const persistChatApiKeys = async (keys: typeof chatApiKeys, selectedId: string): Promise<boolean> => {
         const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
         const nextSelectedId = selectedApiKey?.id ?? "";
+        // `serverEncrypt` binds the ciphertext to the connection behind the
+        // request, while the storage prefix is resolved only once the promise
+        // settles. If the user switches connections in between, writing would
+        // file a blob bound to one connection under another's key, where it can
+        // never be decrypted — and would overwrite that connection's own keys.
+        // The prefix alone cannot tell: an A→B→A switch restores it, so a promise
+        // that settles after the round trip would still match. The epoch only
+        // moves forward, so pair the two.
+        //
+        // Both are still only self-consistent: the prefix follows the session,
+        // which lags the pinned connection, so a switch already under way leaves
+        // the prefix naming A while the request binds the blob to B — and a pair
+        // captured after that point never moves again, so the checks below pass
+        // and B's ciphertext lands under A's key. Refuse unless the prefix and
+        // the pinned connection agree before any of it starts.
+        if (prefixConnectionId !== getActiveConnectionIdGlobal()) {
+            toast({
+                title: "Error",
+                description: "The connection is still switching. Please try again.",
+                variant: "destructive",
+            });
+            return false;
+        }
+        const scope = getConnectionPrefix();
+        const epoch = getConnectionEpoch();
 
         try {
             if (keys.length > 0) {
@@ -484,11 +513,26 @@ export default function BrowserSettings() {
                     });
                     return false;
                 }
-                localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+                if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
+                    toast({
+                        title: "Error",
+                        description: "The connection changed while saving. Please try again.",
+                        variant: "destructive",
+                    });
+                    return false;
+                }
+                setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
             } else {
-                localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+                removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
             }
-            localStorage.removeItem("secretKey");
+            // The legacy single-key setting is superseded once this connection
+            // has its own list — but only if the value is ours to drop. A
+            // server-encrypted one may belong to another connection, which the
+            // loader deliberately preserves so switching back recovers it.
+            const legacySecretKey = localStorage.getItem("secretKey");
+            if (legacySecretKey && !looksServerEncrypted(legacySecretKey)) {
+                localStorage.removeItem("secretKey");
+            }
 
             persistSelectedChatApiKeyId(nextSelectedId);
         } catch (error) {
@@ -662,17 +706,19 @@ export default function BrowserSettings() {
 
     return (
         <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
-            <div className="flex items-start justify-between gap-2 px-2">
-                <div className="flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar">
-                    <h1 className="text-3xl font-semibold">Browser Settings</h1>
-                    <p className="text-base text-muted-foreground">Customize your browser experience and manage configurations</p>
+            <div className="flex items-start justify-between gap-2 px-2 mobile:items-center">
+                <div className="min-w-0 flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar mobile:max-h-none mobile:overflow-visible">
+                    <h1 className="text-3xl font-semibold mobile:text-xl">Browser Settings</h1>
+                    {/* The tab strip already names the page; on a phone the strapline is just chrome. */}
+                    <p className="text-base text-muted-foreground mobile:hidden">Customize your browser experience and manage configurations</p>
                 </div>
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
                             data-testid="replayTutorial"
-                            className="w-fit"
+                            className="w-fit shrink-0 mobile:hidden"
                             variant="Primary"
+                            title="Replay Tutorial"
                             onClick={replayTutorial}
                             label="Replay Tutorial"
                         >
@@ -698,7 +744,7 @@ export default function BrowserSettings() {
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Chat</CardTitle>
+                                <CardTitle className="text-2xl font-semibold mobile:text-xl">Chat</CardTitle>
                                 <CardDescription className="text-sm">Chat Panel Settings</CardDescription>
                             </div>
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.chat && "rotate-90")} />
@@ -1092,7 +1138,7 @@ export default function BrowserSettings() {
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Graph Info</CardTitle>
+                                <CardTitle className="text-2xl font-semibold mobile:text-xl">Graph Info</CardTitle>
                                 <CardDescription className="text-sm">Configure graph visualization and data refresh settings</CardDescription>
                             </div>
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.graphInfo && "rotate-90")} />
@@ -1163,7 +1209,7 @@ export default function BrowserSettings() {
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Query Execution</CardTitle>
+                                <CardTitle className="text-2xl font-semibold mobile:text-xl">Query Execution</CardTitle>
                                 <CardDescription className="text-sm">Control query execution behavior and performance limits</CardDescription>
                             </div>
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.queryExecution && "rotate-90")} />
@@ -1172,7 +1218,8 @@ export default function BrowserSettings() {
                     {expandedSections.queryExecution && (
                         <CardContent>
                             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-                                <div className="flex gap-2">
+                                {/* The two columns each have a wider min-content size than a phone, so stack them. */}
+                                <div className="flex gap-2 mobile:flex-col mobile:[&>div]:basis-auto mobile:[&>div]:grow-0">
                                     {/* Timeout Setting */}
                                     <div className="flex-1 basis-0 flex flex-col items-center sm:flex-row sm:justify-between gap-2 p-2 bg-muted/10 rounded-lg">
                                         <div className="flex flex-col gap-2 flex-1">
@@ -1202,14 +1249,9 @@ export default function BrowserSettings() {
                                         <div className="flex flex-col gap-2 flex-1">
                                             <div className="flex flex gap-1 items-center">
                                                 <h3 className="text-lg font-semibold">Limit</h3>
-                                                <Tooltip>
-                                                    <TooltipTrigger>
-                                                        <Info size={16} />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Be aware that &quot;RESULTSET_SIZE&quot; caps the maximum number of rows returned by a query. (you can modify this configuration in the &quot;DB Configurations&quot; tab)</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
+                                                <HelpTip>
+                                                    <p>Be aware that &quot;RESULTSET_SIZE&quot; caps the maximum number of rows returned by a query. (you can modify this configuration in the &quot;DB Configurations&quot; tab)</p>
+                                                </HelpTip>
                                             </div>
                                             <p className="text-sm text-muted-foreground">
                                                 Limits the number of rows returned by the query.
@@ -1303,7 +1345,7 @@ export default function BrowserSettings() {
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">User Experience</CardTitle>
+                                <CardTitle className="text-2xl font-semibold mobile:text-xl">User Experience</CardTitle>
                                 <CardDescription className="text-sm">Customize browser behavior and visual preferences</CardDescription>
                             </div>
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.userExperience && "rotate-90")} />
@@ -1312,7 +1354,7 @@ export default function BrowserSettings() {
                     {
                         expandedSections.userExperience &&
                         <CardContent>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 mobile:flex-col mobile:[&>div]:basis-auto mobile:[&>div]:grow-0">
                                 <div className="flex-1 basis-0 flex flex-col gap-2">
                                     {/* Captions Keys */}
                                     <div className="flex-1 basis-0 flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
@@ -1375,7 +1417,7 @@ export default function BrowserSettings() {
                                                 </ul>
                                                 : <p className="text-sm text-muted-foreground">No caption keys added. Add keys to display them on the nodes.</p>
                                         }
-                                        <form className="flex gap-2 items-center" onSubmit={handleAddCaptionKey}>
+                                        <form className="flex gap-2 items-center mobile:flex-col mobile:items-stretch" onSubmit={handleAddCaptionKey}>
                                             <Input
                                                 id="captionKeyInput"
                                                 className="flex-1 h-fit"

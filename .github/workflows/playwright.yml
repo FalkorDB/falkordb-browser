@@ -186,6 +186,7 @@ jobs:
             --project="[Read-Write] - Chromium" \
             --project="[Read-Only] - Chromium" \
             --project="[Admin: Settings - Chromium]" \
+            --project="[Admin: Mobile] Chromium" \
             --shard=${{ matrix.shard }}/6 \
             --workers=2 \
             --reporter=dot,list
@@ -539,9 +540,11 @@ jobs:
             falkordb/falkordb:v4.18.10
       - name: Start locally-built browser container
         run: |
+          # A random per-run secret: the entrypoint refuses to start on a
+          # well-known placeholder, and a literal here would be one.
           docker run -d --name falkordb-browser --network=host \
             -e NEXTAUTH_URL=http://localhost:3000/ \
-            -e NEXTAUTH_SECRET=SECRET \
+            -e NEXTAUTH_SECRET="$(openssl rand -hex 32)" \
             -e ENCRYPTION_KEY="$ENCRYPTION_KEY" \
             falkordb-browser:smoke
       - name: Wait for containers to be ready

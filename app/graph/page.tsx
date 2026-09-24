@@ -11,6 +11,8 @@ import { BrowserSettingsContext, CsvLoadContext, GraphContext, GraphTabsContext,
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import ResizableBox from "@/components/ui/ResizableBox";
+import BottomSheet from "@/components/ui/BottomSheet";
+import useIsMobile from "@/lib/useIsMobile";
 import { useResizableSize } from "@/lib/useResizableSize";
 import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConnectionItem, setConnectionItem } from "@/lib/connection-storage";
@@ -28,17 +30,33 @@ const CreateElementPanel = dynamicImport(() => import("./CreateElementPanel"), {
     ssr: false,
 });
 
+/** Mirrors the real Selector rows so the swap on mount does not shift anything. */
+const SelectorSkeleton = () => {
+    const isMobile = useIsMobile();
+    const block = "animate-pulse rounded-lg border border-border bg-background";
+
+    return isMobile ? (
+        <div className="z-20 w-full flex flex-col gap-2">
+            <div className={cn(block, "w-full h-[44px]")} />
+        </div>
+    ) : (
+        <div className="z-20 w-full h-[44px] flex flex-row gap-3 items-center">
+            <div className={cn(block, "w-[42px] h-full")} />
+            <div className={cn(block, "w-[38px] h-full")} />
+            <div className={cn(block, "w-1 grow h-full")} />
+            <div className={cn(block, "w-[92px] h-full")} />
+            <div className={cn(block, "w-[42px] h-full")} />
+        </div>
+    );
+};
+
 const Selector = dynamicImport(() => import("./Selector"), {
     ssr: false,
-    loading: () => <div className="h-[50px] flex flex-row gap-3 items-center">
-        <div className="w-[44px] h-full animate-pulse rounded-lg border border-border bg-background" />
-        <div className="w-1 grow h-full animate-pulse rounded-md border border-border bg-background" />
-        <div className="w-[120px] h-full animate-pulse rounded-md border border-border bg-background" />
-    </div>
+    loading: () => <SelectorSkeleton />
 });
 const GraphView = dynamicImport(() => import("./GraphView"), {
     ssr: false,
-    loading: () => <div className="h-full w-full bg-background flex justify-center items-center border border-border rounded-lg">
+    loading: () => <div className="h-full w-full flex justify-center items-center overflow-hidden">
         <Spinning />
     </div>
 });
@@ -94,6 +112,7 @@ export default function Page() {
         }
     } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
+    const isMobile = useIsMobile();
 
     const panelRef = useRef<PanelImperativeHandle>(null);
     const pendingZoomRef = useRef<((node: any) => boolean) | null>(null);
@@ -103,6 +122,20 @@ export default function Page() {
     const prevGraphNameRef = useRef<string | undefined>(undefined);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
+    // Stands in for Ctrl-click, which a touch device has no way to produce. Only
+    // offered on mobile, so widening past the breakpoint has to drop it or clicks
+    // would stay additive with no toggle left on screen to turn off.
+    const [multiSelect, setMultiSelectState] = useState(false);
+    // The long press turns the mode on and selects its first element in one go, so
+    // the selection handler cannot wait for the re-render to learn the mode is on.
+    const multiSelectRef = useRef(false);
+    const setMultiSelect = useCallback((value: boolean) => {
+        multiSelectRef.current = value;
+        setMultiSelectState(value);
+    }, []);
+    useEffect(() => {
+        if (!isMobile) setMultiSelect(false);
+    }, [isMobile, setMultiSelect]);
     // The Schema tab has a selection of its own — of labels and relationship
     // types, not elements — and it shares the panel with the graph's. It is kept
     // per graph tab, like everything else a tab remembers.
@@ -222,20 +255,23 @@ export default function Page() {
 
     }, [getPanelSize, hasPanelContent]);
 
-    // Keeps the element panel in step with the selection. This re-asserts
-    // `expand()` on every selection change — not just when the count changes —
-    // because switching tabs can swap one selected element for another while
-    // `panel` stays "data", which on its own would leave the panel collapsed.
+    // Keeps the element panel in step with the selection: it is open exactly
+    // while something is selected, on both layouts. This re-asserts `expand()`
+    // on every selection change — not just when the count changes — because
+    // switching tabs can swap one selected element for another while `panel`
+    // stays "data", which on its own would leave the panel collapsed.
+    // `panelRef` is the desktop panel and is absent on mobile, where the sheet
+    // takes its open state from `hasPanelContent` instead; the `panel` half of
+    // this has to run there too, or a sheet that something else closed could
+    // never come back and the element would stay selected with nothing to
+    // show it. Multi select is the one thing that keeps it shut, since on a
+    // phone the sheet covers the canvas the next tap has to reach.
     useEffect(() => {
-        const currentPanel = panelRef.current;
-
-        if (!currentPanel) return;
-
         if (activeSelection.length !== 0) {
-            currentPanel.expand();
-            if (panel === undefined) setPanel("data");
+            panelRef.current?.expand();
+            if (panel === undefined && !multiSelectRef.current) setPanel("data");
         } else if (panel === "data") {
-            currentPanel.collapse();
+            panelRef.current?.collapse();
         }
     }, [activeSelection, panel, setPanel]);
 
@@ -396,6 +432,14 @@ export default function Page() {
         setIsQueryLoading(false);
     }, [fetchCount, graph.Id, graphName, setGraph, runQuery, runDefaultQuery, defaultQuery, setIsQueryLoading, tutorialOpen, pendingAutoLoadRef]);
 
+    // Every route into the data panel goes through here. On mobile the panel
+    // covers the canvas, so while multi select is on it has to stay shut — the
+    // user is still picking the elements it would hide. Multi select is only
+    // offered on mobile, so on desktop this is always a plain open.
+    const openDataPanel = useCallback(() => {
+        setPanel(multiSelectRef.current ? undefined : "data");
+    }, [setPanel]);
+
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = [], fromSearch?: boolean) => {
         setSelectedElements(el);
 
@@ -409,14 +453,23 @@ export default function Page() {
             setSelectedParam("");
         }
 
-        setPanel(el.length !== 0 ? "data" : undefined);
-
-        if (el.length !== 0) {
-            setChatOpen(false);
-            setIsAddEdge(false);
-            setIsAddNode(false);
+        if (el.length === 0) {
+            setPanel(undefined);
+            return;
         }
-    }, [setPanel, setChatOpen, setSelectedParam]);
+
+        openDataPanel();
+        setIsAddEdge(false);
+        setIsAddNode(false);
+        // Only on mobile: the sheets share a stacking level and all cover the
+        // canvas, so the data one would otherwise open behind them. On desktop
+        // the chat floats over the graph and the panels sit side by side, so
+        // opening one has no reason to shut the others.
+        if (isMobile) {
+            setChatOpen(false);
+            if (panelOpen) onTogglePanel();
+        }
+    }, [openDataPanel, setPanel, setChatOpen, setSelectedParam, isMobile, panelOpen, onTogglePanel]);
 
     // Keep selectedElementsRef in sync so the restore effect below can read the
     // full multi-selection without adding selectedElements as a dependency.
@@ -465,7 +518,7 @@ export default function Page() {
             });
             if (restored.length > 0) {
                 setSelectedElements(restored);
-                setPanel("data");
+                openDataPanel();
                 return;
             }
         }
@@ -486,7 +539,7 @@ export default function Page() {
 
                 if (element) {
                     setSelectedElements([element]);
-                    setPanel("data");
+                    openDataPanel();
                     if (isFromSearch && !pendingZoomRef.current) {
                         const zoomFilter = (node: any) => "labels" in element! ? element!.id === node.id : node.id === (element as Link).source || node.id === (element as Link).target;
                         if (graphData) {
@@ -656,6 +709,7 @@ export default function Page() {
                     setLabels={setLabels}
                     canvasRef={canvasRef}
                     schema={currentTab === "Schema"}
+                    onDeleteElement={currentTab === "Schema" ? undefined : handleDeleteElement}
                 />;
             }
 
@@ -689,7 +743,135 @@ export default function Page() {
                 return undefined;
         }
 
-    }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef, currentTab, selectedSchemaElements, setSelectedSchemaElements]);
+    }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, handleDeleteElement, setLabels, canvasRef, currentTab, selectedSchemaElements, setSelectedSchemaElements]);
+
+    // Closing the mobile sheet has to do what the panel's own close button does,
+    // since the sheet header owns the only visible close affordance there.
+    const closeCurrentPanel = useCallback(() => {
+        if (panel === "add") {
+            setPanel(undefined);
+            setIsAddEdge(false);
+            setIsAddNode(false);
+            return;
+        }
+
+        if (currentTab === "Schema") {
+            setSelectedSchemaElements([]);
+        } else {
+            handleSetSelectedElements();
+        }
+    }, [panel, setPanel, currentTab, setSelectedSchemaElements, handleSetSelectedElements]);
+
+    const selectorNode = (
+        <Selector
+            graph={graph}
+            options={graphNames ?? []}
+            setOptions={next => setGraphNames(prev => (
+                typeof next === "function"
+                    ? next(prev ?? [])
+                    : next
+            ))}
+            graphName={graphName}
+            setGraphName={handleSetGraphName}
+            setGraph={setGraph}
+            runQuery={runQuery}
+            historyQuery={historyQuery}
+            setHistoryQuery={setHistoryQuery}
+            isQueryLoading={isQueryLoading}
+            chatOpen={chatOpen}
+            setChatOpen={setChatOpen}
+            queriesOpen={queriesOpen}
+            setQueriesOpen={setQueriesOpen}
+            uploadOpen={uploadOpen}
+            setUploadOpen={setUploadOpen}
+            uploadMode={uploadMode}
+            setUploadMode={setUploadMode}
+        />
+    );
+
+    const graphViewNode = (
+        <GraphView
+            selectedElements={selectedElements}
+            setSelectedElements={handleSetSelectedElements}
+            multiSelect={multiSelect}
+            setMultiSelect={setMultiSelect}
+            selectedSchemaElements={selectedSchemaElements}
+            setSelectedSchemaElements={setSelectedSchemaElements}
+            canvasRef={canvasRef}
+            handleDeleteElement={handleDeleteElement}
+            setLabels={setLabels}
+            setRelationships={setRelationships}
+            labels={labels}
+            relationships={relationships}
+            fetchCount={fetchCount}
+            historyQuery={historyQuery}
+            setHistoryQuery={setHistoryQuery}
+            setIsAddNode={handleSetIsAdd(setIsAddNode, setIsAddEdge)}
+            setIsAddEdge={handleSetIsAdd(setIsAddEdge, setIsAddNode)}
+            isAddEdge={isAddEdge}
+            isAddNode={isAddNode}
+        />
+    );
+
+    const graphInfoNode = (
+        <GraphInfoPanel
+            onClose={onTogglePanel}
+            customizingLabel={customizingLabel}
+            setCustomizingLabel={setCustomizingLabel}
+        />
+    );
+
+    if (isMobile) {
+        return (
+            <div className="h-full w-full flex flex-col min-h-0">
+                <GraphSubHeader />
+                <div className="h-1 grow min-h-0 flex flex-col gap-1 p-1">
+                    {selectorNode}
+                    {/* The sheets are absolute inside this box, so they cover only the
+                        graph — the header and navigation above stay visible, which is
+                        what makes the data read as nested inside the graph context. */}
+                    <div className="h-1 grow min-h-0 relative overflow-hidden">
+                        {graphViewNode}
+                        {/* No sheet title: the info panel renders its own header and
+                            close button, and it needs the height for its grid rows. */}
+                        <BottomSheet
+                            open={panelOpen}
+                            onClose={onTogglePanel}
+                            height="full"
+                            data-testid="mobileGraphInfoSheet"
+                        >
+                            {graphInfoNode}
+                        </BottomSheet>
+                        {/* Open for as long as there is a selection to show — the
+                            other two sheets cover the whole canvas, so this one steps
+                            aside while either is up rather than closing: closing it
+                            drops the selection, and the element would stay picked on
+                            the canvas with nothing on screen saying so.
+                            No sheet title: DataPanel and CreateElementPanel both
+                            render their own header and close button. */}
+                        <BottomSheet
+                            open={hasPanelContent && !panelOpen && !chatOpen}
+                            onClose={closeCurrentPanel}
+                            height="full"
+                            data-testid="mobileDataSheet"
+                        >
+                            {getCurrentPanel()}
+                        </BottomSheet>
+                        {/* No sheet title: Chat renders its own header and close button. */}
+                        <BottomSheet
+                            open={chatOpen && !!graphName}
+                            onClose={() => setChatOpen(false)}
+                            height="full"
+                            data-testid="mobileChatSheet"
+                        >
+                            {graphName ? <Chat onClose={() => setChatOpen(false)} /> : null}
+                        </BottomSheet>
+                    </div>
+                </div>
+                <div className="h-4 w-full Gradient" />
+            </div>
+        );
+    }
 
     return (
         <div className="h-full w-full flex flex-col min-h-0">
@@ -703,11 +885,7 @@ export default function Page() {
                     maxSize="30%"
                     onResize={onInfoPanelResize}
                 >
-                    <GraphInfoPanel
-                        onClose={onTogglePanel}
-                        customizingLabel={customizingLabel}
-                        setCustomizingLabel={setCustomizingLabel}
-                    />
+                    {graphInfoNode}
                 </ResizablePanel>
                 <ResizableHandle
                     withHandle
@@ -722,55 +900,14 @@ export default function Page() {
                 >
                     <div className="h-full w-full flex flex-col">
                         <div className="Page p-3 gap-3">
-                            <Selector
-                                graph={graph}
-                                options={graphNames ?? []}
-                                setOptions={next => setGraphNames(prev => (
-                                    typeof next === "function"
-                                        ? next(prev ?? [])
-                                        : next
-                                ))}
-                                graphName={graphName}
-                                setGraphName={handleSetGraphName}
-                                setGraph={setGraph}
-                                runQuery={runQuery}
-                                historyQuery={historyQuery}
-                                setHistoryQuery={setHistoryQuery}
-                                isQueryLoading={isQueryLoading}
-                                chatOpen={chatOpen}
-                                setChatOpen={setChatOpen}
-                                queriesOpen={queriesOpen}
-                                setQueriesOpen={setQueriesOpen}
-                                uploadOpen={uploadOpen}
-                                setUploadOpen={setUploadOpen}
-                                uploadMode={uploadMode}
-                                setUploadMode={setUploadMode}
-                            />
+                            {selectorNode}
                             <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
                                 <ResizablePanel
                                     defaultSize="100%"
                                     collapsible
                                     minSize="30%"
                                 >
-                                    <GraphView
-                                        selectedElements={selectedElements}
-                                        setSelectedElements={handleSetSelectedElements}
-                                        selectedSchemaElements={selectedSchemaElements}
-                                        setSelectedSchemaElements={setSelectedSchemaElements}
-                                        canvasRef={canvasRef}
-                                        handleDeleteElement={handleDeleteElement}
-                                        setLabels={setLabels}
-                                        setRelationships={setRelationships}
-                                        labels={labels}
-                                        relationships={relationships}
-                                        fetchCount={fetchCount}
-                                        historyQuery={historyQuery}
-                                        setHistoryQuery={setHistoryQuery}
-                                        setIsAddNode={handleSetIsAdd(setIsAddNode, setIsAddEdge)}
-                                        setIsAddEdge={handleSetIsAdd(setIsAddEdge, setIsAddNode)}
-                                        isAddEdge={isAddEdge}
-                                        isAddNode={isAddNode}
-                                    />
+                                    {graphViewNode}
                                 </ResizablePanel>
                                 <ResizableHandle
                                     withHandle
@@ -789,7 +926,7 @@ export default function Page() {
                                 </ResizablePanel>
                                 {
                                     chatOpen && graphName &&
-                                    <div className="absolute bottom-12 right-3 z-30">
+                                    <div className="absolute bottom-2 right-3 z-30">
                                         <ResizableBox
                                             width={chatSize.width}
                                             height={chatSize.height}
