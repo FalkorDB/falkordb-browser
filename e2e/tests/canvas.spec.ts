@@ -297,6 +297,29 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    test(`@admin Validate toolbar actions stay grouped after the search`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+
+        const { row, actions } = await graph.canvasToolbarActionLayout();
+
+        // Same order as mobile: Show All leads, and the group follows the search
+        // rather than being reversed and pinned to the far right of the canvas.
+        expect(actions.map(action => action.id).slice(0, 2)).toEqual([
+            "elementCanvasShowAllGraph",
+            "elementCanvasAddNodeGraph",
+        ]);
+        const last = actions[actions.length - 1]!.box;
+        expect(last.x + last.width).toBeLessThan(row.x + row.width);
+
+        await apicalls.removeGraph(graphName);
+    });
+
     test(`@admin Validate label toggle does not hide multi-labeled node`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
