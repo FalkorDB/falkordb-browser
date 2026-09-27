@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import ToastButton from "@/app/components/ToastButton";
 import AiFixButton from "@/app/components/AiFixButton";
+import { CsvLoadContext } from "@/app/components/provider";
 import { copyText } from "@/lib/clipboard";
 import {
   Toast,
@@ -95,15 +96,35 @@ function ToastItemDetails({ rawMessage }: { rawMessage: string }) {
   );
 }
 
+// Renders nothing where the upload cannot be reached — a read-only connection,
+// no graph selected, or a deployment that does not host the upload at all.
+function CsvUploadToastAction({ onOpen }: { onOpen: () => void }) {
+  const { uploadEnabled, openCsvUpload } = useContext(CsvLoadContext);
+
+  if (!uploadEnabled) return null;
+
+  return (
+    <ToastButton
+      variant="Primary"
+      label="Upload CSV"
+      onClick={() => {
+        openCsvUpload();
+        onOpen();
+      }}
+    />
+  );
+}
+
 export function Toaster() {
   const { toasts, dismiss } = useToast()
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, variant, rawMessage, hint, hintLink, query, ...props }) {
+      {toasts.map(function ({ id, title, description, action, variant, rawMessage, hint, hintLink, hintAction, query, ...props }) {
         return (
           <Toast data-testid={variant === "destructive" ? "toast-destructive" : "toast"} variant={variant} key={id} {...props}>
-            <div className="grid gap-1">
+            {/* The toast root is capped, so a long raw error scrolls here instead of growing off-screen. */}
+            <div className="grid max-h-[calc(60vh-3rem)] min-w-0 gap-1 overflow-y-auto overscroll-contain" data-testid="toast-content">
               {title && <ToastTitle data-testid="toast-title">{title}</ToastTitle>}
               {(description || hint || hintLink || rawMessage) && (
                 <ToastDescription data-testid="toast-description">
@@ -141,6 +162,7 @@ export function Toaster() {
               )}
               {query && <AiFixButton currentQuery={query} />}
             </div>
+            {hintAction === "upload-csv" && <CsvUploadToastAction onOpen={() => dismiss(id)} />}
             {action}
             <ToastClose />
           </Toast>

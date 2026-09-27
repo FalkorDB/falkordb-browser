@@ -48,6 +48,10 @@ const RECOGNIZED_SAMPLES: Array<{ message: string; id: string; needle: string }>
     { message: "Missing parameters", id: "missing-parameters", needle: "parameter" },
     { message: "Integer overflow '999999999999999999999999999999'", id: "integer-overflow", needle: "64-bit" },
     { message: "Exactly one relationship type must be specified for each relation in a CREATE pattern.", id: "create-one-rel-type", needle: "exactly one type" },
+    { message: "URI to CSV must be a string", id: "csv-uri-not-string", needle: "evaluate to a string" },
+    { message: "Unsupported URI", id: "csv-unsupported-uri", needle: "https://" },
+    { message: "Error opening CSV URI: file://missing.csv", id: "csv-open-failed", needle: "import folder" },
+    { message: "Failed reading CSV header row", id: "csv-header-read-failed", needle: "FIELDTERMINATOR" },
   ];
 
 describe("getCypherErrorHint — recognized FalkorDB errors", () => {
@@ -232,6 +236,27 @@ describe("getCypherErrorHint — hint links", () => {
   it("every HINT_LINKS key is a real catalog id", () => {
     const stray = Object.keys(HINT_LINKS).filter((id) => !CYPHER_ERROR_IDS.includes(id));
     assert.deepEqual(stray, [], `HINT_LINKS references unknown catalog ids: ${stray.join(", ")}`);
+  });
+
+  it("offers the CSV upload only for errors an upload can actually fix", () => {
+    // A source the server could not reach is fixable by uploading one it can.
+    assert.equal(getCypherErrorHint("Unsupported URI")?.action, "upload-csv");
+    assert.equal(getCypherErrorHint("Error opening CSV URI: file://x.csv")?.action, "upload-csv");
+    // These two are about the query text and the file's contents — a different
+    // upload would not address either.
+    assert.equal(getCypherErrorHint("URI to CSV must be a string")?.action, undefined);
+    assert.equal(getCypherErrorHint("Failed reading CSV header row")?.action, undefined);
+    assert.equal(getCypherErrorHint("Division by zero")?.action, undefined);
+  });
+
+  it("keeps hints free of remedies the UI may not be able to offer", () => {
+    // Availability of the upload is decided at render time; a hint is a fixed
+    // string, so it must not promise a button that may never appear.
+    const promising = CYPHER_ERROR_IDS.filter((id) => {
+      const sample = RECOGNIZED_SAMPLES.find((s) => s.id === id);
+      return sample ? /\bupload/i.test(getCypherErrorHint(sample.message)?.hint ?? "") : false;
+    });
+    assert.deepEqual(promising, [], `hints must not mention uploading: ${promising.join(", ")}`);
   });
 
   it("links are either an internal path or an https docs URL", () => {

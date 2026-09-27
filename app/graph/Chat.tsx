@@ -14,6 +14,7 @@ import Input from "../components/ui/Input";
 import { GraphContext, GraphTabsContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
+import useQueryPreflight from "../components/useQueryPreflight";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
 import { tabScopedKey } from "@/lib/useGraphTabs";
@@ -73,6 +74,9 @@ export default function Chat({ onClose }: Props) {
     const { currentTheme } = getTheme(resolvedTheme);
     const { setIndicator } = useContext(IndicatorContext);
     const { runQuery, graphName } = useContext(GraphContext);
+    // A generated query is arbitrary text the user never typed, so it gets the same
+    // pre-flight gate as the editor before it can reach the server.
+    const checkPreflight = useQueryPreflight();
     const { activeTabId } = useContext(GraphTabsContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { udfList } = useContext(UDFContext);
@@ -485,7 +489,10 @@ export default function Chat({ onClose }: Props) {
                             <Button
                                 data-testid="chatRunQueryButton"
                                 title="Run Query"
-                                onClick={() => runQuery(message.content)}
+                                onClick={() => {
+                                    if (checkPreflight(message.content)) return;
+                                    runQuery(message.content);
+                                }}
                                 isLoading={isQueryLoading}
                             >
                                 <Play size={20} />

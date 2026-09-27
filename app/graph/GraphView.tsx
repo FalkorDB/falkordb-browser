@@ -1,16 +1,18 @@
 'use client';
 
-import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
-import { GitGraph, ScrollText, Table, Waypoints } from "lucide-react";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
+import { GitGraph, ScrollText, SlidersHorizontal, Table, Waypoints } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraphContext, ForceGraphContext } from "@/app/components/provider";
+import { GraphContext, ForceGraphContext, ConnectionContext } from "@/app/components/provider";
 import ForceGraph from "@/app/components/ForceGraph";
 import { setConnectionItem } from "@/lib/connection-storage";
+import BottomSheet from "@/components/ui/BottomSheet";
+import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import Toolbar from "./toolbar";
-import Controls from "./controls";
+import Controls, { ZoomControls } from "./controls";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
 import SchemaScope, { type ActiveGraphView } from "./SchemaView";
@@ -18,6 +20,8 @@ import SchemaScope, { type ActiveGraphView } from "./SchemaView";
 interface Props {
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements?: (Node | Link)[], fromSearch?: boolean) => void
+    multiSelect: boolean
+    setMultiSelect: (value: boolean) => void
     selectedSchemaElements: (Node | Link)[]
     setSelectedSchemaElements: Dispatch<SetStateAction<(Node | Link)[]>>
     canvasRef: GraphRef
@@ -38,6 +42,8 @@ interface Props {
 function GraphView({
     selectedElements,
     setSelectedElements,
+    multiSelect,
+    setMultiSelect,
     selectedSchemaElements,
     setSelectedSchemaElements,
     canvasRef,
@@ -56,7 +62,10 @@ function GraphView({
 }: Props) {
 
     const { graph, graphName, currentTab, setCurrentTab, isLoading, expand, setExpand } = useContext(GraphContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport, dimmed, setDimmed } = useContext(ForceGraphContext);
+    const isMobile = useIsMobile();
+    const [toolsOpen, setToolsOpen] = useState(false);
 
     useEffect(() => {
         setRelationships([...graph.Relationships]);
@@ -195,6 +204,8 @@ function GraphView({
                 canvasRef={canvasRef}
                 selectedElements={selectedElements}
                 setSelectedElements={setSelectedElements}
+                multiSelect={multiSelect}
+                setMultiSelect={isMobile ? setMultiSelect : undefined}
                 setRelationships={setRelationships}
                 viewport={viewport}
                 setViewport={setViewport}
@@ -214,151 +225,230 @@ function GraphView({
     };
 
     return (
-        <Tabs data-testid="graphView" value={currentTab} onValueChange={handleTabChange} className={cn("h-full w-full relative overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
+        <Tabs data-testid="graphView" value={currentTab} onValueChange={handleTabChange} className={cn("h-full w-full relative overflow-hidden", isMobile && "flex flex-col", currentTab === "Table" && "flex flex-col-reverse")}>
             <SchemaScope
                 active={isSchema}
                 fallback={graphView}
                 selectedElements={selectedSchemaElements}
                 setSelectedElements={setSelectedSchemaElements}
             >
-                {(view) => (
-                    <>
-                        <div className="h-full w-full flex flex-col gap-4 absolute p-2 pointer-events-none z-10 justify-between">
-                            <div className="grow basis-0 flex flex-col gap-2 overflow-hidden">
-                                {
-                                    !isLoading && hasChrome &&
-                                    <>
-                                        <Toolbar
-                                            graph={view.graph}
-                                            graphName={view.graphName}
-                                            selectedElements={view.selectedElements}
-                                            setSelectedElements={view.setSelectedElements}
-                                            handleDeleteElement={view.handleDeleteElement}
-                                            showAllElements={view.showAllElements}
-                                            canvasRef={view.canvasRef}
-                                            setIsAddEdge={view.setIsAddEdge}
-                                            setIsAddNode={view.setIsAddNode}
-                                            expand={view.expand}
-                                            setExpand={view.setExpand}
-                                            isAddEdge={view.isAddEdge}
-                                            isAddNode={view.isAddNode}
-                                        />
-                                        {
-                                            view.expand && (view.labels.length !== 0 || view.relationships.length !== 0) &&
-                                            <div className={cn("w-fit max-w-[180px] h-1 grow grid gap-1.5", view.labels.length !== 0 && view.relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
-                                                {view.labels.length !== 0 && <Labels labels={view.labels} onClick={view.onLabelClick} label="Labels" />}
-                                                {view.labels.length !== 0 && view.relationships.length > 0 && <div className="h-px bg-border/40 rounded-full" />}
-                                                {view.relationships.length !== 0 && <Labels labels={view.relationships} onClick={view.onRelationshipClick} label="Relationships" />}
-                                            </div>
-                                        }
-                                    </>
-                                }
-                            </div>
-                            <div className="flex gap-2 items-center">
-                                <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
-                                    <TabsTrigger
-                                        data-testid="graphTab"
-                                        asChild
-                                        value="Graph"
-                                    >
-                                        <Button
-                                            className="tabs-trigger"
-                                            title="Graph"
-                                        >
-                                            <GitGraph />
-                                        </Button>
-                                    </TabsTrigger>
-                                    <TabsTrigger
-                                        data-testid="tableTab"
-                                        asChild
-                                        value="Table"
-                                    >
-                                        <Button
-                                            disabled={!isTabEnabled("Table")}
-                                            className="tabs-trigger"
-                                            title={!isTabEnabled("Table") ? "No Data" : "Table"}
-                                        >
-                                            <Table />
-                                        </Button>
-                                    </TabsTrigger>
-                                    <TabsTrigger
-                                        data-testid="metadataTab"
-                                        asChild
-                                        value="Metadata"
-                                    >
-                                        <Button
-                                            disabled={!isTabEnabled("Metadata")}
-                                            className="tabs-trigger"
-                                            title={!isTabEnabled("Metadata") ? "No Metadata" : "Metadata"}
-                                        >
-                                            <ScrollText />
-                                        </Button>
-                                    </TabsTrigger>
-                                    <TabsTrigger
-                                        data-testid="schemaTab"
-                                        asChild
-                                        value="Schema"
-                                    >
-                                        <Button
-                                            disabled={!isTabEnabled("Schema")}
-                                            className="tabs-trigger"
-                                            title={!isTabEnabled("Schema") ? "No Graph Selected" : "Schema"}
-                                        >
-                                            <Waypoints />
-                                        </Button>
-                                    </TabsTrigger>
-                                </TabsList>
-                                {
-                                    hasChrome && view.showControls &&
-                                    <div data-testid={view.mode === "schema" ? "schemaControls" : undefined} className="flex gap-2 items-center">
-                                        <Controls
-                                            graph={view.graph}
-                                            canvasRef={view.canvasRef}
-                                            disabled={view.isEmpty}
-                                            dimmed={view.dimmed}
-                                            setDimmed={view.setDimmed}
-                                            selectedElements={view.selectedElements}
-                                        />
-                                    </div>
-                                }
-                                {view.status}
-                            </div>
+                {(view) => {
+                    // Mobile drops the toggle button, so search and legend are always open there.
+                    const expanded = isMobile || view.expand;
+
+                    const toolbarNode = !isLoading && hasChrome && (
+                        <Toolbar
+                            graph={view.graph}
+                            graphName={view.graphName}
+                            selectedElements={view.selectedElements}
+                            setSelectedElements={view.setSelectedElements}
+                            handleDeleteElement={view.handleDeleteElement}
+                            showAllElements={view.showAllElements}
+                            canvasRef={view.canvasRef}
+                            setIsAddEdge={view.setIsAddEdge}
+                            setIsAddNode={view.setIsAddNode}
+                            expand={expanded}
+                            setExpand={view.setExpand}
+                            isAddEdge={view.isAddEdge}
+                            isAddNode={view.isAddNode}
+                        />
+                    );
+
+                    const legendNode = !isLoading && hasChrome && expanded && (view.labels.length !== 0 || view.relationships.length !== 0) && (
+                        <div className={cn("w-fit max-w-[180px] h-1 grow grid gap-1.5", view.labels.length !== 0 && view.relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]", isMobile && "w-full max-w-none grid-flow-col auto-cols-fr grid-rows-1")}>
+                            {view.labels.length !== 0 && <Labels labels={view.labels} onClick={view.onLabelClick} label="Labels" />}
+                            {/* Side by side on mobile, where a divider column would eat a third of the width. */}
+                            {view.labels.length !== 0 && view.relationships.length > 0 && !isMobile && <div className="h-px rounded-full bg-border/40" />}
+                            {view.relationships.length !== 0 && <Labels labels={view.relationships} onClick={view.onRelationshipClick} label="Relationships" />}
                         </div>
-                        <TabsContent data-testid="graphView" value="Graph" className="h-full w-full mt-0 overflow-hidden">
-                            {view.mode === "graph" && view.canvas}
-                        </TabsContent>
-                        <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">
-                            <TableView />
-                        </TabsContent>
-                        <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">
-                            <MetadataView
-                                setQuery={({ profile }) => {
-                                    setHistoryQuery(prev => {
-                                        const newQuery = {
-                                            ...prev.currentQuery,
-                                            profile: profile || []
-                                        };
+                    );
 
-                                        const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
-
-                                        setConnectionItem("query history", JSON.stringify(newQueries));
-
-                                        return {
-                                            ...prev,
-                                            currentQuery: newQuery,
-                                            queries: newQueries
-                                        };
-                                    });
-                                }}
-                                query={historyQuery.currentQuery}
-                                fetchCount={fetchCount}
+                    const controlsNode = hasChrome && view.showControls && (
+                        <div data-testid={view.mode === "schema" ? "schemaControls" : undefined} className="flex gap-2 items-center">
+                            <Controls
+                                graph={view.graph}
+                                canvasRef={view.canvasRef}
+                                disabled={view.isEmpty}
+                                dimmed={view.dimmed}
+                                setDimmed={view.setDimmed}
+                                selectedElements={view.selectedElements}
+                                showZoom={!isMobile}
                             />
-                        </TabsContent>
-                        <TabsContent value="Schema" className="h-full w-full mt-0 overflow-hidden">
-                            {view.mode === "schema" && view.canvas}
-                        </TabsContent>
-                    </>
-                )}
+                        </div>
+                    );
+
+                    // The Toolbar keeps its search and add buttons only while there is a
+                    // graph to act on, and everything else here is already gated on having
+                    // elements — without either, the sheet opens on nothing.
+                    const hasTools = !isLoading && hasChrome && (!view.isEmpty || (!!view.graphName && !isReadOnly));
+
+                    return (
+                        <>
+                            {/* `contents` on desktop: the wrapper generates no box, so the
+                                chrome below still positions against Tabs exactly as before.
+                                On mobile it is the region the tools sheet shrinks. */}
+                            <div className={cn(isMobile ? "relative h-1 grow min-h-0 w-full flex flex-col" : "contents")}>
+                            <div className="h-full w-full flex flex-col gap-4 absolute p-2 mobile:p-1 pointer-events-none z-10 justify-between">
+                                <div className="grow basis-0 flex flex-col gap-2 overflow-hidden">
+                                    {!isMobile && toolbarNode}
+                                    {!isMobile && legendNode}
+                                </div>
+                                {/* The row has to hold tabs, zoom and tools across a phone's
+                                    width, so the spacing there is as tight as the taps allow. */}
+                                <div className="flex gap-2 mobile:gap-1 items-center">
+                                    <TabsList className="bg-transparent flex gap-2 mobile:gap-0.5 pointer-events-auto p-0">
+                                        <TabsTrigger
+                                            data-testid="graphTab"
+                                            asChild
+                                            value="Graph"
+                                        >
+                                            <Button
+                                                className="tabs-trigger"
+                                                title="Graph"
+                                            >
+                                                <GitGraph />
+                                            </Button>
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            data-testid="tableTab"
+                                            asChild
+                                            value="Table"
+                                        >
+                                            <Button
+                                                disabled={!isTabEnabled("Table")}
+                                                className="tabs-trigger"
+                                                title={!isTabEnabled("Table") ? "No Data" : "Table"}
+                                            >
+                                                <Table />
+                                            </Button>
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            data-testid="metadataTab"
+                                            asChild
+                                            value="Metadata"
+                                        >
+                                            <Button
+                                                disabled={!isTabEnabled("Metadata")}
+                                                className="tabs-trigger"
+                                                title={!isTabEnabled("Metadata") ? "No Metadata" : "Metadata"}
+                                            >
+                                                <ScrollText />
+                                            </Button>
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            data-testid="schemaTab"
+                                            asChild
+                                            value="Schema"
+                                        >
+                                            <Button
+                                                disabled={!isTabEnabled("Schema")}
+                                                className="tabs-trigger"
+                                                title={!isTabEnabled("Schema") ? "No Graph Selected" : "Schema"}
+                                            >
+                                                <Waypoints />
+                                            </Button>
+                                        </TabsTrigger>
+                                    </TabsList>
+                                    {
+                                        isMobile
+                                            ? hasChrome && !isLoading && (
+                                                <>
+                                                    {
+                                                        view.showControls &&
+                                                        <>
+                                                            <div className="h-4 w-px bg-border rounded-full" />
+                                                            <ZoomControls
+                                                                canvasRef={view.canvasRef}
+                                                                disabled={view.isEmpty}
+                                                                selectedElements={view.selectedElements}
+                                                                className="pointer-events-auto"
+                                                            />
+                                                        </>
+                                                    }
+                                                    <div className="h-4 w-px bg-border rounded-full" />
+                                                    {/* Not pushed to the right edge: the support widget floats there. */}
+                                                    <Button
+                                                        data-testid="canvasToolsToggle"
+                                                        className="tabs-trigger pointer-events-auto"
+                                                        title={hasTools ? "Tools" : "No tools available"}
+                                                        disabled={!hasTools}
+                                                        onClick={() => setToolsOpen(prev => !prev)}
+                                                    >
+                                                        <SlidersHorizontal />
+                                                    </Button>
+                                                </>
+                                            )
+                                            : (
+                                                <>
+                                                    {controlsNode}
+                                                    <div className="flex gap-2 items-center">
+                                                        {view.status}
+                                                    </div>
+                                                </>
+                                            )
+                                    }
+                                </div>
+                            </div>
+                            <TabsContent data-testid="graphView" value="Graph" className="h-full w-full mt-0 overflow-hidden">
+                                {view.mode === "graph" && view.canvas}
+                            </TabsContent>
+                            <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">
+                                <TableView />
+                            </TabsContent>
+                            <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">
+                                <MetadataView
+                                    setQuery={({ profile }) => {
+                                        setHistoryQuery(prev => {
+                                            const newQuery = {
+                                                ...prev.currentQuery,
+                                                profile: profile || []
+                                            };
+
+                                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
+
+                                            setConnectionItem("query history", JSON.stringify(newQueries));
+
+                                            return {
+                                                ...prev,
+                                                currentQuery: newQuery,
+                                                queries: newQueries
+                                            };
+                                        });
+                                    }}
+                                    query={historyQuery.currentQuery}
+                                    fetchCount={fetchCount}
+                                />
+                            </TabsContent>
+                            <TabsContent value="Schema" className="h-full w-full mt-0 overflow-hidden">
+                                {view.mode === "schema" && view.canvas}
+                            </TabsContent>
+                            </div>
+                            {
+                                isMobile &&
+                                <BottomSheet
+                                    push
+                                    open={toolsOpen && hasChrome}
+                                    onClose={() => setToolsOpen(false)}
+                                    title="Tools"
+                                    data-testid="canvasToolsSheet"
+                                >
+                                    <div className="flex flex-col gap-2 p-2">
+                                        {toolbarNode}
+                                        {controlsNode}
+                                        {/* Both status readouts open with a divider that only
+                                            reads as a separator inline beside the tabs. */}
+                                        <div className="flex flex-wrap gap-2 items-center text-sm [&>div:first-of-type]:hidden">
+                                            {view.status}
+                                        </div>
+                                        {/* Tall enough for three rows; the lists scroll inside
+                                            themselves rather than growing the sheet. */}
+                                        {legendNode && <div className="flex flex-col h-28 shrink-0">{legendNode}</div>}
+                                    </div>
+                                </BottomSheet>
+                            }
+                        </>
+                    );
+                }}
             </SchemaScope>
         </Tabs>
     );

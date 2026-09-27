@@ -343,8 +343,9 @@ export const fixRequest = z.object({
 
 // Auth schemas
 // Both mTLS fields carry base64 of a PEM file, produced by FileReader on the
-// client. Pinning the alphabet keeps quotes and backslashes out of values that
-// reach the credential store, which interpolates them into Cypher.
+// client, and are decoded again before they reach the TLS socket. Pinning the
+// alphabet rejects anything else here, where the field can be named, rather
+// than letting it decode to garbage and fail inside the handshake.
 const BASE64_PEM = /^[A-Za-z0-9+/]+={0,2}$/;
 
 // mTLS material is only usable as a PAIR, and only under TLS. A certificate without
@@ -393,8 +394,8 @@ const optionalCredential = (inner: z.ZodString) =>
 
 // signIn() posts straight to the Auth.js callback, so the credentials provider is
 // the one connection entry point with no route schema in front of it. Validating
-// here keeps unchecked certificate material out of newClient and out of the Token
-// DB, which interpolates it into Cypher.
+// here is what gives that path the same checks the route schemas below apply to
+// every other way a certificate can arrive.
 export const authCredentials = z
   .object({
     tls: z.union([z.string(), z.boolean()]).optional(),

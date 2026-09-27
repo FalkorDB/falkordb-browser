@@ -1,6 +1,23 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* Desktop is authoritative down to 1100px wide; below that is the mobile layout.
+   A max-width variant keeps every mobile rule an additive override, so no existing
+   desktop class has to change. Keep in sync with MOBILE_BREAKPOINT in lib/useIsMobile.ts. */
+@custom-variant mobile (@media (width < 1100px));
+
+/* Orthogonal to `mobile`: a viewport too short for a tall form, whatever its width.
+   A short desktop window needs the same vertical trimming as a phone. */
+@custom-variant short (@media (height < 800px));
+
+/* Everything rem-based comes down a notch on a phone, rather than each component
+   picking its own mobile size. Keep the query in step with the variant above. */
+@media (width < 1100px) {
+    html {
+        font-size: 15px;
+    }
+}
+
 @layer base {
     :root {
         --background: 0 0% 100%;
@@ -314,4 +331,24 @@ input[type="color"]::-webkit-color-swatch {
    "Show More" button causes the documentation panel to open over the graph view. */
 .suggest-widget .suggest-widget-status-bar {
     display: none !important;
+}
+
+/* On iOS Monaco floats a 58x36 keyboard button over the editor. Tapping the query
+   text already opens the keyboard, so the widget is pure clutter in a 44px bar. */
+.monaco-editor .iPadShowKeyboard {
+    display: none !important;
+}
+
+/* The IME proxy is a real <textarea> and has to stay focusable to type, but it is
+   taller than our single-line editor and mobile engines paint a native caret,
+   selection and tap highlight on it. Keep it functional and invisible. */
+.monaco-editor .ime-text-area {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    caret-color: transparent;
+    -webkit-text-fill-color: transparent;
+    -webkit-tap-highlight-color: transparent;
 }

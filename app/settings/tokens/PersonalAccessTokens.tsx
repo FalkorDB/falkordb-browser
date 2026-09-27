@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import Input from "@/app/components/ui/Input";
 import { IndicatorContext } from "@/app/components/provider";
 import { securedFetch } from "@/lib/utils";
+import useIsMobile from "@/lib/useIsMobile";
 import { Copy, Plus, Trash2 } from "lucide-react";
 
 interface Token {
@@ -48,6 +49,7 @@ export default function PersonalAccessTokens() {
 
   const { toast } = useToast();
   const { setIndicator } = useContext(IndicatorContext);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!generateDialogOpen) {
@@ -245,14 +247,14 @@ export default function PersonalAccessTokens() {
 
   return (
     <div className="space-y-6 h-full overflow-auto">
-      <div className="flex items-center justify-between sticky top-0 bg-background z-10 pb-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Personal Access Tokens</h2>
+      <div className="flex items-center justify-between sticky top-0 bg-background z-10 pb-4 mobile:flex-col mobile:items-stretch mobile:gap-2">
+        <div className="min-w-0">
+          <h2 className="text-2xl font-bold tracking-tight mobile:text-xl">Personal Access Tokens</h2>
           <p className="text-muted-foreground">
             Generate tokens to authenticate with the FalkorDB API without using your password.
           </p>
         </div>
-        <Button onClick={() => setGenerateDialogOpen(true)}>
+        <Button className="shrink-0 mobile:w-full mobile:justify-center" onClick={() => setGenerateDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Generate new token
         </Button>
@@ -327,13 +329,13 @@ export default function PersonalAccessTokens() {
 
       {/* Tokens list */}
       <Card className="flex flex-col">
-        <CardHeader>
-          <CardTitle>Active Tokens</CardTitle>
+        <CardHeader className="mobile:p-3">
+          <CardTitle className="mobile:text-xl">Active Tokens</CardTitle>
           <CardDescription>
             Tokens you&apos;ve generated that can be used to access the API
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-auto max-h-96">
+        <CardContent className="overflow-auto max-h-96 mobile:p-3 mobile:pt-0">
           {loading && (
             <p className="text-center text-muted-foreground py-8">Loading tokens...</p>
           )}
@@ -342,7 +344,47 @@ export default function PersonalAccessTokens() {
               No active tokens. Generate one to get started.
             </p>
           )}
-          {!loading && tokens.length > 0 && (
+          {/* A 7-column table needs 638px; on a phone the revoke button ends up off-screen. */}
+          {!loading && tokens.length > 0 && isMobile && (
+            <ul className="flex flex-col gap-3">
+              {tokens.map((token) => (
+                <li key={token.token_id} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium break-all">{token.name}</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="shrink-0"
+                      aria-label={`Revoke ${token.name}`}
+                      onClick={() => {
+                        setSelectedToken(token);
+                        setDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                    {userRole === "Admin" && (
+                      <>
+                        <dt className="text-muted-foreground">Username</dt>
+                        <dd className="break-all">{token.username || "default"}</dd>
+                        <dt className="text-muted-foreground">Role</dt>
+                        <dd>{token.role || "N/A"}</dd>
+                      </>
+                    )}
+                    <dt className="text-muted-foreground">Created</dt>
+                    <dd>{formatDate(token.created_at)}</dd>
+                    <dt className="text-muted-foreground">Last Used</dt>
+                    <dd>{formatDate(token.last_used)}</dd>
+                    <dt className="text-muted-foreground">Expires</dt>
+                    <dd>{token.expires_at ? formatDate(token.expires_at) : "Never"}</dd>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!loading && tokens.length > 0 && !isMobile && (
             <div className="relative w-full overflow-auto">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-background">

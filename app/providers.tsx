@@ -3,10 +3,11 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
-import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout, ToastFn } from "@/lib/utils";
+import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey, ServerDecryptError } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
-import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
+import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, buildConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
+import switchSessionConnection from "@/lib/connection-switch";
 import { usePathname, useRouter } from "next/navigation";
 import { syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
@@ -22,11 +23,14 @@ import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
 import type { LanguageConfig } from "./components/EditorComponent";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider, type UDFFunctionSelection } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CsvLoadContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider, type UDFFunctionSelection } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
+import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
+import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -71,9 +75,20 @@ const defaultQueryHistory: HistoryQuery = {
   counter: 0
 };
 
+const DEMO_GRAPH_NAMES = ["social-demo", "social-demo-test"];
+
+// Swallows the "graph does not exist" error the demo pre-clean expects to get.
+const silentToast = (() => { }) as ToastFn;
+
 const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
 const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
 const LOCAL_LLM_ENDPOINT_STORAGE_KEY = "localLlmEndpoint";
+// Shared instance so an unresolved stub probe hands consumers a stable array.
+const NO_OFFLOADED_GRAPHS: string[] = [];
+
+// The graph list waits on the stub probe, so this bounds how long a hung
+// GRAPH.STUBS can hold the selector empty.
+const STUBS_PROBE_TIMEOUT = 10000;
 const DEFAULT_LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
   ollama: "http://localhost:11434",
   lmstudio: "http://localhost:1234/v1",
@@ -125,7 +140,9 @@ const parseChatApiKeys = (value: string): ChatApiKey[] => {
 };
 
 const loadSelectedChatApiKeyId = () =>
-  localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
+  getConnectionItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY)
+  || localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY)
+  || "";
 
 /**
  * Validates and normalises a model identifier before it is persisted.
@@ -177,15 +194,21 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // Set connection prefix for scoped localStorage
   const [prefixReady, setPrefixReady] = useState(false);
+  // Which connection the prefix above currently points at. The prefix follows
+  // the session, which lags `activeConnectionId` through a switch, so anything
+  // writing connection-scoped storage has to know whether the two agree yet.
+  const [prefixConnectionId, setPrefixConnectionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
       setConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default");
       migrateToScopedStorage();
       setPrefixReady(true);
+      setPrefixConnectionId(sessionData.activeConnectionId ?? null);
     } else if (status === "unauthenticated") {
       clearConnectionPrefix();
       setPrefixReady(false);
+      setPrefixConnectionId(null);
     }
   }, [status, sessionData]);
 
@@ -297,6 +320,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newRefreshInterval, setNewRefreshInterval] = useState(0);
   const [maxTabs, setMaxTabs] = useState(DEFAULT_GRAPH_TABS);
   const [newMaxTabs, setNewMaxTabs] = useState(DEFAULT_GRAPH_TABS);
+  const [graphsSortOrder, setGraphsSortOrder] = useState<GraphSortOrder>(DEFAULT_GRAPH_SORT_ORDER);
+  const [newGraphsSortOrder, setNewGraphsSortOrder] = useState<GraphSortOrder>(DEFAULT_GRAPH_SORT_ORDER);
   const [currentTab, setCurrentTab] = useState<Tab>("Graph");
   const [newSecretKey, setNewSecretKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
@@ -319,16 +344,28 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [model, setModel] = useState("");
   const [newModel, setNewModel] = useState("");
   const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
+  const viewportResolved = useViewportResolved();
+  const isMobile = useIsMobile();
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
+
+  // The tour points at desktop-only chrome, so narrowing past the breakpoint
+  // while it is open has to close it rather than leave it over the mobile layout.
+  useEffect(() => {
+    if (isMobile) setTutorialOpen(false);
+  }, [isMobile]);
+
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [supportsOffload, setSupportsOffload] = useState(false);
-  const [offloadedGraphs, setOffloadedGraphs] = useState<string[]>([]);
+  // Keyed by the connection the stubs were read from: a probe answer describes
+  // one server only, so after a switch the previous server's stubs must read as
+  // "unknown" rather than as this server's offloaded graphs.
+  const [offloadStubs, setOffloadStubs] = useState<{ connectionId: string | null; names: string[] } | null>(null);
   const [ldapProbe, setLdapProbe] = useState<{ connectionId: string | null; usesLdap: boolean } | null>(null);
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
@@ -373,6 +410,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // can tell whether it is still the latest (out-of-order completions are ignored).
   const pendingSwitchesRef = useRef(0);
   const switchTicketRef = useRef(0);
+  // Rendered mirror of `pendingSwitchesRef`, for effects that must hold off
+  // until a switch settles. The ref alone cannot wake them.
+  const [switchPending, setSwitchPending] = useState(false);
 
   const bumpContextGen = useCallback(() => {
     contextGenRef.current += 1;
@@ -391,12 +431,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const beginConnectionSwitch = useCallback(() => {
     pendingSwitchesRef.current += 1;
     switchTicketRef.current += 1;
+    setSwitchPending(true);
     bumpContextGen();
     return switchTicketRef.current;
   }, [bumpContextGen]);
 
   const endConnectionSwitch = useCallback(() => {
     pendingSwitchesRef.current = Math.max(0, pendingSwitchesRef.current - 1);
+    setSwitchPending(pendingSwitchesRef.current > 0);
   }, []);
 
   // True if `ticket` is still the most recently started switch (so a stale,
@@ -441,6 +483,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setNewRefreshInterval,
         newMaxTabs,
         setNewMaxTabs,
+        newGraphsSortOrder,
+        setNewGraphsSortOrder,
       },
       chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
       graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
@@ -460,6 +504,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setRefreshInterval,
         maxTabs,
         setMaxTabs,
+        graphsSortOrder,
+        setGraphsSortOrder,
         captionKeysSettings: { captionsKeys, setCaptionsKeys, showPropertyKeyPrefix, setShowPropertyKeyPrefix },
         tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple },
       },
@@ -478,6 +524,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
       localStorage.setItem("maxTabs", clampMaxTabs(newMaxTabs).toString());
+      localStorage.setItem("graphsSortOrder", newGraphsSortOrder);
       localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
       localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
       localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
@@ -495,6 +542,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLastLimit(limit);
       setRefreshInterval(newRefreshInterval);
       setMaxTabs(clampMaxTabs(newMaxTabs));
+      setGraphsSortOrder(newGraphsSortOrder);
       setMaxSavedMessages(newMaxSavedMessages);
       setCaptionsKeys(newCaptionsKeys);
       setShowPropertyKeyPrefix(newShowPropertyKeyPrefix);
@@ -534,6 +582,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewSecretKey(secretKey);
       setNewRefreshInterval(refreshInterval);
       setNewMaxTabs(maxTabs);
+      setNewGraphsSortOrder(graphsSortOrder);
       setNewMaxSavedMessages(maxSavedMessages);
       setNewCaptionsKeys(captionsKeys);
       setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
@@ -549,7 +598,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHasChanges(false);
     }
 
-  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
+  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, graphsSortOrder, newGraphsSortOrder, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -714,6 +763,58 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // dependency arrays, which avoids cascading effect re-fires.
   const isReadOnlyRef = useRef(isReadOnly);
   isReadOnlyRef.current = isReadOnly;
+
+  // What this deployment can do with LOAD CSV. Assume file:// works until the
+  // server says otherwise, so a failed lookup never blocks a runnable query.
+  const [csvCapabilities, setCsvCapabilities] = useState({ fileUriSupported: true, uploadEnabled: false });
+  const csvUploadOpenerRef = useRef<(() => void) | null>(null);
+  const [csvUploadRegistered, setCsvUploadRegistered] = useState(false);
+
+  // Deployment-wide, so this needs no connection scoping: nothing in the answer
+  // changes when the active connection does. The route is session-guarded
+  // though, so it has to wait for a session — this component outlives the login
+  // redirect, and a 401 answered before sign-in would never be retried.
+  useEffect(() => {
+    if (status !== "authenticated") return undefined;
+
+    let cancelled = false;
+
+    fetch("/api/csv-temp/capabilities", { credentials: "same-origin" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        setCsvCapabilities({
+          fileUriSupported: data.fileUriSupported !== false,
+          uploadEnabled: data.uploadEnabled === true,
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
+  const registerCsvUpload = useCallback((open: () => void) => {
+    csvUploadOpenerRef.current = open;
+    setCsvUploadRegistered(true);
+    return () => {
+      if (csvUploadOpenerRef.current !== open) return;
+      csvUploadOpenerRef.current = null;
+      setCsvUploadRegistered(false);
+    };
+  }, []);
+
+  // The per-caller half of "can upload": the server has to allow it, the
+  // connection has to be writable, a graph has to be selected, and the dialog
+  // has to be mounted — offering the upload anywhere else would go nowhere.
+  const csvLoadContext = useMemo(() => ({
+    fileUriSupported: csvCapabilities.fileUriSupported,
+    uploadEnabled: csvCapabilities.uploadEnabled && csvUploadRegistered && !isReadOnly && Boolean(graphName),
+    openCsvUpload: () => csvUploadOpenerRef.current?.(),
+    registerCsvUpload,
+  }), [csvCapabilities, csvUploadRegistered, isReadOnly, graphName, registerCsvUpload]);
+
   const activeGraphNameRef = useRef(graphName);
   activeGraphNameRef.current = graphName;
   // Ref for the auth status so fetchCount reads the latest value without adding
@@ -721,29 +822,63 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const statusRef = useRef(status);
   statusRef.current = status;
 
+  const stubsSeqRef = useRef(0);
+
+  // Every probe already in flight was read before whatever is about to be
+  // applied, so it must not land afterwards and undo it. The sequence is what
+  // `isCurrent` checks, so bumping it discards all of them.
+  const invalidateStubProbes = useCallback(() => { stubsSeqRef.current += 1; }, []);
+
   // GRAPH.STUBS lists the graphs offloaded from memory. It is registered by the
   // enterprise module only and needs a recent enough core, so the fetch is gated
-  // on `supportsOffload`. The ref holds the connection the result must still
-  // belong to when it resolves, so a superseded connection can't overwrite the
-  // current one's indicators.
-  const activeConnectionIdRef = useRef(activeConnectionId);
-  useEffect(() => { activeConnectionIdRef.current = activeConnectionId; }, [activeConnectionId]);
-
-  const refreshOffloadedGraphs = useCallback(async () => {
+  // on `supportsOffload`.
+  const refreshOffloadedGraphs = useCallback(async (pinnedConnectionId?: string | null) => {
     if (!supportsOffload) return;
 
-    const connectionId = activeConnectionIdRef.current;
-    const isCurrent = () => activeConnectionIdRef.current === connectionId;
+    // `activeConnectionId` changes before the JWT catches up, so the request is
+    // pinned to it by header the same way /api/DBVersion and /api/ldap are —
+    // otherwise the stubs can describe the connection being switched away from.
+    // Callers that are about to publish a graph list pass the connection THAT
+    // list was read for, so a round trip cannot merge one connection's stubs
+    // into another's list. A `null` pin is not a connection: it is the
+    // bootstrap list, read with no header and resolved from the JWT, so the
+    // probe has to resolve the same way rather than be pinned to nothing.
+    const connectionId = pinnedConnectionId ?? getActiveConnectionIdGlobal();
+
+    // Bail before claiming a sequence: a pinned probe whose connection has
+    // already moved on would otherwise discard the probe made for the new one.
+    if (getActiveConnectionIdGlobal() !== connectionId) return;
+
+    // The epoch additionally catches A→B→A, where the id alone repeats. The
+    // sequence orders probes WITHIN one connection: the list refresh, the
+    // periodic effect and the selector all call this, so two can overlap and
+    // the slower one must not resurrect the names the newer one dropped. It is
+    // also what a confirmed delete/rename bumps to discard probes in flight.
+    const epoch = getConnectionEpoch();
+    const seq = (stubsSeqRef.current += 1);
+    const isCurrent = () => getActiveConnectionIdGlobal() === connectionId
+      && getConnectionEpoch() === epoch
+      && stubsSeqRef.current === seq;
 
     try {
-      const result = await fetch("/api/graph/stubs", { method: "GET" });
+      const result = await fetch("/api/graph/stubs", {
+        method: "GET",
+        headers: connectionId ? { "X-Connection-Id": connectionId } : undefined,
+        // The graph list waits on this probe so the offloaded graphs can be
+        // merged into it in one step. That makes a hung enterprise endpoint a
+        // blank selector, so the wait is bounded: timing out is handled like
+        // any other failed probe, and the list goes out without the stubs.
+        signal: AbortSignal.timeout(STUBS_PROBE_TIMEOUT),
+      });
 
       if (!isCurrent()) return;
 
-      if (!result.ok) {
-        setOffloadedGraphs([]);
-        return;
-      }
+      // A failed probe says nothing about what is offloaded, so the last known
+      // stubs are kept rather than published as "nothing is offloaded": that
+      // would drop the graph out of the merged list and make the first-seen
+      // history forget it, so it would come back stamped as brand new. They are
+      // kept under this connection's id, so they can never surface on another.
+      if (!result.ok) return;
 
       const { stubs } = (await result.json()) as StubsResponse;
 
@@ -751,13 +886,78 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       // Keep the same array when nothing changed, so the periodic refresh
       // doesn't re-render every consumer of the indicators.
-      setOffloadedGraphs((prev) => (
-        prev.length === stubs.length && prev.every((name, i) => name === stubs[i]) ? prev : stubs
+      setOffloadStubs((prev) => (
+        prev?.connectionId === connectionId
+          && prev.names.length === stubs.length
+          && prev.names.every((name, i) => name === stubs[i])
+          ? prev
+          : { connectionId, names: stubs }
       ));
     } catch {
-      if (isCurrent()) setOffloadedGraphs([]);
+      // Same as a failed response: a transient error is not an observation.
     }
   }, [supportsOffload]);
+
+  // A stub list describes one connection only, so anything read from another
+  // one (including the render right after a switch) reads as "nothing known".
+  const offloadedGraphs = useMemo(
+    () => (offloadStubs !== null && offloadStubs.connectionId === activeConnectionId ? offloadStubs.names : NO_OFFLOADED_GRAPHS),
+    [offloadStubs, activeConnectionId]
+  );
+
+  // A confirmed graph list outranks the stubs: a graph deleted through the UI
+  // stays in the last probe's answer until the next one, and the selector merges
+  // the stubs back into the list — so without this the deleted graph reappears
+  // and its first-seen timestamp survives to be reused by a graph recreated
+  // under the same name.
+  const pruneOffloadedGraphs = useCallback((confirmed: string[]) => {
+    // A probe read before the delete would otherwise still satisfy `isCurrent`
+    // and write the deleted name straight back in.
+    invalidateStubProbes();
+
+    // Stubs are kept under the connection they were read from, so a list
+    // confirmed against another one says nothing about them — applying it would
+    // empty the connection being switched away from and lose its indicators
+    // (and its first-seen entries) on the way back.
+    const connectionId = getActiveConnectionIdGlobal();
+
+    setOffloadStubs((prev) => {
+      if (prev === null || prev.connectionId !== connectionId) return prev;
+
+      const names = prev.names.filter((name) => confirmed.includes(name));
+
+      return names.length === prev.names.length ? prev : { ...prev, names };
+    });
+  }, [invalidateStubProbes]);
+
+  // A renamed graph is still offloaded, but the probe that would say so is up to
+  // a refresh interval away. Until then the old name is not in the published
+  // list, so the selector would merge the stale stub back in beside the new one
+  // and show the graph twice — the second one stamped as brand new.
+  const renameOffloadedGraph = useCallback((from: string, to: string) => {
+    // Same as the prune: a probe that read the old name must not land after the
+    // rename and overwrite the mapping with it.
+    invalidateStubProbes();
+
+    const connectionId = getActiveConnectionIdGlobal();
+
+    setOffloadStubs((prev) => {
+      if (prev === null || prev.connectionId !== connectionId || !prev.names.includes(from)) return prev;
+
+      return { ...prev, names: prev.names.map((name) => (name === from ? to : name)) };
+    });
+  }, [invalidateStubProbes]);
+
+  // A graph list the server handed back for an explicit create/delete/rename is
+  // confirmed, and outranks every refresh already in flight: one read before the
+  // mutation would otherwise land after it and put the old names back, taking
+  // the first-seen history with them. The generation is module-level because the
+  // list has more than one publisher and the mutation does not always share a
+  // component with the refresh it has to discard.
+  const supersedeGraphRefreshes = useCallback(() => {
+    supersedeGraphLists();
+    invalidateStubProbes();
+  }, [invalidateStubProbes]);
 
   // A probe answer only describes the connection it was made for; anything else
   // (including the render right after a switch) reads as unresolved.
@@ -776,16 +976,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     supportsOffload,
     offloadedGraphs,
     refreshOffloadedGraphs,
+    pruneOffloadedGraphs,
+    renameOffloadedGraph,
+    supersedeGraphRefreshes,
     usesLdap,
     additionalConnections,
     setAdditionalConnections,
     activeConnectionId,
     setActiveConnectionId,
+    prefixConnectionId,
     updateSession,
     beginConnectionSwitch,
     endConnectionSwitch,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, usesLdap, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -1418,8 +1622,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Keep the module-level global in sync with React state on every render.
   // This is intentionally dependency-free so it runs after every render,
   // restoring _activeConnectionId even when Next.js HMR resets the module.
+  // A switch sets the global to its target and only updates React state once
+  // the JWT agrees, so during that window this effect would write the old id
+  // back over the target; skip it until the switch settles, which re-renders
+  // via `switchPending` and syncs whichever id won.
 
-  useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
+  useEffect(() => {
+    if (pendingSwitchesRef.current > 0) return;
+    setActiveConnectionIdGlobal(activeConnectionId);
+  });
 
   // Keep "Did you mean…?" function suggestions aware of the loaded UDFs.
   useEffect(() => { setFunctionCandidates(udfFunctionNames(udfList)); }, [udfList]);
@@ -1452,7 +1663,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         if (!result.ok) {
           setShowMemoryUsage(false);
           setSupportsOffload(false);
-          setOffloadedGraphs([]);
+          invalidateStubProbes();
+          setOffloadStubs(null);
           resolveClosed();
           return;
         }
@@ -1493,16 +1705,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Stop a response for the previous connection (or a signed-out session) from
     // landing on the current one.
     return () => { cancelled = true; };
-  }, [status, activeConnectionId]);
+  }, [status, activeConnectionId, invalidateStubProbes]);
 
   useEffect(() => {
     if (status !== "authenticated" || !supportsOffload) {
-      setOffloadedGraphs([]);
+      // A probe sent while this connection still looked capable can outlive the
+      // answer that says it is not, so discard it rather than let it repopulate
+      // stubs for a connection that cannot have any.
+      invalidateStubProbes();
+      setOffloadStubs(null);
       return;
     }
 
     refreshOffloadedGraphs();
-  }, [status, activeConnectionId, supportsOffload, refreshOffloadedGraphs]);
+  }, [status, activeConnectionId, supportsOffload, refreshOffloadedGraphs, invalidateStubProbes]);
   useEffect(() => {
     if (status !== "authenticated") {
       setConnectionType("Standalone");
@@ -1581,6 +1797,31 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     let cancelled = false;
 
+    // Everything session-derived -- role, host, storage prefix -- comes from the
+    // JWT, so a failed sync must not leave the id pinned to a connection the
+    // session never learned about. Unpin instead and let the JWT answer. A
+    // session that resolves without adopting the id counts as a failure too:
+    // the server declined the switch, so the prefix still describes the other
+    // connection.
+    const pinAndSync = async (id: string) => {
+      setActiveConnectionId(id);
+      setActiveConnectionIdGlobal(id);
+      const pinnedEpoch = getConnectionEpoch();
+      try {
+        await switchSessionConnection(updateSessionRef.current, id);
+      } catch (error) {
+        // Undo only our own pin. A switch started during the await has already
+        // moved the id on and is waiting for the reset effect to release its
+        // gate slot; clearing the id here makes that effect see A→null→B, and
+        // it skips both transitions, so the gate never reopens.
+        if (getConnectionEpoch() === pinnedEpoch) {
+          setActiveConnectionId(null);
+          setActiveConnectionIdGlobal(null);
+        }
+        throw error;
+      }
+    };
+
     (async () => {
       try {
         const result = await securedFetch("/api/connections", {
@@ -1605,15 +1846,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             const target = lastId && conns.find(c => c.id === lastId)
               ? lastId
               : conns[0].id;
-            setActiveConnectionId(target);
-            setActiveConnectionIdGlobal(target);
             // Sync activeConnectionId into the JWT so session.user reflects
             // the correct connection's role/host/port. The JWT callback looks
             // up the full connection details from Token DB.
             if (!cancelled) {
-              await updateSessionRef.current({
-                activeConnectionId: target,
-              });
+              await pinAndSync(target);
             }
 
           } else {
@@ -1645,12 +1882,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 const migratedConn: SessionConnection = migrateJson.connection;
                 const migratedConns = [migratedConn];
                 setAdditionalConnections(migratedConns);
-                setActiveConnectionId(migratedConn.id);
-                setActiveConnectionIdGlobal(migratedConn.id);
                 if (!cancelled) {
-                  await updateSessionRef.current({
-                    activeConnectionId: migratedConn.id,
-                  });
+                  await pinAndSync(migratedConn.id);
                 }
               }
             }
@@ -1739,13 +1972,19 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLastLimit(l);
       setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined));
       setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false");
-      setTutorialOpen(localStorage.getItem("tutorial") !== "false");
+      // The tour drives desktop-only chrome (side panels, hover targets, right-click),
+      // so it never runs on a phone. Read the width rather than `useIsMobile` — this
+      // effect fires before the hook has corrected its server-rendered `false`.
+      setTutorialOpen(window.innerWidth >= MOBILE_BREAKPOINT && localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
       setMaxTabs(loadedMaxTabs);
       // Seed the settings-form value too, otherwise the form keeps showing the
       // default and reads as "changed" against the value actually in effect.
       setNewMaxTabs(loadedMaxTabs);
+      const loadedGraphsSortOrder = normalizeGraphSortOrder(localStorage.getItem("graphsSortOrder"));
+      setGraphsSortOrder(loadedGraphsSortOrder);
+      setNewGraphsSortOrder(loadedGraphsSortOrder);
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
       setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
       setCypherOnly(localStorage.getItem("cypherOnly") === "true");
@@ -1767,70 +2006,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewLocalLlmProvider(loadedLocalLlmProvider);
       setLocalLlmEndpoint(loadedLocalLlmEndpoint);
       setNewLocalLlmEndpoint(loadedLocalLlmEndpoint);
-      let loadedChatApiKeys: ChatApiKey[] = [];
-      const storedChatApiKeys = localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
-      if (storedChatApiKeys) {
-        try {
-          // Validate format before decrypting - only decrypt if looks server-encrypted
-          if (looksServerEncrypted(storedChatApiKeys)) {
-            const decryptedKeys = await serverDecrypt(storedChatApiKeys);
-            loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
-          } else {
-            // Try to parse directly as plaintext JSON for legacy or test values
-            try {
-              loadedChatApiKeys = parseChatApiKeys(storedChatApiKeys);
-            } catch {
-              console.warn('Stored API keys format unrecognized, clearing corrupted data');
-              localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
-            }
-          }
-        } catch (error) {
-          console.error('Failed to decrypt API keys:', error);
-          localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
-        }
-      }
-
-      // Migrate the legacy single-key setting into the new key list.
-      const storedSecretKey = localStorage.getItem("secretKey") || "";
-      if (loadedChatApiKeys.length === 0 && storedSecretKey) {
-        let migratedKey = "";
-        if (isLegacyEncrypted(storedSecretKey)) {
-          try {
-            migratedKey = await legacyDecrypt(storedSecretKey);
-            clearLegacyEncryptionKey();
-          } catch (error) {
-            console.error('Failed to migrate legacy secret key:', error);
-          }
-        } else {
-          try {
-            migratedKey = await serverDecrypt(storedSecretKey);
-          } catch {
-            migratedKey = storedSecretKey;
-          }
-        }
-
-        if (migratedKey) {
-          const migratedChatApiKeys = [createChatApiKey(migratedKey)];
-          const encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
-          if (encryptedKeys) {
-            loadedChatApiKeys = migratedChatApiKeys;
-            localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
-            localStorage.removeItem("secretKey");
-          }
-        } else if (isLegacyEncrypted(storedSecretKey)) {
-          localStorage.removeItem("secretKey");
-        }
-      }
-
-      const storedSelectedId = loadSelectedChatApiKeyId();
-      const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
-      // selectedApiKey.id is a UUID identifier, not the API key value itself
-      const selectedId = String(selectedApiKey?.id ?? "");
-      persistSelectedChatApiKeyId(selectedId);
-      setChatApiKeys(loadedChatApiKeys);
-      setSelectedChatApiKeyId(selectedId);
-      setSecretKey(selectedApiKey?.key ?? "");
-
       const rawModel = localStorage.getItem("model") || "";
       const loadedModel = looksServerEncrypted(rawModel) ? "" : rawModel;
       setModel(loadedModel);
@@ -1841,6 +2016,228 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       } catch { /* ignore corrupted data */ }
     })();
   }, [status, prefixReady, toast]);
+
+  // Chat API keys are loaded separately from the settings above because they
+  // are connection-scoped: /api/encrypt binds each blob to `username@host:port`,
+  // so a blob written by one connection is unreadable by another. Storing them
+  // under a single global key meant the last connection to save wiped the
+  // others, and keeping them out of this effect's dependencies meant a
+  // connection switch left the previous connection's decrypted keys in state.
+  // `connectionScope` is built with the same helper the storage module uses, so
+  // the comparison below cannot drift from the prefix it is checking against.
+  const connectionScope = useMemo(
+    () => (status === "authenticated" && sessionData?.user
+      ? buildConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default")
+      : ""),
+    [status, sessionData?.user]
+  );
+
+  useEffect(() => {
+    // Drop the previous connection's credentials before anything awaits. The
+    // global connection id changes as soon as the switch starts, so a chat sent
+    // while this load is still in flight would otherwise carry connection A's
+    // key to connection B. Only the React state is cleared -- the stored values
+    // stay put under their own prefix and are re-read below. This runs on every
+    // identity change, including the one to "" on sign-out.
+    setChatApiKeys([]);
+    setSelectedChatApiKeyId("");
+    setSecretKey("");
+
+    // `connectionScope` and the storage prefix both come from the session,
+    // which only catches up once `updateSession` resolves -- while the global
+    // connection id every request is tagged with changed at the start of the
+    // switch. Reloading against the old identity in that window would republish
+    // connection A's key for requests already addressed to B, so wait it out.
+    // `endConnectionSwitch` (and the reset effect, which zeroes the counter
+    // once React agrees) re-runs this with whichever identity won, so a
+    // rolled-back switch restores the keys it just cleared.
+    if (switchPending) return undefined;
+
+    if (status !== "authenticated" || !prefixReady || !connectionScope) return undefined;
+
+    // `switchPending` only covers switches that went through
+    // `beginConnectionSwitch`. The bootstrap restore does not -- it moves the
+    // global connection id straight to the stored one -- so it opens the same
+    // window with the flag false: requests are already tagged with connection
+    // B while the session, and with it `connectionScope`, still names A.
+    // Compare the two ids directly so this load waits for them to agree.
+    // A null global is not a disagreement: requests then carry no
+    // `X-Connection-Id` and the server resolves the same identity from the JWT.
+    // Whichever way the disagreement resolves -- the session catching up, or
+    // the bootstrap rolling the id back after a failed sync -- moves a
+    // dependency below, so this load is retried rather than abandoned.
+    const pinnedConnectionId = getActiveConnectionIdGlobal();
+    const pinnedEpoch = getConnectionEpoch();
+    const sessionConnectionId = sessionData?.activeConnectionId ?? null;
+    if (pinnedConnectionId !== null && pinnedConnectionId !== sessionConnectionId) return undefined;
+
+    // The storage prefix is module-global and every step below awaits the
+    // server, so a connection switch mid-flight could publish this
+    // connection's keys into the next one's state, or write its ciphertext
+    // under the next one's prefix. Nothing commits once the run is superseded.
+    // The id being back where it started is not proof it never left: an A→B→A
+    // round trip restores it, and anything this run sent while it was at B was
+    // answered by B. The epoch counts the departures, so check that too.
+    let cancelled = false;
+    const stale = () =>
+      cancelled ||
+      getConnectionPrefix() !== connectionScope ||
+      getActiveConnectionIdGlobal() !== pinnedConnectionId ||
+      getConnectionEpoch() !== pinnedEpoch;
+
+    (async () => {
+      let loadedChatApiKeys: ChatApiKey[] = [];
+      let stored = getConnectionItem(CHAT_API_KEYS_STORAGE_KEY) || "";
+      // Before scoping, every connection shared one unscoped entry. Two paths
+      // out of that, and they differ: ciphertext is owner-bound, so only the
+      // connection it decrypts for claims it and the rest hit 403 and leave it
+      // alone. Plain text names no owner, so the first connection to load it
+      // claims it — and the others, which used to read that same entry, lose
+      // it. That is a narrowing of access, not a crossing of a boundary: the
+      // entry was readable by every connection in this browser a moment ago.
+      // The alternative, leaving it unclaimed, keeps a plaintext secret at rest
+      // for everyone forever, and makes every user re-enter their keys to spare
+      // the multi-connection minority a re-entry.
+      const legacyStored = stored ? "" : localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
+      let claimingLegacy = false;
+      if (legacyStored) {
+        stored = legacyStored;
+        claimingLegacy = true;
+      }
+
+      if (stored) {
+        try {
+          // Validate format before decrypting - only decrypt if looks server-encrypted
+          if (looksServerEncrypted(stored)) {
+            const decryptedKeys = await serverDecrypt(stored);
+            if (stale()) return;
+            loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
+          } else {
+            // Try to parse directly as plaintext JSON for legacy or test values
+            try {
+              loadedChatApiKeys = parseChatApiKeys(stored);
+            } catch {
+              console.warn('Stored API keys format unrecognized, clearing corrupted data');
+              if (claimingLegacy) localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+              else removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
+              claimingLegacy = false;
+            }
+          }
+          if (claimingLegacy) {
+            // The unscoped entry predates server encryption, so it may still be
+            // plain text. Encrypt it on the way in rather than carrying the
+            // plaintext forward until the user happens to edit a key. A failure
+            // here throws to the catch below, which leaves the unscoped entry
+            // where it is — nothing is lost, the migration just retries later.
+            const toStore = looksServerEncrypted(stored) ? stored : await serverEncrypt(stored);
+            if (stale()) return;
+            if (toStore) {
+              setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, toStore);
+              localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            }
+          }
+        } catch (error) {
+          if (stale()) return;
+          if (error instanceof ServerDecryptError && error.status === 403) {
+            // The value belongs to another connection. Keep it: switching back
+            // to that connection restores access.
+            console.warn('Stored API keys belong to a different connection, leaving them untouched');
+          } else if (error instanceof ServerDecryptError && error.status === 400) {
+            // The only permanent refusal: the value predates owner binding and
+            // can never be read again.
+            console.error('Stored API keys are unreadable, clearing them:', error);
+            if (claimingLegacy) localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            else removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
+          } else {
+            // A 5xx or a dropped request says nothing about the value itself;
+            // deleting on one would destroy a perfectly good key.
+            console.error('Failed to decrypt API keys, keeping them for a later attempt:', error);
+          }
+        }
+      }
+
+      // Migrate the legacy single-key setting into the new key list.
+      const storedSecretKey = localStorage.getItem("secretKey") || "";
+      if (loadedChatApiKeys.length === 0 && storedSecretKey) {
+        let migratedKey = "";
+        // The legacy key is the only way back into `secretKey`, and it is
+        // shared rather than connection-scoped. Dropping it the moment the
+        // decrypt succeeds would strand the ciphertext if the migration then
+        // failed to commit -- or if a connection switch superseded this run
+        // before it got the chance. Clear it only once `secretKey` itself is
+        // gone, at which point nothing is left for it to open.
+        let legacyKeySpent = false;
+        if (isLegacyEncrypted(storedSecretKey)) {
+          try {
+            migratedKey = await legacyDecrypt(storedSecretKey);
+            legacyKeySpent = true;
+          } catch (error) {
+            console.error('Failed to migrate legacy secret key:', error);
+          }
+          if (stale()) return;
+        } else if (looksServerEncrypted(storedSecretKey)) {
+          try {
+            migratedKey = await serverDecrypt(storedSecretKey);
+          } catch (error) {
+            // A superseded run must not touch storage, even to delete: the
+            // verdict below is acted on, not merely logged.
+            if (stale()) return;
+            // A refusal must not fall through to treating the ciphertext as the
+            // key itself: that would re-encrypt the blob as a bogus API key and
+            // delete the original.
+            if (error instanceof ServerDecryptError && error.status === 403) {
+              console.warn('Legacy secret key belongs to a different connection, leaving it untouched');
+            } else if (error instanceof ServerDecryptError && error.status === 400) {
+              // The one permanent refusal: predates owner binding, unreadable.
+              localStorage.removeItem("secretKey");
+            } else {
+              console.error('Failed to decrypt legacy secret key, keeping it:', error);
+            }
+          }
+          if (stale()) return;
+        } else {
+          // Never encrypted — the value is the key.
+          migratedKey = storedSecretKey;
+        }
+
+        if (migratedKey) {
+          const migratedChatApiKeys = [createChatApiKey(migratedKey)];
+          // `serverEncrypt` throws on a refusal, and an unhandled rejection
+          // here would abandon the run before the keys below are published.
+          // A failure says nothing about the value, so leave `secretKey` where
+          // it is and let the next run retry the migration.
+          let encryptedKeys = "";
+          try {
+            encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
+          } catch (error) {
+            console.error('Failed to encrypt the migrated secret key, keeping it for a later attempt:', error);
+          }
+          if (stale()) return;
+          if (encryptedKeys) {
+            loadedChatApiKeys = migratedChatApiKeys;
+            setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+            localStorage.removeItem("secretKey");
+            if (legacyKeySpent) clearLegacyEncryptionKey();
+          }
+        } else if (isLegacyEncrypted(storedSecretKey)) {
+          localStorage.removeItem("secretKey");
+          if (legacyKeySpent) clearLegacyEncryptionKey();
+        }
+      }
+
+      const storedSelectedId = loadSelectedChatApiKeyId();
+      const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
+      // selectedApiKey.id is a UUID identifier, not the API key value itself
+      const selectedId = String(selectedApiKey?.id ?? "");
+      if (stale()) return;
+      persistSelectedChatApiKeyId(selectedId);
+      setChatApiKeys(loadedChatApiKeys);
+      setSelectedChatApiKeyId(selectedId);
+      setSecretKey(selectedApiKey?.key ?? "");
+    })();
+
+    return () => { cancelled = true; };
+  }, [status, prefixReady, connectionScope, switchPending, sessionData?.activeConnectionId, activeConnectionId]);
 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.
@@ -1893,7 +2290,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const ctx = contextGenRef.current;
     const cid = getActiveConnectionIdGlobal();
     const epoch = getConnectionEpoch();
-    const isCurrent = () => getConnectionEpoch() === epoch && optionsSeqRef.current === oseq;
+    // A mutation that happened while this was in flight already published a list
+    // it knows to be correct, so this one is stale however recent it is.
+    const generation = getGraphListGeneration();
+    const isCurrent = () => getConnectionEpoch() === epoch
+      && getGraphListGeneration() === generation
+      && optionsSeqRef.current === oseq;
     const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
     const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
 
@@ -1902,6 +2304,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (options?.clear) setGraphNames(undefined);
 
     const res = await fetchOptions(gToast, gInd, indicator, cid);
+
+    // GRAPH.LIST omits offloaded graphs and the selector merges the stubs back
+    // in, so settle the stubs first: publishing the list on its own would take
+    // a newly offloaded graph out of the merged list until they land. The probe
+    // is pinned to the connection this list was read for, so the two can never
+    // describe different servers.
+    if (res) await refreshOffloadedGraphs(cid);
 
     // The list is connection-scoped: apply only if this is still the newest
     // refresh for the same connection (a later switch/refresh owns it otherwise).
@@ -1914,7 +2323,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphNamesLoaded(true);
     // Auto-select is graph-scoped: only apply if the graph context is unchanged.
     if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
-  }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName]);
+  }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName, refreshOffloadedGraphs]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -1963,7 +2372,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     prevActiveConnectionIdRef.current = activeConnectionId;
 
     // Skip the very first selection (initial mount / login) and null resets
-    if (prev === null || activeConnectionId === null) return;
+    if (prev === null || activeConnectionId === null) {
+      // A switch that took a gate slot can still land here: a failed bootstrap
+      // pin leaves the id null, so the user's next click is a null → B
+      // transition. There is no previous connection's state to clear, but the
+      // slot still has to be released or graph ops stay blocked until the
+      // switch after this one.
+      if (activeConnectionId !== null && pendingSwitchesRef.current > 0) {
+        pendingSwitchesRef.current = 0;
+        setSwitchPending(false);
+      }
+      return;
+    }
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
@@ -1973,6 +2393,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     bumpContextGen();
     activeGraphNameRef.current = "";
     pendingSwitchesRef.current = 0;
+    setSwitchPending(false);
 
     // Clear graph data so stale results from the old connection are gone.
     // Build the empty graph with the real toast/setIndicator callbacks up front
@@ -1997,15 +2418,45 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setTutorialOpen(false);
   };
 
-  const handleLoadDemoGraphs = useCallback(async () => {
+  const handleLoadDemoGraphs = useCallback(async (): Promise<DemoLoadOutcome> => {
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
 
+    // Read once: the failure path has to put this back, and the state setter
+    // below is not readable synchronously.
+    const urlParams = window.location.search;
+
+    // Pinned to `cid`: after a connection switch neither the retry nor the
+    // cleanup looks at the connection these graphs were created on.
+    const dropDemoGraphs = async () => {
+      await Promise.all(DEMO_GRAPH_NAMES.map(async name => {
+        const res = await securedFetch(`/api/graph/${name}`, {
+          method: "DELETE",
+        }, silentToast, setIndicator, cid);
+
+        // The route answers 400 for every failure including "no such graph",
+        // and securedFetch has already drained the body that would tell them
+        // apart — so 400 is the one status this rollback cannot act on.
+        if (!res.ok && res.status !== 400) console.error(`Failed to drop ${name} while rolling back the demo load: HTTP ${res.status}`);
+      }));
+    };
+
+    // Undoes the address bar and the snapshot this attempt took, so whoever
+    // comes next reads the URL the user arrived with, not the stripped one.
+    const restorePreTutorialState = () => {
+      if (urlParams) window.history.replaceState(null, "", `${window.location.pathname}${urlParams}`);
+      setUserGraphsBeforeTutorial([]);
+      setUserGraphBeforeTutorial("");
+      setUrlParamsBeforeTutorial("");
+    };
+
     try {
-      // Store current user graphs and URL params
-      setUserGraphsBeforeTutorial(graphNames);
+      // Store current user graphs and URL params. A previous tutorial session that
+      // ended without cleanup leaves its demo graphs in the list; they are about to
+      // be dropped, so they must not come back when the list is restored.
+      setUserGraphsBeforeTutorial(graphNames?.filter(name => !DEMO_GRAPH_NAMES.includes(name)));
       setUserGraphBeforeTutorial(graphName);
-      setUrlParamsBeforeTutorial(window.location.search);
+      setUrlParamsBeforeTutorial(urlParams);
 
       // Clear the visible URL params for the tutorial, but push a new history
       // entry (rather than replacing) so the user's pre-tutorial URL stays in
@@ -2016,8 +2467,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLayout('force');
       setDirection('');
 
+      // CREATE only appends, and the tutorial re-opens by itself on every load
+      // until it is dismissed, so a demo graph left behind by a refresh or a closed
+      // tab used to gain another full copy of the dataset (#2087). Purging in the
+      // same query keeps the reset atomic: two tabs racing each other still end up
+      // with exactly one copy, and there is no delete response to interpret.
+      const purge = "MATCH (n) DETACH DELETE n WITH count(n) AS purged";
+
       // Create social demo graph
       const socialQuery = `
+        ${purge}
         CREATE 
           (alice:Person {name: 'Alice', age: 30, role: 'CEO'}),
           (bob:Person {name: 'Bob', age: 25, role: 'VP Engineering'}),
@@ -2045,34 +2504,55 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       // Create social-test demo graph
       const socialTestQuery = `
+      ${purge}
       CREATE 
       (eve:Person {name: 'Eve', age: 32}),
       (frank:Person {name: 'Frank', age: 29}),
       (eve)-[:FOLLOWS]->(frank)
       `;
 
-      await Promise.all([
-        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator, { connectionId: cid }),
-        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator, { connectionId: cid })
-      ]).catch(async () => {
-        await Promise.all([
-          securedFetch("/api/graph/social-demo", {
-            method: "DELETE",
-          }, toast, setIndicator, cid),
-          securedFetch("/api/graph/social-demo-test", {
-            method: "DELETE",
-          }, toast, setIndicator, cid)
-        ]);
-      });
+      // allSettled, not all: a rejection from one load would leave the other
+      // still streaming, and in FalkorDB any query re-creates its graph — so a
+      // rollback delete issued while that create is in flight gets undone by it.
+      // Both queries are hardcoded, so the SSE layer's parse/connection detail is
+      // for the console, not the user — silence it and report once, below.
+      const loads = await Promise.allSettled([
+        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid }),
+        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid })
+      ]);
 
-      if (getConnectionEpoch() !== startEpoch) return;
+      const failedLoad = loads.find((load): load is PromiseRejectedResult => load.status === "rejected");
+
+      if (failedLoad) {
+        // One graph can be loaded while the other failed, so drop both rather
+        // than walk the tutorial into half a dataset.
+        await dropDemoGraphs();
+        throw failedLoad.reason;
+      }
+
+      if (getConnectionEpoch() !== startEpoch) {
+        // Nothing downstream will find these: the retry and the cleanup both
+        // run against the connection that has since become active.
+        await dropDemoGraphs();
+
+        // The retry re-reads window.location.search, which is stripped by now.
+        restorePreTutorialState();
+
+        return "cancelled";
+      }
+
+      // A refresh that started before the tutorial opened is exempt from the
+      // tutorialOpen guard and would put the user's graphs back in the list.
+      supersedeGraphRefreshes();
 
       // Update graph list to only show demo graphs
-      setGraphNames(["social-demo", "social-demo-test"]);
+      setGraphNames([...DEMO_GRAPH_NAMES]);
       handleSetGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       setGraph(Graph.empty());
       setData({ nodes: [], links: [] });
+
+      return "loaded";
     } catch (error) {
 
       console.error("Failed to load demo graphs", error);
@@ -2081,22 +2561,26 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         description: "Failed to load demo graphs",
         variant: "destructive",
       });
+
+      // The tutorial's failure path closes without running handleCleanupDemoGraphs,
+      // so the history entry and the snapshot taken above would otherwise strand
+      // the user on a stripped URL with a stale pre-tutorial state.
+      restorePreTutorialState();
+
+      // The tutorial takes a resolved promise as a loaded dataset and walks the
+      // user into steps that query it, so a failure has to reach it.
+      throw error;
     }
-  }, [graphName, graphNames, toast]);
+  }, [graphName, graphNames, toast, supersedeGraphRefreshes]);
 
   const handleCleanupDemoGraphs = useCallback(async () => {
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
 
     try {
-      await Promise.all([
-        securedFetch("/api/graph/social-demo", {
-          method: "DELETE",
-        }, toast, setIndicator, cid),
-        securedFetch("/api/graph/social-demo-test", {
-          method: "DELETE",
-        }, toast, setIndicator, cid)
-      ]);
+      await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
+        method: "DELETE",
+      }, toast, setIndicator, cid)));
     } catch (error) {
 
       console.error("Failed to cleanup demo graphs", error);
@@ -2130,6 +2614,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     }
 
+    // The deletes above make every refresh still in flight stale, demo graphs
+    // included; this restored list is the confirmed one.
+    supersedeGraphRefreshes();
+
     setGraphNames(userGraphsBeforeTutorial);
     setUserGraphsBeforeTutorial([]);
     setUserGraphBeforeTutorial("");
@@ -2139,7 +2627,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       window.history.replaceState(null, "", `${window.location.pathname}${urlParamsBeforeTutorial}`);
     }
     setUrlParamsBeforeTutorial("");
-  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial]);
+  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial, supersedeGraphRefreshes]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>
@@ -2156,23 +2644,29 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                           <ConnectionContext.Provider value={connectionContext}>
                             <UDFContext.Provider value={udfContext}>
                               <CypherLanguageContext.Provider value={cypherLanguageContext}>
-                                <AiFixContext.Provider value={aiFixContext}>
-                                  <GraphTabsContext.Provider value={graphTabsContext}>
-                                    <ProviderLayout
-                                      panelRef={panelRef}
-                                      customizingLabel={customizingLabel}
-                                      setCustomizingLabel={setCustomizingLabel}
-                                      tutorialOpen={tutorialOpen}
-                                      onCloseTutorial={handleCloseTutorial}
-                                      onLoadDemoGraphs={handleLoadDemoGraphs}
-                                      onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                      showUDF={showUDF}
-                                    >
-                                      {children}
-                                    </ProviderLayout>
-                                  </GraphTabsContext.Provider>
-                                  <AiFixDialogs />
-                                </AiFixContext.Provider>
+                                <CsvLoadContext.Provider value={csvLoadContext}>
+                                  <AiFixContext.Provider value={aiFixContext}>
+                                    <GraphTabsContext.Provider value={graphTabsContext}>
+                                      {
+                                        viewportResolved
+                                          ? <ProviderLayout
+                                            panelRef={panelRef}
+                                            customizingLabel={customizingLabel}
+                                            setCustomizingLabel={setCustomizingLabel}
+                                            tutorialOpen={tutorialOpen}
+                                            onCloseTutorial={handleCloseTutorial}
+                                            onLoadDemoGraphs={handleLoadDemoGraphs}
+                                            onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                            showUDF={showUDF}
+                                          >
+                                            {children}
+                                          </ProviderLayout>
+                                          : <div className="h-full w-full bg-background" />
+                                      }
+                                    </GraphTabsContext.Provider>
+                                    <AiFixDialogs />
+                                  </AiFixContext.Provider>
+                                </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>
                             </UDFContext.Provider>
                           </ConnectionContext.Provider>

@@ -9,9 +9,10 @@ import { twMerge } from "tailwind-merge";
 import React, { type RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData, NodeShape } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
-import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink, type CypherErrorHint } from "./cypherErrors.ts";
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 import { quoteCypherIdentifier } from "./cypher.ts";
+import { getActiveConnectionIdGlobal } from "./active-connection.ts";
 import type { PropertyValue } from "./graphValues.ts";
 
 export { parseSyntaxError };
@@ -24,6 +25,7 @@ export type ToastArguments = {
   rawMessage?: string;
   hint?: string;
   hintLink?: HintLink;
+  hintAction?: CypherErrorHint["action"];
   query?: string;
 };
 
@@ -335,6 +337,7 @@ export type UserFriendlyMessage = {
   rawMessage?: string;
   hint?: string;
   hintLink?: HintLink;
+  hintAction?: CypherErrorHint["action"];
   syntaxError?: SyntaxErrorInfo;
 };
 
@@ -382,7 +385,7 @@ export async function getSSEGraphResult(
 
     // Route through an explicit connection id when provided, so every request in
     // a batch targets the same connection even if the global changes mid-flight.
-    const connId = options?.connectionId !== undefined ? options.connectionId : _activeConnectionId;
+    const connId = options?.connectionId !== undefined ? options.connectionId : getActiveConnectionIdGlobal();
 
     // EventSource doesn't support headers — inject connectionId as a query param.
     let effectiveUrl = normalizeApiUrl(url);
@@ -485,7 +488,7 @@ export async function getSSEGraphResult(
       }
 
       const friendly = toUserFriendlyMessage(message, status, options?.query ? { query: options.query } : undefined);
-      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: options?.query });
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, hintAction: friendly.hintAction, query: options?.query });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -696,7 +699,7 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
   // For user-readable errors, description IS the raw message — skip rawMessage
   // to avoid a duplicate "See more" section.
   if (isAllowlistedUserError(rawMessage) || hint) {
-    return { title: "Error", description: rawMessage, hint, hintLink };
+    return { title: "Error", description: rawMessage, hint, hintLink, hintAction: catalog?.action };
   }
 
   const lower = rawMessage.toLowerCase();
@@ -748,29 +751,28 @@ function triggerSessionInvalidationSignOut(): void {
 }
 
 // Active connection ID — injected into every outgoing request as X-Connection-Id.
-// Not initialised from localStorage to avoid overriding restricted-user sessions.
-// providers.tsx keeps it in sync after every render.
-let _activeConnectionId: string | null = null;
-// Monotonic counter bumped whenever the active connection id actually changes.
-// Async callers can capture it before a request and re-check it before applying
-// results, so a switch (including A→B→A, where the id repeats) is still detected.
-let _connectionEpoch = 0;
+// Lives in its own module so helpers that cannot pull in this one can still pin
+// a request to a connection.
+export {
+  setActiveConnectionIdGlobal,
+  getActiveConnectionIdGlobal,
+  getConnectionEpoch,
+} from "./active-connection.ts";
 
-export function setActiveConnectionIdGlobal(id: string | null) {
-  // Bump only when switching AWAY from an already-established connection (the old
-  // id is non-null). The initial null→id establishment on every page load is not
-  // a "switch" and must not discard the first graph-list load / query, which
-  // capture the epoch before the connection id settles.
-  if (_activeConnectionId !== null && id !== _activeConnectionId) _connectionEpoch += 1;
-  _activeConnectionId = id;
+// Monotonic counter bumped whenever a mutation (create/delete/rename/duplicate)
+// hands back a graph list it knows to be correct. The graph list has more than
+// one publisher, and a refresh read before the mutation would otherwise land
+// after it and undo it, so every publisher captures this before fetching and
+// re-checks it before applying. Module-level rather than a ref because the
+// mutation and the refresh it supersedes do not share a component.
+let _graphListGeneration = 0;
+
+export function supersedeGraphLists(): void {
+  _graphListGeneration += 1;
 }
 
-export function getActiveConnectionIdGlobal(): string | null {
-  return _activeConnectionId;
-}
-
-export function getConnectionEpoch(): number {
-  return _connectionEpoch;
+export function getGraphListGeneration(): number {
+  return _graphListGeneration;
 }
 
 /** Error thrown when an in-flight request is superseded (e.g. a graph/connection
@@ -816,7 +818,7 @@ export async function securedFetch(
   // Callers that set X-Connection-Id explicitly take priority over the global.
   const effectiveInit = { ...init };
   const existingHeaders = new Headers(effectiveInit.headers);
-  const effectiveConnId = connectionId !== undefined ? connectionId : _activeConnectionId;
+  const effectiveConnId = connectionId !== undefined ? connectionId : getActiveConnectionIdGlobal();
   if (effectiveConnId && !existingHeaders.has("X-Connection-Id")) {
     existingHeaders.set("X-Connection-Id", effectiveConnId);
   }
@@ -843,6 +845,7 @@ export async function securedFetch(
       rawMessage: friendly.rawMessage,
       hint: friendly.hint,
       hintLink: friendly.hintLink,
+      hintAction: friendly.hintAction,
     });
 
     if (status === 401 || status >= 500) {
@@ -903,8 +906,9 @@ export function uploadFileWithProgress(
     const xhr = new XMLHttpRequest();
     xhr.open("POST", normalizeApiUrl(input));
 
-    if (_activeConnectionId) {
-      xhr.setRequestHeader("X-Connection-Id", _activeConnectionId);
+    const activeConnId = getActiveConnectionIdGlobal();
+    if (activeConnId) {
+      xhr.setRequestHeader("X-Connection-Id", activeConnId);
     }
 
     const onAbort = () => xhr.abort();
@@ -937,6 +941,7 @@ export function uploadFileWithProgress(
           rawMessage: friendly.rawMessage,
           hint: friendly.hint,
           hintLink: friendly.hintLink,
+          hintAction: friendly.hintAction,
         });
         if (status === 401 || status >= 500) setIndicator("offline");
         resolve({ ok: false, status, body });
@@ -1390,7 +1395,7 @@ export const getMemoryUsage = async (
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
   // Pass activeConnectionId explicitly from React context/closure.
-  // This avoids relying on the module-level global _activeConnectionId
+  // This avoids relying on the module-level global active connection id
   // which can be reset to null by Next.js HMR between renders.
   connectionId?: string | null,
   signal?: AbortSignal,
@@ -1399,7 +1404,7 @@ export const getMemoryUsage = async (
   // from restricted users don't produce error toasts — memory usage is an
   // optional admin-only feature and missing it is not an error worth surfacing.
   try {
-    const effectiveConnId = connectionId !== undefined ? connectionId : _activeConnectionId;
+    const effectiveConnId = connectionId !== undefined ? connectionId : getActiveConnectionIdGlobal();
     const headers = new Headers();
     if (effectiveConnId) {
       headers.set("X-Connection-Id", effectiveConnId);
