@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+    buildShareUrl,
     clampMaxTabs,
     forStorage,
     normalizeDirection,
     normalizeLayout,
+    parseSharedTab,
     parseStoredTabs,
     tabScopedKey,
     tabStripItemWidth,
@@ -12,6 +14,7 @@ import {
     MAX_GRAPH_TABS,
     MIN_GRAPH_TABS,
     TAB_SCOPE_PREFIX,
+    withSharedTab,
     type GraphTab,
 } from "./graphTabs.ts";
 
@@ -309,4 +312,125 @@ test("parseStoredTabs defaults a missing active tab id to empty", () => {
 
     const numeric = parseStoredTabs(stored([tab()], 5));
     assert.equal(numeric?.activeTabId, "");
+});
+
+const BASE = "https://browser.example.com/graph?tab=mine";
+
+test("buildShareUrl carries only the portable part of the tab", () => {
+    const url = new URL(buildShareUrl(tab({
+        id: "private",
+        name: "mine",
+        view: "Table",
+        graph: {
+            layout: "tree",
+            direction: "lr",
+            viewport: { centerX: 1, centerY: 2, zoom: 3 },
+            selected: "node-1",
+            panelOpen: false,
+        },
+        chatOpen: true,
+    }), BASE));
+
+    assert.equal(url.pathname, "/graph");
+    assert.deepEqual(Object.fromEntries(url.searchParams), {
+        graph: "g",
+        query: "MATCH (n) RETURN n",
+        view: "Table",
+        layout: "tree",
+        direction: "lr",
+    });
+});
+
+test("buildShareUrl takes the schema view's own layout", () => {
+    const url = new URL(buildShareUrl(tab({
+        view: "Schema",
+        graph: { layout: "tree", direction: "td" },
+        schema: { layout: "radial", direction: "in" },
+    }), BASE));
+
+    assert.equal(url.searchParams.get("layout"), "radial");
+    assert.equal(url.searchParams.get("direction"), "in");
+});
+
+test("buildShareUrl leaves out what the tab does not have", () => {
+    const url = new URL(buildShareUrl(tab({ query: "" }), BASE));
+    assert.deepEqual([...url.searchParams.keys()], ["graph", "view"]);
+});
+
+test("parseSharedTab round-trips a share link", () => {
+    const source = tab({ view: "Metadata", graph: { layout: "radial", direction: "out" } });
+    const shared = parseSharedTab(new URL(buildShareUrl(source, BASE)).search);
+
+    assert.deepEqual(shared, {
+        graphName: "g",
+        query: "MATCH (n) RETURN n",
+        view: "Metadata",
+        layout: "radial",
+        direction: "out",
+    });
+});
+
+test("parseSharedTab needs a graph to open", () => {
+    assert.equal(parseSharedTab(""), null);
+    assert.equal(parseSharedTab("?tab=abc"), null);
+    assert.equal(parseSharedTab("?query=MATCH%20(n)%20RETURN%20n"), null);
+});
+
+test("parseSharedTab falls back to the graph view for an unknown view", () => {
+    assert.equal(parseSharedTab("?graph=g&view=Bogus")?.view, "Graph");
+    assert.equal(parseSharedTab("?graph=g")?.view, "Graph");
+});
+
+test("withSharedTab opens the shared context in a new active tab", () => {
+    const stored = { tabs: [tab({ id: "a", graphName: "other" })], activeTabId: "a" };
+    const result = withSharedTab(
+        stored,
+        { graphName: "g", query: "q", view: "Table", layout: "tree", direction: "lr" },
+        tab({ id: "fresh", graphName: "", query: "" }),
+    );
+
+    assert.equal(result.activeTabId, "fresh");
+    assert.deepEqual(result.tabs.map(t => t.id), ["a", "fresh"]);
+    const opened = result.tabs[1];
+    assert.equal(opened.graphName, "g");
+    assert.equal(opened.query, "q");
+    assert.equal(opened.view, "Table");
+    assert.deepEqual(opened.graph, { layout: "tree", direction: "lr" });
+    assert.deepEqual(opened.schema, {});
+});
+
+test("withSharedTab puts a schema link's layout on the schema view", () => {
+    const result = withSharedTab(
+        null,
+        { graphName: "g", query: "", view: "Schema", layout: "radial", direction: "in" },
+        tab({ id: "fresh" }),
+    );
+
+    assert.deepEqual(result.tabs[0].graph, {});
+    assert.deepEqual(result.tabs[0].schema, { layout: "radial", direction: "in" });
+});
+
+test("withSharedTab starts a strip of its own when nothing is stored", () => {
+    const result = withSharedTab(null, { graphName: "g", query: "q", view: "Graph" }, tab({ id: "fresh" }));
+    assert.deepEqual(result.tabs.map(t => t.id), ["fresh"]);
+    assert.equal(result.activeTabId, "fresh");
+});
+
+test("withSharedTab reuses a tab that already holds the same graph and query", () => {
+    const stored = {
+        tabs: [tab({ id: "a", graphName: "other" }), tab({ id: "b", graphName: "g", query: "q" })],
+        activeTabId: "a",
+    };
+    const result = withSharedTab(stored, { graphName: "g", query: "q", view: "Table" }, tab({ id: "fresh" }));
+
+    assert.equal(result.activeTabId, "b");
+    assert.equal(result.tabs, stored.tabs);
+});
+
+test("withSharedTab opens past the tab limit", () => {
+    const tabs = Array.from({ length: MAX_GRAPH_TABS }, (_, i) => tab({ id: `t${i}`, graphName: `g${i}` }));
+    const result = withSharedTab({ tabs, activeTabId: "t0" }, { graphName: "new", query: "", view: "Graph" }, tab({ id: "fresh" }));
+
+    assert.equal(result.tabs.length, MAX_GRAPH_TABS + 1);
+    assert.equal(result.activeTabId, "fresh");
 });

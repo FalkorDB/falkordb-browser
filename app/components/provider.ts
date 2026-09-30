@@ -256,6 +256,8 @@ type GraphTabsContextType = {
   renameTab: (id: string, name: string) => void;
   /** No-op when only one tab is left. */
   closeTab: (id: string) => void;
+  /** Link that opens the tab for someone else; "" when it has no graph yet. */
+  shareUrl: (id: string) => string;
   /**
    * The schema view is unmounted while it is not the active view, so it hands
    * its metadata over as it changes instead of being sampled when the tab is
@@ -597,6 +599,7 @@ export const GraphTabsContext = createContext<GraphTabsContextType>({
   addTab: () => { },
   renameTab: () => { },
   closeTab: () => { },
+  shareUrl: () => "",
   setSchemaMeta: () => { },
 });
 

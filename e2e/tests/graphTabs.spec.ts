@@ -184,4 +184,49 @@ test.describe("@admin Graph tabs", () => {
         await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(limit);
         await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
     });
+
+    // A share link carries the tab's graph and query, not its id, so it opens
+    // for anyone — including a browser that has never seen the tab.
+    const shareLink = (graphName: string, query: string, view = "Graph") => {
+        const url = new URL(urls.graphUrl);
+        url.searchParams.set("graph", graphName);
+        url.searchParams.set("query", query);
+        url.searchParams.set("view", view);
+        return url.toString();
+    };
+
+    test("A share link opens its graph in a tab of its own, then clears itself off the URL", async () => {
+        const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, "MATCH (n) RETURN n LIMIT 1"));
+        const page = await browser.getPage();
+        await graph.waitForPageIdle();
+
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+        await expect(page.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+
+        // The address bar goes back to naming the user's own tab.
+        await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+        const params = new URL(graph.getCurrentURL()).searchParams;
+        expect(params.get("graph")).toBeNull();
+        expect(params.get("query")).toBeNull();
+    });
+
+    test("Opening a link to a tab you already have reuses it", async () => {
+        const query = "MATCH (n) RETURN n LIMIT 2";
+        const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, query));
+        await graph.waitForPageIdle();
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+
+        await browser.navigateTo(shareLink(graphOne, query));
+        await graph.waitForPageIdle();
+
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true");
+    });
+
+    test("A tab without a graph cannot be shared", async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+
+        await expect(graph.stripTab("New tab").locator('[data-testid^="graphTabShare-"]')).toBeDisabled({ timeout: 15000 });
+    });
 });
