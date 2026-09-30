@@ -232,19 +232,21 @@ test.describe("@admin Graph tabs", () => {
         await expect(graph.stripTabShare("New tab")).toBeDisabled({ timeout: 15000 });
     });
 
-    /**
-     * Opens /graph with the clipboard writer replaced before any app code runs.
-     * Deterministic across browsers — the e2e context grants clipboard access
-     * on Chromium only. Copies land on `window.__copied`; `fail` makes the
-     * writer reject instead.
-     */
     // The toast title, not the screen-reader live region that repeats it.
     const toastTitle = (page: Page, text: string) => page.getByTestId("toast-title").filter({ hasText: text });
 
+    /**
+     * Opens /graph the way every other test does, then replaces the clipboard
+     * writer. The app looks the writer up when the button is clicked, so there
+     * is no need to install it before the app boots. Deterministic across
+     * browsers — the e2e context grants clipboard access on Chromium only.
+     * Copies land on `window.__copied`; `fail` makes the writer reject instead.
+     */
     const openWithStubbedClipboard = async (fail = false) => {
-        const graph = await browser.createNewPage(GraphPage);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
         const page = await browser.getPage();
-        await page.addInitScript((shouldFail) => {
+        await page.evaluate((shouldFail) => {
             Object.defineProperty(navigator, "clipboard", {
                 configurable: true,
                 value: {
@@ -255,7 +257,6 @@ test.describe("@admin Graph tabs", () => {
                 },
             });
         }, fail);
-        await browser.navigateTo(urls.graphUrl);
         return { graph, page };
     };
 
