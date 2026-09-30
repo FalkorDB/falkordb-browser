@@ -13,7 +13,7 @@
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "test": "node --test \"app/**/*.test.ts\" \"lib/**/*.test.ts\"",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=\"lib/cypherSuggestions.ts\" --test-coverage-include=\"lib/cypherDiagnostics.ts\" --test-coverage-include=\"lib/aiFix.ts\" --test-coverage-include=\"lib/cypherErrors.ts\" --test-coverage-include=\"lib/clipboard.ts\" --test-coverage-include=\"app/graph/confidence.ts\" --test-coverage-include=\"app/graph/chatHistory.ts\" --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 \"app/**/*.test.ts\" \"lib/**/*.test.ts\"",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=\"lib/cypherSuggestions.ts\" --test-coverage-include=\"lib/cypherDiagnostics.ts\" --test-coverage-include=\"lib/aiFix.ts\" --test-coverage-include=\"lib/cypherErrors.ts\" --test-coverage-include=\"lib/clipboard.ts\" --test-coverage-include=\"lib/graphTabs.ts\" --test-coverage-include=\"lib/urlParams.ts\" --test-coverage-include=\"app/graph/confidence.ts\" --test-coverage-include=\"app/graph/chatHistory.ts\" --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 \"app/**/*.test.ts\" \"lib/**/*.test.ts\"",
     "test:smoke": "node --test \"lib/**/*.smoke.ts\"",
     "test:e2e": "playwright test",
     "generate:grammar": "cd lib/falkordb-cypher/generated/.grammar-src && antlr4ng -Dlanguage=TypeScript Cypher.g4 && mv CypherLexer.ts CypherParser.ts CypherListener.ts .. && rm -f Cypher.interp Cypher.tokens CypherLexer.interp CypherLexer.tokens"
