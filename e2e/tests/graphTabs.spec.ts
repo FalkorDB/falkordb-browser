@@ -212,6 +212,24 @@ test.describe("@admin Graph tabs", () => {
         expect(params.get("query")).toBeNull();
     });
 
+    test("A share link opens on a first visit instead of the tutorial", async () => {
+        // The suite marks the tutorial as seen for every page. A real first
+        // visit has not, and the tour would otherwise take over the page.
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const page = await browser.getPage();
+        await page.evaluate(() => localStorage.setItem("tutorial", "true"));
+
+        await browser.navigateTo(shareLink(graphOne, "MATCH (n) RETURN n LIMIT 3"));
+        await graph.waitForPageIdle();
+
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+        await expect(page.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        await expect(page.getByTestId("skipTutorial")).toBeHidden();
+        // Deferred, not skipped: the next regular visit still gets the tour.
+        expect(await page.evaluate(() => localStorage.getItem("tutorial"))).toBe("true");
+    });
+
     test("Opening a link to a tab you already have reuses it", async () => {
         const query = "MATCH (n) RETURN n LIMIT 2";
         const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, query));
