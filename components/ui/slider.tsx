@@ -1,43 +1,35 @@
 "use client"
 
 import * as React from "react"
-import * as SliderPrimitive from "@radix-ui/react-slider"
+import { Slider as UISlider, type SliderProps as UISliderProps } from "@falkordb/ui"
 
-import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 
-interface SliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
+interface SliderProps extends Omit<UISliderProps, "renderThumb"> {
   type?: "seconds" | "%" | "px" | "items" | "multiplier"
 }
 
+// The browser's sliders read their value out in a tooltip on the thumb, with
+// the unit the setting is measured in, and ring the thumb on focus.
 const Slider = React.forwardRef<
-  React.ElementRef<typeof SliderPrimitive.Root>,
+  React.ComponentRef<typeof UISlider>,
   SliderProps
->(({ value, type = "seconds", className, ...props }, ref) => (
-  <SliderPrimitive.Root
+>(({ value, type = "seconds", ...props }, ref) => (
+  <UISlider
     ref={ref}
-    className={cn(
-      "relative flex w-full touch-none select-none items-center",
-      className
-    )}
     value={value}
+    thumbClassName="ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    renderThumb={(thumb) => (
+      <Tooltip>
+        <TooltipTrigger asChild>{thumb}</TooltipTrigger>
+        <TooltipContent>
+          {type === "multiplier" ? `${value}x` : <>{value} {type}</>}
+        </TooltipContent>
+      </Tooltip>
+    )}
     {...props}
-  >
-    <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-border">
-      <SliderPrimitive.Range className="absolute h-full bg-primary" />
-    </SliderPrimitive.Track>
-    <Tooltip>
-      <TooltipTrigger
-        asChild
-      >
-        <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
-      </TooltipTrigger>
-      <TooltipContent>
-        {type === "multiplier" ? `${value}x` : <>{value} {type}</>}
-      </TooltipContent>
-    </Tooltip>
-  </SliderPrimitive.Root>
+  />
 ))
-Slider.displayName = SliderPrimitive.Root.displayName
+Slider.displayName = "Slider"
 
 export { Slider }
