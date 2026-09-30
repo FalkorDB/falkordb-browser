@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getConnectionItem, removeConnectionItemsByPrefix, setConnectionItem } from "./connection-storage";
 import {
-    buildShareUrl,
     clampMaxTabs,
     createTab,
     forStorage,
     INITIAL_TAB_ID,
     parseStoredTabs,
     TAB_SCOPE_PREFIX,
+    resolveEntryTabs,
+    shareParams,
     TABS_STORAGE_KEY,
-    withSharedTab,
     type GraphTab,
     type GraphTabMeta,
     type SharedTab,
@@ -41,11 +41,12 @@ type Params<S> = {
      * and are read back from storage when it closes.
      */
     tutorialOpen: boolean;
-    /** Tab named by the URL on entry; wins over the stored active tab. */
+    /** Tab named by the URL on entry; wins over the stored active tab and over `initialShare`. */
     initialTabId: string;
     /**
      * Tab handed over by a share link on entry. Opened on top of the stored
-     * strip and made active, winning over `initialTabId`.
+     * strip and made active, unless `initialTabId` names one of the user's own
+     * tabs — then the URL is the user's own address bar, not someone's link.
      */
     initialShare: SharedTab | null;
     graphName: string;
@@ -232,13 +233,8 @@ export default function useGraphTabs<S>({
         initialTabIdRef.current = "";
         initialShareRef.current = null;
 
-        let next: TabsState;
-        if (shared) {
-            next = withSharedTab(stored, shared, fresh);
-        } else if (stored) {
-            const preferred = [urlTabId, stored.activeTabId].find(id => stored.tabs.some(t => t.id === id));
-            next = { tabs: stored.tabs, activeTabId: preferred ?? stored.tabs[0].id };
-        } else {
+        const next = resolveEntryTabs(stored, urlTabId, shared, fresh);
+        if (!next) {
             reset();
             return;
         }
@@ -346,13 +342,14 @@ export default function useGraphTabs<S>({
     }, [withLive, prefixReady]);
 
     /**
-     * Link that opens tab `id` for someone else, or "" when it has no graph to
-     * open. Read at click time so the active tab's live layout is folded in.
+     * Share params for the address bar, so a URL copied straight out of it
+     * opens the active tab for anyone.
      */
-    const shareUrl = useCallback((id: string) => {
-        const tab = withLive(stateRef.current).find(t => t.id === id);
-        return tab?.graphName ? buildShareUrl(tab, window.location.origin) : "";
-    }, [withLive]);
+    const activeTab = tabs.find(t => t.id === state.activeTabId);
+    const activeShareParams = useMemo(
+        () => (activeTab ? shareParams(activeTab) : {}),
+        [activeTab],
+    );
 
     return useMemo(() => ({
         tabs,
@@ -362,6 +359,6 @@ export default function useGraphTabs<S>({
         addTab,
         renameTab,
         closeTab,
-        shareUrl,
-    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab, shareUrl]);
+        activeShareParams,
+    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab, activeShareParams]);
 }

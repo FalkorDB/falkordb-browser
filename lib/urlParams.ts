@@ -30,14 +30,12 @@ export function setUrlParam(updates: Record<string, string | null>) {
 /**
  * Build the full URL param record for the /graph route from current state.
  *
- * Nothing about the working context — graph, query, selection, viewport,
- * layout — is in the URL; it belongs to the active tab, which persists it and
- * rebuilds it on entry. The URL only has to name *which* tab, so a reload
- * lands where you left off.
- *
- * A share link does carry the context (see `buildShareUrl`), but only until
- * it has been opened as a tab — the share params are cleared here, so the
- * address bar goes back to naming the user's own tab.
+ * The active tab owns the working context — graph, query, selection,
+ * viewport, layout — and rebuilds it on entry, so `tab` is what a reload goes
+ * by. The portable part of it (see `shareParams` in ./graphTabs) rides along anyway: people
+ * share a page by copying the address bar, and `?tab=` alone names an entry in
+ * the sender's localStorage that nobody else has. With the share params next
+ * to it, an unknown `tab` falls back to opening them as a shared tab.
  *
  * Kept in sync by hand with `SHARE_PARAM_KEYS` in ./graphTabs: this module
  * stays import-free so `node --test` can load it without a resolver.
@@ -47,14 +45,16 @@ export function setUrlParam(updates: Record<string, string | null>) {
  */
 export function buildGraphUrlParams(state: {
   tab: string;
+  share?: Partial<Record<"graph" | "query" | "view" | "layout" | "direction", string>>;
 }): Record<string, string | null> {
+  const share = state.share ?? {};
   return {
     tab: state.tab || null,
-    graph: null,
-    query: null,
-    view: null,
-    layout: null,
-    direction: null,
+    graph: share.graph || null,
+    query: share.query || null,
+    view: share.view || null,
+    layout: share.layout || null,
+    direction: share.direction || null,
   };
 }
 

@@ -273,27 +273,20 @@ const layoutMeta = (tab: Pick<GraphTab, "view" | "graph" | "schema">): ViewTabMe
     (tab.view === "Schema" ? tab.schema : tab.graph);
 
 /**
- * Builds the link that opens `tab` for someone else. Built on demand rather
- * than kept in the address bar: the URL only ever names the user's own tab,
- * so a copied link is a snapshot that later work in the tab does not change.
+ * The share params for `tab`, one per `SHARE_PARAM_KEYS` entry, `undefined`
+ * where the tab has nothing to say. The address bar carries these next to
+ * `?tab=`, so a URL copied straight out of it opens for anyone. A link with
+ * the params and no `?tab=` works too — `parseSharedTab` reads either.
  */
-export const buildShareUrl = (tab: GraphTab, base: string): string => {
-    const url = new URL("/graph", base);
+export const shareParams = (tab: GraphTab): Record<(typeof SHARE_PARAM_KEYS)[number], string | undefined> => {
     const { layout, direction } = layoutMeta(tab);
-    const values: Record<(typeof SHARE_PARAM_KEYS)[number], string | undefined> = {
-        graph: tab.graphName,
-        query: tab.query,
-        view: tab.view,
+    return {
+        graph: tab.graphName || undefined,
+        query: tab.query || undefined,
+        view: tab.graphName ? tab.view : undefined,
         layout,
         direction,
     };
-
-    SHARE_PARAM_KEYS.forEach(key => {
-        const value = values[key];
-        if (value) url.searchParams.set(key, value);
-    });
-
-    return url.toString();
 };
 
 /**
@@ -349,4 +342,28 @@ export const withSharedTab = (stored: TabsState | null, shared: SharedTab, fresh
         tabs: blank ? tabs.map(t => (t.id === blank.id ? tab : t)) : [...tabs, tab],
         activeTabId: tab.id,
     };
+};
+
+/**
+ * Picks the strip to open on entry. A `?tab=` naming one of the user's own
+ * tabs wins: the address bar always carries the active tab's share params
+ * too, and a reload must not let that snapshot override the tab. Only when
+ * the id is unknown here — a URL copied out of someone else's address bar —
+ * do the share params open as a shared tab. Null when there is nothing to
+ * restore and nothing shared.
+ */
+export const resolveEntryTabs = (
+    stored: TabsState | null,
+    urlTabId: string,
+    shared: SharedTab | null,
+    fresh: GraphTab,
+): TabsState | null => {
+    if (stored && urlTabId && stored.tabs.some(t => t.id === urlTabId)) {
+        return { tabs: stored.tabs, activeTabId: urlTabId };
+    }
+    if (shared) return withSharedTab(stored, shared, fresh);
+    if (!stored) return null;
+
+    const active = stored.tabs.some(t => t.id === stored.activeTabId) ? stored.activeTabId : stored.tabs[0].id;
+    return { tabs: stored.tabs, activeTabId: active };
 };

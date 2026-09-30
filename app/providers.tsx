@@ -2362,9 +2362,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName, graphNamesLoaded]);
 
-  // One-way sync: context state → URL (only while on /graph). The working
-  // context itself is not in the URL — the active tab owns it — so all the URL
-  // has to name is which tab.
+  // One-way sync: context state → URL (only while on /graph). The URL names
+  // the active tab, and carries its share params so a copied address bar opens
+  // for anyone. Debounced: the query changes on every keystroke, and Safari
+  // throws once replaceState is called too often.
   const prevPathnameRef = useRef(pathname);
 
   useEffect(() => {
@@ -2377,8 +2378,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // then would strip ?tab= before it has been read back.
     if (!graphNamesLoaded) return;
 
-    syncRouteUrlParams(pathname, { tab: graphTabs.activeTabId });
-  }, [pathname, graphTabs.activeTabId, tutorialOpen, graphNamesLoaded]);
+    const timer = window.setTimeout(() => {
+      syncRouteUrlParams(pathname, { tab: graphTabs.activeTabId, share: graphTabs.activeShareParams });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [pathname, graphTabs.activeTabId, graphTabs.activeShareParams, tutorialOpen, graphNamesLoaded]);
 
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
