@@ -169,7 +169,7 @@ const isViewport = (value: unknown): value is ViewportState => {
         && typeof viewport.zoom === "number";
 };
 
-const isView = (value: string | null): value is Tab =>
+const isView = (value: unknown): value is Tab =>
     value === "Graph" || value === "Table" || value === "Metadata" || value === "Schema";
 
 const isGraphTab = (value: unknown): value is GraphTab => {
@@ -178,7 +178,7 @@ const isGraphTab = (value: unknown): value is GraphTab => {
     return typeof tab.id === "string"
         && typeof tab.graphName === "string"
         && typeof tab.query === "string"
-        && isView(tab.view ?? null);
+        && isView(tab.view);
 };
 
 const asString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);

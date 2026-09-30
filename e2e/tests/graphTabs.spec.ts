@@ -227,6 +227,69 @@ test.describe("@admin Graph tabs", () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await graph.waitForPageIdle();
 
-        await expect(graph.stripTab("New tab").locator('[data-testid^="graphTabShare-"]')).toBeDisabled({ timeout: 15000 });
+        await expect(graph.stripTabShare("New tab")).toBeDisabled({ timeout: 15000 });
+    });
+
+    /**
+     * Opens /graph with the clipboard writer replaced before any app code runs.
+     * Deterministic across browsers — the e2e context grants clipboard access
+     * on Chromium only. Copies land on `window.__copied`; `fail` makes the
+     * writer reject instead.
+     */
+    const openWithStubbedClipboard = async (fail = false) => {
+        const graph = await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        await page.addInitScript((shouldFail) => {
+            Object.defineProperty(navigator, "clipboard", {
+                configurable: true,
+                value: {
+                    writeText: async (text: string) => {
+                        if (shouldFail) throw new Error("denied");
+                        (window as unknown as { __copied?: string }).__copied = text;
+                    },
+                },
+            });
+        }, fail);
+        await browser.navigateTo(urls.graphUrl);
+        return { graph, page };
+    };
+
+    test("Copying a tab's link hands over its graph and query, not its id", async () => {
+        const { graph, page } = await openWithStubbedClipboard();
+        await graph.selectGraphByName(graphOne);
+        await graph.waitForPageIdle();
+
+        await graph.shareStripTab(graphOne);
+        await expect(page.getByText("Link copied")).toBeVisible({ timeout: 15000 });
+
+        const copied = await page.evaluate(() => (window as unknown as { __copied?: string }).__copied ?? "");
+        const link = new URL(copied);
+        expect(link.pathname).toBe("/graph");
+        expect(link.searchParams.get("graph")).toBe(graphOne);
+        expect(link.searchParams.get("view")).toBeTruthy();
+        expect(link.searchParams.get("tab")).toBeNull();
+
+        // A browser that has never seen the tab opens the same context.
+        const other = new BrowserWrapper();
+        try {
+            const otherGraph = await other.createNewPage(GraphPage, copied);
+            const otherPage = await other.getPage();
+            await otherGraph.waitForPageIdle();
+
+            await expect(otherGraph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+            await expect(otherPage.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        } finally {
+            await other.closeBrowser();
+        }
+    });
+
+    test("A failed copy says so instead of claiming success", async () => {
+        const { graph, page } = await openWithStubbedClipboard(true);
+        await graph.selectGraphByName(graphOne);
+        await graph.waitForPageIdle();
+
+        await graph.shareStripTab(graphOne);
+        await expect(page.getByText("Couldn't copy the link to the clipboard")).toBeVisible({ timeout: 15000 });
+        await expect(page.getByText("Link copied")).toBeHidden();
     });
 });

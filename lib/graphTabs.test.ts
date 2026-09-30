@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
     buildShareUrl,
     clampMaxTabs,
+    createTab,
     forStorage,
     normalizeDirection,
     normalizeLayout,
@@ -433,4 +434,25 @@ test("withSharedTab opens past the tab limit", () => {
 
     assert.equal(result.tabs.length, MAX_GRAPH_TABS + 1);
     assert.equal(result.activeTabId, "fresh");
+});
+
+test("createTab starts a blank graph-view tab with a unique id", () => {
+    const a = createTab();
+    const b = createTab();
+
+    assert.notEqual(a.id, b.id);
+    assert.deepEqual({ ...a, id: "" }, { id: "", graphName: "", query: "", view: "Graph", graph: {}, schema: {} });
+});
+
+test("createTab falls back to a generated id without crypto.randomUUID", (t) => {
+    // Non-secure contexts (plain-http hosts) have no randomUUID.
+    const original = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+    Object.defineProperty(globalThis, "crypto", { configurable: true, value: {} });
+    t.after(() => { if (original) Object.defineProperty(globalThis, "crypto", original); });
+
+    const a = createTab();
+    const b = createTab();
+
+    assert.match(a.id, /^tab-\d+-[a-z0-9]+$/);
+    assert.notEqual(a.id, b.id);
 });
