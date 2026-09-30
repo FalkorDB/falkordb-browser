@@ -316,26 +316,37 @@ export const parseSharedTab = (search: string): SharedTab | null => {
     };
 };
 
+/** A tab the user has put nothing into — no graph, no query, no name — so nothing is lost by filling it. */
+const isBlank = (tab: GraphTab) => !tab.graphName && !tab.query && !tab.name;
+
 /**
  * Opens a shared tab on top of the stored strip. A tab that already holds the
  * same graph and query is reused — opening your own link must not duplicate
- * it — otherwise the shared context gets a tab of its own (`fresh` supplies
- * the id), even past the tab limit: the user asked for it explicitly, and the
- * strip already copes with sitting above the cap.
+ * it. Failing that, a blank tab takes the shared context, the active one first:
+ * a strip is never empty, so a visitor who has not done anything yet would
+ * otherwise land on the link next to a leftover "New tab". Only then does the
+ * shared context get a tab of its own (`fresh` supplies the id), even past the
+ * tab limit: the user asked for it explicitly, and the strip already copes with
+ * sitting above the cap.
  */
 export const withSharedTab = (stored: TabsState | null, shared: SharedTab, fresh: GraphTab): TabsState => {
     const tabs = stored?.tabs ?? [];
     const existing = tabs.find(t => t.graphName === shared.graphName && t.query === shared.query);
     if (existing) return { tabs, activeTabId: existing.id };
 
+    const blank = tabs.find(t => t.id === stored?.activeTabId && isBlank(t)) ?? tabs.find(isBlank);
+
     const { layout, direction, ...rest } = shared;
     const meta: ViewTabMeta = layout ? { layout, direction } : {};
     const tab: GraphTab = {
-        ...fresh,
+        ...(blank ?? fresh),
         ...rest,
         graph: shared.view === "Schema" ? {} : meta,
         schema: shared.view === "Schema" ? meta : {},
     };
 
-    return { tabs: [...tabs, tab], activeTabId: tab.id };
+    return {
+        tabs: blank ? tabs.map(t => (t.id === blank.id ? tab : t)) : [...tabs, tab],
+        activeTabId: tab.id,
+    };
 };

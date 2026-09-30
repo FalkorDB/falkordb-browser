@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import GraphPage from "../logic/POM/graphPage";
@@ -202,6 +202,8 @@ test.describe("@admin Graph tabs", () => {
 
         await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
         await expect(page.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        // The untouched tab the visitor already had takes the link — no leftover "New tab".
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
 
         // The address bar goes back to naming the user's own tab.
         await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
@@ -236,6 +238,9 @@ test.describe("@admin Graph tabs", () => {
      * on Chromium only. Copies land on `window.__copied`; `fail` makes the
      * writer reject instead.
      */
+    // The toast title, not the screen-reader live region that repeats it.
+    const toastTitle = (page: Page, text: string) => page.getByTestId("toast-title").filter({ hasText: text });
+
     const openWithStubbedClipboard = async (fail = false) => {
         const graph = await browser.createNewPage(GraphPage);
         const page = await browser.getPage();
@@ -260,7 +265,7 @@ test.describe("@admin Graph tabs", () => {
         await graph.waitForPageIdle();
 
         await graph.shareStripTab(graphOne);
-        await expect(page.getByText("Link copied")).toBeVisible({ timeout: 15000 });
+        await expect(toastTitle(page, "Link copied")).toBeVisible({ timeout: 15000 });
 
         const copied = await page.evaluate(() => (window as unknown as { __copied?: string }).__copied ?? "");
         const link = new URL(copied);
@@ -289,7 +294,8 @@ test.describe("@admin Graph tabs", () => {
         await graph.waitForPageIdle();
 
         await graph.shareStripTab(graphOne);
-        await expect(page.getByText("Couldn't copy the link to the clipboard")).toBeVisible({ timeout: 15000 });
-        await expect(page.getByText("Link copied")).toBeHidden();
+        await expect(toastTitle(page, "Error")).toBeVisible({ timeout: 15000 });
+        await expect(page.getByTestId("toast-description").filter({ hasText: "Couldn't copy the link to the clipboard" })).toBeVisible();
+        await expect(toastTitle(page, "Link copied")).toBeHidden();
     });
 });

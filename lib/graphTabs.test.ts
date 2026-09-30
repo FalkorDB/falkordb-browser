@@ -456,3 +456,58 @@ test("createTab falls back to a generated id without crypto.randomUUID", (t) => 
     assert.match(a.id, /^tab-\d+-[a-z0-9]+$/);
     assert.notEqual(a.id, b.id);
 });
+
+// The strip is never empty, so the most common "nothing stored" case in a real
+// browser is a single untouched tab — not `null`.
+const blankTab = (id: string, overrides: Partial<GraphTab> = {}) => tab({ id, graphName: "", query: "", ...overrides });
+
+test("withSharedTab fills the untouched tab a fresh visitor already has", () => {
+    const result = withSharedTab(
+        { tabs: [blankTab("blank")], activeTabId: "blank" },
+        { graphName: "g", query: "q", view: "Table", layout: "tree", direction: "lr" },
+        tab({ id: "fresh" }),
+    );
+
+    assert.deepEqual(result.tabs.map(t => t.id), ["blank"]);
+    assert.equal(result.activeTabId, "blank");
+    assert.equal(result.tabs[0].graphName, "g");
+    assert.equal(result.tabs[0].query, "q");
+    assert.equal(result.tabs[0].view, "Table");
+    assert.deepEqual(result.tabs[0].graph, { layout: "tree", direction: "lr" });
+});
+
+test("withSharedTab fills a blank background tab rather than growing the strip", () => {
+    const result = withSharedTab(
+        { tabs: [tab({ id: "a", graphName: "other" }), blankTab("blank")], activeTabId: "a" },
+        { graphName: "g", query: "q", view: "Graph" },
+        tab({ id: "fresh" }),
+    );
+
+    assert.deepEqual(result.tabs.map(t => t.id), ["a", "blank"]);
+    assert.equal(result.tabs[0].graphName, "other");
+    assert.equal(result.activeTabId, "blank");
+});
+
+test("withSharedTab prefers the active blank tab over an earlier one", () => {
+    const result = withSharedTab(
+        { tabs: [blankTab("first"), blankTab("active")], activeTabId: "active" },
+        { graphName: "g", query: "q", view: "Graph" },
+        tab({ id: "fresh" }),
+    );
+
+    assert.equal(result.activeTabId, "active");
+    assert.equal(result.tabs[0].graphName, "");
+    assert.equal(result.tabs[1].graphName, "g");
+});
+
+test("withSharedTab leaves a tab alone once the user has put anything in it", () => {
+    const tabs = [
+        blankTab("named", { name: "scratch" }),
+        blankTab("typed", { query: "MATCH (n) RETURN n" }),
+    ];
+    const result = withSharedTab({ tabs, activeTabId: "named" }, { graphName: "g", query: "q", view: "Graph" }, tab({ id: "fresh" }));
+
+    assert.deepEqual(result.tabs.map(t => t.id), ["named", "typed", "fresh"]);
+    assert.equal(result.tabs[0].name, "scratch");
+    assert.equal(result.activeTabId, "fresh");
+});
