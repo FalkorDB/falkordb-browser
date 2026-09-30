@@ -1982,7 +1982,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // The tour drives desktop-only chrome (side panels, hover targets, right-click),
       // so it never runs on a phone. Read the width rather than `useIsMobile` — this
       // effect fires before the hook has corrected its server-rendered `false`.
-      setTutorialOpen(window.innerWidth >= MOBILE_BREAKPOINT && localStorage.getItem("tutorial") !== "false");
+      // A share link is someone asking to see a particular graph, and the tour
+      // would swap it out for demo graphs — so it waits for a regular visit
+      // instead. It is not marked as seen, so that visit still shows it.
+      setTutorialOpen(
+        window.innerWidth >= MOBILE_BREAKPOINT
+        && localStorage.getItem("tutorial") !== "false"
+        && !initialShareRef.current
+      );
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
       setMaxTabs(loadedMaxTabs);
