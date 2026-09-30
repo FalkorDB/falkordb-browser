@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import GraphPage from "../logic/POM/graphPage";
@@ -183,5 +183,138 @@ test.describe("@admin Graph tabs", () => {
 
         await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(limit);
         await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
+    });
+
+    // A share link carries the tab's graph and query, not its id, so it opens
+    // for anyone — including a browser that has never seen the tab.
+    const shareLink = (graphName: string, query: string, view = "Graph") => {
+        const url = new URL(urls.graphUrl);
+        url.searchParams.set("graph", graphName);
+        url.searchParams.set("query", query);
+        url.searchParams.set("view", view);
+        return url.toString();
+    };
+
+    test("A share link opens its graph in a tab of its own, then clears itself off the URL", async () => {
+        const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, "MATCH (n) RETURN n LIMIT 1"));
+        const page = await browser.getPage();
+        await graph.waitForPageIdle();
+
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+        await expect(page.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        // The untouched tab the visitor already had takes the link — no leftover "New tab".
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+
+        // The address bar goes back to naming the user's own tab.
+        await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+        const params = new URL(graph.getCurrentURL()).searchParams;
+        expect(params.get("graph")).toBeNull();
+        expect(params.get("query")).toBeNull();
+    });
+
+    test("A share link opens on a first visit instead of the tutorial", async () => {
+        // The suite marks the tutorial as seen for every page. A real first
+        // visit has not, and the tour would otherwise take over the page.
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const page = await browser.getPage();
+        await page.evaluate(() => localStorage.setItem("tutorial", "true"));
+
+        await browser.navigateTo(shareLink(graphOne, "MATCH (n) RETURN n LIMIT 3"));
+        await graph.waitForPageIdle();
+
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+        await expect(page.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        await expect(page.getByTestId("skipTutorial")).toBeHidden();
+        // Deferred, not skipped: the next regular visit still gets the tour.
+        expect(await page.evaluate(() => localStorage.getItem("tutorial"))).toBe("true");
+    });
+
+    test("Opening a link to a tab you already have reuses it", async () => {
+        const query = "MATCH (n) RETURN n LIMIT 2";
+        const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, query));
+        await graph.waitForPageIdle();
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+
+        await browser.navigateTo(shareLink(graphOne, query));
+        await graph.waitForPageIdle();
+
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true");
+    });
+
+    test("A tab without a graph cannot be shared", async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+
+        await expect(graph.stripTabShare("New tab")).toBeDisabled({ timeout: 15000 });
+    });
+
+    // The toast title, not the screen-reader live region that repeats it.
+    const toastTitle = (page: Page, text: string) => page.getByTestId("toast-title").filter({ hasText: text });
+
+    /**
+     * Opens /graph the way every other test does, then replaces the clipboard
+     * writer. The app looks the writer up when the button is clicked, so there
+     * is no need to install it before the app boots. Deterministic across
+     * browsers — the e2e context grants clipboard access on Chromium only.
+     * Copies land on `window.__copied`; `fail` makes the writer reject instead.
+     */
+    const openWithStubbedClipboard = async (fail = false) => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const page = await browser.getPage();
+        await page.evaluate((shouldFail) => {
+            Object.defineProperty(navigator, "clipboard", {
+                configurable: true,
+                value: {
+                    writeText: async (text: string) => {
+                        if (shouldFail) throw new Error("denied");
+                        (window as unknown as { __copied?: string }).__copied = text;
+                    },
+                },
+            });
+        }, fail);
+        return { graph, page };
+    };
+
+    test("Copying a tab's link hands over its graph and query, not its id", async () => {
+        const { graph, page } = await openWithStubbedClipboard();
+        await graph.selectGraphByName(graphOne);
+        await graph.waitForPageIdle();
+
+        await graph.shareStripTab(graphOne);
+        await expect(toastTitle(page, "Link copied")).toBeVisible({ timeout: 15000 });
+
+        const copied = await page.evaluate(() => (window as unknown as { __copied?: string }).__copied ?? "");
+        const link = new URL(copied);
+        expect(link.pathname).toBe("/graph");
+        expect(link.searchParams.get("graph")).toBe(graphOne);
+        expect(link.searchParams.get("view")).toBeTruthy();
+        expect(link.searchParams.get("tab")).toBeNull();
+
+        // A browser that has never seen the tab opens the same context.
+        const other = new BrowserWrapper();
+        try {
+            const otherGraph = await other.createNewPage(GraphPage, copied);
+            const otherPage = await other.getPage();
+            await otherGraph.waitForPageIdle();
+
+            await expect(otherGraph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+            await expect(otherPage.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        } finally {
+            await other.closeBrowser();
+        }
+    });
+
+    test("A failed copy says so instead of claiming success", async () => {
+        const { graph, page } = await openWithStubbedClipboard(true);
+        await graph.selectGraphByName(graphOne);
+        await graph.waitForPageIdle();
+
+        await graph.shareStripTab(graphOne);
+        await expect(toastTitle(page, "Error")).toBeVisible({ timeout: 15000 });
+        await expect(page.getByTestId("toast-description").filter({ hasText: "Couldn't copy the link to the clipboard" })).toBeVisible();
+        await expect(toastTitle(page, "Link copied")).toBeHidden();
     });
 });

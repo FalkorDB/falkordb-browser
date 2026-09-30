@@ -35,6 +35,13 @@ export function setUrlParam(updates: Record<string, string | null>) {
  * rebuilds it on entry. The URL only has to name *which* tab, so a reload
  * lands where you left off.
  *
+ * A share link does carry the context (see `buildShareUrl`), but only until
+ * it has been opened as a tab — the share params are cleared here, so the
+ * address bar goes back to naming the user's own tab.
+ *
+ * Kept in sync by hand with `SHARE_PARAM_KEYS` in ./graphTabs: this module
+ * stays import-free so `node --test` can load it without a resolver.
+ *
  * Add new graph-page params here — the sync effect in providers.tsx
  * calls this so you never need to update the effect itself.
  */
@@ -43,6 +50,11 @@ export function buildGraphUrlParams(state: {
 }): Record<string, string | null> {
   return {
     tab: state.tab || null,
+    graph: null,
+    query: null,
+    view: null,
+    layout: null,
+    direction: null,
   };
 }
 

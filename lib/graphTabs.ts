@@ -169,13 +169,16 @@ const isViewport = (value: unknown): value is ViewportState => {
         && typeof viewport.zoom === "number";
 };
 
+const isView = (value: unknown): value is Tab =>
+    value === "Graph" || value === "Table" || value === "Metadata" || value === "Schema";
+
 const isGraphTab = (value: unknown): value is GraphTab => {
     if (typeof value !== "object" || value === null) return false;
     const tab = value as Partial<GraphTab>;
     return typeof tab.id === "string"
         && typeof tab.graphName === "string"
         && typeof tab.query === "string"
-        && (tab.view === "Graph" || tab.view === "Table" || tab.view === "Metadata" || tab.view === "Schema");
+        && isView(tab.view);
 };
 
 const asString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
@@ -249,4 +252,101 @@ export const parseStoredTabs = (raw: string | null): TabsState | null => {
     } catch {
         return null;
     }
+};
+
+/**
+ * URL params a share link carries. Only what means the same thing on someone
+ * else's machine: which graph, which query, which view, and how it is laid
+ * out. Viewport, selection and panel state belong to one screen and one
+ * session, so they stay behind.
+ */
+export const SHARE_PARAM_KEYS = ["graph", "query", "view", "layout", "direction"] as const;
+
+/** The portable part of a tab, as a share link hands it over. */
+export type SharedTab = Pick<GraphTab, "graphName" | "query" | "view"> & {
+    layout?: string;
+    direction?: string;
+};
+
+/** The view metadata a tab's layout lives in — the schema view keeps its own. */
+const layoutMeta = (tab: Pick<GraphTab, "view" | "graph" | "schema">): ViewTabMeta =>
+    (tab.view === "Schema" ? tab.schema : tab.graph);
+
+/**
+ * Builds the link that opens `tab` for someone else. Built on demand rather
+ * than kept in the address bar: the URL only ever names the user's own tab,
+ * so a copied link is a snapshot that later work in the tab does not change.
+ */
+export const buildShareUrl = (tab: GraphTab, base: string): string => {
+    const url = new URL("/graph", base);
+    const { layout, direction } = layoutMeta(tab);
+    const values: Record<(typeof SHARE_PARAM_KEYS)[number], string | undefined> = {
+        graph: tab.graphName,
+        query: tab.query,
+        view: tab.view,
+        layout,
+        direction,
+    };
+
+    SHARE_PARAM_KEYS.forEach(key => {
+        const value = values[key];
+        if (value) url.searchParams.set(key, value);
+    });
+
+    return url.toString();
+};
+
+/**
+ * Reads a share link back. Null unless it names a graph — without one there is
+ * nothing to open. An unknown view falls back to the graph view.
+ */
+export const parseSharedTab = (search: string): SharedTab | null => {
+    const params = new URLSearchParams(search);
+    const graphName = params.get("graph");
+    if (!graphName) return null;
+
+    const view = params.get("view");
+
+    return {
+        graphName,
+        query: params.get("query") ?? "",
+        view: isView(view) ? view : "Graph",
+        layout: params.get("layout") ?? undefined,
+        direction: params.get("direction") ?? undefined,
+    };
+};
+
+/** A tab the user has put nothing into — no graph, no query, no name — so nothing is lost by filling it. */
+const isBlank = (tab: GraphTab) => !tab.graphName && !tab.query && !tab.name;
+
+/**
+ * Opens a shared tab on top of the stored strip. A tab that already holds the
+ * same graph and query is reused — opening your own link must not duplicate
+ * it. Failing that, a blank tab takes the shared context, the active one first:
+ * a strip is never empty, so a visitor who has not done anything yet would
+ * otherwise land on the link next to a leftover "New tab". Only then does the
+ * shared context get a tab of its own (`fresh` supplies the id), even past the
+ * tab limit: the user asked for it explicitly, and the strip already copes with
+ * sitting above the cap.
+ */
+export const withSharedTab = (stored: TabsState | null, shared: SharedTab, fresh: GraphTab): TabsState => {
+    const tabs = stored?.tabs ?? [];
+    const existing = tabs.find(t => t.graphName === shared.graphName && t.query === shared.query);
+    if (existing) return { tabs, activeTabId: existing.id };
+
+    const blank = tabs.find(t => t.id === stored?.activeTabId && isBlank(t)) ?? tabs.find(isBlank);
+
+    const { layout, direction, ...rest } = shared;
+    const meta: ViewTabMeta = layout ? { layout, direction } : {};
+    const tab: GraphTab = {
+        ...(blank ?? fresh),
+        ...rest,
+        graph: shared.view === "Schema" ? {} : meta,
+        schema: shared.view === "Schema" ? meta : {},
+    };
+
+    return {
+        tabs: blank ? tabs.map(t => (t.id === blank.id ? tab : t)) : [...tabs, tab],
+        activeTabId: tab.id,
+    };
 };

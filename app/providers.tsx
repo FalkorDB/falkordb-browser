@@ -28,7 +28,7 @@ import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } f
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 import { DemoLoadOutcome } from "./components/Tutorial";
-import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
 import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
 
@@ -227,6 +227,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("tab") || ""
       : ""
+  );
+  // Captured at render for the same reason. It also has to outlive a detour
+  // through /login: a signed-out visitor is redirected there and back
+  // client-side, and the providers stay mounted the whole way.
+  const initialShareRef = useRef(
+    typeof window !== "undefined" ? parseSharedTab(window.location.search) : null
   );
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
@@ -1600,6 +1606,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // The tutorial gets a strip of its own; the user's tabs come back with it.
     tutorialOpen,
     initialTabId: initialTabIdRef.current,
+    initialShare: initialShareRef.current,
     graphName,
     query: historyQuery.query,
     view: currentTab,
@@ -1975,7 +1982,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // The tour drives desktop-only chrome (side panels, hover targets, right-click),
       // so it never runs on a phone. Read the width rather than `useIsMobile` — this
       // effect fires before the hook has corrected its server-rendered `false`.
-      setTutorialOpen(window.innerWidth >= MOBILE_BREAKPOINT && localStorage.getItem("tutorial") !== "false");
+      // A share link is someone asking to see a particular graph, and the tour
+      // would swap it out for demo graphs — so it waits for a regular visit
+      // instead. It is not marked as seen, so that visit still shows it.
+      setTutorialOpen(
+        window.innerWidth >= MOBILE_BREAKPOINT
+        && localStorage.getItem("tutorial") !== "false"
+        && !initialShareRef.current
+      );
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
       setMaxTabs(loadedMaxTabs);
