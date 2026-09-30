@@ -11,9 +11,11 @@ import {
     TAB_SCOPE_PREFIX,
     resolveEntryTabs,
     shareParams,
+    withLiveLayout,
     TABS_STORAGE_KEY,
     type GraphTab,
     type GraphTabMeta,
+    type LiveLayout,
     type SharedTab,
     type TabsState,
 } from "./graphTabs";
@@ -52,6 +54,8 @@ type Params<S> = {
     graphName: string;
     query: string;
     view: Tab;
+    /** Each view's current layout and direction, for the address bar. */
+    liveLayout: LiveLayout;
     /** How many tabs the user allows at once; `addTab` is a no-op at the cap. */
     maxTabs: number;
     /**
@@ -96,6 +100,7 @@ export default function useGraphTabs<S>({
     graphName,
     query,
     view,
+    liveLayout,
     maxTabs,
     captureSession,
     captureMeta,
@@ -347,8 +352,8 @@ export default function useGraphTabs<S>({
      */
     const activeTab = tabs.find(t => t.id === state.activeTabId);
     const activeShareParams = useMemo(
-        () => (activeTab ? shareParams(activeTab) : {}),
-        [activeTab],
+        () => (activeTab ? shareParams(withLiveLayout(activeTab, liveLayout)) : {}),
+        [activeTab, liveLayout],
     );
 
     return useMemo(() => ({

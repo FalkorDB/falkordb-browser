@@ -12,6 +12,7 @@ import {
     shareParams,
     tabScopedKey,
     tabStripItemWidth,
+    withLiveLayout,
     DEFAULT_GRAPH_TABS,
     MAX_GRAPH_TABS,
     MIN_GRAPH_TABS,
@@ -523,7 +524,8 @@ test("withSharedTab leaves a tab alone once the user has put anything in it", ()
 });
 
 test("shareParams says nothing for a tab without a graph", () => {
-    assert.deepEqual(shareParams(tab({ graphName: "", query: "" })), {
+    // Not even the layout: the canvas always has one, but there is nothing to open.
+    assert.deepEqual(shareParams(tab({ graphName: "", query: "", graph: { layout: "force", direction: "" } })), {
         graph: undefined,
         query: undefined,
         view: undefined,
@@ -561,4 +563,41 @@ test("resolveEntryTabs falls back to the stored active tab, then the first", () 
 
 test("resolveEntryTabs has nothing to open without storage or a share", () => {
     assert.equal(resolveEntryTabs(null, "", null, tab()), null);
+});
+
+test("withLiveLayout shares the layout on screen, not the one the tab was opened with", () => {
+    const source = tab({
+        graph: { layout: "force", direction: "", selected: "n1" },
+        schema: { layout: "tree", direction: "td" },
+    });
+    const result = withLiveLayout(source, {
+        graph: { layout: "radial", direction: "out" },
+        schema: { layout: "tree", direction: "lr" },
+    });
+
+    assert.deepEqual(result.graph, { layout: "radial", direction: "out", selected: "n1" });
+    assert.deepEqual(result.schema, { layout: "tree", direction: "lr" });
+    assert.equal(shareParams({ ...result, view: "Schema" }).direction, "lr");
+});
+
+test("withLiveLayout keeps the tab's layout for a view that reports nothing yet", () => {
+    // The schema view only reports once it has mounted.
+    const source = tab({ schema: { layout: "tree", direction: "td" } });
+    const result = withLiveLayout(source, { graph: {}, schema: {} });
+    assert.deepEqual(result.schema, { layout: "tree", direction: "td" });
+});
+
+test("resolveEntryTabs lets a blank tab of the user's own take the share params", () => {
+    // A blank tab has nothing to lose — and two browsers restored from the
+    // same saved state can hold the same tab id.
+    const tabs = [tab({ id: "a", graphName: "", query: "" })];
+    const result = resolveEntryTabs({ tabs, activeTabId: "a" }, "a", { graphName: "g", query: "q", view: "Graph" }, tab({ id: "fresh" }));
+    assert.equal(result?.activeTabId, "a");
+    assert.equal(result?.tabs.length, 1);
+    assert.equal(result?.tabs[0].graphName, "g");
+});
+
+test("resolveEntryTabs reopens a blank tab of the user's own when nothing is shared", () => {
+    const tabs = [tab({ id: "a" }), tab({ id: "b", graphName: "", query: "" })];
+    assert.equal(resolveEntryTabs({ tabs, activeTabId: "a" }, "b", null, tab())?.activeTabId, "b");
 });

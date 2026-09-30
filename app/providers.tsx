@@ -1433,9 +1433,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // into the tab — seeded from the tab on activation so a capture taken before
   // the view mounts does not carry the previous tab's state over.
   const schemaMetaRef = useRef<SchemaViewMeta>({});
+  // The schema view's layout and direction are also mirrored in state, so the
+  // address bar follows them. The rest of its metadata changes on every pan
+  // and stays in the ref; bailing out on equal values keeps this quiet.
+  const [schemaLayout, setSchemaLayout] = useState<Pick<SchemaViewMeta, "layout" | "direction">>({});
+  const mirrorSchemaLayout = useCallback(({ layout: l, direction: d }: SchemaViewMeta) => {
+    setSchemaLayout(prev => (prev.layout === l && prev.direction === d ? prev : { layout: l, direction: d }));
+  }, []);
   const setSchemaMeta = useCallback((meta: SchemaViewMeta) => {
     schemaMetaRef.current = meta;
-  }, []);
+    mirrorSchemaLayout(meta);
+  }, [mirrorSchemaLayout]);
 
   const captureGraphSession = useCallback((): GraphSession => {
     const state = sessionStateRef.current;
@@ -1529,6 +1537,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // The schema view reads this when it mounts, and writes back to it as the
     // user works — so hand it the incoming tab's state before it does either.
     schemaMetaRef.current = tab.schema ?? {};
+    mirrorSchemaLayout(schemaMetaRef.current);
 
     // The canvas follows these through ForceGraphContext, so applying them here
     // covers both branches — a restored session carries its positions, not the
@@ -1595,7 +1604,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (meta.viewport) setViewport(meta.viewport);
       setCurrentTab(tab.view);
     });
-  }, [handleSetGraphName, restoreGraphSession, runQuery]);
+  }, [handleSetGraphName, restoreGraphSession, runQuery, mirrorSchemaLayout]);
+
+  const liveLayout = useMemo(
+    () => ({ graph: { layout, direction }, schema: schemaLayout }),
+    [layout, direction, schemaLayout],
+  );
 
   const graphTabs = useGraphTabs({
     prefixReady,
@@ -1610,6 +1624,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     graphName,
     query: historyQuery.query,
     view: currentTab,
+    liveLayout,
     maxTabs,
     captureSession: captureGraphSession,
     captureMeta: captureTabMeta,
