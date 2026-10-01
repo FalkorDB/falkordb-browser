@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import GraphPage from "../logic/POM/graphPage";
@@ -195,7 +195,7 @@ test.describe("@admin Graph tabs", () => {
         return url.toString();
     };
 
-    test("A share link opens its graph in a tab of its own, then clears itself off the URL", async () => {
+    test("A share link opens its graph in a tab of its own, and the address bar names that tab", async () => {
         const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, "MATCH (n) RETURN n LIMIT 1"));
         const page = await browser.getPage();
         await graph.waitForPageIdle();
@@ -205,11 +205,49 @@ test.describe("@admin Graph tabs", () => {
         // The untouched tab the visitor already had takes the link — no leftover "New tab".
         await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
 
-        // The address bar goes back to naming the user's own tab.
+        // The address bar names the user's own tab, still carrying what it shows.
         await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
         const params = new URL(graph.getCurrentURL()).searchParams;
-        expect(params.get("graph")).toBeNull();
-        expect(params.get("query")).toBeNull();
+        expect(params.get("graph")).toBe(graphOne);
+        expect(params.get("query")).toBe("MATCH (n) RETURN n LIMIT 1");
+    });
+
+    test("A URL copied straight out of the address bar opens for someone else", async () => {
+        // People share by copying the address bar, not by finding the link
+        // button — and `?tab=` alone names an entry in the sender's storage.
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.selectGraphByName(graphOne);
+        await graph.waitForPageIdle();
+        await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("graph"), { timeout: 15000 }).toBe(graphOne);
+        const copied = graph.getCurrentURL();
+
+        const other = new BrowserWrapper();
+        try {
+            const otherGraph = await other.createNewPage(GraphPage, copied);
+            const otherPage = await other.getPage();
+            await otherGraph.waitForPageIdle();
+
+            await expect(otherGraph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+            await expect(otherPage.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        } finally {
+            await other.closeBrowser();
+        }
+    });
+
+    test("Reloading keeps the tab as it is now, not the URL's snapshot of it", async () => {
+        const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, "MATCH (n) RETURN n LIMIT 1"));
+        const page = await browser.getPage();
+        await graph.waitForPageIdle();
+        await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+
+        // A stale query next to the user's own tab id must not win.
+        const url = new URL(graph.getCurrentURL());
+        url.searchParams.set("query", "MATCH (n) RETURN n LIMIT 9");
+        await browser.navigateTo(url.toString());
+        await graph.waitForPageIdle();
+
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+        await expect.poll(() => new URL(page.url()).searchParams.get("query"), { timeout: 15000 }).toBe("MATCH (n) RETURN n LIMIT 1");
     });
 
     test("A share link opens on a first visit instead of the tutorial", async () => {
@@ -243,78 +281,11 @@ test.describe("@admin Graph tabs", () => {
         await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true");
     });
 
-    test("A tab without a graph cannot be shared", async () => {
+    test("A tab without a graph puts nothing to share on the URL", async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await graph.waitForPageIdle();
 
-        await expect(graph.stripTabShare("New tab")).toBeDisabled({ timeout: 15000 });
-    });
-
-    // The toast title, not the screen-reader live region that repeats it.
-    const toastTitle = (page: Page, text: string) => page.getByTestId("toast-title").filter({ hasText: text });
-
-    /**
-     * Opens /graph the way every other test does, then replaces the clipboard
-     * writer. The app looks the writer up when the button is clicked, so there
-     * is no need to install it before the app boots. Deterministic across
-     * browsers — the e2e context grants clipboard access on Chromium only.
-     * Copies land on `window.__copied`; `fail` makes the writer reject instead.
-     */
-    const openWithStubbedClipboard = async (fail = false) => {
-        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        const page = await browser.getPage();
-        await page.evaluate((shouldFail) => {
-            Object.defineProperty(navigator, "clipboard", {
-                configurable: true,
-                value: {
-                    writeText: async (text: string) => {
-                        if (shouldFail) throw new Error("denied");
-                        (window as unknown as { __copied?: string }).__copied = text;
-                    },
-                },
-            });
-        }, fail);
-        return { graph, page };
-    };
-
-    test("Copying a tab's link hands over its graph and query, not its id", async () => {
-        const { graph, page } = await openWithStubbedClipboard();
-        await graph.selectGraphByName(graphOne);
-        await graph.waitForPageIdle();
-
-        await graph.shareStripTab(graphOne);
-        await expect(toastTitle(page, "Link copied")).toBeVisible({ timeout: 15000 });
-
-        const copied = await page.evaluate(() => (window as unknown as { __copied?: string }).__copied ?? "");
-        const link = new URL(copied);
-        expect(link.pathname).toBe("/graph");
-        expect(link.searchParams.get("graph")).toBe(graphOne);
-        expect(link.searchParams.get("view")).toBeTruthy();
-        expect(link.searchParams.get("tab")).toBeNull();
-
-        // A browser that has never seen the tab opens the same context.
-        const other = new BrowserWrapper();
-        try {
-            const otherGraph = await other.createNewPage(GraphPage, copied);
-            const otherPage = await other.getPage();
-            await otherGraph.waitForPageIdle();
-
-            await expect(otherGraph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
-            await expect(otherPage.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
-        } finally {
-            await other.closeBrowser();
-        }
-    });
-
-    test("A failed copy says so instead of claiming success", async () => {
-        const { graph, page } = await openWithStubbedClipboard(true);
-        await graph.selectGraphByName(graphOne);
-        await graph.waitForPageIdle();
-
-        await graph.shareStripTab(graphOne);
-        await expect(toastTitle(page, "Error")).toBeVisible({ timeout: 15000 });
-        await expect(page.getByTestId("toast-description").filter({ hasText: "Couldn't copy the link to the clipboard" })).toBeVisible();
-        await expect(toastTitle(page, "Link copied")).toBeHidden();
+        await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+        expect(new URL(graph.getCurrentURL()).searchParams.get("graph")).toBeNull();
     });
 });

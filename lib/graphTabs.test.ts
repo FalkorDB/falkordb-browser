@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-    buildShareUrl,
     clampMaxTabs,
     createTab,
     forStorage,
@@ -9,8 +8,11 @@ import {
     normalizeLayout,
     parseSharedTab,
     parseStoredTabs,
+    resolveEntryTabs,
+    shareParams,
     tabScopedKey,
     tabStripItemWidth,
+    withLiveLayout,
     DEFAULT_GRAPH_TABS,
     MAX_GRAPH_TABS,
     MIN_GRAPH_TABS,
@@ -315,10 +317,17 @@ test("parseStoredTabs defaults a missing active tab id to empty", () => {
     assert.equal(numeric?.activeTabId, "");
 });
 
-const BASE = "https://browser.example.com/graph?tab=mine";
+/** The search string the address bar carries for `source` — what a visitor pastes. */
+const addressBar = (source: GraphTab) => {
+    const params = new URLSearchParams({ tab: source.id });
+    Object.entries(shareParams(source)).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+    });
+    return `?${params}`;
+};
 
-test("buildShareUrl carries only the portable part of the tab", () => {
-    const url = new URL(buildShareUrl(tab({
+test("shareParams carries only the portable part of the tab", () => {
+    assert.deepEqual(shareParams(tab({
         id: "private",
         name: "mine",
         view: "Table",
@@ -330,10 +339,7 @@ test("buildShareUrl carries only the portable part of the tab", () => {
             panelOpen: false,
         },
         chatOpen: true,
-    }), BASE));
-
-    assert.equal(url.pathname, "/graph");
-    assert.deepEqual(Object.fromEntries(url.searchParams), {
+    })), {
         graph: "g",
         query: "MATCH (n) RETURN n",
         view: "Table",
@@ -342,25 +348,30 @@ test("buildShareUrl carries only the portable part of the tab", () => {
     });
 });
 
-test("buildShareUrl takes the schema view's own layout", () => {
-    const url = new URL(buildShareUrl(tab({
+test("shareParams takes the schema view's own layout", () => {
+    const params = shareParams(tab({
         view: "Schema",
         graph: { layout: "tree", direction: "td" },
         schema: { layout: "radial", direction: "in" },
-    }), BASE));
+    }));
 
-    assert.equal(url.searchParams.get("layout"), "radial");
-    assert.equal(url.searchParams.get("direction"), "in");
+    assert.equal(params.layout, "radial");
+    assert.equal(params.direction, "in");
 });
 
-test("buildShareUrl leaves out what the tab does not have", () => {
-    const url = new URL(buildShareUrl(tab({ query: "" }), BASE));
-    assert.deepEqual([...url.searchParams.keys()], ["graph", "view"]);
+test("shareParams leaves out what the tab does not have", () => {
+    assert.deepEqual(shareParams(tab({ query: "" })), {
+        graph: "g",
+        query: undefined,
+        view: "Graph",
+        layout: undefined,
+        direction: undefined,
+    });
 });
 
-test("parseSharedTab round-trips a share link", () => {
+test("parseSharedTab round-trips the address bar", () => {
     const source = tab({ view: "Metadata", graph: { layout: "radial", direction: "out" } });
-    const shared = parseSharedTab(new URL(buildShareUrl(source, BASE)).search);
+    const shared = parseSharedTab(addressBar(source));
 
     assert.deepEqual(shared, {
         graphName: "g",
@@ -510,4 +521,83 @@ test("withSharedTab leaves a tab alone once the user has put anything in it", ()
     assert.deepEqual(result.tabs.map(t => t.id), ["named", "typed", "fresh"]);
     assert.equal(result.tabs[0].name, "scratch");
     assert.equal(result.activeTabId, "fresh");
+});
+
+test("shareParams says nothing for a tab without a graph", () => {
+    // Not even the layout: the canvas always has one, but there is nothing to open.
+    assert.deepEqual(shareParams(tab({ graphName: "", query: "", graph: { layout: "force", direction: "" } })), {
+        graph: undefined,
+        query: undefined,
+        view: undefined,
+        layout: undefined,
+        direction: undefined,
+    });
+});
+
+test("resolveEntryTabs keeps the user's own tab over the share params beside it", () => {
+    // The address bar carries both, so a reload must reopen the tab as it is
+    // now — not the snapshot the URL was last written with.
+    const tabs = [tab({ id: "a" }), tab({ id: "b", graphName: "other" })];
+    const result = resolveEntryTabs({ tabs, activeTabId: "a" }, "b", { graphName: "g", query: "stale", view: "Graph" }, tab({ id: "fresh" }));
+    assert.deepEqual(result, { tabs, activeTabId: "b" });
+});
+
+test("resolveEntryTabs opens the share params when the tab id is someone else's", () => {
+    const tabs = [tab({ id: "a", graphName: "mine" })];
+    const result = resolveEntryTabs({ tabs, activeTabId: "a" }, "theirs", { graphName: "g", query: "q", view: "Table" }, tab({ id: "fresh" }));
+    assert.equal(result?.activeTabId, "fresh");
+    assert.equal(result?.tabs.at(-1)?.graphName, "g");
+    assert.equal(result?.tabs.at(-1)?.query, "q");
+});
+
+test("resolveEntryTabs opens a share link on a browser with nothing stored", () => {
+    const result = resolveEntryTabs(null, "theirs", { graphName: "g", query: "q", view: "Graph" }, tab({ id: "fresh" }));
+    assert.equal(result?.activeTabId, "fresh");
+});
+
+test("resolveEntryTabs falls back to the stored active tab, then the first", () => {
+    const tabs = [tab({ id: "a" }), tab({ id: "b" })];
+    assert.equal(resolveEntryTabs({ tabs, activeTabId: "b" }, "", null, tab())?.activeTabId, "b");
+    assert.equal(resolveEntryTabs({ tabs, activeTabId: "gone" }, "gone-too", null, tab())?.activeTabId, "a");
+});
+
+test("resolveEntryTabs has nothing to open without storage or a share", () => {
+    assert.equal(resolveEntryTabs(null, "", null, tab()), null);
+});
+
+test("withLiveLayout shares the layout on screen, not the one the tab was opened with", () => {
+    const source = tab({
+        graph: { layout: "force", direction: "", selected: "n1" },
+        schema: { layout: "tree", direction: "td" },
+    });
+    const result = withLiveLayout(source, {
+        graph: { layout: "radial", direction: "out" },
+        schema: { layout: "tree", direction: "lr" },
+    });
+
+    assert.deepEqual(result.graph, { layout: "radial", direction: "out", selected: "n1" });
+    assert.deepEqual(result.schema, { layout: "tree", direction: "lr" });
+    assert.equal(shareParams({ ...result, view: "Schema" }).direction, "lr");
+});
+
+test("withLiveLayout keeps the tab's layout for a view that reports nothing yet", () => {
+    // The schema view only reports once it has mounted.
+    const source = tab({ schema: { layout: "tree", direction: "td" } });
+    const result = withLiveLayout(source, { graph: {}, schema: {} });
+    assert.deepEqual(result.schema, { layout: "tree", direction: "td" });
+});
+
+test("resolveEntryTabs lets a blank tab of the user's own take the share params", () => {
+    // A blank tab has nothing to lose — and two browsers restored from the
+    // same saved state can hold the same tab id.
+    const tabs = [tab({ id: "a", graphName: "", query: "" })];
+    const result = resolveEntryTabs({ tabs, activeTabId: "a" }, "a", { graphName: "g", query: "q", view: "Graph" }, tab({ id: "fresh" }));
+    assert.equal(result?.activeTabId, "a");
+    assert.equal(result?.tabs.length, 1);
+    assert.equal(result?.tabs[0].graphName, "g");
+});
+
+test("resolveEntryTabs reopens a blank tab of the user's own when nothing is shared", () => {
+    const tabs = [tab({ id: "a" }), tab({ id: "b", graphName: "", query: "" })];
+    assert.equal(resolveEntryTabs({ tabs, activeTabId: "a" }, "b", null, tab())?.activeTabId, "b");
 });

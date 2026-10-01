@@ -2,10 +2,8 @@
 
 import { useContext, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Link2, Pencil, Plus, X } from "lucide-react";
+import { ChevronDown, Pencil, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { copyText } from "@/lib/clipboard";
-import { useToast } from "@/components/ui/use-toast";
 import { tabStripItemWidth } from "@/lib/useGraphTabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,10 +18,9 @@ import { GraphTabsContext, PanelContext } from "../components/provider";
  * user can keep several graph/query setups side by side.
  */
 export default function GraphSubHeader() {
-  const { tabs, activeTabId, maxTabs, selectTab, addTab, renameTab, closeTab, shareUrl } = useContext(GraphTabsContext);
+  const { tabs, activeTabId, maxTabs, selectTab, addTab, renameTab, closeTab } = useContext(GraphTabsContext);
   const { mobileNavSlot } = useContext(PanelContext);
   const isMobile = useIsMobile();
-  const { toast } = useToast();
 
   // The tab being renamed, and the text typed so far. The draft starts from the
   // custom name only: an empty box is what clears it back to the graph name.
@@ -56,21 +53,6 @@ export default function GraphSubHeader() {
   const cancelRename = () => {
     cancelRenameRef.current = true;
     setEditingId(null);
-  };
-
-  const copyShareLink = async (id: string) => {
-    const url = shareUrl(id);
-    if (!url) return;
-
-    const writer = typeof navigator !== "undefined"
-      ? navigator.clipboard?.writeText?.bind(navigator.clipboard)
-      : undefined;
-
-    if (await copyText(writer, url)) {
-      toast({ title: "Link copied", description: "Anyone with access to this graph can open it in a new tab." });
-    } else {
-      toast({ title: "Error", description: "Couldn't copy the link to the clipboard", variant: "destructive" });
-    }
   };
 
   if (isMobile) {
@@ -146,16 +128,6 @@ export default function GraphSubHeader() {
                           {label}
                         </button>
                     }
-                    <button
-                      type="button"
-                      data-testid={`graphTabShare-${tab.id}`}
-                      className="shrink-0 min-h-11 min-w-11 flex items-center justify-center rounded p-2 hover:bg-background disabled:opacity-30 disabled:cursor-not-allowed"
-                      aria-label={`Copy link to ${label}`}
-                      disabled={!tab.graphName}
-                      onClick={() => copyShareLink(tab.id)}
-                    >
-                      <Link2 size={14} />
-                    </button>
                     <button
                       type="button"
                       data-testid={`graphTabRenameTrigger-${tab.id}`}
@@ -277,26 +249,6 @@ export default function GraphSubHeader() {
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>Rename tab</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        {/* Wrapper keeps the tooltip reachable while the button is disabled */}
-                        <span className="flex">
-                          <button
-                            type="button"
-                            data-testid={`graphTabShare-${tab.id}`}
-                            className="rounded hover:bg-background disabled:opacity-30 disabled:cursor-not-allowed"
-                            aria-label={`Copy link to ${label}`}
-                            disabled={!tab.graphName}
-                            onClick={() => copyShareLink(tab.id)}
-                          >
-                            <Link2 size={12} />
-                          </button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {tab.graphName ? "Copy link" : "Pick a graph to share this tab"}
-                      </TooltipContent>
                     </Tooltip>
                   </>
               }

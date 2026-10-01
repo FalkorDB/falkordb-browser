@@ -273,27 +273,42 @@ const layoutMeta = (tab: Pick<GraphTab, "view" | "graph" | "schema">): ViewTabMe
     (tab.view === "Schema" ? tab.schema : tab.graph);
 
 /**
- * Builds the link that opens `tab` for someone else. Built on demand rather
- * than kept in the address bar: the URL only ever names the user's own tab,
- * so a copied link is a snapshot that later work in the tab does not change.
+ * The share params for `tab`, one per `SHARE_PARAM_KEYS` entry, `undefined`
+ * where the tab has nothing to say — all of them for a tab without a graph,
+ * which has nothing to open. The address bar carries these next to
+ * `?tab=`, so a URL copied straight out of it opens for anyone. A link with
+ * the params and no `?tab=` works too — `parseSharedTab` reads either.
  */
-export const buildShareUrl = (tab: GraphTab, base: string): string => {
-    const url = new URL("/graph", base);
+export const shareParams = (tab: GraphTab): Record<(typeof SHARE_PARAM_KEYS)[number], string | undefined> => {
+    if (!tab.graphName) {
+        return { graph: undefined, query: undefined, view: undefined, layout: undefined, direction: undefined };
+    }
     const { layout, direction } = layoutMeta(tab);
-    const values: Record<(typeof SHARE_PARAM_KEYS)[number], string | undefined> = {
+    return {
         graph: tab.graphName,
-        query: tab.query,
+        query: tab.query || undefined,
         view: tab.view,
-        layout,
-        direction,
+        layout: layout || undefined,
+        direction: direction || undefined,
     };
+};
 
-    SHARE_PARAM_KEYS.forEach(key => {
-        const value = values[key];
-        if (value) url.searchParams.set(key, value);
+/** Layout and direction of each view as the canvas shows them right now. */
+export type LiveLayout = Record<"graph" | "schema", Pick<ViewTabMeta, "layout" | "direction">>;
+
+/**
+ * `tab` with its layout and direction taken from the live canvas. The tab's
+ * own copy is only refreshed when the strip is saved and read back, so the
+ * address bar would otherwise keep sharing the layout the tab was opened with.
+ * A view that reports nothing yet keeps what the tab has.
+ */
+export const withLiveLayout = (tab: GraphTab, live: LiveLayout): GraphTab => {
+    const merge = (meta: ViewTabMeta, { layout, direction }: LiveLayout["graph"]): ViewTabMeta => ({
+        ...meta,
+        layout: layout ?? meta.layout,
+        direction: direction ?? meta.direction,
     });
-
-    return url.toString();
+    return { ...tab, graph: merge(tab.graph, live.graph), schema: merge(tab.schema, live.schema) };
 };
 
 /**
@@ -349,4 +364,29 @@ export const withSharedTab = (stored: TabsState | null, shared: SharedTab, fresh
         tabs: blank ? tabs.map(t => (t.id === blank.id ? tab : t)) : [...tabs, tab],
         activeTabId: tab.id,
     };
+};
+
+/**
+ * Picks the strip to open on entry. A `?tab=` naming one of the user's own
+ * tabs wins: the address bar always carries the active tab's share params
+ * too, and a reload must not let that snapshot override the tab. The share
+ * params open as a shared tab when the id is unknown here — a URL copied out
+ * of someone else's address bar — or names a blank tab, which has nothing to
+ * lose by taking them. Null when there is nothing to restore and nothing shared.
+ */
+export const resolveEntryTabs = (
+    stored: TabsState | null,
+    urlTabId: string,
+    shared: SharedTab | null,
+    fresh: GraphTab,
+): TabsState | null => {
+    const own = urlTabId ? stored?.tabs.find(t => t.id === urlTabId) : undefined;
+    if (stored && own && !(shared && isBlank(own))) {
+        return { tabs: stored.tabs, activeTabId: own.id };
+    }
+    if (shared) return withSharedTab(stored, shared, fresh);
+    if (!stored) return null;
+
+    const active = stored.tabs.some(t => t.id === stored.activeTabId) ? stored.activeTabId : stored.tabs[0].id;
+    return { tabs: stored.tabs, activeTabId: active };
 };

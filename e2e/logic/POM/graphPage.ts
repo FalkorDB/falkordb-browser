@@ -1223,18 +1223,6 @@ export default class GraphPage extends BasePage {
     );
   }
 
-  public stripTabShare(label: string): Locator {
-    return this.stripTab(label).locator('[data-testid^="graphTabShare-"]');
-  }
-
-  async shareStripTab(label: string): Promise<void> {
-    await interactWhenVisible(
-      this.stripTabShare(label),
-      (el) => el.click(),
-      `Share Tab ${label}`
-    );
-  }
-
   /** Renames via the pencil affordance. An empty name clears back to the graph name. */
   async renameStripTab(label: string, name: string): Promise<void> {
     const tab = this.stripTab(label);

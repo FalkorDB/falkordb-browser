@@ -41,9 +41,22 @@ test("buildGraphUrlParams drops the param when there is no tab", () => {
     assert.deepEqual(buildGraphUrlParams({ tab: "" }), { tab: null, ...SHARE_CLEARED });
 });
 
-test("syncing the graph route clears an opened share link", () => {
-    // Once the shared context is a tab of its own, the address bar goes back
-    // to naming that tab — not the snapshot it was opened from.
+test("buildGraphUrlParams carries the active tab's share params next to its id", () => {
+    // So a URL copied straight out of the address bar opens for anyone.
+    assert.deepEqual(
+        buildGraphUrlParams({ tab: "abc", share: { graph: "movies", query: "MATCH (n) RETURN n", view: "Table", layout: "", direction: undefined } }),
+        { tab: "abc", graph: "movies", query: "MATCH (n) RETURN n", view: "Table", layout: null, direction: null },
+    );
+});
+
+test("syncing the graph route writes the active tab's share params", () => {
+    location.search = "?graph=old&query=stale";
+    syncRouteUrlParams("/graph", { tab: "abc", share: { graph: "movies", view: "Graph" } });
+    assert.deepEqual(replaceStateCalls, ["/graph?tab=abc&graph=movies&view=Graph"]);
+});
+
+test("syncing the graph route clears share params the active tab does not have", () => {
+    // A blank tab has nothing to share, so an opened link's params go away.
     location.search = "?graph=movies&query=MATCH%20(n)%20RETURN%20n&view=Table&layout=tree&direction=lr";
     syncRouteUrlParams("/graph", { tab: "abc" });
     assert.deepEqual(replaceStateCalls, ["/graph?tab=abc"]);
