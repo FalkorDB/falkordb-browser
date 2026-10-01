@@ -1,14 +1,19 @@
 import { cn, Query } from "@/lib/utils";
 import { getCypherErrorHint } from "@/lib/cypherErrors";
 import { suggestForError } from "@/lib/cypherSuggestions";
-import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
+import { Fragment, KeyboardEvent, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Check, Circle, Loader2, Star, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import useIsMobile from "@/lib/useIsMobile";
+import useLongPress from "@/lib/useLongPress";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 
 type Item = string | Query;
+
+/** How many more rows a phone reveals each time the list is scrolled near its end. */
+const SCROLL_CHUNK = 30;
 
 type ElementItem = {
     content: React.ReactNode;
@@ -39,8 +44,9 @@ const getItemClassName = (selected: boolean, hover: boolean, prefix: "text" | "b
 };
 
 const getSeparator = () => (
+    // Meaningless once the chips wrap onto two lines, and its 2/3 height stretches them.
     <div
-        className={cn("h-2/3 w-px rounded-full bg-foreground/60")}
+        className={cn("h-2/3 w-px shrink-0 rounded-full bg-foreground/60 mobile:hidden")}
     />
 );
 
@@ -72,7 +78,7 @@ const getQueryElement = (item: Query) => {
         elements.push({
             content: getStatusIcon(item.status),
             tooltip: statusTooltip,
-            className: "text-center truncate",
+            className: "shrink-0",
             tooltipClassName: item.status === "Failed" ? "bg-destructive text-destructive-foreground whitespace-pre-line" : undefined
         });
     }
@@ -109,12 +115,14 @@ const getQueryElement = (item: Query) => {
     }
 
     return (
-        <div className="flex gap-2 items-center text-foreground/60 overflow-hidden whitespace-nowrap">
+        // On a phone all four chips truncate to "EL…"/"LR: 14…" and the tooltips that
+        // would explain them need a hover, so wrap onto a second line instead.
+        <div className="min-w-0 flex gap-2 items-center text-foreground/60 overflow-hidden whitespace-nowrap mobile:flex-wrap mobile:gap-x-2 mobile:gap-y-0.5">
             {elements.map((element, index) => (
                 <Fragment key={element.tooltip}>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <div className={cn("truncate", element.className)}>{element.content}</div>
+                            <div className={cn("truncate mobile:overflow-visible mobile:text-clip mobile:whitespace-normal mobile:break-words", element.className)}>{element.content}</div>
                         </TooltipTrigger>
                         <TooltipContent className={element.tooltipClassName}>
                             {element.tooltip}
@@ -136,6 +144,8 @@ interface Props<T extends Item> {
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
     onDoubleClick?: (item: T, evt: MouseEvent<HTMLButtonElement>) => void
+    /** Press and hold on a row, the phone's way into a multi-selection. */
+    onLongPress?: (item: T) => void
     onToggleFav?: (item: T, name?: string) => void
     searchRef: React.RefObject<HTMLInputElement | null>
     isLoading?: boolean
@@ -145,7 +155,7 @@ interface Props<T extends Item> {
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons, itemIndicator }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, onLongPress, dataTestId, afterSearchCallback, isSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons, itemIndicator }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list]);
     const [hoverIndex, setHoverIndex] = useState<number>(0);
@@ -155,13 +165,32 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
     const [itemsPerPage, setItemsPerPage] = useState(1);
     const [favDialogItem, setFavDialogItem] = useState<T | null>(null);
     const [favName, setFavName] = useState("");
+    const [visibleCount, setVisibleCount] = useState(SCROLL_CHUNK);
+
+    const isMobile = useIsMobile();
 
     const containerRef = useRef<HTMLUListElement>(null);
+    // Only one row can be held at a time, so the gesture is shared and the row it
+    // started on is remembered on the way down.
+    const pressedItem = useRef<T | undefined>(undefined);
+
+    const handleLongPress = useCallback(() => {
+        if (!onLongPress || !pressedItem.current) return false;
+        onLongPress(pressedItem.current);
+        return true;
+    }, [onLongPress]);
+
+    const { handlers: longPressHandlers, consumeClick } = useLongPress(onLongPress ? handleLongPress : undefined);
 
     const startIndex = stepCounter * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, filteredList.length);
-    const items = filteredList.slice(startIndex, endIndex);
+    // A phone scrolls one continuous list instead of paging; rows there size to their content.
+    const items = isMobile ? filteredList.slice(0, visibleCount) : filteredList.slice(startIndex, endIndex);
     const itemHeight = typeof items[0] === "string" ? 30 : 40;
+
+    useEffect(() => {
+        setVisibleCount(SCROLL_CHUNK);
+    }, [search, isMobile]);
 
     useEffect(() => {
         setStepCounter(0);
@@ -227,12 +256,14 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
     return (
         <div className={cn("w-full flex flex-col gap-2 p-2", className)}>
             {children}
-            <div className="flex gap-2 items-center">
+            {/* Wraps so the search keeps a usable width: once the action buttons leave it
+               less than `basis-56`, it drops onto a row of its own instead of shrinking. */}
+            <div className="flex flex-wrap gap-2 items-center min-w-0">
                 {actionButtons}
                 <Input
                     ref={searchRef as React.RefObject<HTMLInputElement>}
                     data-testid={`${label}Search`}
-                    className="w-full bg-background text-foreground text-xs"
+                    className="grow basis-56 min-w-0 bg-background text-foreground text-xs"
                     value={search}
                     placeholder={`Search for a ${label}`}
                     onChange={(e) => setSearch(e.target.value)}
@@ -267,7 +298,13 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
             <ul
                 ref={containerRef}
                 data-testid="queryList"
-                className={cn("h-1 grow flex flex-col", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
+                onScroll={(e) => {
+                    if (!isMobile) return;
+                    const el = e.currentTarget;
+                    if (el.scrollHeight - el.scrollTop - el.clientHeight > itemHeight * 2) return;
+                    setVisibleCount(prev => Math.min(prev + SCROLL_CHUNK, filteredList.length));
+                }}
+                className={cn("h-1 grow flex flex-col", isMobile && "overflow-y-auto", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
             >
                 {
                     items.map((item, index) => {
@@ -290,7 +327,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                         {getQueryElement(item)}
                                         {!isString && onToggleFav && (
                                             <div
-                                                className="flex items-center gap-1 justify-end overflow-hidden whitespace-nowrap"
+                                                className="shrink-0 min-w-0 max-w-[45%] flex items-center gap-1 justify-end overflow-hidden whitespace-nowrap"
                                             >
                                                 {
                                                     item.name &&
@@ -304,6 +341,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                                     </Tooltip>
                                                 }
                                                 <Button
+                                                    className="shrink-0"
                                                     data-testid={`${dataTestId}${text}Fav`}
                                                     title={isFav ? "Remove from favorites" : "Add to favorites"}
                                                     onClick={(e) => {
@@ -335,6 +373,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                             onMouseEnter={() => setHoverIndex(index)}
                                             onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                             onClick={(e) => {
+                                                if (consumeClick()) return;
                                                 onClick(item, e);
                                             }}
                                             onDoubleClick={(e) => {
@@ -355,11 +394,24 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                             <li
                                 className={cn(
                                     "border-b cursor-pointer relative",
+                                    isMobile && "shrink-0 py-1",
+                                    onLongPress && "select-none",
                                     getItemClassName(selected, hover)
                                 )}
                                 data-testid={`${dataTestId}${text}`}
-                                style={{ height: `${itemHeight}px` }}
+                                data-long-press={onLongPress ? "" : undefined}
+                                style={isMobile ? { minHeight: `${itemHeight}px` } : { height: `${itemHeight}px` }}
                                 key={text}
+                                {...longPressHandlers}
+                                onPointerDown={(e) => {
+                                    pressedItem.current = item;
+                                    longPressHandlers.onPointerDown(e);
+                                }}
+                                onContextMenu={(e) => {
+                                    // Android raises its own menu on a long press, which would
+                                    // cancel the gesture's pointer sequence.
+                                    if (onLongPress) e.preventDefault();
+                                }}
                             >
                                 {
                                     // The indicator sits beside the row button rather than inside
@@ -376,7 +428,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                     })
                 }
             </ul >
-            <ul className="flex gap-6 p-0 items-center justify-center">
+            {!isMobile && <ul className="flex gap-6 p-0 items-center justify-center">
                 <li className="flex gap-4">
                     <Button disabled={stepCounter < 4} label="<<" title="Previous 5 pages" onClick={() => setStepCounter(prev => prev > 4 ? prev - 5 : prev)} />
                     <Button disabled={stepCounter === 0} label="<" title="Previous page" onClick={() => handleSetStepCounter(prev => prev > 0 ? prev - 1 : prev)} />
@@ -410,7 +462,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                     <Button disabled={stepCounter > pageCount - 2} label=">" title="Next page" onClick={() => handleSetStepCounter(prev => prev < pageCount - 1 ? prev + 1 : prev)} />
                     <Button disabled={stepCounter > pageCount - 6} label=">>" title="Next 5 pages" onClick={() => handleSetStepCounter(prev => prev < pageCount - 5 ? prev + 5 : prev)} />
                 </li>
-            </ul>
+            </ul>}
             <Dialog open={!!favDialogItem} onOpenChange={(open) => { if (!open) setFavDialogItem(null); }}>
                 <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
                     <DialogHeader>

@@ -7,8 +7,9 @@ source**, so the app builds and ships without needing Java/ANTLR at build time.
 generated/
   CypherLexer.ts            ← generated lexer (antlr4ng target)
   CypherParser.ts           ← generated parser (antlr4ng target)
-  CypherParserListener.ts   ← generated listener (imported by the parser)
+  CypherListener.ts         ← generated listener (imported by the parser)
   .grammar-src/             ← the .g4 sources used to generate the above
+    Cypher.g4               ← the combined grammar that is actually generated from
     CypherLexer.g4
     CypherParser.g4
 ```
@@ -30,7 +31,12 @@ must stay. It is **extended with FalkorDB-specific clauses**:
 - `shortestPath(…)` / `allShortestPaths(…)` — shortest-path pattern functions
 - `reduce(acc = init, x IN list | expr)` — list reduction
 - `EXISTS { … }` extended to accept a full `MATCH …` subquery
+- `LOAD CSV [WITH HEADERS] FROM <uri> AS <var> [FIELDTERMINATOR '<c>']`
 - Schema DDL: `CREATE/DROP INDEX`, `CREATE FULLTEXT INDEX`, `CREATE/DROP CONSTRAINT`
+- Vector indexes: `CREATE/DROP VECTOR INDEX …`, with a trailing `OPTIONS { … }` map
+  on a *qualified* `CREATE … INDEX FOR` only — FalkorDB rejects `OPTIONS` on an
+  unqualified `CREATE INDEX` and on every `DROP`, and rejects the `FULLTEXT`/`VECTOR`
+  qualifiers on the legacy `ON :Label(prop)` form
 
 Coverage is verified empirically against 357 real FalkorDB queries extracted from
 the FalkorDB test suite: **99.2%** accepted (the remainder are intentionally
@@ -56,6 +62,19 @@ runs `antlr4ng -Dlanguage=TypeScript` on `Cypher.g4` and copies the emitted
 Then commit the regenerated `.ts` files. Day-to-day schema changes (labels,
 procedures, `algo.*`, `$params`) do **not** require regeneration — they are
 injected at runtime via the engine's schema getter.
+
+### Why the generator is pinned to a deprecated package
+
+npm marks `antlr4ng-cli` deprecated in favour of [`antlr-ng`], which needs no
+Java. It is not a drop-in swap: `antlr-ng@1.0.10` emits a byte-identical
+`CypherParser.ts` and `CypherListener.ts`, but a **different serialized ATN for
+the lexer** — its Unicode identifier tables disagree with ANTLR 4.13.1's (793 vs
+768 entries, with shifted ranges), so it would change which characters lex as
+identifiers. Adopting it is a deliberate change to validate on its own, not a
+dependency bump. Until then the pinned `2.0.0` is the only thing that reproduces
+the committed files.
+
+[`antlr-ng`]: https://github.com/mike-lischke/antlr-ng
 
 ## How the rest of the engine binds to these
 

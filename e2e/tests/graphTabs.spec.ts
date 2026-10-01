@@ -184,4 +184,108 @@ test.describe("@admin Graph tabs", () => {
         await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(limit);
         await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
     });
+
+    // A share link carries the tab's graph and query, not its id, so it opens
+    // for anyone — including a browser that has never seen the tab.
+    const shareLink = (graphName: string, query: string, view = "Graph") => {
+        const url = new URL(urls.graphUrl);
+        url.searchParams.set("graph", graphName);
+        url.searchParams.set("query", query);
+        url.searchParams.set("view", view);
+        return url.toString();
+    };
+
+    test("A share link opens its graph in a tab of its own, and the address bar names that tab", async () => {
+        const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, "MATCH (n) RETURN n LIMIT 1"));
+        const page = await browser.getPage();
+        await graph.waitForPageIdle();
+
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+        await expect(page.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        // The untouched tab the visitor already had takes the link — no leftover "New tab".
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+
+        // The address bar names the user's own tab, still carrying what it shows.
+        await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+        const params = new URL(graph.getCurrentURL()).searchParams;
+        expect(params.get("graph")).toBe(graphOne);
+        expect(params.get("query")).toBe("MATCH (n) RETURN n LIMIT 1");
+    });
+
+    test("A URL copied straight out of the address bar opens for someone else", async () => {
+        // People share by copying the address bar, not by finding the link
+        // button — and `?tab=` alone names an entry in the sender's storage.
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.selectGraphByName(graphOne);
+        await graph.waitForPageIdle();
+        await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("graph"), { timeout: 15000 }).toBe(graphOne);
+        const copied = graph.getCurrentURL();
+
+        const other = new BrowserWrapper();
+        try {
+            const otherGraph = await other.createNewPage(GraphPage, copied);
+            const otherPage = await other.getPage();
+            await otherGraph.waitForPageIdle();
+
+            await expect(otherGraph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+            await expect(otherPage.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        } finally {
+            await other.closeBrowser();
+        }
+    });
+
+    test("Reloading keeps the tab as it is now, not the URL's snapshot of it", async () => {
+        const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, "MATCH (n) RETURN n LIMIT 1"));
+        const page = await browser.getPage();
+        await graph.waitForPageIdle();
+        await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+
+        // A stale query next to the user's own tab id must not win.
+        const url = new URL(graph.getCurrentURL());
+        url.searchParams.set("query", "MATCH (n) RETURN n LIMIT 9");
+        await browser.navigateTo(url.toString());
+        await graph.waitForPageIdle();
+
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+        await expect.poll(() => new URL(page.url()).searchParams.get("query"), { timeout: 15000 }).toBe("MATCH (n) RETURN n LIMIT 1");
+    });
+
+    test("A share link opens on a first visit instead of the tutorial", async () => {
+        // The suite marks the tutorial as seen for every page. A real first
+        // visit has not, and the tour would otherwise take over the page.
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const page = await browser.getPage();
+        await page.evaluate(() => localStorage.setItem("tutorial", "true"));
+
+        await browser.navigateTo(shareLink(graphOne, "MATCH (n) RETURN n LIMIT 3"));
+        await graph.waitForPageIdle();
+
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+        await expect(page.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        await expect(page.getByTestId("skipTutorial")).toBeHidden();
+        // Deferred, not skipped: the next regular visit still gets the tour.
+        expect(await page.evaluate(() => localStorage.getItem("tutorial"))).toBe("true");
+    });
+
+    test("Opening a link to a tab you already have reuses it", async () => {
+        const query = "MATCH (n) RETURN n LIMIT 2";
+        const graph = await browser.createNewPage(GraphPage, shareLink(graphOne, query));
+        await graph.waitForPageIdle();
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+
+        await browser.navigateTo(shareLink(graphOne, query));
+        await graph.waitForPageIdle();
+
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(1);
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true");
+    });
+
+    test("A tab without a graph puts nothing to share on the URL", async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+
+        await expect.poll(() => new URL(graph.getCurrentURL()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+        expect(new URL(graph.getCurrentURL()).searchParams.get("graph")).toBeNull();
+    });
 });

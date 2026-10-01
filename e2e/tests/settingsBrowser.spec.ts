@@ -580,6 +580,34 @@ test.describe('@browser Browser Settings tests', () => {
         }
     });
 
+    test('@readwrite Verify graphs order can be changed and persists', async () => {
+        const orderByLabel: Record<string, string> = {
+            'Newest First': 'new-old',
+            'Oldest First': 'old-new',
+            'Name (A-Z)': 'a-z',
+            'Name (Z-A)': 'z-a',
+        };
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const originalValue = await settingsBrowserPage.getGraphsSortOrder();
+
+        expect(originalValue).toBe('Newest First');
+
+        try {
+            await settingsBrowserPage.setGraphsSortOrder('a-z');
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+
+            expect(await settingsBrowserPage.getGraphsSortOrder()).toBe('Name (A-Z)');
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.setGraphsSortOrder(orderByLabel[originalValue]);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
+    });
+
     // ===== Graph Info Section =====
 
     test('@readwrite Verify refresh interval slider can be changed and persists', async () => {

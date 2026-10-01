@@ -24,9 +24,17 @@ async function createChatPageWithSettings(
 
   await page.goto(urls.graphUrl);
   await page.waitForLoadState("networkidle");
-  await expect.poll(async () => page.evaluate(() =>
-    localStorage.getItem("secretKey") === null && localStorage.getItem("chatApiKeys") !== null
-  ), { timeout: 15000 }).toBe(true);
+  // Chat API keys live under a connection-scoped key
+  // (`<host>:<port>:<user>:chatApiKeys`), so resolve it by suffix rather than
+  // reading the bare name.
+  await expect.poll(async () => page.evaluate(() => {
+    if (localStorage.getItem("secretKey") !== null) return false;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.endsWith(":chatApiKeys")) return true;
+    }
+    return false;
+  }), { timeout: 15000 }).toBe(true);
 
   return chat;
 }
@@ -87,8 +95,13 @@ test.describe("Chat Feature Tests", () => {
       localStorage.setItem("chatModelSource", "api-key");
       localStorage.setItem("model", selectedModel);
       localStorage.removeItem("secretKey");
-      localStorage.removeItem("chatApiKeys");
       localStorage.removeItem("selectedChatApiKeyId");
+      for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+        const key = localStorage.key(i);
+        if (key && (key.endsWith("chatApiKeys") || key.endsWith("selectedChatApiKeyId"))) {
+          localStorage.removeItem(key);
+        }
+      }
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");

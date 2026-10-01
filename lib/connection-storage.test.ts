@@ -150,3 +150,139 @@ test("migrateToScopedStorage never overwrites an existing scoped value", () => {
 
     assert.equal(getConnectionItem("query history"), "[current]");
 });
+
+test("migrateToScopedStorage leaves another user's scoped keys alone", () => {
+    // A username may itself look like a scoped-key prefix, so `chat-bob`'s own
+    // keys read as legacy `chat-` keys by shape. Stealing them would both leak
+    // his data into this scope and delete his copy.
+    setConnectionPrefix("localhost", 6379, "chat-bob");
+    storage.setItem("localhost:6379:chat-bob:chat-social", "bob's chat");
+    storage.setItem("localhost:6379:chat-bob:query history", "bob's history");
+
+    setConnectionPrefix("localhost", 6379, "chat-alice");
+    migrateToScopedStorage();
+
+    assert.equal(storage.getItem("localhost:6379:chat-bob:chat-social"), "bob's chat");
+    assert.equal(storage.getItem("localhost:6379:chat-bob:query history"), "bob's history");
+    assert.equal(getConnectionItem("chat-bob:chat-social"), null);
+    assert.equal(getConnectionItem("chat-bob:query history"), null);
+});
+
+test("a colon in the username cannot collide with another scope's key", () => {
+    // `alice`'s graph is named `bob:chat-social`; `alice:chat-bob`'s is `social`.
+    // Spelled out raw, both would be localhost:6379:alice:chat-bob:chat-social.
+    setConnectionPrefix("localhost", 6379, "alice");
+    setConnectionItem("chat-bob:chat-social", "alice's chat");
+
+    setConnectionPrefix("localhost", 6379, "alice:chat-bob");
+    assert.equal(getConnectionItem("chat-social"), null);
+    setConnectionItem("chat-social", "the other alice's chat");
+
+    setConnectionPrefix("localhost", 6379, "alice");
+    assert.equal(getConnectionItem("chat-bob:chat-social"), "alice's chat");
+});
+
+test("migrateToScopedStorage recognises a scope whose username contains a colon", () => {
+    setConnectionPrefix("localhost", 6379, "chat-bob:prod");
+    setConnectionItem("chat-social", "bob's chat");
+    assert.equal(storage.getItem("localhost:6379:chat-bob%3Aprod:chat-social"), "bob's chat");
+
+    setConnectionPrefix("localhost", 6379, "chat-alice");
+    migrateToScopedStorage();
+
+    assert.equal(storage.getItem("localhost:6379:chat-bob%3Aprod:chat-social"), "bob's chat");
+    assert.equal(getConnectionItem("chat-bob%3Aprod:chat-social"), null);
+});
+
+test("migrateToScopedStorage still upgrades a graph name that looks like a username", () => {
+    // `social` is not a key this app writes, so `chat-ns:social` has only one
+    // reading: a legacy key for a graph named `ns:social`.
+    setConnectionPrefix("localhost", 6379, "migrate-colon");
+    storage.setItem("localhost:6379:chat-ns:social", "old");
+
+    migrateToScopedStorage();
+
+    assert.equal(getConnectionItem("chat-ns:social"), "old");
+    assert.equal(storage.getItem("localhost:6379:chat-ns:social"), null);
+});
+
+test("migrateToScopedStorage leaves a key that reads as another user's alone", () => {
+    // `chat-bob:query history` is `chat-bob`'s query history as readily as it is
+    // a graph named `bob:query history`, and he has not signed in since the
+    // marker existed, so nothing vouches for either reading. Left in place it is
+    // still his to claim; migrated, it is copied here and deleted there.
+    setConnectionPrefix("localhost", 6379, "migrate-tie");
+    storage.setItem("localhost:6379:chat-bob:query history", "whose?");
+
+    migrateToScopedStorage();
+
+    assert.equal(storage.getItem("localhost:6379:chat-bob:query history"), "whose?");
+    assert.equal(getConnectionItem("chat-bob:query history"), null);
+});
+
+test("migrateToScopedStorage rescues keys written under an unescaped username", () => {
+    // The release before the escape wrote this user's prefix out raw, so the
+    // suffix carries the username. Left unrecognized, the data is stranded.
+    setConnectionPrefix("localhost", 6379, "migrate:raw");
+    storage.setItem("localhost:6379:migrate:raw:query history", "[3]");
+    storage.setItem("localhost:6379:migrate:raw:chat-social", "old");
+
+    migrateToScopedStorage();
+
+    assert.equal(getConnectionItem("query history"), "[3]");
+    assert.equal(getConnectionItem("chat-social"), "old");
+    assert.equal(storage.getItem("localhost:6379:migrate:raw:query history"), null);
+    assert.equal(storage.getItem("localhost:6379:migrate:raw:chat-social"), null);
+});
+
+test("migrateToScopedStorage leaves an unescaped-username key a live scope could own", () => {
+    // By shape `localhost:6379:live:chat-bob:chat-social` is this user's legacy
+    // key, but it is just as likely `live`'s key for a graph named
+    // `chat-bob:chat-social` — and `live` has signed in, so that scope exists.
+    // Ambiguity resolves in favour of the scope that is known to be real.
+    setConnectionPrefix("localhost", 6379, "live");
+    setConnectionItem("keep", "1");
+    storage.setItem("localhost:6379:live:chat-bob:chat-social", "whose?");
+
+    setConnectionPrefix("localhost", 6379, "live:chat-bob");
+    migrateToScopedStorage();
+
+    assert.equal(storage.getItem("localhost:6379:live:chat-bob:chat-social"), "whose?");
+    assert.equal(getConnectionItem("chat-social"), null);
+});
+
+test("an escaped prefix does not inherit a pre-escape user's keys", () => {
+    // A legacy build gave a user literally named `alice%3Aprod` the prefix
+    // `localhost:6379:alice%3Aprod:` — character for character the prefix this
+    // build hands `alice:prod`. Its scope marker is no help: the legacy session
+    // wrote one itself. The keys are parked, not read.
+    storage.setItem("localhost:6379:alice%3Aprod:__scope", "1");
+    storage.setItem("localhost:6379:alice%3Aprod:query history", "[legacy]");
+
+    setConnectionPrefix("localhost", 6379, "alice:prod");
+
+    assert.equal(getConnectionPrefix(), "localhost:6379:alice%3Aprod:");
+    assert.equal(getConnectionItem("query history"), null);
+    assert.equal(
+        storage.getItem("__scope-conflict:localhost:6379:alice%3Aprod:query history"),
+        "[legacy]"
+    );
+});
+
+test("a scope this build owns survives re-entering it", () => {
+    setConnectionPrefix("localhost", 6379, "carol:prod");
+    setConnectionItem("query history", "[mine]");
+
+    setConnectionPrefix("localhost", 6379, "someone-else");
+    setConnectionPrefix("localhost", 6379, "carol:prod");
+
+    assert.equal(getConnectionItem("query history"), "[mine]");
+});
+
+test("a username that needs no escaping keeps the keys already in its scope", () => {
+    storage.setItem("localhost:6379:dave:query history", "[dave's]");
+
+    setConnectionPrefix("localhost", 6379, "dave");
+
+    assert.equal(getConnectionItem("query history"), "[dave's]");
+});

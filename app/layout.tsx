@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import "./globals.css";
-import { Metadata } from "next";
+import { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +17,13 @@ export const metadata: Metadata = {
   description: "FalkorDB Browser is a web-based UI for FalkorDB.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // `viewportFit` keeps content clear of notches; pinch-zoom stays enabled for a11y.
+  viewportFit: "cover",
+};
+
 export default async function RootLayout({
   children,
 }: {
@@ -27,8 +34,10 @@ export default async function RootLayout({
   // Setting suppressHydrationWarning on html tag to prevent warning
   // caused by mismatched client/server content caused by next-themes
   return (
-    <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className="w-full h-full bg-background flex flex-col">
+    <html className="w-screen h-screen mobile:h-[100dvh] overflow-hidden overscroll-none" lang="en" suppressHydrationWarning>
+      {/* `viewportFit: "cover"` lets the layout run under the notch, so the shell
+          pads itself back out. `env()` is 0 on anything without an inset. */}
+      <body className="w-full h-full bg-background flex flex-col overflow-hidden overscroll-none pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <GTM />
         <TooltipProvider>
           <NextAuthProvider nonce={nonce}>

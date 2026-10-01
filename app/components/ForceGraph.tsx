@@ -3,11 +3,12 @@
 
 "use client";
 
-import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection, NodeShape } from "@falkordb/canvas";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import useLongPress from "@/lib/useLongPress";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
 
@@ -22,6 +23,13 @@ interface Props {
     canvasRef: GraphRef
     selectedElements: (Node | Link)[]
     setSelectedElements: (el?: (Node | Link)[]) => void
+    /** Treats every click as additive, standing in for a Ctrl key touch cannot press. */
+    multiSelect?: boolean
+    /**
+     * Enables the long-press-to-multi-select gesture. Left out (desktop, schema
+     * view) the gesture is off and `multiSelect` is driven from elsewhere.
+     */
+    setMultiSelect?: (value: boolean) => void
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
@@ -47,6 +55,8 @@ export default function ForceGraph({
     canvasRef,
     selectedElements,
     setSelectedElements,
+    multiSelect = false,
+    setMultiSelect = undefined,
     setRelationships,
     viewport = undefined,
     setViewport = undefined,
@@ -66,7 +76,10 @@ export default function ForceGraph({
     const { toast } = useToast();
     const { background, foreground } = getTheme(theme);
 
-    const lastClick = useRef<{ date: number, id: number }>({ date: 0, id: -1 });
+    // A click only selects once the double-click window has passed, so a
+    // double-click expands without selecting first. `select` lets a click on a
+    // different node commit this one instead of discarding it.
+    const pendingClick = useRef<{ timer: ReturnType<typeof setTimeout>, id: number, select: () => void } | undefined>(undefined);
     // One counter per node, bumped whenever a double-click toggles its expansion.
     // An expand awaits a fetch, so a collapse and a re-expand can both land while
     // it is in flight; a completion only touches the graph while its token is
@@ -84,8 +97,44 @@ export default function ForceGraph({
 
     useEffect(() => () => clearTimeout(viewportRestoreTimerRef.current), []);
 
+    // Mirrors the selection so a handler can read it without closing over it.
+    // Synced after commit, never during render, so a discarded render cannot leak
+    // into the committed canvas handlers.
+    const selectedElementsRef = useRef(selectedElements);
+
+    useLayoutEffect(() => {
+        selectedElementsRef.current = selectedElements;
+    }, [selectedElements]);
+
+    const clearPendingClick = useCallback(() => {
+        if (!pendingClick.current) return;
+        clearTimeout(pendingClick.current.timer);
+        pendingClick.current = undefined;
+    }, []);
+
+    // Commits a pending selection early. Clicking a second node inside the
+    // double-click window would otherwise cancel the first one's timer and drop
+    // that click, which multi-select makes easy to hit.
+    const flushPendingClick = useCallback(() => {
+        const pending = pendingClick.current;
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        pendingClick.current = undefined;
+        pending.select();
+    }, []);
+
+    // Keyed on the graph and its data, not just unmount: a queued click closes over
+    // the outgoing elements and would otherwise select one of them into the view
+    // that replaced them.
+    useEffect(() => clearPendingClick, [clearPendingClick, graph, data]);
+
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
+
+    // The element under the finger, read by the long-press timer. force-graph
+    // resolves what a pointer is over on pointer*down*, so the hover callback has
+    // already fired by the time the hold starts.
+    const hoverElementRef = useRef<Node | Link | undefined>(undefined);
 
     // Load falkordb-canvas web component on client side only
     useEffect(() => {
@@ -250,73 +299,50 @@ export default function ForceGraph({
         canvas.centerAt(cx, cy, 300);
     }, [dimmed, canvasRef]);
 
-    const handleNodeClick = useCallback(async (node: GraphNode, _event: MouseEvent) => {
-        const fullNode = graph.NodesMap.get(node.id);
-        if (!fullNode || disableExpand) return;
-
-        const now = Date.now();
-        const isDoubleClick = now - lastClick.current.date < DOUBLE_CLICK_MS && lastClick.current.id === node.id;
-
-        // Always reset after acting so the next click starts fresh
-        lastClick.current = isDoubleClick ? { date: 0, id: -1 } : { date: now, id: node.id };
-
-        if (isDoubleClick) {
-            const token = (expandTokens.current.get(node.id) ?? 0) + 1;
-            expandTokens.current.set(node.id, token);
-
-            fullNode.expand = !fullNode.expand;
-            if (fullNode.expand) {
-                await onFetchNode(fullNode, () => expandTokens.current.get(node.id) === token);
-
-                if (expandTokens.current.get(node.id) !== token) {
-                    // A newer toggle superseded this one while the fetch was in
-                    // flight; it owns the node's neighbours now. `graph.extend`
-                    // mutates in place and awaits along the way, so a collapse
-                    // that landed mid-merge may have swept before the neighbours
-                    // arrived — sweep again for it.
-                    if (!fullNode.expand) deleteNeighbors([fullNode]);
-                    return;
-                }
-
-                // Guard: if the node was collapsed while fetching, undo the expansion.
-                if (!fullNode.expand) {
-                    deleteNeighbors([fullNode]);
-                }
-            } else {
-                deleteNeighbors([fullNode]);
-            }
+    const commitSelection = useCallback((fullElement: Node | Link, additive: boolean) => {
+        // Read through the ref: `setSelectedElements` takes an array rather than
+        // an updater, so two selections in the same tick would both build on the
+        // same stale snapshot and the first would be lost.
+        const current = selectedElementsRef.current;
+        let nextSelection: (Node | Link)[];
+        if (additive) {
+            const alreadyIn = current.find(e =>
+                (('source' in e) === ('source' in fullElement)) && e.id === fullElement.id
+            );
+            // Filter on the instance that was actually found: the map may hand
+            // back a different object than the one the selection holds, and an
+            // identity test against `fullElement` would then remove nothing while
+            // `alreadyIn` still blocks the add — a toggle that does nothing at all.
+            nextSelection = alreadyIn
+                ? current.filter(el => el !== alreadyIn)
+                : [...current, fullElement];
+        } else {
+            nextSelection = [fullElement];
         }
-    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand]);
-
-    const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
-        const fullLink = graph.LinksMap.get(link.id);
-        if (!fullLink) return;
-        if ((event.shiftKey || event.ctrlKey) && selectedElements.some(el => 'source' in el && el.id === fullLink.id)) return;
-
-        const nextSelection = (event.shiftKey || event.ctrlKey)
-            ? [...selectedElements, fullLink]
-            : [fullLink];
+        selectedElementsRef.current = nextSelection;
         setSelectedElements(nextSelection);
         centerOnSelection(nextSelection);
-    }, [graph.LinksMap, selectedElements, setSelectedElements, centerOnSelection]);
 
-    const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
-        if (element === null) {
-            setHoverElement(undefined);
-            return;
-        }
+        // Untoggling the last element leaves the mode with nothing to act on, so
+        // treat it as the way out rather than stranding the user in it.
+        if (additive && nextSelection.length === 0) setMultiSelect?.(false);
+    }, [setSelectedElements, centerOnSelection, setMultiSelect]);
 
-        // Find the full element from the graph
-        if ('source' in element) {
-            const fullLink = graph.LinksMap.get(element.id);
-            if (fullLink) setHoverElement(fullLink);
-        } else {
-            const fullNode = graph.NodesMap.get(element.id);
-            if (fullNode) setHoverElement(fullNode);
-        }
-    }, [graph]);
+    const handleLongPress = useCallback(() => {
+        if (multiSelect) return false;
 
-    const handleRightClick = useCallback((element: GraphNode | GraphLink, evt: MouseEvent) => {
+        const element = hoverElementRef.current;
+        // A hold on empty background has nothing to start the selection with.
+        if (!element) return false;
+
+        setMultiSelect?.(true);
+        commitSelection(element, false);
+        return true;
+    }, [multiSelect, setMultiSelect, commitSelection]);
+
+    const { handlers: longPressHandlers, consumeClick } = useLongPress(setMultiSelect ? handleLongPress : undefined);
+
+    const handleSelect = useCallback((element: GraphNode | GraphLink, additive: boolean) => {
         let fullElement: Node | Link | undefined;
         if ('source' in element) {
             fullElement = graph.LinksMap.get(element.id);
@@ -325,25 +351,118 @@ export default function ForceGraph({
         }
         if (!fullElement) return;
 
-        let nextSelection: (Node | Link)[];
-        if (evt.ctrlKey) {
-            const alreadyIn = selectedElements.find(e =>
-                (('source' in e) === ('source' in fullElement)) && e.id === fullElement.id
-            );
-            nextSelection = alreadyIn
-                ? selectedElements.filter(el => el !== fullElement)
-                : [...selectedElements, fullElement];
+        commitSelection(fullElement, additive);
+    }, [graph, commitSelection]);
+
+    const handleNodeClick = useCallback(async (node: GraphNode, event: MouseEvent) => {
+        if (consumeClick()) return;
+
+        const fullNode = graph.NodesMap.get(node.id);
+        if (!fullNode) return;
+
+        const isDoubleClick = pendingClick.current?.id === node.id;
+        if (isDoubleClick) {
+            clearPendingClick();
         } else {
-            nextSelection = [fullElement];
+            flushPendingClick();
         }
-        setSelectedElements(nextSelection);
-        centerOnSelection(nextSelection);
-    }, [graph, selectedElements, setSelectedElements, centerOnSelection]);
+
+        if (!isDoubleClick) {
+            const additive = event.shiftKey || event.ctrlKey || multiSelect;
+
+            if (disableExpand) {
+                handleSelect(node, additive);
+                return;
+            }
+
+            pendingClick.current = {
+                id: node.id,
+                select: () => handleSelect(node, additive),
+                timer: setTimeout(() => {
+                    pendingClick.current = undefined;
+                    handleSelect(node, additive);
+                }, DOUBLE_CLICK_MS),
+            };
+            return;
+        }
+
+        if (disableExpand) return;
+
+        const token = (expandTokens.current.get(node.id) ?? 0) + 1;
+        expandTokens.current.set(node.id, token);
+
+        fullNode.expand = !fullNode.expand;
+        if (fullNode.expand) {
+            await onFetchNode(fullNode, () => expandTokens.current.get(node.id) === token);
+
+            if (expandTokens.current.get(node.id) !== token) {
+                // A newer toggle superseded this one while the fetch was in
+                // flight; it owns the node's neighbours now. `graph.extend`
+                // mutates in place and awaits along the way, so a collapse
+                // that landed mid-merge may have swept before the neighbours
+                // arrived — sweep again for it.
+                if (!fullNode.expand) deleteNeighbors([fullNode]);
+                return;
+            }
+
+            // Guard: if the node was collapsed while fetching, undo the expansion.
+            if (!fullNode.expand) {
+                deleteNeighbors([fullNode]);
+            }
+        } else {
+            deleteNeighbors([fullNode]);
+        }
+    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand, handleSelect, clearPendingClick, flushPendingClick, multiSelect, consumeClick]);
+
+    // Links have nothing to expand, so their click selects straight away.
+    const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
+        if (consumeClick()) return;
+        flushPendingClick();
+        handleSelect(link, event.shiftKey || event.ctrlKey || multiSelect);
+    }, [handleSelect, flushPendingClick, multiSelect, consumeClick]);
+
+    const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
+        if (element === null) {
+            hoverElementRef.current = undefined;
+            setHoverElement(undefined);
+            return;
+        }
+
+        // Find the full element from the graph
+        if ('source' in element) {
+            const fullLink = graph.LinksMap.get(element.id);
+            if (fullLink) {
+                hoverElementRef.current = fullLink;
+                setHoverElement(fullLink);
+            }
+        } else {
+            const fullNode = graph.NodesMap.get(element.id);
+            if (fullNode) {
+                hoverElementRef.current = fullNode;
+                setHoverElement(fullNode);
+            }
+        }
+    }, [graph]);
 
     const handleUnselected = useCallback((evt?: MouseEvent) => {
-        if (evt?.ctrlKey || selectedElements.length === 0) return;
+        if (consumeClick()) return;
+        // A stray tap on the background must not wipe a selection built up one
+        // element at a time, exactly as Ctrl-click protects it on desktop. Commit
+        // the pending pick rather than dropping it — additive is the mode that
+        // makes tapping a node and then the background easy to do by accident.
+        // Multi-select is the mobile stand-in for Ctrl-click, so the background
+        // is protected there for the same reason: a selection built up one tap at
+        // a time is too expensive to lose to a miss. Done on the toolbar is the
+        // deliberate way out, and untoggling the last element is the other.
+        if (evt?.shiftKey || evt?.ctrlKey || multiSelect) {
+            flushPendingClick();
+            return;
+        }
+        clearPendingClick();
+        if (selectedElements.length === 0) return;
+        selectedElementsRef.current = [];
         setSelectedElements([]);
-    }, [selectedElements, setSelectedElements]);
+    }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, consumeClick]);
 
     const checkIsNodeSelected = useCallback((node: GraphNode) =>
         selectedElements.some(el => el.id === node.id && !('source' in el)) ||
@@ -481,14 +600,12 @@ export default function ForceGraph({
             eventHandlers: {
                 onNodeClick: handleNodeClick,
                 onLinkClick: handleLinkClick,
-                onNodeRightClick: handleRightClick,
-                onLinkRightClick: handleRightClick,
                 onNodeHover: handleHover,
                 onLinkHover: handleHover,
                 onBackgroundClick: handleUnselected,
             },
         });
-    }, [handleNodeClick, handleLinkClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, checkIsNodeDimmed, checkIsLinkDimmed, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
+    }, [handleNodeClick, handleLinkClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, checkIsNodeDimmed, checkIsLinkDimmed, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
 
     // Initialize canvas dimmed state when component mounts or dimmed prop changes
     useEffect(() => {
@@ -576,12 +693,44 @@ export default function ForceGraph({
 
     return (
         <div
-            className="w-full h-full"
+            className="relative w-full h-full"
             data-testid={testId}
+            data-long-press={setMultiSelect ? "" : undefined}
             data-focus-active={String(dimmed && selectedElements.length > 0)}
             data-selection-count={String(selectedElements.length)}
+            {...longPressHandlers}
+            onContextMenu={(e) => {
+                // Android raises its own menu on a long press, which would cancel
+                // the gesture's pointer sequence.
+                if (setMultiSelect) e.preventDefault();
+            }}
         >
             <falkordb-canvas ref={canvasRef} className="w-full h-full" />
+            {
+                setMultiSelect && multiSelect &&
+                <div
+                    data-testid="multiSelectBar"
+                    // Just clear of the tab row it sits above, and out of the way of
+                    // the elements being picked.
+                    className="absolute bottom-11 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-full border border-primary bg-background/95 px-2.5 py-1 shadow-lg"
+                >
+                    <span data-testid="multiSelectCount" className="text-xs tabular-nums">
+                        {selectedElements.length} selected
+                    </span>
+                    <button
+                        type="button"
+                        data-testid="multiSelectDone"
+                        className="text-xs font-medium text-primary"
+                        onClick={() => {
+                            setMultiSelect(false);
+                            selectedElementsRef.current = [];
+                            setSelectedElements([]);
+                        }}
+                    >
+                        Done
+                    </button>
+                </div>
+            }
         </div>
     );
 }

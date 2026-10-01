@@ -105,12 +105,12 @@ export function getPATGraphName(): string {
  */
 export async function executePATQuery(
   query: string,
-  params: Record<string, unknown> = {}
+  params: Record<string, string | number | boolean | null> = {}
 ) {
   const client = await getPATFalkorDBClient();
   const graph = client.selectGraph(getPATGraphName());
 
-  return graph.query(query, params);
+  return graph.query(query, { params });
 }
 
 /**

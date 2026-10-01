@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import DialogComponent from "./DialogComponent";
 import Button from "./ui/Button";
+import HelpTip from "./ui/HelpTip";
 import CloseDialog from "./CloseDialog";
 import Input from "./ui/Input";
 import Dropzone from "./ui/Dropzone";
@@ -164,14 +165,9 @@ export default function CreateGraph({
         >
             <form className="flex flex-col gap-4" onSubmit={isLoading ? undefined : handleCreateGraph}>
                 <div className="flex gap-2 items-center">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <InfoIcon size={20} />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            {"Graph names can be edited later"}
-                        </TooltipContent>
-                    </Tooltip>
+                    <HelpTip trigger={<InfoIcon size={20} />}>
+                        {"Graph names can be edited later"}
+                    </HelpTip>
                     <p className="font-normal text-2xl">Name your Graph:</p>
                     <Input
                         data-testid={"createGraphInput"}

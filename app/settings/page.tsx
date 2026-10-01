@@ -5,6 +5,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Database, KeyRound, SlidersHorizontal, Users as UsersIcon } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useToast } from "@/components/ui/use-toast";
 import { useSettingsParams } from "@/lib/useUrlParams";
@@ -22,6 +23,14 @@ const VALID_TABS: Tab[] = ['Browser', 'Configurations', 'Users', 'Tokens'];
 function isValidTab(value: string): value is Tab {
     return VALID_TABS.includes(value as Tab);
 }
+
+// Desktop keeps the wide text-only tabs. Mobile turns the same buttons into
+// equal-width segments, stacking an icon over a short label so the strip always
+// fits the viewport instead of scrolling sideways.
+const tabClass = "p-2 rounded-lg mobile:flex-1 mobile:basis-0 mobile:min-w-0 mobile:flex-col mobile:gap-1";
+const activeTabClass = "bg-background mobile:bg-secondary mobile:text-primary";
+const tabIconClass = "hidden mobile:block shrink-0";
+const tabLabelClass = "block min-w-0 truncate text-center mobile:text-[11px] mobile:leading-tight";
 
 export default function Settings() {
 
@@ -154,43 +163,62 @@ export default function Settings() {
     return (
         <div className="Page p-2 gap-2">
             <p className="text-sm text-foreground"><span className="opacity-50">Settings</span> <span data-testid="settingsCurrentTab">{`> ${current}`}</span></p>
-            <div className="w-full bg-background flex flex-wrap gap-2 p-2 rounded-lg justify-center overflow-x-auto">
+            {/* Mobile splits the row into equal segments with an icon and a short
+                label, so every tab stays reachable without a horizontal scroll. */}
+            <div className="w-full bg-background flex flex-wrap gap-2 p-2 rounded-lg justify-center mobile:flex-nowrap mobile:gap-1">
                 <Button
                     data-testid="settingsTabBrowser"
-                    className={cn("p-2 rounded-lg", current === "Browser" ? "bg-background" : "text-gray-500")}
-                    label="Browser Settings"
+                    className={cn(tabClass, current === "Browser" ? activeTabClass : "text-gray-500")}
                     title="Manage browser settings"
                     onClick={() => handleSetCurrent("Browser")}
-                />
+                >
+                    <SlidersHorizontal size={18} className={tabIconClass} />
+                    <span className={tabLabelClass}>
+                        <span className="mobile:hidden">Browser Settings</span>
+                        <span className="hidden mobile:inline">Browser</span>
+                    </span>
+                </Button>
                 {
                     canShowAdminTabs &&
                     <>
                         <Button
                             data-testid="settingsTabConfigurations"
-                            className={cn("p-2 rounded-lg", current === "Configurations" ? "bg-background" : "text-gray-500")}
-                            label="DB Configurations"
+                            className={cn(tabClass, current === "Configurations" ? activeTabClass : "text-gray-500")}
                             title="Configure database settings"
                             onClick={() => handleSetCurrent("Configurations")}
-                        />
+                        >
+                            <Database size={18} className={tabIconClass} />
+                            <span className={tabLabelClass}>
+                                <span className="mobile:hidden">DB Configurations</span>
+                                <span className="hidden mobile:inline">Configurations</span>
+                            </span>
+                        </Button>
                         {
                             canManageUsers &&
                             <Button
                                 data-testid="settingsTabUsers"
-                                className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
-                                label="Users"
+                                className={cn(tabClass, current === "Users" ? activeTabClass : "text-gray-500")}
                                 title="Manage users accounts"
                                 onClick={() => handleSetCurrent("Users")}
-                            />
+                            >
+                                <UsersIcon size={18} className={tabIconClass} />
+                                <span className={tabLabelClass}>Users</span>
+                            </Button>
                         }
                     </>
                 }
                 <Button
                     data-testid="settingsTabTokens"
-                    className={cn("p-2 rounded-lg", current === "Tokens" ? "bg-background" : "text-gray-500")}
-                    label="Personal Access Tokens"
+                    className={cn(tabClass, current === "Tokens" ? activeTabClass : "text-gray-500")}
                     title="Manage personal access tokens"
                     onClick={() => handleSetCurrent("Tokens")}
-                />
+                >
+                    <KeyRound size={18} className={tabIconClass} />
+                    <span className={tabLabelClass}>
+                        <span className="mobile:hidden">Personal Access Tokens</span>
+                        <span className="hidden mobile:inline">Tokens</span>
+                    </span>
+                </Button>
             </div>
             {
                 getCurrentTab()

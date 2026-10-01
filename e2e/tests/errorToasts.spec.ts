@@ -410,4 +410,45 @@ test.describe("Error Toast Messages", () => {
     // 19), so poll until the label flips rather than reading it once.
     await expect(graph.errorToast.getByTestId("toast-copy-raw")).toHaveText("Copied!");
   });
+
+  // ---------------------------------------------------------------------------
+  // Height cap — a long raw error scrolls inside the toast instead of growing
+  // past the viewport and taking its dismiss button with it
+  // ---------------------------------------------------------------------------
+
+  test(`@admin Long error is capped and scrolls inside the toast instead of overflowing the viewport`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    // A short viewport is what makes the cap bite: the expanded toast wants
+    // ~300px, which is more than 60vh here, so it has to clamp and scroll.
+    const page = await browser.getPage();
+    await page.setViewportSize({ width: 1280, height: 400 });
+
+    await graph.insertQuery(`CREATE INDEX FOR (p:Person) ON (p.${"m".repeat(3000)}.n)`);
+    await graph.clickRunQuery(false);
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+
+    await graph.clickErrorToastSeeMore();
+    await expect(graph.errorToast.getByTestId("toast-raw-message")).toBeAttached();
+
+    await expect
+      .poll(async () => {
+        const { contentScrollHeight, contentClientHeight } =
+          await graph.getErrorToastSizing();
+        return contentScrollHeight > contentClientHeight;
+      })
+      .toBe(true);
+
+    const { toastHeight, viewportHeight, toastBottom } =
+      await graph.getErrorToastSizing();
+    expect(toastHeight).toBeLessThanOrEqual(viewportHeight * 0.61);
+    expect(toastBottom).toBeLessThanOrEqual(viewportHeight);
+    // The dismiss affordance stays reachable rather than being pushed off-screen.
+    await expect(graph.errorToast.locator("[toast-close]")).toBeAttached();
+  });
 });
