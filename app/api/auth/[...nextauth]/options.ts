@@ -24,6 +24,7 @@ import {
   storeEncryptedCredential,
   getAuthSecret,
 } from "../tokenUtils";
+import { authCredentials } from "../../validate-body";
 
 interface CustomJWTPayload {
   sub: string;
@@ -34,6 +35,8 @@ interface CustomJWTPayload {
   port: number;
   tls: boolean;
   ca?: string;
+  cert?: string;
+  key?: string;
   url?: string;
   pbv?: number; // Endpoint binding marker; see PAT_BINDING_VERSION
 }
@@ -46,6 +49,8 @@ interface AuthenticatedUser {
   port: number;
   tls: boolean;
   ca?: string;
+  cert?: string;
+  key?: string;
   url?: string;
   credentialRef?: string;
 }
@@ -86,6 +91,16 @@ function sessionConnectionKey(sessionId: string, connectionId: string): string {
   return `${sessionId}:${connectionId}`;
 }
 
+/**
+ * Decode a base64 certificate field into the PEM text the TLS socket takes.
+ * NextAuth stringifies an absent credential, so the literal "undefined" has to
+ * count as absent too.
+ */
+function pemFromBase64(value?: string): string | undefined {
+  if (!value || value === "undefined") return undefined;
+  return Buffer.from(value, "base64").toString("utf8");
+}
+
 export async function newClient(
   credentials: {
     host?: string;
@@ -94,11 +109,32 @@ export async function newClient(
     username?: string;
     tls?: string;
     ca?: string;
+    cert?: string;
+    key?: string;
     url?: string;
   },
   id: string
 ): Promise<{ role: Role; client: FalkorDB }> {
   let connectionOptions: FalkorDBOptions;
+
+  // The credentials provider is the one connection entry point with no route
+  // schema in front of it — signIn() posts straight to the Auth.js callback — and
+  // every other connect path (reconnect from the Token DB, JWT fallback) comes
+  // through here too, so the mTLS rules are applied here for all of them. This
+  // runs before the material is persisted; without it a half-configured setup
+  // fails in the TLS handshake, far from the cause, and authorize() reports it as
+  // a generic "Connection failed".
+  const validation = authCredentials.safeParse(credentials);
+  if (!validation.success) {
+    throw new Error(
+      validation.error.issues.map((issue) => issue.message).join("; ")
+    );
+  }
+
+  const tlsEnabled = credentials.tls === "true";
+  const ca = pemFromBase64(credentials.ca);
+  const cert = pemFromBase64(validation.data.cert);
+  const key = pemFromBase64(validation.data.key);
 
   // If URL is provided, use it directly
   if (credentials.url) {
@@ -107,30 +143,28 @@ export async function newClient(
     };
   } else {
     // Use individual connection parameters
-    connectionOptions =
-      credentials.tls === "true"
-        ? {
-          socket: {
-            host: credentials.host ?? "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            tls: credentials.tls === "true",
-            ...(process.env.SKIP_SERVER_IDENTITY_CHECK === "true" ? { checkServerIdentity: () => undefined } : {}),
-            ca:
-              !credentials.ca || credentials.ca === "undefined"
-                ? undefined
-                : [Buffer.from(credentials.ca, "base64").toString("utf8")],
-          },
-          password: credentials.password ?? undefined,
-          username: credentials.username ?? undefined,
-        }
-        : {
-          socket: {
-            host: credentials.host || "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-          },
-          password: credentials.password ?? undefined,
-          username: credentials.username ?? undefined,
-        };
+    connectionOptions = tlsEnabled
+      ? {
+        socket: {
+          host: credentials.host ?? "localhost",
+          port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+          tls: true,
+          ...(process.env.SKIP_SERVER_IDENTITY_CHECK === "true" ? { checkServerIdentity: () => undefined } : {}),
+          ca: ca ? [ca] : undefined,
+          cert,
+          key,
+        },
+        password: credentials.password ?? undefined,
+        username: credentials.username ?? undefined,
+      }
+      : {
+        socket: {
+          host: credentials.host || "localhost",
+          port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+        },
+        password: credentials.password ?? undefined,
+        username: credentials.username ?? undefined,
+      };
   }
 
   const client = await FalkorDB.connect(connectionOptions);
@@ -288,6 +322,7 @@ export interface ConnectionInfo {
   port: number;
   tls: boolean;
   ca?: string;
+  cert?: string;
 }
 
 /**
@@ -304,6 +339,8 @@ export async function addSessionConnection(
     username?: string;
     tls?: string;
     ca?: string;
+    cert?: string;
+    key?: string;
   }
 ): Promise<ConnectionInfo> {
   const connId = uuidv4();
@@ -331,6 +368,8 @@ export async function addSessionConnection(
       kind: "session",
       tls: credentials.tls === "true",
       ca: credentials.ca,
+      cert: credentials.cert,
+      key: credentials.key,
       expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
     });
   } catch (storageError) {
@@ -351,6 +390,7 @@ export async function addSessionConnection(
     port: credentials.port ? parseInt(credentials.port, 10) : 6379,
     tls: credentials.tls === "true",
     ca: credentials.ca,
+    cert: credentials.cert,
   };
 }
 
@@ -371,6 +411,7 @@ export async function listSessionConnections(sessionId: string): Promise<Connect
       port: t.port,
       tls: t.tls ?? false,
       ca: t.ca || undefined,
+      cert: t.cert || undefined,
     }));
 }
 
@@ -473,6 +514,8 @@ async function getConnectionClient(
         password,
         tls: (tokenData.tls ?? false).toString(),
         ca: tokenData.ca || undefined,
+        cert: tokenData.cert || undefined,
+        key: tokenData.encrypted_key ? decrypt(tokenData.encrypted_key) : undefined,
       },
       key
     );
@@ -487,6 +530,7 @@ async function getConnectionClient(
         port: tokenData.port,
         tls: tokenData.tls ?? false,
         ca: tokenData.ca || undefined,
+        cert: tokenData.cert || undefined,
       },
     };
   }
@@ -516,6 +560,7 @@ async function getConnectionClient(
         port: tokenData.port,
         tls: tokenData.tls ?? false,
         ca: tokenData.ca || undefined,
+        cert: tokenData.cert || undefined,
       },
     };
   } catch (metaErr) {
@@ -612,6 +657,8 @@ function createUserFromJWTPayload(payload: CustomJWTPayload): AuthenticatedUser 
     port: payload.port,
     tls: payload.tls || false,
     ca: payload.ca,
+    cert: payload.cert,
+    key: payload.key,
     url: payload.url,
   };
 }
@@ -732,6 +779,8 @@ async function tryJWTAuthentication(): Promise<JWTAuthResult> {
             password,
             tls: payload.tls.toString(),
             ca: payload.ca || undefined,
+            cert: payload.cert || undefined,
+            key: payload.key || undefined,
           },
           payload.sub
         );
@@ -793,6 +842,8 @@ const authOptions: NextAuthConfig = {
         password: { label: "Password", type: "password" },
         tls: { label: "tls", type: "boolean" },
         ca: { label: "ca", type: "string" },
+        cert: { label: "cert", type: "string" },
+        key: { label: "key", type: "string" },
         url: { label: "url", type: "string" },
         preconfigured: { label: "preconfigured", type: "string" },
       },
@@ -809,6 +860,8 @@ const authOptions: NextAuthConfig = {
           username: (credentials.username as string) || undefined,
           tls: (credentials.tls as string) || undefined,
           ca: (credentials.ca as string) || undefined,
+          cert: (credentials.cert as string) || undefined,
+          key: (credentials.key as string) || undefined,
           url: (credentials.url as string) || undefined,
         };
 
@@ -830,7 +883,9 @@ const authOptions: NextAuthConfig = {
           if (!preconfigured) return null;
 
           // Discrete fields only, so the URL normalisation below is a no-op
-          // for this path by construction.
+          // for this path by construction. The environment carries no client
+          // certificate, so the ones the client posted are dropped with the
+          // rest rather than being paired with the operator's endpoint.
           creds = {
             host: preconfigured.host,
             port: preconfigured.port,
@@ -838,6 +893,8 @@ const authOptions: NextAuthConfig = {
             username: preconfigured.username,
             tls: preconfigured.tls,
             ca: preconfigured.ca,
+            cert: undefined,
+            key: undefined,
             url: undefined,
           };
         }
@@ -905,6 +962,8 @@ const authOptions: NextAuthConfig = {
               kind: 'session',
               tls: creds.tls === "true",
               ca: creds.url ? undefined : creds.ca,
+              cert: creds.url ? undefined : creds.cert,
+              key: creds.url ? undefined : creds.key,
               expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
             });
           } catch (storageError) {
@@ -930,6 +989,12 @@ const authOptions: NextAuthConfig = {
             username: creds.username || "default",
             tls: creds.tls === "true",
             ca: creds.url ? undefined : creds.ca,
+            // cert/key are deliberately NOT on the returned User. They are already
+            // persisted for this connection (the key encrypted) in the Token DB above
+            // and re-read on reconnect, so putting them on the session user would add
+            // no capability - only the risk that a later refactor lets a private key
+            // reach a JWT or the client. The jwt callback strips them today; not
+            // carrying them here means it does not have to.
             role,
           };
           return res;
@@ -1003,6 +1068,8 @@ const authOptions: NextAuthConfig = {
       delete token.picture;
       delete token.image;
       delete token.ca;          // CA certs are large; stored in Token DB
+      delete token.cert;      // client cert; stored in Token DB
+      delete token.key;       // client key is sensitive; stored in Token DB
       delete token.url;         // Connection URL; stored in Token DB
       delete token.credentialRef; // Legacy field replaced by Token DB
 
