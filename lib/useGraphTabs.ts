@@ -9,9 +9,14 @@ import {
     INITIAL_TAB_ID,
     parseStoredTabs,
     TAB_SCOPE_PREFIX,
+    resolveEntryTabs,
+    shareParams,
+    withLiveLayout,
     TABS_STORAGE_KEY,
     type GraphTab,
     type GraphTabMeta,
+    type LiveLayout,
+    type SharedTab,
     type TabsState,
 } from "./graphTabs";
 import type { Tab } from "./utils";
@@ -38,11 +43,19 @@ type Params<S> = {
      * and are read back from storage when it closes.
      */
     tutorialOpen: boolean;
-    /** Tab named by the URL on entry; wins over the stored active tab. */
+    /** Tab named by the URL on entry; wins over the stored active tab and over `initialShare`. */
     initialTabId: string;
+    /**
+     * Tab handed over by a share link on entry. Opened on top of the stored
+     * strip and made active, unless `initialTabId` names one of the user's own
+     * tabs — then the URL is the user's own address bar, not someone's link.
+     */
+    initialShare: SharedTab | null;
     graphName: string;
     query: string;
     view: Tab;
+    /** Each view's current layout and direction, for the address bar. */
+    liveLayout: LiveLayout;
     /** How many tabs the user allows at once; `addTab` is a no-op at the cap. */
     maxTabs: number;
     /**
@@ -83,9 +96,11 @@ export default function useGraphTabs<S>({
     connectionKey,
     tutorialOpen,
     initialTabId,
+    initialShare,
     graphName,
     query,
     view,
+    liveLayout,
     maxTabs,
     captureSession,
     captureMeta,
@@ -120,6 +135,7 @@ export default function useGraphTabs<S>({
     // state→URL sync overwrites the param as soon as the strip settles, so later
     // reads would see our own value.
     const initialTabIdRef = useRef(initialTabId);
+    const initialShareRef = useRef(initialShare);
 
     /** Live snapshots by tab id. Sessions hold graph objects — never persisted. */
     const sessionsRef = useRef(new Map<string, S>());
@@ -213,24 +229,26 @@ export default function useGraphTabs<S>({
         const reset = () => commitRestored({ tabs: [fresh], activeTabId: fresh.id });
 
         const stored = parseStoredTabs(raw);
-        if (!stored) {
-            reset();
-            return;
-        }
 
         const urlTabId = initialTabIdRef.current;
+        const shared = initialShareRef.current;
         // Spent here rather than at mount: this effect runs again when the
         // tutorial closes, and a tab named on entry must not win a second time
         // over the tab the user was actually on when the tutorial took over.
         initialTabIdRef.current = "";
-        const preferred = [urlTabId, stored.activeTabId].find(id => stored.tabs.some(t => t.id === id));
-        const activeTabId = preferred ?? stored.tabs[0].id;
+        initialShareRef.current = null;
 
-        commitRestored({ tabs: stored.tabs, activeTabId });
+        const next = resolveEntryTabs(stored, urlTabId, shared, fresh);
+        if (!next) {
+            reset();
+            return;
+        }
+
+        commitRestored(next);
 
         // Nothing to rebuild for a tab that never picked a graph — and
         // activating it would clear a graph auto-selected in the meantime.
-        const active = stored.tabs.find(t => t.id === activeTabId)!;
+        const active = next.tabs.find(t => t.id === next.activeTabId)!;
         if (active.graphName) onActivateRef.current(active, undefined);
     }, [prefixReady, canRestore, tutorialOpen, connectionKey, commitRestored]);
 
@@ -328,6 +346,16 @@ export default function useGraphTabs<S>({
         if (next) onActivateRef.current(next, sessionsRef.current.get(next.id));
     }, [withLive, prefixReady]);
 
+    /**
+     * Share params for the address bar, so a URL copied straight out of it
+     * opens the active tab for anyone.
+     */
+    const activeTab = tabs.find(t => t.id === state.activeTabId);
+    const activeShareParams = useMemo(
+        () => (activeTab ? shareParams(withLiveLayout(activeTab, liveLayout)) : {}),
+        [activeTab, liveLayout],
+    );
+
     return useMemo(() => ({
         tabs,
         activeTabId: state.activeTabId,
@@ -336,5 +364,6 @@ export default function useGraphTabs<S>({
         addTab,
         renameTab,
         closeTab,
-    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab]);
+        activeShareParams,
+    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab, activeShareParams]);
 }

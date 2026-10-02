@@ -29,14 +29,37 @@ beforeEach(() => {
     replaceStateCalls.length = 0;
 });
 
+const SHARE_CLEARED = { graph: null, query: null, view: null, layout: null, direction: null };
+
 test("buildGraphUrlParams puts the active tab on the URL", () => {
-    assert.deepEqual(buildGraphUrlParams({ tab: "abc-123" }), { tab: "abc-123" });
+    assert.deepEqual(buildGraphUrlParams({ tab: "abc-123" }), { tab: "abc-123", ...SHARE_CLEARED });
 });
 
 test("buildGraphUrlParams drops the param when there is no tab", () => {
     // The working context lives on the tab, so an empty id means nothing to
     // point at — the param is deleted rather than left blank.
-    assert.deepEqual(buildGraphUrlParams({ tab: "" }), { tab: null });
+    assert.deepEqual(buildGraphUrlParams({ tab: "" }), { tab: null, ...SHARE_CLEARED });
+});
+
+test("buildGraphUrlParams carries the active tab's share params next to its id", () => {
+    // So a URL copied straight out of the address bar opens for anyone.
+    assert.deepEqual(
+        buildGraphUrlParams({ tab: "abc", share: { graph: "movies", query: "MATCH (n) RETURN n", view: "Table", layout: "", direction: undefined } }),
+        { tab: "abc", graph: "movies", query: "MATCH (n) RETURN n", view: "Table", layout: null, direction: null },
+    );
+});
+
+test("syncing the graph route writes the active tab's share params", () => {
+    location.search = "?graph=old&query=stale";
+    syncRouteUrlParams("/graph", { tab: "abc", share: { graph: "movies", view: "Graph" } });
+    assert.deepEqual(replaceStateCalls, ["/graph?tab=abc&graph=movies&view=Graph"]);
+});
+
+test("syncing the graph route clears share params the active tab does not have", () => {
+    // A blank tab has nothing to share, so an opened link's params go away.
+    location.search = "?graph=movies&query=MATCH%20(n)%20RETURN%20n&view=Table&layout=tree&direction=lr";
+    syncRouteUrlParams("/graph", { tab: "abc" });
+    assert.deepEqual(replaceStateCalls, ["/graph?tab=abc"]);
 });
 
 test("setUrlParam adds a param to a bare URL", () => {
