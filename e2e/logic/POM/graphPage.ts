@@ -1952,6 +1952,46 @@ export default class GraphPage extends BasePage {
     };
   }
 
+  /** Geometry of the Create New Graph dialog, everything laid out inside it, and the viewport. */
+  async createGraphDialogLayout(): Promise<{
+    dialog: Box;
+    children: Box[];
+    viewport: { width: number; height: number };
+  }> {
+    const viewport = this.page.viewportSize();
+    if (!viewport) throw new Error("Headless page has no viewport");
+    const dialog = this.page.locator("#dialog");
+    const children: Box[] = [];
+    const boxes = await dialog.locator("button, input, p").all();
+    for (const box of boxes) {
+      if (!(await box.isVisible())) continue;
+      const rect = await box.boundingBox();
+      if (rect) children.push(rect);
+    }
+    return {
+      dialog: await GraphPage.boxOf(dialog, "Create New Graph dialog"),
+      children,
+      viewport,
+    };
+  }
+
+  /**
+   * The canvas toolbar's action buttons in render order, plus the row that holds
+   * them, so a test can check both the order and where the group sits.
+   */
+  async canvasToolbarActionLayout(): Promise<{ row: Box; actions: { id: string; box: Box }[] }> {
+    const group = this.page.getByTestId("elementCanvasToolbarActionGraph");
+    const actions: { id: string; box: Box }[] = [];
+    for (const button of await group.getByRole("button").all()) {
+      const rect = await button.boundingBox();
+      if (rect) actions.push({ id: (await button.getAttribute("data-testid")) ?? "", box: rect });
+    }
+    return {
+      row: await GraphPage.boxOf(group.locator("xpath=.."), "Canvas toolbar row"),
+      actions,
+    };
+  }
+
   /** Geometry of the maximized query editor and the viewport it has to fit into. */
   async maximizedEditorLayout(): Promise<{
     dialog: Box;
