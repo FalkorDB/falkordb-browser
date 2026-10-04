@@ -8,26 +8,27 @@ import * as monaco from "monaco-editor";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
+import useIsMobile from "@/lib/useIsMobile";
 
 if (typeof window !== 'undefined') {
     (window as Window & { MonacoEnvironment?: { getWorker: (_moduleId: unknown, label: string) => Worker } }).MonacoEnvironment = {
         getWorker(_moduleId: unknown, label: string) {
             switch (label) {
                 case 'json':
-                    return new Worker(new URL('monaco-editor/esm/vs/language/json/json.worker', import.meta.url));
+                    return new Worker(new URL('monaco-editor/language/json/json.worker', import.meta.url));
                 case 'css':
                 case 'scss':
                 case 'less':
-                    return new Worker(new URL('monaco-editor/esm/vs/language/css/css.worker', import.meta.url));
+                    return new Worker(new URL('monaco-editor/language/css/css.worker', import.meta.url));
                 case 'html':
                 case 'handlebars':
                 case 'razor':
-                    return new Worker(new URL('monaco-editor/esm/vs/language/html/html.worker', import.meta.url));
+                    return new Worker(new URL('monaco-editor/language/html/html.worker', import.meta.url));
                 case 'typescript':
                 case 'javascript':
-                    return new Worker(new URL('monaco-editor/esm/vs/language/typescript/ts.worker', import.meta.url));
+                    return new Worker(new URL('monaco-editor/language/typescript/ts.worker', import.meta.url));
                 default:
-                    return new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker', import.meta.url));
+                    return new Worker(new URL('monaco-editor/editor/editor.worker', import.meta.url));
             }
         },
     };
@@ -65,6 +66,8 @@ const completionProviderRegistry = new Map<string, ProviderEntry>();
 const modelConfigRegistry = new Map<string, LanguageConfig>();
 
 export const LINE_HEIGHT = 22;
+
+export const MOBILE_FONT_SIZE = 14;
 
 export const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -196,6 +199,7 @@ export default function EditorComponent({
 }: EditorComponentProps) {
     const { theme } = useTheme();
     const { background, currentTheme } = getTheme(theme);
+    const isMobile = useIsMobile();
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
     const monacoRef = useRef<Monaco | null>(null);
@@ -225,6 +229,9 @@ export default function EditorComponent({
 
     const mergedOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
         ...DEFAULT_MONACO_OPTIONS,
+        // A phone fits a third of a desktop line, so the query sets smaller to keep
+        // more than one keyword on screen at a time.
+        ...(isMobile && { fontSize: MOBILE_FONT_SIZE }),
         readOnly,
         ...options,
     };
@@ -414,7 +421,7 @@ export default function EditorComponent({
     // Update options when they change
     useEffect(() => {
         editorRef.current?.updateOptions(mergedOptions);
-    }, [readOnly, options]);
+    }, [readOnly, options, isMobile]);
 
     // Update theme when it changes (editorKey is included so that external state
     // changes – such as closing the query-history dialog – trigger a re-apply)

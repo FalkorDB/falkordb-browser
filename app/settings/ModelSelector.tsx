@@ -153,7 +153,7 @@ export default function ModelSelector({
                     <Search className="absolute left-5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         data-testid="modelSearch"
-                        className="pl-9 bg-muted/30 border-border focus:bg-background transition-colors"
+                        className="pl-9 bg-muted/30 border-border focus:bg-background transition-colors mobile:w-full"
                         value={search}
                         placeholder="Search models..."
                         onChange={(e) => setSearch(e.target.value)}

@@ -10,7 +10,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { cn, Node, Value } from "@/lib/utils";
 import { getNodeDisplayText } from "@falkordb/canvas";
+import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
+import HelpTip from "../components/ui/HelpTip";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
@@ -58,6 +60,9 @@ export default function CreateElementPanel(props: Props) {
     const [labelsHover, setLabelsHover] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [hover, setHover] = useState<string>("");
+    // There is no hover on touch, so the row's actions — and the explanation of why
+    // a complex value has none — would never appear.
+    const isMobile = useIsMobile();
     const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({});
     const [editable, setEditable] = useState<string>("");
     const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
@@ -578,17 +583,12 @@ export default function CreateElementPanel(props: Props) {
                                                         <X size={20} />
                                                     </Button>
                                                 </>
-                                                : hover === key &&
+                                                : (isMobile || hover === key) &&
                                                 <>
                                                     {isComplex ? (
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <Info size={20} />
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p>Complex values (arrays, objects) can only be added from Cypher queries</p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
+                                                        <HelpTip trigger={<Info size={20} />}>
+                                                            <p>Complex values (arrays, objects) can only be added from Cypher queries</p>
+                                                        </HelpTip>
                                                     ) : (
                                                         <Button
                                                             variant="button"

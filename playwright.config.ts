@@ -68,7 +68,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$|.*mobile\.spec\.ts$/,
     },
     {
       name: '[Admin] Firefox',
@@ -79,7 +79,7 @@ export default defineConfig({
       timeout: 40000,
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$|.*mobile\.spec\.ts$/,
     },
     {
       name: '[Read-Write] - Chromium',
@@ -89,7 +89,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readwrite/,
-      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$|.*mobile\.spec\.ts$/,
     },
     {
       name: '[Read-Write] - Firefox',
@@ -100,7 +100,7 @@ export default defineConfig({
       timeout: 40000,
       dependencies: ['setup'],
       grep: /@readwrite/,
-      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$|.*mobile\.spec\.ts$/,
     },
     {
       name: '[Read-Only] - Chromium',
@@ -110,7 +110,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readonly/,
-      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$|.*mobile\.spec\.ts$/,
     },
     {
       name: '[Read-Only] - Firefox',
@@ -121,7 +121,7 @@ export default defineConfig({
       timeout: 40000,
       dependencies: ['setup'],
       grep: /@readonly/,
-      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$|.*mobile\.spec\.ts$/,
     },
 
     // Sign-out tests (dedicated projects with isolated auth state).
@@ -156,6 +156,22 @@ export default defineConfig({
       dependencies: ['setup'],
       grep: /@readonly/,
       testMatch: /.*signOut\.spec\.ts$/,
+    },
+
+    // Mobile layout (< 1100px). A narrow viewport rather than a device preset:
+    // the layout is driven purely by width, and `isMobile` emulation adds
+    // meta-viewport scaling that makes assertions less predictable.
+    {
+      name: '[Admin: Mobile] Chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        hasTouch: true,
+        storageState: 'playwright/.auth/admin.json',
+      },
+      dependencies: ['setup'],
+      grep: /@admin/,
+      testMatch: /.*mobile\.spec\.ts$/,
     },
 
     // Settings tests (run separately)

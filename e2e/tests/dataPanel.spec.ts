@@ -405,7 +405,8 @@ test.describe("Data panel Tests", () => {
     const valueAttribute = await graph.getAttributeValue("id");
     await graph.setAttribute("id", "10", "integer");
     await graph.clickUnDoButtonInToast();
-    expect(await graph.getAttributeValue("id")).toBe(valueAttribute);
+    // Undo only queues the write; the panel is not repainted until it returns.
+    await expect.poll(() => graph.getAttributeValue("id")).toBe(valueAttribute);
     await apicalls.removeGraph(graphName);
   });
 
@@ -489,7 +490,8 @@ test.describe("Data panel Tests", () => {
     await graph.searchElementInCanvas("Alice");
     await graph.removeAttribute("name");
     await graph.clickUnDoButtonInToast();
-    expect(await graph.getContentDataPanelAttributesCount()).toBe(2);
+    // Undo only queues the write; the panel is not repainted until it returns.
+    await expect.poll(() => graph.getContentDataPanelAttributesCount()).toBe(2);
     await apicalls.removeGraph(graphName);
   });
 
@@ -576,6 +578,55 @@ test.describe("Data panel Tests", () => {
     await graph.clickRunQuery(false);
     const nodesCount = await graph.getNodesCount();
     expect(parseInt(nodesCount ?? "0", 10)).toBe(2);
+    await apicalls.removeGraph(graphName);
+  });
+
+  // The mobile sheets close one another because they all cover the same region.
+  // Desktop has the room to show them at once, so opening one leaves the rest.
+  test(`@readwrite Validate selecting a node keeps the chat and graph info open`, async () => {
+    const graphName = getRandomString("datapanel");
+    await apicalls.addGraph(graphName);
+    await apicalls.runQuery(
+      graphName,
+      'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})'
+    );
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+
+    const page = await browser.getPage();
+    await page.getByTestId("chatToggleButton").click();
+    await expect(page.getByTestId("chatPanel")).toBeVisible();
+    await expect(page.getByTestId("graphInfoPanel")).toBeVisible();
+
+    await graph.searchElementInCanvas("Bob");
+    expect(await graph.isVisibleDataPanel()).toBe(true);
+    await expect(page.getByTestId("chatPanel")).toBeVisible();
+    await expect(page.getByTestId("graphInfoPanel")).toBeVisible();
+
+    await apicalls.removeGraph(graphName);
+  });
+
+  // A phone has no hover, so there the pencil is always out and the value cell
+  // is left alone to scroll the row. Desktop keeps the shortcut: clicking the
+  // value is how most edits start.
+  test(`@readwrite Validate clicking an attribute value starts an edit`, async () => {
+    const graphName = getRandomString("datapanel");
+    await apicalls.addGraph(graphName);
+    await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"})');
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+    await graph.searchElementInCanvas("Alice");
+
+    await graph.clickDataPanelValueSetAttribute();
+    expect(await graph.isEditingAttribute()).toBe(true);
+
+    await graph.clickDataPanelSetAttributeCancel();
     await apicalls.removeGraph(graphName);
   });
 });

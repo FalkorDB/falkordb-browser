@@ -11,7 +11,7 @@ process.env.CSV_LOCAL_LOAD_URI_MODE = "file";
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csv-local-test-"));
 process.env.CSV_LOCAL_TEMP_DIR = tempRoot;
 
-const { LocalCsvStorage, getCsvTempBaseDir, openLocalCsvReadStream } = await import("./csv-storage-local.ts");
+const { LocalCsvStorage, getCsvTempBaseDir, getLocalLoadUriMode, openLocalCsvReadStream } = await import("./csv-storage-local.ts");
 
 const OWNER_A = "a".repeat(32);
 const OWNER_B = "b".repeat(32);
@@ -57,6 +57,20 @@ test("store rejects an invalid owner or key (path-traversal safe)", async () => 
     const storage = new LocalCsvStorage();
     await assert.rejects(() => storage.store("../evil", KEY_1, streamOf("x")), /Invalid CSV owner/);
     await assert.rejects(() => storage.store(OWNER_A, "../../etc/passwd", streamOf("x")), /Invalid CSV key/);
+});
+
+// An explicit mode must win over the Docker/HTTPS guess, and whitespace around
+// it is an operator's typo — not a request to fall back to guessing.
+test("getLocalLoadUriMode honours an explicit mode whatever its padding and case", () => {
+    try {
+        process.env.CSV_LOCAL_LOAD_URI_MODE = " File ";
+        assert.equal(getLocalLoadUriMode(), "file");
+        process.env.CSV_LOCAL_LOAD_URI_MODE = "\tHTTP\n";
+        assert.equal(getLocalLoadUriMode(), "http");
+    } finally {
+        // Back to the file mode the rest of this file is set up with.
+        process.env.CSV_LOCAL_LOAD_URI_MODE = "file";
+    }
 });
 
 test("store leaves no .part file behind on success", async () => {

@@ -46,6 +46,15 @@ export const CYPHER_KEYWORDS = [
   "DELETE",
   "REMOVE",
 
+  // Bulk loading (FalkorDB grammar extension)
+  "LOAD CSV WITH HEADERS",
+  "LOAD CSV",
+  "LOAD",
+  "CSV",
+  "HEADERS",
+  "FIELDTERMINATOR",
+  "FROM",
+
   // Pattern/path keywords
   "SHORTESTPATH",
   "ALLSHORTESTPATHS",
@@ -53,11 +62,17 @@ export const CYPHER_KEYWORDS = [
   // Schema / DDL (OpenCypher + FalkorDB grammar extensions)
   "CREATE CONSTRAINT ON",
   "DROP CONSTRAINT ON",
+  "CREATE FULLTEXT INDEX FOR",
+  "CREATE VECTOR INDEX FOR",
+  "DROP FULLTEXT INDEX FOR",
+  "DROP VECTOR INDEX FOR",
   "CREATE INDEX FOR",
   "CREATE INDEX ON",
   "DROP INDEX FOR",
   "DROP INDEX ON",
   "FULLTEXT",
+  "VECTOR",
+  "OPTIONS",
   "INDEX",
   "CONSTRAINT",
   "ASSERT",

@@ -186,6 +186,7 @@ jobs:
             --project="[Read-Write] - Chromium" \
             --project="[Read-Only] - Chromium" \
             --project="[Admin: Settings - Chromium]" \
+            --project="[Admin: Mobile] Chromium" \
             --shard=${{ matrix.shard }}/6 \
             --workers=2 \
             --reporter=dot,list
@@ -521,9 +522,9 @@ jobs:
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build local browser docker image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ./Dockerfile
@@ -539,9 +540,11 @@ jobs:
             falkordb/falkordb:v4.18.10
       - name: Start locally-built browser container
         run: |
+          # A random per-run secret: the entrypoint refuses to start on a
+          # well-known placeholder, and a literal here would be one.
           docker run -d --name falkordb-browser --network=host \
             -e NEXTAUTH_URL=http://localhost:3000/ \
-            -e NEXTAUTH_SECRET=SECRET \
+            -e NEXTAUTH_SECRET="$(openssl rand -hex 32)" \
             -e ENCRYPTION_KEY="$ENCRYPTION_KEY" \
             falkordb-browser:smoke
       - name: Wait for containers to be ready

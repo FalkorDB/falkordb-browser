@@ -10,6 +10,20 @@ import { getToken } from "next-auth/jwt";
 import { LRUCache } from "lru-cache";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import {
+  preconfiguredLoginCredentials,
+  readPreconfiguredConnection,
+  warnIfAutoConnectExposesCredentials,
+} from "@/lib/preconfiguredConnection";
+import {
+  BINDING_VERSION,
+  PAT_BINDING_VERSION,
+  isConnectionRecord,
+  isEndpointBound,
+  isUsableConnectionRecord,
+  parseConnectionUrl,
+  patPayloadStatus,
+} from "@/lib/connectionBinding";
+import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
   isRequestOriginTrusted,
@@ -20,6 +34,7 @@ import {
   isTokenActive,
   getPasswordFromTokenDB,
   storeEncryptedCredential,
+  getAuthSecret,
 } from "../tokenUtils";
 
 interface CustomJWTPayload {
@@ -32,6 +47,7 @@ interface CustomJWTPayload {
   tls: boolean;
   ca?: string;
   url?: string;
+  pbv?: number; // Endpoint binding marker; see PAT_BINDING_VERSION
 }
 
 interface AuthenticatedUser {
@@ -71,6 +87,9 @@ const connections = new LRUCache<string, FalkorDB>({
 });
 
 enableAutoNextAuthUrl();
+
+// The token routes import the PAT marker from here, alongside `newClient`.
+export { PAT_BINDING_VERSION };
 
 /**
  * Returns the map key for a session-scoped multi-connection entry.
@@ -281,7 +300,7 @@ export async function listSessionConnections(sessionId: string): Promise<Connect
   const storage = StorageFactory.getStorage();
   const tokens = await storage.fetchTokensByUserId(sessionId);
   return tokens
-    .filter(t => t.name.startsWith("connection:"))
+    .filter(isConnectionRecord)
     .map(t => ({
       id: t.token_id,
       username: t.username,
@@ -304,7 +323,7 @@ export async function removeSessionConnection(
   // Verify the token belongs to this session before deleting
   const storage = StorageFactory.getStorage();
   const tokenData = await storage.fetchTokenById(connId);
-  if (!tokenData || tokenData.user_id !== sessionId || !tokenData.name.startsWith("connection:")) {
+  if (!tokenData || tokenData.user_id !== sessionId || !isConnectionRecord(tokenData)) {
     return false;
   }
 
@@ -345,7 +364,7 @@ async function getConnectionClient(
     // Recreate from Token DB
     const storage = StorageFactory.getStorage();
     const tokenData = await storage.fetchTokenById(connId);
-    if (!tokenData || !tokenData.is_active || !tokenData.name.startsWith("connection:") || tokenData.user_id !== sessionId) {
+    if (!isUsableConnectionRecord(tokenData, sessionId)) {
       return null;
     }
 
@@ -384,27 +403,18 @@ async function getConnectionClient(
   }
 
   // Get metadata from Token DB for role/host/port.
-  // If the Token DB query fails or the entry is missing, we still have a
-  // healthy cached client — return it with minimal info rather than
-  // invalidating the session.
+  // A healthy socket says nothing about who is on the other end of it: the
+  // record is the only source of the connection's role, and a `Read-Write`
+  // fallback would hand every read-only connection write access for the
+  // length of a Token DB outage. Refuse instead — the caller turns this into
+  // SESSION_INVALID.
   try {
     const storage = StorageFactory.getStorage();
     const tokenData = await storage.fetchTokenById(connId);
-    if (!tokenData) {
-      // Entry missing but client is alive — use fallback metadata.
+    if (!isUsableConnectionRecord(tokenData, sessionId)) {
       // eslint-disable-next-line no-console
-      console.warn("Token DB entry not found for connId (non-fatal, using cached client):", connId);
-      return {
-        client,
-        connInfo: {
-          id: connId,
-          username: "",
-          role: "Read-Write" as Role,
-          host: "",
-          port: 0,
-          tls: false,
-        },
-      };
+      console.warn("No usable Token DB entry for connId:", connId);
+      return null;
     }
 
     return {
@@ -421,18 +431,8 @@ async function getConnectionClient(
     };
   } catch (metaErr) {
     // eslint-disable-next-line no-console
-    console.warn("Failed to fetch connection metadata (non-fatal, using cached client):", metaErr);
-    return {
-      client,
-      connInfo: {
-        id: connId,
-        username: "",
-        role: "Read-Write" as Role,
-        host: "",
-        port: 0,
-        tls: false,
-      },
-    };
+    console.warn("Failed to fetch connection metadata:", metaErr);
+    return null;
   }
 }
 
@@ -491,7 +491,7 @@ async function isJWTOnlyRequest(): Promise<boolean> {
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
   const { jwtVerify } = await import('jose');
-  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const authSecret = getAuthSecret();
   if (!authSecret) throw new Error('AUTH_SECRET or NEXTAUTH_SECRET must be set');
   const secret = new TextEncoder().encode(authSecret);
   const { payload } = await jwtVerify(token, secret);
@@ -499,11 +499,11 @@ async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
 }
 
 /**
- * Validates JWT payload structure
+ * Validates JWT payload structure. The rules, and why a pre-binding token is
+ * refused, live with `patPayloadStatus`.
  */
 function isValidJWTPayload(payload: unknown): payload is CustomJWTPayload {
-  const p = payload as Record<string, unknown>;
-  return Boolean(p.sub && p.host && p.port);
+  return patPayloadStatus(payload) === "valid";
 }
 
 /**
@@ -523,9 +523,32 @@ function createUserFromJWTPayload(payload: CustomJWTPayload): AuthenticatedUser 
 }
 
 /**
+ * The outcome of reading an `Authorization: Bearer` credential.
+ *
+ * `rejected` is kept apart from `absent` because the caller must not fall
+ * through to the cookie session on a refused token: the request would then run
+ * under whatever identity the browser happens to hold rather than the one it
+ * named, and a revoked access token would keep working for as long as its
+ * holder is signed in.
+ */
+type JWTAuthResult =
+  | { status: "authenticated"; client: FalkorDB; user: AuthenticatedUserWithPassword }
+  | { status: "rejected"; message?: string }
+  | { status: "absent" };
+
+const JWT_ABSENT: JWTAuthResult = { status: "absent" };
+const JWT_REJECTED: JWTAuthResult = { status: "rejected" };
+// Refused like any other, but "revoked" would send the holder looking for a
+// revocation that never happened; what they need to do is issue a new token.
+const JWT_PREDATES_BINDING: JWTAuthResult = {
+  status: "rejected",
+  message: "Access token predates endpoint binding; create a new token",
+};
+
+/**
  * Attempts JWT authentication and returns client and user if successful
  */
-async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: AuthenticatedUserWithPassword } | null> {
+async function tryJWTAuthentication(): Promise<JWTAuthResult> {
   // Try to get authorization header
   const authorizationHeader = await getAuthorizationHeader();
 
@@ -536,7 +559,10 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       const payload = await verifyJWTToken(token);
       // Validate JWT payload structure
       if (!isValidJWTPayload(payload)) {
-        return null;
+        // `getToken` accepts a session token from this same header, so one sent
+        // that way is a credential for the path below, not a refusal here.
+        if (isEndpointBound(payload as unknown as Record<string, unknown>)) return JWT_ABSENT;
+        return patPayloadStatus(payload) === "predates-binding" ? JWT_PREDATES_BINDING : JWT_REJECTED;
       }
 
       // Validate token is active in FalkorDB (not revoked)
@@ -557,7 +583,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
             console.warn("Failed to close revoked JWT connection", closeError);
           }
         }
-        return null;
+        return JWT_REJECTED;
       }
 
       // Resolve password server-side from Token DB (never from the JWT payload).
@@ -574,7 +600,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         }
         // eslint-disable-next-line no-console
         console.warn("Failed to resolve JWT credential from Token DB:", pwErr);
-        return null;
+        return JWT_REJECTED;
       }
 
       // Try to reuse existing connection (performance optimization)
@@ -591,7 +617,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
             ...createUserFromJWTPayload(payload),
             password,
           };
-          return { client, user };
+          return { status: "authenticated", client, user };
         } catch (pingError) {
           // Connection is dead, remove from pool and recreate
           // eslint-disable-next-line no-console
@@ -634,7 +660,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         // eslint-disable-next-line no-console
         console.error("Failed to create connection from Token DB:", connectionError);
 
-        return null;
+        return JWT_REJECTED;
       }
 
       // At this point, client is guaranteed to be defined (either reused or recreated)
@@ -643,21 +669,20 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         password,
       };
 
-      return { client, user };
+      return { status: "authenticated", client, user };
     } catch (error) {
       // Surface server misconfiguration errors instead of silently falling back
       if (error instanceof Error && (error.message.includes("AUTH_SECRET") || error.message.includes("NEXTAUTH_SECRET") || error.message.includes("ENCRYPTION_KEY"))) {
         throw error;
       }
-      // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
-      console.warn("JWT authentication failed, falling back to session:", error);
+      console.warn("JWT authentication failed:", error);
 
-      return null;
+      return JWT_REJECTED;
     }
   }
 
-  return null;
+  return JWT_ABSENT;
 }
 
 const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60; // 24 hours; keep in sync with session.maxAge below
@@ -682,6 +707,7 @@ const authOptions: NextAuthConfig = {
         tls: { label: "tls", type: "boolean" },
         ca: { label: "ca", type: "string" },
         url: { label: "url", type: "string" },
+        preconfigured: { label: "preconfigured", type: "string" },
       },
       async authorize(credentials) {
         if (!credentials) {
@@ -689,7 +715,7 @@ const authOptions: NextAuthConfig = {
         }
 
         // In next-auth v5, credential values are `unknown`. Cast to strings.
-        const creds = {
+        let creds = {
           host: (credentials.host as string) || undefined,
           port: (credentials.port as string) || undefined,
           password: (credentials.password as string) || undefined,
@@ -698,6 +724,71 @@ const authOptions: NextAuthConfig = {
           ca: (credentials.ca as string) || undefined,
           url: (credentials.url as string) || undefined,
         };
+
+        // The client may ask to log in with the operator's preconfigured
+        // connection, but it may not influence it: every field is replaced by
+        // the server-side value, so the password never crosses the wire.
+        if (credentials.preconfigured === "true") {
+          let preconfigured;
+          try {
+            preconfigured = preconfiguredLoginCredentials(process.env);
+            // A client can POST here without ever loading the login page, so
+            // the operator is warned from this path as well.
+            if (preconfigured) warnIfAutoConnectExposesCredentials(readPreconfiguredConnection(process.env));
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error("Invalid preconfigured connection environment:", err);
+            return null;
+          }
+
+          // Also null when FALKORDB_AUTO_CONNECT is false — the operator wants
+          // the password typed, so the server does not substitute it.
+          if (!preconfigured) return null;
+
+          // Discrete fields only, so the URL normalisation below is a no-op
+          // for this path by construction.
+          creds = {
+            host: preconfigured.host,
+            port: preconfigured.port,
+            password: preconfigured.password,
+            username: preconfigured.username,
+            tls: preconfigured.tls,
+            ca: preconfigured.ca,
+            url: undefined,
+          };
+        }
+
+        // A URL login carries the endpoint only inside `url`, and `newClient`
+        // ignores host/port/username entirely when a URL is present. Record
+        // what the URL actually connects to, so the connection is not filed
+        // under the localhost:6379 defaults below — that identity is hashed
+        // into the AAD binding encrypted browser values to a connection, so a
+        // shared one would let unrelated servers read each other's values.
+        // The URL wins outright rather than merging: keeping a host or port the
+        // client never used would describe a connection that does not exist,
+        // and would let two different URLs share one identity.
+        if (creds.url) {
+          const fromUrl = parseConnectionUrl(creds.url);
+          // A URL naming no host still connects — `unix:///run/redis.sock`
+          // reaches a real server — but leaves nothing to record it as, so it
+          // would be filed under the localhost:6379 defaults and share that
+          // identity, and hence its AAD binding, with every other such login.
+          // There is no honest record to write, so refuse the login instead.
+          // The same goes for a database other than 0 or query options, which
+          // the record cannot carry into a reconnect.
+          if (!fromUrl.host) {
+            // eslint-disable-next-line no-console
+            console.error(
+              "Rejected login: the connection URL is malformed, names no host, or selects a database other than 0 / carries query options"
+            );
+            return null;
+          }
+          creds.host = fromUrl.host;
+          creds.port = fromUrl.port;
+          creds.username = fromUrl.username;
+          creds.password = fromUrl.password;
+          creds.tls = fromUrl.tls ? "true" : "false";
+        }
 
         try {
           // Generate random UUID for this session and its first connection
@@ -789,8 +880,17 @@ const authOptions: NextAuthConfig = {
           username: user.username || "default",
           role: user.role,
           tls: user.tls,
+          bv: BINDING_VERSION,
         };
       }
+
+      // Tokens minted before the endpoint binding recorded the URL's real
+      // host/port cannot be trusted to identify a connection: a URL login was
+      // persisted as localhost:6379, so every such session would share one
+      // owner and could read the others' ciphertext. There is no way to repair
+      // them -- the URL was never stored on the token -- so retire them and
+      // make the user sign in again once.
+      if (token.bv !== BINDING_VERSION) return null;
 
       // ── Strip any accumulated bloat from old tokens ──
       // Remove fields that are no longer needed and inflate the cookie.
@@ -892,21 +992,35 @@ const authOptions: NextAuthConfig = {
       if (trigger === "update" && updateData) {
         if (updateData.activeConnectionId !== undefined) {
           const newConnId = updateData.activeConnectionId as string;
-          token.activeConnectionId = newConnId;
 
-          // Look up the connection details from Token DB
+          // The id and the host/port/username it resolves to are one value, not
+          // two: the client derives its connection-scoped storage prefix from
+          // those fields and pairs it with this id, and ciphertext is bound to
+          // the same triple server-side. Committing the id while the lookup
+          // fails would leave the session naming connection B with A's host,
+          // port and username — the client's "prefix and id agree" checks would
+          // then pass on a pairing that is actually crossed, and a save would
+          // file B-owned ciphertext under A's key. So switch both together or
+          // neither, and let an unresolvable record leave the token untouched;
+          // the client sees the session still naming the old connection and
+          // rolls its pin back.
           try {
             const storage = StorageFactory.getStorage();
             const tokenData = await storage.fetchTokenById(newConnId);
-            if (tokenData && tokenData.name.startsWith("connection:")) {
+            if (isUsableConnectionRecord(tokenData, token.id as string)) {
+              token.activeConnectionId = newConnId;
               token.host = tokenData.host;
               token.port = tokenData.port;
               token.username = tokenData.username || "default";
               token.role = tokenData.role;
               token.tls = tokenData.tls ?? false;
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn("JWT update: ignoring switch to a connection that is not usable for this session");
             }
           } catch (lookupErr) {
-            // Non-fatal: session.user will use stale values until next refresh
+            // Non-fatal: the token keeps naming the previous connection, which
+            // is the pairing its host/port/username still describe.
             // eslint-disable-next-line no-console
             console.warn("JWT update: failed to look up connection from Token DB:", lookupErr);
           }
@@ -950,7 +1064,7 @@ const authOptions: NextAuthConfig = {
         try {
           const storage = StorageFactory.getStorage();
           const allTokens = await storage.fetchTokensByUserId(id);
-          const connTokens = allTokens.filter(tk => tk.name.startsWith("connection:"));
+          const connTokens = allTokens.filter(isConnectionRecord);
           await Promise.all(connTokens.map(async (tk) => {
             const key = sessionConnectionKey(id, tk.token_id);
             const c = connections.get(key);
@@ -979,11 +1093,17 @@ export async function getSessionFromRequest(
   const token = await getToken({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     req: request as any,
-    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secret: getAuthSecret(),
     secureCookie: shouldUseSecureCookies(request),
   });
 
   if (!token?.sub) return null;
+
+  // The jwt callback retires pre-binding tokens, but it never sees this read.
+  // Such a token's host/port are the localhost defaults rather than the
+  // endpoint it actually reached, so the identity built below would be wrong
+  // for every URL login — and shared between all of them.
+  if (!isEndpointBound(token)) return null;
 
   return {
     user: {
@@ -1065,8 +1185,19 @@ export async function getClient(
 
   // Try JWT authentication first
   const jwtResult = await tryJWTAuthentication();
-  if (jwtResult) {
-    return jwtResult;
+  if (jwtResult.status === "authenticated") {
+    const { client, user } = jwtResult;
+    return { client, user };
+  }
+
+  // A token that was presented and refused ends the request here. Falling
+  // through would run it under the browser's cookie instead, which keeps a
+  // revoked or pre-binding token working and reports success for an identity
+  // the caller never asked for.
+  if (jwtResult.status === "rejected") {
+    return NextResponse.json({
+      message: jwtResult.message ?? "Invalid or revoked access token"
+    }, { status: 401, headers: getCorsHeaders(request) });
   }
 
   // If JWT-only is required and JWT failed, return 401 immediately
@@ -1101,7 +1232,7 @@ export async function getClient(
     try {
       const storage = StorageFactory.getStorage();
       const allTokens = await storage.fetchTokensByUserId(id);
-      const connTokens = allTokens.filter(t => t.name.startsWith("connection:"));
+      const connTokens = allTokens.filter(isConnectionRecord);
       if (connTokens.length > 0) {
         // Default: first entry from Token DB
         connId = connTokens[0].token_id;
@@ -1130,7 +1261,7 @@ export async function getClient(
       const jwt = await getToken({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         req: request as any,
-        secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+        secret: getAuthSecret(),
         secureCookie: shouldUseSecureCookies(request),
       });
       const credentialRef = jwt?.credentialRef as string | undefined;
@@ -1270,43 +1401,53 @@ export async function getClient(
   const connKey = sessionConnectionKey(id, connId);
   const cachedClient = connections.get(connKey);
   if (cachedClient) {
+    let healthy = false;
     try {
       const conn = await cachedClient.connection;
       await conn.ping();
-      // Cache hit + healthy → return without lock
-      const connUser: AuthenticatedUserWithPassword = {
-        id,
-        username: "",
-        role: "Read-Write" as Role,
-        host: "",
-        port: 0,
-        tls: false,
-        password: undefined,
-      };
-      try {
-        const storage = StorageFactory.getStorage();
-        const tokenData = await storage.fetchTokenById(connId);
-        if (tokenData) {
-          connUser.username = tokenData.username;
-          connUser.role = tokenData.role as Role;
-          connUser.host = tokenData.host;
-          connUser.port = tokenData.port;
-          connUser.tls = tokenData.tls ?? false;
-          if (tokenData.encrypted_password) {
-            const { decrypt } = await import("../encryption");
-            connUser.password = decrypt(tokenData.encrypted_password) || undefined;
-          }
-        }
-      } catch {
-        // Non-fatal: metadata lookup failed but connection works
-      }
-      return { client: cachedClient, user: connUser };
+      healthy = true;
     } catch {
       // Health check failed — fall through to locked recreation path.
       // Only remove from cache; do NOT close the client here because
       // another concurrent request may still hold a reference to it.
       // The underlying socket error handler or GC will clean it up.
       connections.delete(connKey);
+    }
+
+    if (healthy) {
+      // A live socket says nothing about who is on the other end of it. Without
+      // the Token DB record there is no role to enforce and no endpoint to
+      // identify the connection by, and a `Read-Write` default would hand every
+      // read-only connection write access for the length of the outage. Leave
+      // the client cached and fall through to the locked path, which resolves
+      // the record properly or refuses the request.
+      const tokenData = await StorageFactory.getStorage()
+        .fetchTokenById(connId)
+        .catch(() => null);
+      if (isUsableConnectionRecord(tokenData, id)) {
+        const connUser: AuthenticatedUserWithPassword = {
+          id,
+          username: tokenData.username,
+          role: tokenData.role as Role,
+          host: tokenData.host,
+          port: tokenData.port,
+          tls: tokenData.tls ?? false,
+          // Carried because callers mint PATs from this user, and a token
+          // without the CA cannot reconnect to a server behind a private one.
+          ca: tokenData.ca || undefined,
+          password: undefined,
+        };
+        if (tokenData.encrypted_password) {
+          try {
+            const { decrypt } = await import("../encryption");
+            connUser.password = decrypt(tokenData.encrypted_password) || undefined;
+          } catch {
+            // Non-fatal: the password is only needed to reconnect, and the
+            // cached client is already connected.
+          }
+        }
+        return { client: cachedClient, user: connUser };
+      }
     }
   }
 
@@ -1323,6 +1464,7 @@ export async function getClient(
         host: connResult.connInfo.host,
         port: connResult.connInfo.port,
         tls: connResult.connInfo.tls,
+        ca: connResult.connInfo.ca,
         password: undefined,
       };
       try {

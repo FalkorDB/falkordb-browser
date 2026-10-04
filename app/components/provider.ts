@@ -8,6 +8,7 @@ import type { SessionConnection } from "next-auth";
 import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
 import { DEFAULT_GRAPH_TABS, GraphTab, SchemaViewMeta } from "@/lib/useGraphTabs";
+import { DEFAULT_GRAPH_SORT_ORDER, type GraphSortOrder } from "@/lib/graphSortOrder";
 
 export type ChatApiKey = {
   id: string;
@@ -39,6 +40,8 @@ type BrowserSettingsContextType = {
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
       newMaxTabs: number;
       setNewMaxTabs: Dispatch<SetStateAction<number>>;
+      newGraphsSortOrder: GraphSortOrder;
+      setNewGraphsSortOrder: Dispatch<SetStateAction<GraphSortOrder>>;
       captionKeysSettings: {
         newCaptionsKeys: [string, boolean][];
         setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -96,6 +99,9 @@ type BrowserSettingsContextType = {
       /** Upper bound on open graph tabs, between 4 and 10. */
       maxTabs: number;
       setMaxTabs: Dispatch<SetStateAction<number>>;
+      /** Order the graph list and the Manage Graphs table are shown in. */
+      graphsSortOrder: GraphSortOrder;
+      setGraphsSortOrder: Dispatch<SetStateAction<GraphSortOrder>>;
       captionKeysSettings: {
         captionsKeys: [string, boolean][];
         setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -186,6 +192,12 @@ type GraphContextType = {
    * the initial query.
    */
   pendingAutoLoadRef: RefObject<string | null>;
+  /**
+   * Bumped when the graph is reset without its name changing (a share link's
+   * tab opening on the graph already shown), so /graph refetches its info and
+   * counts — that fetch is otherwise keyed on `graphName` alone.
+   */
+  graphInfoReload: number;
 };
 
 type HistoryQueryContextType = {
@@ -219,6 +231,17 @@ type PanelContextType = {
    */
   customizingLabel: CustomizingRef | null;
   setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>>;
+  /**
+   * Mobile only. The nav row rendered by `ProviderLayout` reserves a slot so a
+   * route can portal its own switcher (e.g. the /graph tab dropdown) beside the
+   * hamburger, keeping navigation to a single row. Null on desktop.
+   */
+  mobileNavSlot: HTMLDivElement | null;
+  /**
+   * Mobile only. Trailing slot in the same nav row for the active route's
+   * toolbar actions, so they do not cost a row of their own. Null on desktop.
+   */
+  mobileToolbarSlot: HTMLDivElement | null;
 };
 
 type QueryLoadingContextType = {
@@ -297,7 +320,20 @@ type ConnectionContextType = {
   // currently offloaded from memory.
   supportsOffload: boolean;
   offloadedGraphs: string[];
-  refreshOffloadedGraphs: () => Promise<void>;
+  // Pass the connection a graph list was read for when the probe is about to be
+  // merged into it, so the two can never describe different servers.
+  refreshOffloadedGraphs: (pinnedConnectionId?: string | null) => Promise<void>;
+  // Drops every stub that is not in a freshly confirmed graph list, so a graph
+  // deleted through the UI leaves the merged list at once instead of lingering
+  // until the next probe.
+  pruneOffloadedGraphs: (confirmed: string[]) => void;
+  // Carries a stub over to the graph's new name, so a renamed offloaded graph
+  // does not show up twice (once per name) until the next probe.
+  renameOffloadedGraph: (from: string, to: string) => void;
+  // Discards every graph-list refresh and stub probe already in flight. Callers
+  // that are applying a confirmed list (create/delete/rename) use it so a read
+  // taken before the mutation cannot land after it and undo it.
+  supersedeGraphRefreshes: () => void;
   // True when the enterprise module is loaded with LDAP servers configured. In
   // that case FalkorDB defers authentication and authorization to LDAP, so the
   // browser must not offer user/role management for this connection. `null`
@@ -307,6 +343,11 @@ type ConnectionContextType = {
   setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
   activeConnectionId: string | null;
   setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
+  // The connection the scoped-localStorage prefix currently points at. It is
+  // derived from the session, which lags `activeConnectionId` through a switch,
+  // so connection-scoped writes must wait for the two to agree. `null` also
+  // means "first load", where `activeConnectionId` has not been chosen yet.
+  prefixConnectionId: string | null;
   updateSession: (data: { activeConnectionId?: string | null }) => Promise<unknown>;
   // Mark a user connection switch as in-progress (blocks graph ops + supersedes
   // in-flight ones) and clear it once the switch settles. `beginConnectionSwitch`
@@ -369,6 +410,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewRefreshInterval: () => { },
         newMaxTabs: DEFAULT_GRAPH_TABS,
         setNewMaxTabs: () => { },
+        newGraphsSortOrder: DEFAULT_GRAPH_SORT_ORDER,
+        setNewGraphsSortOrder: () => { },
       },
       chatSettings: {
         newSecretKey: "",
@@ -411,6 +454,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setRefreshInterval: () => { },
         maxTabs: DEFAULT_GRAPH_TABS,
         setMaxTabs: () => { },
+        graphsSortOrder: DEFAULT_GRAPH_SORT_ORDER,
+        setGraphsSortOrder: () => { },
         captionKeysSettings: {
           captionsKeys: [],
           setCaptionsKeys: () => { },
@@ -492,6 +537,7 @@ export const GraphContext = createContext<GraphContextType>({
   selectedParam: "",
   setSelectedParam: () => { },
   pendingAutoLoadRef: { current: null },
+  graphInfoReload: 0,
 });
 
 type GraphInfoContextType = {
@@ -541,6 +587,8 @@ export const PanelContext = createContext<PanelContextType>({
   onInfoPanelResize: () => { },
   customizingLabel: null,
   setCustomizingLabel: () => { },
+  mobileNavSlot: null,
+  mobileToolbarSlot: null,
 });
 
 export const QueryLoadingContext = createContext<QueryLoadingContextType>({
@@ -600,11 +648,15 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   supportsOffload: false,
   offloadedGraphs: [],
   refreshOffloadedGraphs: async () => { },
+  pruneOffloadedGraphs: () => { },
+  renameOffloadedGraph: () => { },
+  supersedeGraphRefreshes: () => { },
   usesLdap: null,
   additionalConnections: [],
   setAdditionalConnections: () => { },
   activeConnectionId: null,
   setActiveConnectionId: () => { },
+  prefixConnectionId: null,
   updateSession: async () => { },
   beginConnectionSwitch: () => 0,
   endConnectionSwitch: () => { },
@@ -668,4 +720,25 @@ export const AiFixContext = createContext<AiFixContextType>({
   cancelConsent: () => { },
   dismissResult: () => { },
   insertCorrectedQuery: () => { },
+});
+
+type CsvLoadContextType = {
+  /** Whether `LOAD CSV FROM 'file://…'` can resolve on this deployment. */
+  fileUriSupported: boolean;
+  /** Whether the CSV upload flow is available to this user. */
+  uploadEnabled: boolean;
+  /** Open the Upload Data dialog on its Load CSV tab. */
+  openCsvUpload: () => void;
+  /** The dialog belongs to the graph page; callers elsewhere in the tree reach
+   *  it through the opener the page registers here. Returns an unregister fn. */
+  registerCsvUpload: (open: () => void) => () => void;
+};
+
+export const CsvLoadContext = createContext<CsvLoadContextType>({
+  // Assume `file://` works until the server says otherwise, so a failed or
+  // pending capability lookup never blocks a query that would have run.
+  fileUriSupported: true,
+  uploadEnabled: false,
+  openCsvUpload: () => { },
+  registerCsvUpload: () => () => { },
 });

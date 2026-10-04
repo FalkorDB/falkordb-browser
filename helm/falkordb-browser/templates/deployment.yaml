@@ -1,4 +1,5 @@
 {{ include "falkordb-browser.validateEncryptionKeySecret" . }}
+{{ include "falkordb-browser.validateNextauthSecret" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -53,8 +54,13 @@ spec:
         - name: NEXTAUTH_SECRET
           valueFrom:
             secretKeyRef:
+              {{- if .Values.nextauth.existingSecret.name }}
+              name: {{ .Values.nextauth.existingSecret.name | quote }}
+              key: {{ .Values.nextauth.existingSecret.key | quote }}
+              {{- else }}
               name: {{ include "falkordb-browser.fullname" . }}
               key: NEXTAUTH_SECRET
+              {{- end }}
         - name: ENCRYPTION_KEY
           valueFrom:
             secretKeyRef:
@@ -65,6 +71,17 @@ spec:
               name: {{ include "falkordb-browser.fullname" . }}
               key: ENCRYPTION_KEY
               {{- end }}
+        {{- if .Values.connection.enabled }}
+        {{- with (include "falkordb-browser.connectionSecretEnv" (dict "root" $ "name" "FALKORDB_CONNECTION_URL" "value" $.Values.connection.url "existingKey" $.Values.connection.existingSecret.urlKey)) }}
+        {{- . | nindent 8 }}
+        {{- end }}
+        {{- with (include "falkordb-browser.connectionSecretEnv" (dict "root" $ "name" "FALKORDB_PASSWORD" "value" $.Values.connection.password "existingKey" $.Values.connection.existingSecret.passwordKey)) }}
+        {{- . | nindent 8 }}
+        {{- end }}
+        {{- with (include "falkordb-browser.connectionSecretEnv" (dict "root" $ "name" "FALKORDB_CA" "value" $.Values.connection.ca "existingKey" $.Values.connection.existingSecret.caKey)) }}
+        {{- . | nindent 8 }}
+        {{- end }}
+        {{- end }}
         livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 12 }}
         readinessProbe:

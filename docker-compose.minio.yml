@@ -1,6 +1,10 @@
+# Dev-only MinIO stack. Images are pinned by digest so a rebuild months from now
+# reproduces this one. To refresh, look the tag up again and paste the new digest:
+#   docker buildx imagetools inspect <image>:<tag>
+# MinIO publishes to quay.io; its Docker Hub mirror no longer serves anonymously.
 services:
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     container_name: falkordb-browser-minio
     command: server /data --console-address ":9001"
     environment:
@@ -13,7 +17,7 @@ services:
       - minio-data:/data
 
   minio-tls:
-    image: caddy:2
+    image: caddy:2@sha256:13ba145cba2f3e28fa801994876e4c086d1b95d5aa2a520a734765ffb6b12017
     container_name: falkordb-browser-minio-tls
     depends_on:
       - minio
@@ -27,7 +31,7 @@ services:
       - minio-tls-config:/config
 
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     container_name: falkordb-browser-minio-init
     depends_on:
       - minio

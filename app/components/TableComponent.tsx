@@ -441,12 +441,13 @@ export default function TableComponent({
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
-            <div className="flex gap-4">
+            {/* The action buttons plus the search box are wider than a phone, and the ancestor clips rather than scrolls — wrap onto a second row rather than stacking one button per line. */}
+            <div className="flex flex-wrap gap-4 mobile:gap-2">
                 {children}
                 <Input
                     data-testid={`searchInput${label}`}
                     ref={searchRef}
-                    className={cn("grow", valueClassName)}
+                    className={cn("grow mobile:basis-full", valueClassName)}
                     value={search}
                     type="text"
                     placeholder={`Search for${entityName ? ` a ${entityName}` : ""}`}

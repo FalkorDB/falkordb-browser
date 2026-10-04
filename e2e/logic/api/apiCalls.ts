@@ -289,6 +289,33 @@ export default class ApiCalls {
     }
   }
 
+  /** Like `addGraphNodeLabel`, but hands back the status too, for asserting refusals. */
+  async addGraphNodeLabelWithStatus(
+    graph: string,
+    node: string,
+    data: Record<string, string>
+  ): Promise<{ status: number; body: any }> {
+    const result = await postRequest(
+      `${urls.api.graphUrl}${graph}/${node}/label`,
+      data
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
+  /** Like `deleteGraphNodeLabel`, but hands back the status too, for asserting refusals. */
+  async deleteGraphNodeLabelWithStatus(
+    graph: string,
+    node: string,
+    data: Record<string, string>
+  ): Promise<{ status: number; body: any }> {
+    const result = await deleteRequest(
+      `${urls.api.graphUrl}${graph}/${node}/label`,
+      undefined,
+      data
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
   async deleteGraphNode(
     graph: string,
     node: string,
@@ -306,6 +333,24 @@ export default class ApiCalls {
         `Failed to delete graph node. \n Error: ${(error as Error).message}`
       );
     }
+  }
+
+  /** POST /api/graph/:graph/:element — `element` is ignored by the route, any id works. */
+  async createGraphElement(
+    graph: string,
+    data: {
+      type: boolean;
+      label: string[];
+      attributes: [string, string][];
+      selectedNodes?: { id: number }[];
+    },
+    readOnly = false
+  ): Promise<{ status: number; body: any }> {
+    const result = await postRequest(
+      `${urls.api.graphUrl}${graph}/-1${readOnly ? "?readOnly=true" : ""}`,
+      data
+    );
+    return { status: result.status(), body: await result.json() };
   }
 
   async addGraphNodeAttribute(

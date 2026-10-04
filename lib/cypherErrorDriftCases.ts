@@ -198,6 +198,26 @@ export const DRIFT_CASES: DriftCase[] = [
     // Exactly one relationship type must be specified for each relation in a CREATE pattern.
     expectedMessage: /Exactly one relationship type must be specified/i,
   },
+  {
+    id: "csv-uri-not-string",
+    query: "LOAD CSV FROM 1 AS row RETURN row",
+    // URI to CSV must be a string
+    expectedMessage: /^URI to CSV must be a string$/i,
+  },
+  {
+    id: "csv-unsupported-uri",
+    query: "LOAD CSV FROM 'ftp://example.com/a.csv' AS row RETURN row",
+    // Unsupported URI
+    expectedMessage: /^Unsupported URI$/i,
+  },
+  {
+    id: "csv-open-failed",
+    // A relative file:// path stays inside the server's import folder, so this
+    // reaches the open attempt without touching the network.
+    query: "LOAD CSV FROM 'file://falkordb-browser-no-such-file.csv' AS row RETURN row",
+    // Error opening CSV URI: file://falkordb-browser-no-such-file.csv
+    expectedMessage: /^Error opening CSV URI:/i,
+  },
 ];
 
 // Catalog ids that are intentionally NOT covered by a runnable drift case, with the
@@ -214,4 +234,6 @@ export const NOT_DRIFT_TESTABLE: Record<string, string> = {
     "Requires exhausting the query memory limit — unsafe/non-deterministic in a shared smoke run.",
   "write-queue-full":
     "Requires saturating the server write queue under load — not reproducible by a single query.",
+  "csv-header-read-failed":
+    "Requires a source that opens but whose header row does not parse; the only single-query way there is an unreachable https:// host, which makes the outcome depend on the runner's DNS.",
 };

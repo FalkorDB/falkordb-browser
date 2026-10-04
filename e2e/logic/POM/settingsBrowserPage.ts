@@ -779,6 +779,30 @@ export default class SettingsBrowserPage extends BasePage {
     return this.getSliderValue(this.maxTabsSlider);
   }
 
+  private get graphsSortOrderSelect(): Locator {
+    return this.page.getByTestId("graphsSortOrder");
+  }
+
+  private graphsSortOrderOption(order: string): Locator {
+    return this.page.getByTestId(`graphsSortOrder${order}`);
+  }
+
+  async setGraphsSortOrder(order: string): Promise<void> {
+    await this.expandUserExperienceSection();
+    await interactWhenVisible(this.graphsSortOrderSelect, (el) => el.click(), "Graphs Order Select");
+    await interactWhenVisible(this.graphsSortOrderOption(order), (el) => el.click(), `Graphs Order ${order}`);
+    // Radix keeps the popper mounted through its close animation, and it
+    // swallows the next click on the page while it is still there.
+    await this.graphsSortOrderOption(order).waitFor({ state: "detached" });
+  }
+
+  /** The label shown on the select, e.g. "Newest First". */
+  async getGraphsSortOrder(): Promise<string> {
+    await this.expandUserExperienceSection();
+    await waitForElementToBeVisible(this.graphsSortOrderSelect);
+    return (await this.graphsSortOrderSelect.textContent() ?? "").trim();
+  }
+
   async setMaxItemsForSearchSlider(value: number): Promise<void> {
     await this.setSliderByStep(this.maxItemsForSearchSlider, value, 1);
   }

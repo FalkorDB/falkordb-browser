@@ -1,5 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
+import { quoteCypherIdentifier } from "@/lib/cypher";
 import {
   addGraphElementLabel,
   removeGraphElementLabel,
@@ -45,7 +46,8 @@ export async function DELETE(
       }
 
       const { label } = validation.data;
-      const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
+      // A label cannot travel as a parameter, so it is quoted instead.
+      const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${quoteCypherIdentifier(label)}`;
       const graph = client.selectGraph(graphId);
 
       await graph.query(query, { params: { id: elementId } });
@@ -104,11 +106,11 @@ export async function POST(
       }
 
       const { label } = validation.data;
-      const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
+      // A label cannot travel as a parameter, so it is quoted instead.
+      const query = `MATCH (n) WHERE ID(n) = $id SET n:${quoteCypherIdentifier(label)}`;
       const graph = client.selectGraph(graphId);
 
       await graph.query(query, { params: { id: elementId } });
-      
 
       return NextResponse.json(
         { message: "Label added successfully" },
