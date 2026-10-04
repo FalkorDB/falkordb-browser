@@ -76,6 +76,49 @@ type RateLimitConfig = {
     windowMs: number;
 };
 
+/**
+ * Reads a per-minute request budget from the environment. `0` disables the
+ * limit; anything unparsable falls back to the default rather than to "off".
+ */
+function readMaxRequests(raw: string | undefined, fallback: number): number {
+    const parsed = raw ? parseInt(raw, 10) : fallback;
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+const PRECONFIGURED_SIGN_IN_PATH = "/api/auth/callback/credentials";
+const DEFAULT_PRECONFIGURED_SIGN_IN_MAX_REQUESTS = 10;
+
+/**
+ * True for a credentials sign-in that asks for the operator's preconfigured
+ * connection. That sign-in needs no secret, yet each one opens a FalkorDB
+ * client and writes a Token DB row, so it gets a far smaller budget than the
+ * general API limit. Only this one small form body is read; upload routes
+ * never reach the body parse.
+ */
+async function isPreconfiguredSignIn(request: NextRequest): Promise<boolean> {
+    if (request.method !== "POST" || request.nextUrl.pathname !== PRECONFIGURED_SIGN_IN_PATH) return false;
+
+    try {
+        // Proxy buffers the body, so the route handler still reads its own copy.
+        const body = await request.clone().text();
+        if (request.headers.get("content-type")?.includes("application/json")) {
+            return (JSON.parse(body) as { preconfigured?: unknown } | null)?.preconfigured === "true";
+        }
+        return new URLSearchParams(body).get("preconfigured") === "true";
+    } catch {
+        // A body this cannot read is one Auth.js cannot read either, so it is
+        // not a preconfigured sign-in.
+        return false;
+    }
+}
+
+function tooManyRequests() {
+    return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": "60" } }
+    );
+}
+
 function getExtraConnectSrc(): string[] {
     const raw = process.env.CSP_CONNECT_SRC;
     if (!raw) return [];
@@ -100,23 +143,31 @@ function getExtraConnectSrc(): string[] {
         .filter((source): source is string => Boolean(source));
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // --- Rate limiting (API routes only) ---
-    // Set RATE_LIMIT_MAX_REQUESTS=0 to disable rate limiting entirely.
-    const parsedMaxRequests = process.env.RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) : 200;
-    const maxRequests = Number.isFinite(parsedMaxRequests) ? parsedMaxRequests : 200;
-    const config = maxRequests !== 0 ? { maxRequests, windowMs: 60_000 } : null;
+    // Set RATE_LIMIT_MAX_REQUESTS=0 to disable the general limit.
+    const maxRequests = readMaxRequests(process.env.RATE_LIMIT_MAX_REQUESTS, 200);
+    const config: RateLimitConfig | null = maxRequests !== 0 ? { maxRequests, windowMs: 60_000 } : null;
     if (config) {
         const ip = getClientIP(request);
         const key = `${ip}:${pathname.split("/").slice(0, 4).join("/")}`;
 
         if (isRateLimited(key, config.maxRequests, config.windowMs)) {
-            return NextResponse.json(
-                { error: "Too many requests. Please try again later." },
-                { status: 429, headers: { "Retry-After": "60" } }
-            );
+            return tooManyRequests();
+        }
+    }
+
+    // A separate budget, so it holds even where the general limit is raised or
+    // disabled. Set PRECONFIGURED_SIGN_IN_MAX_REQUESTS=0 to disable it.
+    const preconfiguredMax = readMaxRequests(
+        process.env.PRECONFIGURED_SIGN_IN_MAX_REQUESTS,
+        DEFAULT_PRECONFIGURED_SIGN_IN_MAX_REQUESTS
+    );
+    if (preconfiguredMax !== 0 && await isPreconfiguredSignIn(request)) {
+        if (isRateLimited(`${getClientIP(request)}:preconfigured-sign-in`, preconfiguredMax, 60_000)) {
+            return tooManyRequests();
         }
     }
 

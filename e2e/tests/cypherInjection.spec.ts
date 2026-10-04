@@ -12,10 +12,23 @@ import urls from "../config/urls.json";
  * data rather than executing — the sentinel nodes are the canary.
  */
 
-// Closes the label/type position and appends a destructive clause.
-const HOSTILE_LABEL = "Injected DETACH DELETE n //";
-// Closes the property map as well, for the `{key: value}` position.
-const HOSTILE_KEY = "k} ) DETACH DELETE n //";
+// Each case pairs a label/relationship type with a property key. `label`
+// closes the label/type position and appends a destructive clause; `key`
+// closes the `{key: value}` property map as well. The backtick case targets
+// the one character quoting has to escape: an unescaped backtick would end the
+// quoted span and let the rest run as Cypher.
+const HOSTILE_IDENTIFIERS = [
+  {
+    variant: "",
+    label: "Injected DETACH DELETE n //",
+    key: "k} ) DETACH DELETE n //",
+  },
+  {
+    variant: " (backtick)",
+    label: "x` DETACH DELETE n //",
+    key: "x`: 0} ) DETACH DELETE n //",
+  },
+];
 const SENTINELS = 'CREATE (:Victim {name: "a"}), (:Victim {name: "b"})';
 
 test.describe("Cypher identifier escaping", () => {
@@ -39,95 +52,99 @@ test.describe("Cypher identifier escaping", () => {
     return Number(response.data[0].c);
   };
 
-  test(`@readwrite Validate that a hostile node label added via API is stored literally`, async () => {
-    const graphName = getRandomString("injection");
-    await apiCall.addGraph(graphName);
-    await apiCall.runQuery(graphName, SENTINELS);
+  for (const { variant, label, key } of HOSTILE_IDENTIFIERS) {
+    test(`@readwrite Validate that a hostile node label added via API is stored literally${variant}`, async () => {
+      const graphName = getRandomString("injection");
+      await apiCall.addGraph(graphName);
+      await apiCall.runQuery(graphName, SENTINELS);
 
-    await apiCall.addGraphNodeLabel(graphName, "0", { label: HOSTILE_LABEL });
+      await apiCall.addGraphNodeLabel(graphName, "0", { label });
 
-    expect(await countVictims(graphName)).toBe(2);
-    const response = await apiCall.runQuery(
-      graphName,
-      "MATCH (n) WHERE ID(n) = 0 RETURN n"
-    );
-    expect(response.data[0].n.labels).toContain(HOSTILE_LABEL);
+      expect(await countVictims(graphName)).toBe(2);
+      const response = await apiCall.runQuery(
+        graphName,
+        "MATCH (n) WHERE ID(n) = 0 RETURN n"
+      );
+      expect(response.data[0].n.labels).toContain(label);
 
-    await apiCall.removeGraph(graphName);
-  });
-
-  test(`@readwrite Validate that a hostile node label removed via API is not executed`, async () => {
-    const graphName = getRandomString("injection");
-    await apiCall.addGraph(graphName);
-    await apiCall.runQuery(graphName, SENTINELS);
-    await apiCall.addGraphNodeLabel(graphName, "0", { label: HOSTILE_LABEL });
-
-    // Without this, a pair of no-op API calls would leave the label absent and
-    // the sentinels intact, and the assertions below would pass vacuously.
-    const beforeRemoval = await apiCall.runQuery(
-      graphName,
-      "MATCH (n) WHERE ID(n) = 0 RETURN n"
-    );
-    expect(beforeRemoval.data[0].n.labels).toContain(HOSTILE_LABEL);
-
-    await apiCall.deleteGraphNodeLabel(graphName, "0", { label: HOSTILE_LABEL });
-
-    expect(await countVictims(graphName)).toBe(2);
-    const response = await apiCall.runQuery(
-      graphName,
-      "MATCH (n) WHERE ID(n) = 0 RETURN n"
-    );
-    expect(response.data[0].n.labels).not.toContain(HOSTILE_LABEL);
-
-    await apiCall.removeGraph(graphName);
-  });
-
-  test(`@readwrite Validate that a hostile label and attribute key on node creation are stored literally`, async () => {
-    const graphName = getRandomString("injection");
-    await apiCall.addGraph(graphName);
-    await apiCall.runQuery(graphName, SENTINELS);
-
-    const created = await apiCall.createGraphElement(graphName, {
-      type: true,
-      label: [HOSTILE_LABEL],
-      attributes: [[HOSTILE_KEY, "payload"]],
+      await apiCall.removeGraph(graphName);
     });
 
-    expect(created.status).toBe(200);
-    expect(await countVictims(graphName)).toBe(2);
-    const response = await apiCall.runQuery(
-      graphName,
-      `MATCH (n:\`${HOSTILE_LABEL}\`) RETURN n`
-    );
-    expect(response.data).toHaveLength(1);
-    expect(response.data[0].n.properties[HOSTILE_KEY]).toBe("payload");
+    test(`@readwrite Validate that a hostile node label removed via API is not executed${variant}`, async () => {
+      const graphName = getRandomString("injection");
+      await apiCall.addGraph(graphName);
+      await apiCall.runQuery(graphName, SENTINELS);
+      await apiCall.addGraphNodeLabel(graphName, "0", { label });
 
-    await apiCall.removeGraph(graphName);
-  });
+      // Without this, a pair of no-op API calls would leave the label absent and
+      // the sentinels intact, and the assertions below would pass vacuously.
+      const beforeRemoval = await apiCall.runQuery(
+        graphName,
+        "MATCH (n) WHERE ID(n) = 0 RETURN n"
+      );
+      expect(beforeRemoval.data[0].n.labels).toContain(label);
 
-  test(`@readwrite Validate that a hostile relationship type on edge creation is stored literally`, async () => {
-    const graphName = getRandomString("injection");
-    await apiCall.addGraph(graphName);
-    await apiCall.runQuery(graphName, SENTINELS);
+      await apiCall.deleteGraphNodeLabel(graphName, "0", { label });
 
-    const created = await apiCall.createGraphElement(graphName, {
-      type: false,
-      label: [HOSTILE_LABEL],
-      attributes: [[HOSTILE_KEY, "payload"]],
-      selectedNodes: [{ id: 0 }, { id: 1 }],
+      expect(await countVictims(graphName)).toBe(2);
+      const response = await apiCall.runQuery(
+        graphName,
+        "MATCH (n) WHERE ID(n) = 0 RETURN n"
+      );
+      expect(response.data[0].n.labels).not.toContain(label);
+
+      await apiCall.removeGraph(graphName);
     });
 
-    expect(created.status).toBe(200);
-    expect(await countVictims(graphName)).toBe(2);
-    const response = await apiCall.runQuery(
-      graphName,
-      `MATCH ()-[e:\`${HOSTILE_LABEL}\`]->() RETURN e`
-    );
-    expect(response.data).toHaveLength(1);
-    expect(response.data[0].e.properties[HOSTILE_KEY]).toBe("payload");
+    test(`@readwrite Validate that a hostile label and attribute key on node creation are stored literally${variant}`, async () => {
+      const graphName = getRandomString("injection");
+      await apiCall.addGraph(graphName);
+      await apiCall.runQuery(graphName, SENTINELS);
 
-    await apiCall.removeGraph(graphName);
-  });
+      const created = await apiCall.createGraphElement(graphName, {
+        type: true,
+        label: [label],
+        attributes: [[key, "payload"]],
+      });
+
+      expect(created.status).toBe(200);
+      expect(await countVictims(graphName)).toBe(2);
+      const response = await apiCall.runQuery(
+        graphName,
+        "MATCH (n) WHERE NOT n:Victim RETURN n"
+      );
+      expect(response.data).toHaveLength(1);
+      expect(response.data[0].n.labels).toContain(label);
+      expect(response.data[0].n.properties[key]).toBe("payload");
+
+      await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite Validate that a hostile relationship type on edge creation is stored literally${variant}`, async () => {
+      const graphName = getRandomString("injection");
+      await apiCall.addGraph(graphName);
+      await apiCall.runQuery(graphName, SENTINELS);
+
+      const created = await apiCall.createGraphElement(graphName, {
+        type: false,
+        label: [label],
+        attributes: [[key, "payload"]],
+        selectedNodes: [{ id: 0 }, { id: 1 }],
+      });
+
+      expect(created.status).toBe(200);
+      expect(await countVictims(graphName)).toBe(2);
+      const response = await apiCall.runQuery(
+        graphName,
+        "MATCH ()-[e]->() RETURN type(e) AS t, e"
+      );
+      expect(response.data).toHaveLength(1);
+      expect(response.data[0].t).toBe(label);
+      expect(response.data[0].e.properties[key]).toBe("payload");
+
+      await apiCall.removeGraph(graphName);
+    });
+  }
 
   test(`@readwrite Validate that an attribute value is passed as a parameter and never parsed`, async () => {
     const graphName = getRandomString("injection");

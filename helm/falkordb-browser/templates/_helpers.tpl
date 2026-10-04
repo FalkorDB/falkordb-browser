@@ -157,6 +157,42 @@ allowed to keep it across an upgrade.
 {{- end }}
 
 {{/*
+Validate existing Secret based NEXTAUTH_SECRET configuration.
+When the existing Secret is visible to lookup, its value goes through the same
+placeholder check as env.nextauthSecret. Rendering without cluster access
+(helm template, Argo CD) skips that check; the reference itself still renders.
+*/}}
+{{- define "falkordb-browser.validateNextauthSecret" -}}
+{{- $provided := .Values.env.nextauthSecret | default "" -}}
+{{- $existingSecretName := .Values.nextauth.existingSecret.name | default "" -}}
+{{- $rawExistingSecretKey := .Values.nextauth.existingSecret.key -}}
+{{- $chartSecretName := include "falkordb-browser.fullname" . -}}
+{{- if and $provided $existingSecretName -}}
+{{- fail "set either env.nextauthSecret or nextauth.existingSecret.name, not both" -}}
+{{- end -}}
+{{- if and $existingSecretName (not $rawExistingSecretKey) -}}
+{{- fail "nextauth.existingSecret.key is required when nextauth.existingSecret.name is set" -}}
+{{- end -}}
+{{- if and $existingSecretName (eq $existingSecretName $chartSecretName) -}}
+{{- fail "nextauth.existingSecret.name must reference a Secret not managed by this chart" -}}
+{{- end -}}
+{{- if $existingSecretName -}}
+{{- $existingSecret := lookup "v1" "Secret" .Release.Namespace $existingSecretName -}}
+{{- if $existingSecret -}}
+{{- $existingSecretData := $existingSecret.data | default dict -}}
+{{- if not (hasKey $existingSecretData $rawExistingSecretKey) -}}
+{{- fail (printf "existing Secret %s must contain key %s" $existingSecretName $rawExistingSecretKey) -}}
+{{- end -}}
+{{- $existingValue := index $existingSecretData $rawExistingSecretKey | b64dec -}}
+{{- $wellKnown := splitList "," (include "falkordb-browser.wellKnownSecrets" .) -}}
+{{- if or (not $existingValue) (has $existingValue $wellKnown) -}}
+{{- fail (printf "existing Secret %s key %s is empty or a well-known placeholder; set it to a random value (openssl rand -base64 32)" $existingSecretName $rawExistingSecretKey) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Validate existing Secret based ENCRYPTION_KEY configuration.
 */}}
 {{- define "falkordb-browser.validateEncryptionKeySecret" -}}

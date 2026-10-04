@@ -147,6 +147,9 @@ Notes:
 - **Security:** with `FALKORDB_AUTO_CONNECT=true`, anyone who can reach the
   browser reaches the database with these credentials. Enable it only where the
   browser itself is access-controlled, and prefer a read-only FalkorDB user.
+  The server logs a warning on first use when auto-connect is on with a
+  password, and limits these sign-ins to `PRECONFIGURED_SIGN_IN_MAX_REQUESTS`
+  per minute per client IP (default `10`, `0` disables).
 
 The Helm chart exposes the same settings under `connection.*` — see
 [Deploy to Kubernetes with Helm](#deploy-to-kubernetes-with-helm).

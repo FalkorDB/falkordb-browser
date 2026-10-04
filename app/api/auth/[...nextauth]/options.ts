@@ -9,8 +9,19 @@ import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
 import { LRUCache } from "lru-cache";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
-import type { TokenData } from "@/lib/token-storage/ITokenStorage";
-import { preconfiguredLoginCredentials } from "@/lib/preconfiguredConnection";
+import {
+  preconfiguredLoginCredentials,
+  readPreconfiguredConnection,
+  warnIfAutoConnectExposesCredentials,
+} from "@/lib/preconfiguredConnection";
+import {
+  BINDING_VERSION,
+  PAT_BINDING_VERSION,
+  isEndpointBound,
+  isUsableConnectionRecord,
+  parseConnectionUrl,
+  patPayloadStatus,
+} from "@/lib/connectionBinding";
 import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
@@ -75,6 +86,9 @@ const connections = new LRUCache<string, FalkorDB>({
 });
 
 enableAutoNextAuthUrl();
+
+// The token routes import the PAT marker from here, alongside `newClient`.
+export { PAT_BINDING_VERSION };
 
 /**
  * Returns the map key for a session-scoped multi-connection entry.
@@ -186,37 +200,6 @@ export function generateTimeUUID() {
 }
 
 /**
- * Marks tokens whose host/port were resolved from the connection URL rather
- * than defaulted. Bump this whenever a change makes older tokens unable to
- * identify their own connection; the jwt callback retires anything older.
- */
-const BINDING_VERSION = 2;
-
-/**
- * The same marker for personal access tokens, under a claim of its own.
- *
- * It cannot share `bv`: `getToken` falls back to reading an `Authorization:
- * Bearer` header as a session token, and `getSessionFromRequest` admits anything
- * `isEndpointBound` accepts without consulting `isTokenActive`. A PAT carrying
- * `bv` would therefore authenticate on that path after it had been revoked.
- */
-export const PAT_BINDING_VERSION = 1;
-
-/**
- * True when a JWT carries the current endpoint binding.
- *
- * The `jwt` callback retires older tokens, but that only runs for callers that
- * go through NextAuth. Anything reading a token directly with `getToken` sees
- * the raw payload, pre-binding tokens included, so it has to ask here before
- * trusting `host`/`port`/`username` to identify a connection.
- */
-export function isEndpointBound(
-  token: Record<string, unknown> | null | undefined
-): boolean {
-  return token?.bv === BINDING_VERSION;
-}
-
-/**
  * Generates a consistent user ID based on credentials
  * This ensures the same user gets the same ID across multiple logins
  * Format: SHA-256 hash of "username@host:port"
@@ -228,52 +211,6 @@ export function generateConsistentUserId(
 ): string {
   const identifier = `${username || 'default'}@${host}:${port}`;
   return crypto.createHash('sha256').update(identifier).digest('hex');
-}
-
-/**
- * Pulls the connection parameters out of a `falkor[s]://` connection string.
- *
- * URL logins send only `url`, so without this every one of them was recorded as
- * `default@localhost:6379`. That identity is what `generateConsistentUserId`
- * hashes into the AAD that binds encrypted browser values to a connection, so
- * two unrelated servers reached by URL would have shared one binding and could
- * decrypt each other's values.
- *
- * The scheme and password come out too: the connection record outlives the URL
- * (which is deliberately never stored), and a record that kept the discrete
- * fields' empty `tls`/`password` would describe a plaintext, unauthenticated
- * connection that the user never asked for.
- *
- * Returns an empty object when the string does not parse, or names no host at
- * all (`unix://`, or a `redis://` with an empty authority); the caller refuses
- * the login rather than recording it under the defaults.
- */
-export function parseConnectionUrl(url: string): {
-  host?: string;
-  port?: string;
-  username?: string;
-  password?: string;
-  tls?: boolean;
-} {
-  try {
-    const parsed = new URL(url);
-    if (!parsed.hostname) return {};
-    return {
-      // `URL` keeps the brackets around an IPv6 literal, but they are URL
-      // syntax rather than part of the address: node-redis strips them before
-      // handing the host to `net.connect` (same expression), so a record
-      // holding `[::1]` would be recreated as a hostname that never resolves,
-      // and would hash into a different identity than the very same server
-      // reached through the discrete fields.
-      host: parsed.hostname.replace(/^\[([0-9a-f:]+)\]$/i, "$1"),
-      port: parsed.port || undefined,
-      username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
-      password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
-      tls: parsed.protocol === "falkors:" || parsed.protocol === "rediss:",
-    };
-  } catch {
-    return {};
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -396,33 +333,6 @@ export async function removeSessionConnection(
     try { await client.close(); } catch { /* ignore */ }
   }
   return storage.deleteToken(connId);
-}
-
-/**
- * True while the record still authorises this session to use the connection.
- *
- * A cached socket outlives its record: revoking a connection flips `is_active`
- * but cannot reach into the pool, so every path that hands back a pooled client
- * has to ask the record again rather than treat "the ping succeeded" as proof.
- *
- * Expiry is checked here too. Connection records are always written with a
- * finite `expires_at` (the session's max age), and `fetchTokenById` — unlike
- * `fetchTokensByUserId` — applies no filter of its own, so without this clause
- * an expired connection disappears from the connection list while still
- * serving requests.
- */
-function isUsableConnectionRecord(
-  tokenData: TokenData | null | undefined,
-  sessionId: string
-): tokenData is TokenData {
-  return (
-    !!tokenData &&
-    tokenData.is_active &&
-    (tokenData.expires_at === -1 ||
-      tokenData.expires_at > Math.floor(Date.now() / 1000)) &&
-    tokenData.name.startsWith("connection:") &&
-    tokenData.user_id === sessionId
-  );
 }
 
 /**
@@ -588,16 +498,11 @@ async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
 }
 
 /**
- * Validates JWT payload structure
+ * Validates JWT payload structure. The rules, and why a pre-binding token is
+ * refused, live with `patPayloadStatus`.
  */
 function isValidJWTPayload(payload: unknown): payload is CustomJWTPayload {
-  const p = payload as Record<string, unknown>;
-  // `host`/`port` are the connection's identity here — they pick the server to
-  // talk to and seed the owner that ciphertext is bound to. A token minted
-  // before those were resolved from the connection URL carries the localhost
-  // defaults instead, which every such token shares. Refuse it: the holder must
-  // issue a new one rather than act under an identity that is not theirs alone.
-  return Boolean(p.sub && p.host && p.port) && p.pbv === PAT_BINDING_VERSION;
+  return patPayloadStatus(payload) === "valid";
 }
 
 /**
@@ -627,11 +532,17 @@ function createUserFromJWTPayload(payload: CustomJWTPayload): AuthenticatedUser 
  */
 type JWTAuthResult =
   | { status: "authenticated"; client: FalkorDB; user: AuthenticatedUserWithPassword }
-  | { status: "rejected" }
+  | { status: "rejected"; message?: string }
   | { status: "absent" };
 
 const JWT_ABSENT: JWTAuthResult = { status: "absent" };
 const JWT_REJECTED: JWTAuthResult = { status: "rejected" };
+// Refused like any other, but "revoked" would send the holder looking for a
+// revocation that never happened; what they need to do is issue a new token.
+const JWT_PREDATES_BINDING: JWTAuthResult = {
+  status: "rejected",
+  message: "Access token predates endpoint binding; create a new token",
+};
 
 /**
  * Attempts JWT authentication and returns client and user if successful
@@ -649,7 +560,8 @@ async function tryJWTAuthentication(): Promise<JWTAuthResult> {
       if (!isValidJWTPayload(payload)) {
         // `getToken` accepts a session token from this same header, so one sent
         // that way is a credential for the path below, not a refusal here.
-        return isEndpointBound(payload as unknown as Record<string, unknown>) ? JWT_ABSENT : JWT_REJECTED;
+        if (isEndpointBound(payload as unknown as Record<string, unknown>)) return JWT_ABSENT;
+        return patPayloadStatus(payload) === "predates-binding" ? JWT_PREDATES_BINDING : JWT_REJECTED;
       }
 
       // Validate token is active in FalkorDB (not revoked)
@@ -819,6 +731,9 @@ const authOptions: NextAuthConfig = {
           let preconfigured;
           try {
             preconfigured = preconfiguredLoginCredentials(process.env);
+            // A client can POST here without ever loading the login page, so
+            // the operator is warned from this path as well.
+            if (preconfigured) warnIfAutoConnectExposesCredentials(readPreconfiguredConnection(process.env));
           } catch (err) {
             // eslint-disable-next-line no-console
             console.error("Invalid preconfigured connection environment:", err);
@@ -860,7 +775,7 @@ const authOptions: NextAuthConfig = {
           // There is no honest record to write, so refuse the login instead.
           if (!fromUrl.host) {
             // eslint-disable-next-line no-console
-            console.error("Rejected login: the connection URL names no host");
+            console.error("Rejected login: the connection URL is malformed or names no host");
             return null;
           }
           creds.host = fromUrl.host;
@@ -1276,7 +1191,7 @@ export async function getClient(
   // the caller never asked for.
   if (jwtResult.status === "rejected") {
     return NextResponse.json({
-      message: "Invalid or revoked access token"
+      message: jwtResult.message ?? "Invalid or revoked access token"
     }, { status: 401, headers: getCorsHeaders(request) });
   }
 

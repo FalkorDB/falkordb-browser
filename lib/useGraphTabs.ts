@@ -347,6 +347,21 @@ export default function useGraphTabs<S>({
     }, [withLive, prefixReady]);
 
     /**
+     * The user ran a query in the active tab, so a share link's tab stops
+     * waiting for one and rebuilds itself like any other from here on.
+     */
+    const markRan = useCallback(() => {
+        setState(prev => {
+            const active = prev.tabs.find(t => t.id === prev.activeTabId);
+            if (!active?.awaitingRun) return prev;
+            return {
+                ...prev,
+                tabs: prev.tabs.map(t => (t.id === active.id ? { ...t, awaitingRun: undefined } : t)),
+            };
+        });
+    }, []);
+
+    /**
      * Share params for the address bar, so a URL copied straight out of it
      * opens the active tab for anyone.
      */
@@ -364,6 +379,7 @@ export default function useGraphTabs<S>({
         addTab,
         renameTab,
         closeTab,
+        markRan,
         activeShareParams,
-    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab, activeShareParams]);
+    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab, markRan, activeShareParams]);
 }
