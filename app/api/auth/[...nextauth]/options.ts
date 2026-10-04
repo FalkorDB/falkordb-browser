@@ -17,6 +17,7 @@ import {
 import {
   BINDING_VERSION,
   PAT_BINDING_VERSION,
+  isConnectionRecord,
   isEndpointBound,
   isUsableConnectionRecord,
   parseConnectionUrl,
@@ -299,7 +300,7 @@ export async function listSessionConnections(sessionId: string): Promise<Connect
   const storage = StorageFactory.getStorage();
   const tokens = await storage.fetchTokensByUserId(sessionId);
   return tokens
-    .filter(t => t.name.startsWith("connection:"))
+    .filter(isConnectionRecord)
     .map(t => ({
       id: t.token_id,
       username: t.username,
@@ -322,7 +323,7 @@ export async function removeSessionConnection(
   // Verify the token belongs to this session before deleting
   const storage = StorageFactory.getStorage();
   const tokenData = await storage.fetchTokenById(connId);
-  if (!tokenData || tokenData.user_id !== sessionId || !tokenData.name.startsWith("connection:")) {
+  if (!tokenData || tokenData.user_id !== sessionId || !isConnectionRecord(tokenData)) {
     return false;
   }
 
@@ -773,9 +774,13 @@ const authOptions: NextAuthConfig = {
           // would be filed under the localhost:6379 defaults and share that
           // identity, and hence its AAD binding, with every other such login.
           // There is no honest record to write, so refuse the login instead.
+          // The same goes for a database other than 0 or query options, which
+          // the record cannot carry into a reconnect.
           if (!fromUrl.host) {
             // eslint-disable-next-line no-console
-            console.error("Rejected login: the connection URL is malformed or names no host");
+            console.error(
+              "Rejected login: the connection URL is malformed, names no host, or selects a database other than 0 / carries query options"
+            );
             return null;
           }
           creds.host = fromUrl.host;
@@ -1059,7 +1064,7 @@ const authOptions: NextAuthConfig = {
         try {
           const storage = StorageFactory.getStorage();
           const allTokens = await storage.fetchTokensByUserId(id);
-          const connTokens = allTokens.filter(tk => tk.name.startsWith("connection:"));
+          const connTokens = allTokens.filter(isConnectionRecord);
           await Promise.all(connTokens.map(async (tk) => {
             const key = sessionConnectionKey(id, tk.token_id);
             const c = connections.get(key);
@@ -1227,7 +1232,7 @@ export async function getClient(
     try {
       const storage = StorageFactory.getStorage();
       const allTokens = await storage.fetchTokensByUserId(id);
-      const connTokens = allTokens.filter(t => t.name.startsWith("connection:"));
+      const connTokens = allTokens.filter(isConnectionRecord);
       if (connTokens.length > 0) {
         // Default: first entry from Token DB
         connId = connTokens[0].token_id;

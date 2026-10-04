@@ -101,6 +101,7 @@ export default function Page() {
         setSelectedParam,
         isLoading,
         pendingAutoLoadRef,
+        graphInfoReload,
         currentTab,
         chatOpen,
         setChatOpen,
@@ -385,7 +386,8 @@ export default function Page() {
         // The auto-load effect below runs the query for a freshly selected
         // graph, and that query fetches info/stats (including memory) itself —
         // skip here so the initial fetch isn't duplicated. Every other reason
-        // this effect re-runs (a restored tab, showMemoryUsage flipping on,
+        // this effect re-runs (a restored tab, a share link's tab resetting the
+        // graph already shown, showMemoryUsage flipping on,
         // refreshInterval changing) needs the fetch right away rather than at
         // the next tick of the interval.
         const willAutoLoadQuery = runDefaultQuery && pendingAutoLoadRef.current === graphName;
@@ -401,7 +403,7 @@ export default function Page() {
             clearInterval(interval);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
+    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, graphInfoReload, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
         if (graphName) return;

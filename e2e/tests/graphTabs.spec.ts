@@ -292,11 +292,13 @@ test.describe("@admin Graph tabs", () => {
         await graph.waitForPageIdle();
 
         const runs: string[] = [];
-        // The share link's own page load carries the query too — only a request
-        // the page makes counts as running it.
+        // The share link's own page load (and every reload) carries the query
+        // too — only a query request to the graph API counts as running it.
         page.on("request", (request) => {
-            if (request.isNavigationRequest()) return;
-            if (decodeURIComponent(request.url()).includes(marker)) runs.push(request.url());
+            if (request.method() !== "GET") return;
+            const url = new URL(request.url());
+            if (!url.pathname.startsWith("/api/graph/")) return;
+            if (url.searchParams.get("query")?.includes(marker)) runs.push(request.url());
         });
 
         await browser.navigateTo(shareLink(graphOne, query));

@@ -278,6 +278,14 @@ export const SHARE_PARAM_KEYS = ["graph", "query", "view", "layout", "direction"
  */
 export const MAX_SHARED_QUERY_LENGTH = 2000;
 
+/**
+ * Length of `query` as the address bar carries it. Measured with the same
+ * serializer `setUrlParam` writes with — URLSearchParams encodes differently
+ * from encodeURIComponent (spaces as `+`, `!'()~` escaped) — which also never
+ * throws: a lone surrogate becomes U+FFFD instead of a URIError.
+ */
+const encodedQueryLength = (query: string) => new URLSearchParams({ query }).toString().length - "query=".length;
+
 /** The portable part of a tab, as a share link hands it over. */
 export type SharedTab = Pick<GraphTab, "graphName" | "query" | "view"> & {
     layout?: string;
@@ -303,7 +311,7 @@ export const shareParams = (tab: GraphTab): Record<(typeof SHARE_PARAM_KEYS)[num
     const { layout, direction } = layoutMeta(tab);
     return {
         graph: tab.graphName,
-        query: tab.query && encodeURIComponent(tab.query).length <= MAX_SHARED_QUERY_LENGTH ? tab.query : undefined,
+        query: tab.query && encodedQueryLength(tab.query) <= MAX_SHARED_QUERY_LENGTH ? tab.query : undefined,
         view: tab.view,
         layout: layout || undefined,
         direction: direction || undefined,

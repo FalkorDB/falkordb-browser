@@ -401,6 +401,20 @@ test("shareParams measures the query as the URL carries it, encoded", () => {
     assert.equal(shareParams(tab({ query: `${encodedToFit}é` })).query, undefined);
 });
 
+test("shareParams measures the query the way the address bar writes it", () => {
+    // URLSearchParams escapes "(" (encodeURIComponent does not)...
+    const parens = "(".repeat(MAX_SHARED_QUERY_LENGTH / 3);
+    assert.equal(shareParams(tab({ query: parens })).query, parens);
+    assert.equal(shareParams(tab({ query: `${parens}(` })).query, undefined);
+    // ...and writes a space as a single "+".
+    const spaces = " ".repeat(MAX_SHARED_QUERY_LENGTH);
+    assert.equal(shareParams(tab({ query: spaces })).query, spaces);
+});
+
+test("shareParams does not throw on a lone surrogate in the editor text", () => {
+    assert.equal(shareParams(tab({ query: "RETURN '\uD800'" })).query, "RETURN '\uD800'");
+});
+
 test("parseSharedTab round-trips the address bar", () => {
     const source = tab({ view: "Metadata", graph: { layout: "radial", direction: "out" } });
     const shared = parseSharedTab(addressBar(source));

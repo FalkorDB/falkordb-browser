@@ -150,6 +150,13 @@ Notes:
   The server logs a warning on first use when auto-connect is on with a
   password, and limits these sign-ins to `PRECONFIGURED_SIGN_IN_MAX_REQUESTS`
   per minute per client IP (default `10`, `0` disables).
+- The client IP is read from `X-Forwarded-For`, `TRUSTED_PROXY_HOPS` entries
+  from the right (default `1`, one reverse proxy), because the entries further
+  left are whatever the client sent. Set it to the number of proxies that
+  append to the header; a browser exposed with no proxy in front cannot tell a
+  spoofed address from a real one.
+- The limiter keeps its counts in memory, so the budget is per instance: with
+  several replicas a client gets each budget once per replica.
 
 The Helm chart exposes the same settings under `connection.*` — see
 [Deploy to Kubernetes with Helm](#deploy-to-kubernetes-with-helm).

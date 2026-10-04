@@ -347,10 +347,15 @@ export default function useGraphTabs<S>({
     }, [withLive, prefixReady]);
 
     /**
-     * The user ran a query in the active tab, so a share link's tab stops
-     * waiting for one and rebuilds itself like any other from here on.
+     * The user ran a query against `graph`, so if that is the active tab's
+     * graph, a share link's tab stops waiting for one and rebuilds itself like
+     * any other from here on. A run aimed at another graph (e.g. the tutorial
+     * cleaning up its demo graphs) leaves the tab waiting.
      */
-    const markRan = useCallback(() => {
+    const markRan = useCallback((graph: string) => {
+        // The live graph, not the stored one: the user may have picked another
+        // graph in the tab since it opened.
+        if (graph !== liveRef.current.graphName) return;
         setState(prev => {
             const active = prev.tabs.find(t => t.id === prev.activeTabId);
             if (!active?.awaitingRun) return prev;

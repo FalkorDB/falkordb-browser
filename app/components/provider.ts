@@ -192,6 +192,12 @@ type GraphContextType = {
    * the initial query.
    */
   pendingAutoLoadRef: RefObject<string | null>;
+  /**
+   * Bumped when the graph is reset without its name changing (a share link's
+   * tab opening on the graph already shown), so /graph refetches its info and
+   * counts — that fetch is otherwise keyed on `graphName` alone.
+   */
+  graphInfoReload: number;
 };
 
 type HistoryQueryContextType = {
@@ -531,6 +537,7 @@ export const GraphContext = createContext<GraphContextType>({
   selectedParam: "",
   setSelectedParam: () => { },
   pendingAutoLoadRef: { current: null },
+  graphInfoReload: 0,
 });
 
 type GraphInfoContextType = {

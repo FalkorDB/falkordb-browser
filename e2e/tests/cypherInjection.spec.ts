@@ -142,8 +142,11 @@ test.describe("Cypher identifier escaping", () => {
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, SENTINELS);
 
-    await apiCall.addGraphNodeLabel(graphName, "0", { label: BACKTICK_LABEL });
-    await apiCall.deleteGraphNodeLabel(graphName, "0", { label: BACKTICK_LABEL });
+    // FalkorDB has no backtick escape inside a quoted name, so both are syntax errors.
+    const added = await apiCall.addGraphNodeLabelWithStatus(graphName, "0", { label: BACKTICK_LABEL });
+    expect(added.status).not.toBe(200);
+    const removed = await apiCall.deleteGraphNodeLabelWithStatus(graphName, "0", { label: BACKTICK_LABEL });
+    expect(removed.status).not.toBe(200);
 
     expect(await countVictims(graphName)).toBe(2);
     const response = await apiCall.runQuery(

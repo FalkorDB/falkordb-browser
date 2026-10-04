@@ -4,6 +4,7 @@ import type { TokenData } from "./token-storage/ITokenStorage";
 import {
     BINDING_VERSION,
     PAT_BINDING_VERSION,
+    isConnectionRecord,
     isEndpointBound,
     isUsableConnectionRecord,
     parseConnectionUrl,
@@ -69,6 +70,20 @@ test("a url naming no host yields nothing to record", () => {
     assert.deepEqual(parseConnectionUrl("unix:///run/redis.sock"), {});
     assert.deepEqual(parseConnectionUrl("unix://alice:pw@/run/redis.sock"), {});
     assert.deepEqual(parseConnectionUrl("redis://"), {});
+});
+
+test("database 0 may be named explicitly", () => {
+    assert.equal(parseConnectionUrl("falkor://db:6379/").host, "db");
+    assert.equal(parseConnectionUrl("falkor://db:6379/0").host, "db");
+    assert.equal(parseConnectionUrl("redis://u:p@db:6379/0").password, "p");
+});
+
+test("another database or a query string is refused, since reconnects could not keep it", () => {
+    assert.deepEqual(parseConnectionUrl("redis://db:6379/1"), {});
+    assert.deepEqual(parseConnectionUrl("falkor://db:6379/0/extra"), {});
+    assert.deepEqual(parseConnectionUrl("redis://db:6379?x=y"), {});
+    assert.deepEqual(parseConnectionUrl("redis://db:6379/1?x=y"), {});
+    assert.deepEqual(parseConnectionUrl("redis://db:6379/0?"), parseConnectionUrl("redis://db:6379/0"));
 });
 
 test("a string that is not a url yields nothing", () => {
@@ -140,6 +155,7 @@ function record(overrides: Partial<TokenData> = {}): TokenData {
         last_used: -1,
         is_active: true,
         encrypted_password: "",
+        kind: "session",
         ...overrides,
     };
 }
@@ -160,6 +176,16 @@ test("a missing, revoked or expired record is not usable", () => {
 test("another session's record, or a PAT row, is not usable", () => {
     assert.equal(isUsableConnectionRecord(record(), "session-2", NOW), false);
     assert.equal(isUsableConnectionRecord(record({ name: "my token" }), "session-1", NOW), false);
+});
+
+test("a PAT named like a connection is still not one", () => {
+    // A PAT's name is chosen by its owner, so only the stored kind can tell.
+    assert.equal(isUsableConnectionRecord(record({ kind: "pat" }), "session-1", NOW), false);
+    assert.equal(isUsableConnectionRecord(record({ kind: undefined }), "session-1", NOW), false);
+    assert.equal(isConnectionRecord({ kind: "pat", name: "connection:c1" }), false);
+    assert.equal(isConnectionRecord({ kind: undefined, name: "connection:c1" }), false);
+    assert.equal(isConnectionRecord({ kind: "session", name: "connection:c1" }), true);
+    assert.equal(isConnectionRecord({ kind: "session", name: "my token" }), false);
 });
 
 test("expiry defaults to the current time", () => {

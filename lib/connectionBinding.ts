@@ -94,6 +94,11 @@ function decodeOrUndefined(value: string): string | undefined {
  * "%" that starts no valid escape counts as not parsing: node-redis decodes
  * credentials with the same `decodeURIComponent`, so that URL cannot connect
  * either, and a literal "%" has to be written `%25`.
+ *
+ * A database selector other than `/0`, or any query string, also counts as not
+ * parsing. The initial login would honour it, but the record keeps only the
+ * fields above, so every reconnect from it lands on database 0 with no options
+ * — a silent move to a different keyspace partway through the session.
  */
 export function parseConnectionUrl(url: string): {
   host?: string;
@@ -109,6 +114,7 @@ export function parseConnectionUrl(url: string): {
     return {};
   }
   if (!parsed.hostname) return {};
+  if (!["", "/", "/0"].includes(parsed.pathname) || parsed.search) return {};
 
   const username = parsed.username ? decodeOrUndefined(parsed.username) : undefined;
   const password = parsed.password ? decodeOrUndefined(parsed.password) : undefined;
@@ -129,6 +135,20 @@ export function parseConnectionUrl(url: string): {
     password,
     tls: parsed.protocol === "falkors:" || parsed.protocol === "rediss:",
   };
+}
+
+/**
+ * True for a stored record that is one of a session's connections, rather
+ * than a personal access token.
+ *
+ * The `connection:` name alone cannot decide it: a PAT's name is whatever its
+ * owner typed, and it is stored under the same `user_id` as their session, so
+ * a PAT named `connection:…` would otherwise be listed and served as one of
+ * that session's connections. Every connection record is written with
+ * `kind: 'session'`, and a PAT never is.
+ */
+export function isConnectionRecord(tokenData: Pick<TokenData, "kind" | "name">): boolean {
+  return tokenData.kind === "session" && tokenData.name.startsWith("connection:");
 }
 
 /**
@@ -153,7 +173,7 @@ export function isUsableConnectionRecord(
     !!tokenData &&
     tokenData.is_active &&
     (tokenData.expires_at === -1 || tokenData.expires_at > nowSeconds) &&
-    tokenData.name.startsWith("connection:") &&
+    isConnectionRecord(tokenData) &&
     tokenData.user_id === sessionId
   );
 }
