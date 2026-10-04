@@ -292,7 +292,10 @@ test.describe("@admin Graph tabs", () => {
         await graph.waitForPageIdle();
 
         const runs: string[] = [];
+        // The share link's own page load carries the query too — only a request
+        // the page makes counts as running it.
         page.on("request", (request) => {
+            if (request.isNavigationRequest()) return;
             if (decodeURIComponent(request.url()).includes(marker)) runs.push(request.url());
         });
 

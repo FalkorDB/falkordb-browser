@@ -1596,7 +1596,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // so everything the tab carries has to be applied after it.
     handleSetGraphName(graphIsGone ? "" : tab.graphName);
     setCurrentTab(tab.view);
-    setHistoryQuery(h => ({ ...h, query: tab.query, currentQuery: defaultQueryHistory.currentQuery }));
+    // The editor falls back to `currentQuery.text` when it mounts, so the tab's
+    // text goes there too — or an editor mounting after this wipes it, and a tab
+    // that does not run its query (a share link's) never gets it back.
+    setHistoryQuery(h => ({ ...h, query: tab.query, currentQuery: { ...defaultQueryHistory.currentQuery, text: tab.query } }));
     // /graph resolves this against the results once they arrive.
     setSelectedParam(meta.selected ?? "");
 
