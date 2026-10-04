@@ -42,8 +42,13 @@ export default function useLongPress(onLongPress?: () => boolean | void): LongPr
     }, []);
 
     const onPointerDown = useCallback((e: ReactPointerEvent) => {
+        // Never leave a pending press behind: its timer would be orphaned and fire
+        // later. A second finger (a pinch) lands here as a non-primary pointer, so
+        // this also cancels the first finger's press instead of firing mid-pinch.
+        cancel();
+
         // Mouse users have Ctrl-click, and a hold with the button down is a pan.
-        if (!onLongPress || e.pointerType === "mouse") return;
+        if (!onLongPress || e.pointerType === "mouse" || !e.isPrimary) return;
 
         origin.current = { x: e.clientX, y: e.clientY };
         timer.current = setTimeout(() => {
@@ -59,7 +64,7 @@ export default function useLongPress(onLongPress?: () => boolean | void): LongPr
 
             navigator.vibrate?.(10);
         }, LONG_PRESS_MS);
-    }, [onLongPress]);
+    }, [onLongPress, cancel]);
 
     const onPointerMove = useCallback((e: ReactPointerEvent) => {
         if (!origin.current) return;

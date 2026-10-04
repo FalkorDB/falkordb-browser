@@ -59,6 +59,25 @@ test.describe("@admin Graph URL params", () => {
         expect(param("viewport")).toBeNull();
     });
 
+    test("A query too long for the address bar stays off it", async () => {
+        // Past MAX_SHARED_QUERY_LENGTH (lib/graphTabs.ts) once encoded.
+        const query = `RETURN '${"x".repeat(2100)}'`;
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.selectGraphByName(graphName);
+        await graph.waitForPageIdle();
+        await graph.insertQuery("MATCH (n) RETURN n LIMIT 5");
+
+        const param = (key: string) => new URL(graph.getCurrentURL()).searchParams.get(key);
+        await expect.poll(() => param("query"), { timeout: 15000 }).toBe("MATCH (n) RETURN n LIMIT 5");
+
+        await graph.insertQuery(query);
+
+        // The link still opens the tab's graph, just without the draft.
+        await expect.poll(() => param("query"), { timeout: 15000 }).toBeNull();
+        expect(param("graph")).toBe(graphName);
+        expect(tabParam(graph)).toBeTruthy();
+    });
+
     test("Refreshing rebuilds the tab's graph and query", async () => {
         const query = "MATCH (n) RETURN n LIMIT 5";
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);

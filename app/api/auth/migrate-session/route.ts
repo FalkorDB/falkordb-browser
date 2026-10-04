@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { getSessionFromRequest, newClient } from "@/app/api/auth/[...nextauth]/options";
 import { storeEncryptedCredential } from "@/app/api/auth/tokenUtils";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
+import { isConnectionRecord } from "@/lib/connectionBinding";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
 
 const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60;
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
       const existing = await storage.fetchTokensByUserId(user.id);
       await Promise.all(
         existing
-          .filter(t => t.name.startsWith("connection:"))
+          .filter(isConnectionRecord)
           .map(t => storage.deleteToken(t.token_id).catch(() => { /* ignore */ }))
       );
     } catch {

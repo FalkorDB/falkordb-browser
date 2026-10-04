@@ -220,6 +220,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // it. Keeping it a latch (instead of comparing graphName to graph.Id) is what
   // stops a /graph remount, a tab switch or a failed query from replaying it.
   const pendingAutoLoadRef = useRef<string | null>(null);
+  const [graphInfoReload, setGraphInfoReload] = useState(0);
   // Read ?tab= straight off the location at render time. useSearchParams returns
   // "" during SSR, and the state→URL sync overwrites the param as soon as the
   // tab strip settles, so by the time the strip restores it would be our own value.
@@ -1144,6 +1145,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), merged];
   }, [historyQuery.queries]);
 
+  // useGraphTabs is set up after runQuery (its activation runs queries), so
+  // runQuery reaches its `markRan` through a ref.
+  const markTabRanRef = useRef<(graph: string) => void>(() => { });
+
   /**
    * @param options.readOnly Force GRAPH.RO_QUERY regardless of the user's role.
    * @param options.silent Swallow the failure: no toast, no diagnostics, no history entry.
@@ -1154,6 +1159,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Reject while a connection switch is mid-flight — its global id and React
     // state may still disagree, so starting here could hit the wrong DB.
     if (pendingSwitchesRef.current > 0) return;
+
+    // Only a tab rebuild runs silently; anything else is the user's own run, so
+    // a share link's tab no longer waits for one — if it ran on that tab's graph.
+    if (!options?.silent) markTabRanRef.current(n);
 
     // This query *is* the load for that graph, so the automatic one must not
     // also fire (it would race this one and win, being newer).
@@ -1391,7 +1400,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedParam,
     setSelectedParam,
     pendingAutoLoadRef,
-  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam]);
+    graphInfoReload,
+  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam, graphInfoReload]);
 
   // Everything a tab needs to show its results again without querying. Mirrored
   // at render so `captureGraphSession` can read it without a dependency list.
@@ -1581,15 +1591,37 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       && graphNamesLoadedRef.current
       && !graphNamesRef.current.includes(tab.graphName);
 
+    // A tab that will not run its query must not keep showing the outgoing
+    // tab's results either — treat its graph as a fresh selection, which clears them.
+    if (tab.awaitingRun && !graphIsGone) {
+      // Same graph as the one shown: the reset clears its info and counts, and
+      // /graph only refetches those when the name changes — so ask it to.
+      if (graphNameRef.current === tab.graphName) setGraphInfoReload(v => v + 1);
+      graphNameRef.current = "";
+    }
     // Ordering matters: handleSetGraphName clears the editor and the selection,
     // so everything the tab carries has to be applied after it.
     handleSetGraphName(graphIsGone ? "" : tab.graphName);
     setCurrentTab(tab.view);
-    setHistoryQuery(h => ({ ...h, query: tab.query, currentQuery: defaultQueryHistory.currentQuery }));
+    // The editor falls back to `currentQuery.text` when it mounts, so the tab's
+    // text goes there too — or an editor mounting after this wipes it, and a tab
+    // that does not run its query (a share link's) never gets it back.
+    setHistoryQuery(h => ({ ...h, query: tab.query, currentQuery: { ...defaultQueryHistory.currentQuery, text: tab.query } }));
     // /graph resolves this against the results once they arrive.
     setSelectedParam(meta.selected ?? "");
 
-    if (graphIsGone || !tab.graphName || !tab.query) return;
+    if (graphIsGone || !tab.graphName) return;
+
+    // A share link hands over someone else's query: show it, but leave running
+    // it to the user. The graph page still fetches the graph's info and counts;
+    // the default-query auto-load must not fire, or it would run a query after
+    // all and replace the shared text in the editor.
+    if (tab.awaitingRun) {
+      pendingAutoLoadRef.current = null;
+      return;
+    }
+
+    if (!tab.query) return;
 
     // We run the tab's own query, so the default-query auto-load must not fire.
     pendingAutoLoadRef.current = null;
@@ -1630,6 +1662,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     captureMeta: captureTabMeta,
     onActivate: handleActivateTab,
   });
+
+  markTabRanRef.current = graphTabs.markRan;
 
   const graphTabsContext = useMemo(
     () => ({ ...graphTabs, setSchemaMeta }),

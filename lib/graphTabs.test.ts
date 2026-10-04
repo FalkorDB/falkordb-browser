@@ -7,6 +7,7 @@ import {
     normalizeDirection,
     normalizeLayout,
     parseSharedTab,
+    MAX_SHARED_QUERY_LENGTH,
     parseStoredTabs,
     resolveEntryTabs,
     shareParams,
@@ -309,6 +310,19 @@ test("parseStoredTabs drops a customizing ref that is not a known kind and name"
     assert.deepEqual(customizing({ kind: "node", name: "" }), { kind: "node", name: "" });
 });
 
+test("parseStoredTabs keeps a share link's tab waiting for its first run", () => {
+    // Otherwise a reload would run the shared query after all.
+    const result = parseStoredTabs(stored([
+        tab({ id: "waiting", awaitingRun: true }),
+        { ...tab({ id: "bogus" }), awaitingRun: "yes" },
+        tab({ id: "plain" }),
+    ]));
+
+    assert.equal(result?.tabs[0].awaitingRun, true);
+    assert.equal("awaitingRun" in result!.tabs[1], false);
+    assert.equal("awaitingRun" in result!.tabs[2], false);
+});
+
 test("parseStoredTabs defaults a missing active tab id to empty", () => {
     const result = parseStoredTabs(JSON.stringify({ tabs: [tab()] }));
     assert.equal(result?.activeTabId, "");
@@ -369,6 +383,38 @@ test("shareParams leaves out what the tab does not have", () => {
     });
 });
 
+test("shareParams leaves a query too long for the address bar behind", () => {
+    const fits = "x".repeat(MAX_SHARED_QUERY_LENGTH);
+    assert.equal(shareParams(tab({ query: fits })).query, fits);
+
+    const params = shareParams(tab({ query: `${fits}x` }));
+    assert.equal(params.query, undefined);
+    // The link still opens the graph and the view.
+    assert.equal(params.graph, "g");
+    assert.equal(params.view, "Graph");
+});
+
+test("shareParams measures the query as the URL carries it, encoded", () => {
+    // Each "é" is two UTF-8 bytes, so six characters once percent-encoded.
+    const encodedToFit = "é".repeat(MAX_SHARED_QUERY_LENGTH / 6);
+    assert.equal(shareParams(tab({ query: encodedToFit })).query, encodedToFit);
+    assert.equal(shareParams(tab({ query: `${encodedToFit}é` })).query, undefined);
+});
+
+test("shareParams measures the query the way the address bar writes it", () => {
+    // URLSearchParams escapes "(" (encodeURIComponent does not)...
+    const parens = "(".repeat(MAX_SHARED_QUERY_LENGTH / 3);
+    assert.equal(shareParams(tab({ query: parens })).query, parens);
+    assert.equal(shareParams(tab({ query: `${parens}(` })).query, undefined);
+    // ...and writes a space as a single "+".
+    const spaces = " ".repeat(MAX_SHARED_QUERY_LENGTH);
+    assert.equal(shareParams(tab({ query: spaces })).query, spaces);
+});
+
+test("shareParams does not throw on a lone surrogate in the editor text", () => {
+    assert.equal(shareParams(tab({ query: "RETURN '\uD800'" })).query, "RETURN '\uD800'");
+});
+
 test("parseSharedTab round-trips the address bar", () => {
     const source = tab({ view: "Metadata", graph: { layout: "radial", direction: "out" } });
     const shared = parseSharedTab(addressBar(source));
@@ -409,6 +455,26 @@ test("withSharedTab opens the shared context in a new active tab", () => {
     assert.equal(opened.view, "Table");
     assert.deepEqual(opened.graph, { layout: "tree", direction: "lr" });
     assert.deepEqual(opened.schema, {});
+});
+
+test("withSharedTab leaves the shared query for the user to run", () => {
+    const opened = withSharedTab(null, { graphName: "g", query: "q", view: "Graph" }, tab({ id: "fresh" }));
+    assert.equal(opened.tabs[0].awaitingRun, true);
+
+    const filled = withSharedTab(
+        { tabs: [tab({ id: "blank", graphName: "", query: "" })], activeTabId: "blank" },
+        { graphName: "g", query: "q", view: "Graph" },
+        tab({ id: "fresh" }),
+    );
+    assert.equal(filled.tabs[0].awaitingRun, true);
+
+    // A tab the user already has is theirs — it rebuilds as usual.
+    const reused = withSharedTab(
+        { tabs: [tab({ id: "b", query: "q" })], activeTabId: "b" },
+        { graphName: "g", query: "q", view: "Graph" },
+        tab({ id: "fresh" }),
+    );
+    assert.equal(reused.tabs[0].awaitingRun, undefined);
 });
 
 test("withSharedTab puts a schema link's layout on the schema view", () => {
@@ -474,7 +540,7 @@ const blankTab = (id: string, overrides: Partial<GraphTab> = {}) => tab({ id, gr
 
 test("withSharedTab fills the untouched tab a fresh visitor already has", () => {
     const result = withSharedTab(
-        { tabs: [blankTab("blank")], activeTabId: "blank" },
+        { tabs: [tab({ id: "blank", graphName: "", query: "" })], activeTabId: "blank" },
         { graphName: "g", query: "q", view: "Table", layout: "tree", direction: "lr" },
         tab({ id: "fresh" }),
     );

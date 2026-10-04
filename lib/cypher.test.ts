@@ -19,3 +19,10 @@ test("quoteCypherIdentifier keeps a crafted key from becoming a clause", () => {
 
     assert.equal(quoteCypherIdentifier(crafted), "`x = 1 WITH n MATCH (m) DETACH DELETE m //`");
 });
+
+test("quoteCypherIdentifier keeps a backtick breakout inside the quoted span", () => {
+    // The backtick is the one character that can end the span early: undoubled,
+    // everything after it would run as Cypher.
+    assert.equal(quoteCypherIdentifier("x` DETACH DELETE n //"), "`x`` DETACH DELETE n //`");
+    assert.equal(quoteCypherIdentifier("x`: 0} ) DETACH DELETE n //"), "`x``: 0} ) DETACH DELETE n //`");
+});

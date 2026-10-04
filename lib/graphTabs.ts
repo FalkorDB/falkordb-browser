@@ -58,6 +58,13 @@ export type GraphTab = GraphTabMeta & {
     view: Tab;
     /** User-supplied label. Falls back to the graph name when unset. */
     name?: string;
+    /**
+     * Opened from a share link and not run since. Rebuilding the tab loads its
+     * graph and query text but leaves running it to the user: a link must not
+     * execute someone else's query on open, nor on every reload after. Cleared
+     * by the first query the user runs in the tab.
+     */
+    awaitingRun?: true;
 };
 
 export type TabsState = {
@@ -223,6 +230,7 @@ const normalizeTab = (tab: GraphTab): GraphTab => {
         query: tab.query,
         view: tab.view,
         name: asString(tab.name),
+        ...(tab.awaitingRun === true && { awaitingRun: true as const }),
         // Chat used to be stored inside the graph view's metadata.
         chatOpen: asBoolean(tab.chatOpen) ?? asBoolean(graph.chatOpen),
         graph: {
@@ -262,6 +270,22 @@ export const parseStoredTabs = (raw: string | null): TabsState | null => {
  */
 export const SHARE_PARAM_KEYS = ["graph", "query", "view", "layout", "direction"] as const;
 
+/**
+ * Longest query, URL-encoded, the address bar carries. The query is the live
+ * editor text, so a long script would push the URL past what proxies and Node
+ * accept on reload (414/431), and spill a draft into history and logs. Past
+ * this the link names the graph and view only.
+ */
+export const MAX_SHARED_QUERY_LENGTH = 2000;
+
+/**
+ * Length of `query` as the address bar carries it. Measured with the same
+ * serializer `setUrlParam` writes with — URLSearchParams encodes differently
+ * from encodeURIComponent (spaces as `+`, `!'()~` escaped) — which also never
+ * throws: a lone surrogate becomes U+FFFD instead of a URIError.
+ */
+const encodedQueryLength = (query: string) => new URLSearchParams({ query }).toString().length - "query=".length;
+
 /** The portable part of a tab, as a share link hands it over. */
 export type SharedTab = Pick<GraphTab, "graphName" | "query" | "view"> & {
     layout?: string;
@@ -277,7 +301,8 @@ const layoutMeta = (tab: Pick<GraphTab, "view" | "graph" | "schema">): ViewTabMe
  * where the tab has nothing to say — all of them for a tab without a graph,
  * which has nothing to open. The address bar carries these next to
  * `?tab=`, so a URL copied straight out of it opens for anyone. A link with
- * the params and no `?tab=` works too — `parseSharedTab` reads either.
+ * the params and no `?tab=` works too — `parseSharedTab` reads either. A
+ * query longer than `MAX_SHARED_QUERY_LENGTH` stays behind.
  */
 export const shareParams = (tab: GraphTab): Record<(typeof SHARE_PARAM_KEYS)[number], string | undefined> => {
     if (!tab.graphName) {
@@ -286,7 +311,7 @@ export const shareParams = (tab: GraphTab): Record<(typeof SHARE_PARAM_KEYS)[num
     const { layout, direction } = layoutMeta(tab);
     return {
         graph: tab.graphName,
-        query: tab.query || undefined,
+        query: tab.query && encodedQueryLength(tab.query) <= MAX_SHARED_QUERY_LENGTH ? tab.query : undefined,
         view: tab.view,
         layout: layout || undefined,
         direction: direction || undefined,
@@ -342,7 +367,8 @@ const isBlank = (tab: GraphTab) => !tab.graphName && !tab.query && !tab.name;
  * otherwise land on the link next to a leftover "New tab". Only then does the
  * shared context get a tab of its own (`fresh` supplies the id), even past the
  * tab limit: the user asked for it explicitly, and the strip already copes with
- * sitting above the cap.
+ * sitting above the cap. A tab the shared context lands in waits for the
+ * user to run it (see `awaitingRun`); a reused tab is the user's own.
  */
 export const withSharedTab = (stored: TabsState | null, shared: SharedTab, fresh: GraphTab): TabsState => {
     const tabs = stored?.tabs ?? [];
@@ -356,6 +382,7 @@ export const withSharedTab = (stored: TabsState | null, shared: SharedTab, fresh
     const tab: GraphTab = {
         ...(blank ?? fresh),
         ...rest,
+        awaitingRun: true,
         graph: shared.view === "Schema" ? {} : meta,
         schema: shared.view === "Schema" ? meta : {},
     };

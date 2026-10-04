@@ -281,6 +281,53 @@ test.describe("@admin Graph tabs", () => {
         await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true");
     });
 
+    test("A share link shows its query but leaves running it to the user", async () => {
+        test.setTimeout(60_000);
+
+        // Distinctive enough to pick this query's requests out of the page's own.
+        const marker = getRandomString("sharedmarker");
+        const query = `MATCH (n) WHERE n.\`${marker}\` IS NULL RETURN n LIMIT 1`;
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await graph.waitForPageIdle();
+
+        const runs: string[] = [];
+        // The share link's own page load (and every reload) carries the query
+        // too — only a query request to the graph API counts as running it.
+        page.on("request", (request) => {
+            if (request.method() !== "GET") return;
+            const url = new URL(request.url());
+            if (!url.pathname.startsWith("/api/graph/")) return;
+            if (url.searchParams.get("query")?.includes(marker)) runs.push(request.url());
+        });
+
+        await browser.navigateTo(shareLink(graphOne, query));
+        await graph.waitForPageIdle();
+
+        // The graph and the query are loaded…
+        await expect(graph.stripTab(graphOne)).toHaveAttribute("data-active", "true", { timeout: 15000 });
+        await expect(page.getByTestId("selectGraph")).toContainText(graphOne, { timeout: 15000 });
+        await expect.poll(() => graph.getEditorInput(), { timeout: 15000 }).toBe(query);
+        // …but nothing ran them.
+        expect(runs).toHaveLength(0);
+
+        // The tab is stored off a state update — reloading too eagerly would
+        // race that write and test nothing.
+        await expect
+            .poll(() => page.evaluate(() => JSON.stringify(window.localStorage)), { timeout: 15000 })
+            .toContain(marker);
+
+        // A reload restores the tab without running it either.
+        await graph.refreshPage();
+        await graph.waitForPageIdle();
+        await expect.poll(() => graph.getEditorInput(), { timeout: 15000 }).toBe(query);
+        expect(runs).toHaveLength(0);
+
+        // Running it is the user's call.
+        await graph.clickRunQuery(false);
+        await expect.poll(() => runs.length, { timeout: 15000 }).toBeGreaterThan(0);
+    });
+
     test("A tab without a graph puts nothing to share on the URL", async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await graph.waitForPageIdle();
