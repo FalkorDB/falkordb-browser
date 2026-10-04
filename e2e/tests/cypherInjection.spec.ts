@@ -23,6 +23,13 @@ const HOSTILE_KEY = "k} ) DETACH DELETE n //";
 const BACKTICK_LABEL = "x` DETACH DELETE n //";
 const BACKTICK_KEY = "x`: 0} ) DETACH DELETE n //";
 const SENTINELS = 'CREATE (:Victim {name: "a"}), (:Victim {name: "b"})';
+// FalkorDB's parse error for the doubled backtick, passed through by the
+// routes. Pinning it keeps an unrelated refusal (a 403, a validation 400) from
+// passing for this one.
+const expectParseRefusal = ({ status, body }: { status: number; body: { message?: string } }) => {
+  expect(status).toBe(400);
+  expect(body.message).toMatch(/Invalid input '`'/);
+};
 
 test.describe("Cypher identifier escaping", () => {
   let browser: BrowserWrapper;
@@ -144,9 +151,9 @@ test.describe("Cypher identifier escaping", () => {
 
     // FalkorDB has no backtick escape inside a quoted name, so both are syntax errors.
     const added = await apiCall.addGraphNodeLabelWithStatus(graphName, "0", { label: BACKTICK_LABEL });
-    expect(added.status).not.toBe(200);
+    expectParseRefusal(added);
     const removed = await apiCall.deleteGraphNodeLabelWithStatus(graphName, "0", { label: BACKTICK_LABEL });
-    expect(removed.status).not.toBe(200);
+    expectParseRefusal(removed);
 
     expect(await countVictims(graphName)).toBe(2);
     const response = await apiCall.runQuery(
@@ -171,7 +178,7 @@ test.describe("Cypher identifier escaping", () => {
     ];
     for (const attempt of attempts) {
       const created = await apiCall.createGraphElement(graphName, attempt);
-      expect(created.status).not.toBe(200);
+      expectParseRefusal(created);
     }
 
     expect(await countVictims(graphName)).toBe(2);
