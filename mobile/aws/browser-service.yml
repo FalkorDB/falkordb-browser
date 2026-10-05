@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  FalkorDB Browser on ECS Fargate behind an HTTPS Application Load Balancer.
+  This is the server the mobile app opens. It runs the published Docker image
+  unchanged.
+
+Parameters:
+  BrowserUrl:
+    Type: String
+    Description: Public HTTPS URL the browser is served at, e.g. https://browser.example.com. Point its DNS at the load balancer.
+    AllowedPattern: "^https://[^/]+/?$"
+  CertificateArn:
+    Type: String
+    Description: ACM certificate ARN covering the BrowserUrl host, in this stack's region.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two public subnets in different AZs. Tasks get public IPs so they can pull the image without a NAT gateway.
+  ImageUri:
+    Type: String
+    Default: docker.io/falkordb/falkordb-browser:latest
+  AuthSecret:
+    Type: String
+    NoEcho: true
+    Description: 64 hex characters (openssl rand -hex 32). Signs session cookies; keep it stable across deploys.
+    AllowedPattern: "^[0-9a-fA-F]{64}$"
+  EncryptionKey:
+    Type: String
+    NoEcho: true
+    Description: 64 hex characters (openssl rand -hex 32). Encrypts stored credentials; keep it stable across deploys.
+    AllowedPattern: "^[0-9a-fA-F]{64}$"
+  DesiredCount:
+    Type: Number
+    Default: 1
+    Description: Rate limits and API tokens are kept per task, so raise this only if that is acceptable.
+  Cpu:
+    Type: String
+    Default: "512"
+  Memory:
+    Type: String
+    Default: "1024"
+
+Resources:
+  BrowserSecrets:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: FalkorDB Browser session and encryption secrets
+      SecretString: !Sub '{"AUTH_SECRET":"${AuthSecret}","ENCRYPTION_KEY":"${EncryptionKey}"}'
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/${AWS::StackName}
+      RetentionInDays: 30
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: read-browser-secrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref BrowserSecrets
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: FalkorDB Browser load balancer
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
+
+  ServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: FalkorDB Browser tasks (reachable only from the load balancer)
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Subnets: !Ref SubnetIds
+      SecurityGroups: [!Ref LoadBalancerSecurityGroup]
+      LoadBalancerAttributes:
+        # Long-running queries and streamed chat responses outlast the 60s default.
+        - { Key: idle_timeout.timeout_seconds, Value: "300" }
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      Port: 3000
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /login
+      Matcher: { HttpCode: "200-399" }
+      TargetGroupAttributes:
+        - { Key: deregistration_delay.timeout_seconds, Value: "30" }
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates: [{ CertificateArn: !Ref CertificateArn }]
+      DefaultActions:
+        - { Type: forward, TargetGroupArn: !Ref TargetGroup }
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig: { Protocol: HTTPS, Port: "443", StatusCode: HTTP_301 }
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${AWS::StackName}-browser
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref Cpu
+      Memory: !Ref Memory
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      RuntimePlatform: { CpuArchitecture: X86_64, OperatingSystemFamily: LINUX }
+      ContainerDefinitions:
+        - Name: browser
+          Image: !Ref ImageUri
+          Essential: true
+          PortMappings: [{ ContainerPort: 3000, Protocol: tcp }]
+          Environment:
+            - { Name: AUTH_URL, Value: !Ref BrowserUrl }
+            - { Name: ALLOWED_ORIGINS, Value: !Ref BrowserUrl }
+            # The ALB appends exactly one X-Forwarded-For entry.
+            - { Name: TRUSTED_PROXY_HOPS, Value: "1" }
+          Secrets:
+            - { Name: AUTH_SECRET, ValueFrom: !Sub "${BrowserSecrets}:AUTH_SECRET::" }
+            - { Name: ENCRYPTION_KEY, ValueFrom: !Sub "${BrowserSecrets}:ENCRYPTION_KEY::" }
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: browser
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: [HttpsListener]
+    Properties:
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      TaskDefinition: !Ref TaskDefinition
+      HealthCheckGracePeriodSeconds: 60
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker: { Enable: true, Rollback: true }
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: !Ref SubnetIds
+          SecurityGroups: [!Ref ServiceSecurityGroup]
+      LoadBalancers:
+        - { ContainerName: browser, ContainerPort: 3000, TargetGroupArn: !Ref TargetGroup }
+
+Outputs:
+  LoadBalancerDns:
+    Description: Point the BrowserUrl host's DNS (CNAME or Route 53 alias) here.
+    Value: !GetAtt LoadBalancer.DNSName
+  BrowserUrl:
+    Description: Set FALKORDB_BROWSER_URL to this when building the mobile app.
+    Value: !Ref BrowserUrl

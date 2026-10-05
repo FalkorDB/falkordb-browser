@@ -1,0 +1,20 @@
+{
+  "name": "falkordb-browser-desktop",
+  "productName": "FalkorDB Browser",
+  "author": "FalkorDB",
+  "description": "FalkorDB Browser desktop app",
+  "version": "2.6.0",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "build:web": "npm --prefix .. run build",
+    "prepare:server": "node scripts/prepare-server.mjs",
+    "start": "npm run prepare:server && electron .",
+    "dist": "npm run build:web && npm run prepare:server && electron-builder --publish never",
+    "dist:dir": "npm run build:web && npm run prepare:server && electron-builder --dir --publish never"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  }
+}

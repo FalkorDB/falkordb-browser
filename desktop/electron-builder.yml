@@ -1,0 +1,23 @@
+appId: com.falkordb.browser
+productName: FalkorDB Browser
+copyright: Copyright © FalkorDB
+directories:
+  output: dist
+files:
+  - main.cjs
+  - package.json
+# The Next.js server (desktop/server, from `npm run prepare:server`) is copied
+# to resources/server outside app.asar by this hook: server.js chdirs into its
+# own directory and loads native modules (@falkordb/text-to-cypher) from disk.
+afterPack: scripts/after-pack.cjs
+asar: true
+# The standalone build already contains exactly the server's runtime deps.
+npmRebuild: false
+mac:
+  category: public.app-category.developer-tools
+  target: [dmg, zip]
+win:
+  target: [nsis]
+linux:
+  category: Development
+  target: [AppImage]

@@ -1,0 +1,78 @@
+name: Desktop app
+
+# Builds the Electron app on every OS and uploads the installers as workflow
+# artifacts. It publishes nothing, and runs only when the desktop shell
+# changes, on release tags, or on demand, so the web build and image release
+# workflows are unaffected.
+
+on:
+  push:
+    branches: ["main", "staging"]
+    tags: ["v*.*.*"]
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+  pull_request:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Unsigned builds until signing certificates are configured.
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci --no-audit --progress=false
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci --no-audit --progress=false
+
+      # Native modules in the standalone server are traced for the OS that
+      # builds them, which is why each platform builds its own installer.
+      - name: Build installers
+        working-directory: desktop
+        run: npm run dist
+
+      - name: Upload installers
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: falkordb-browser-desktop-${{ runner.os }}
+          path: |
+            desktop/dist/*.AppImage
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
