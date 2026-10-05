@@ -6,8 +6,8 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json';
-import { BATCH_CREATE_PERSONS } from "../config/constants";
-import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomString } from "../infra/utils";
+import { BATCH_CREATE_PERSONS, CREATE_TEN_CONNECTED_NODES } from "../config/constants";
+import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomString, simulateCanvasFingerprintNoise } from "../infra/utils";
 
 test.describe('Canvas Tests', () => {
     let browser: BrowserWrapper;
@@ -669,6 +669,38 @@ test.describe('Canvas Tests', () => {
             expect(await graph.getSelectionCount()).toBe(1);
             // A select must never expand.
             expect((await graph.getNodesScreenPositions()).length).toBe(1);
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
+    // #1084: with canvas fingerprinting protection on, hit detection's pixel
+    // read is scrambled and random nodes stopped responding to hover and click.
+    test(`@admin Every node stays hoverable and clickable when canvas pixel reads are scrambled`, async () => {
+        const graphName = getRandomString('fingerprint');
+        await apicalls.addGraph(graphName);
+        try {
+            await apicalls.runQuery(graphName, CREATE_TEN_CONNECTED_NODES);
+            const graph = await browser.createNewPage(GraphPage);
+            const page = await browser.getPage();
+            await page.addInitScript(simulateCanvasFingerprintNoise());
+            await browser.navigateTo(urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH (n:Person) RETURN n");
+            await graph.clickRunQuery();
+            await graph.clickCenterControl();
+            await graph.waitForScaleToStabilize();
+
+            const nodes = (await graph.getNodesScreenPositions()).filter((node) => node.isVisible);
+            expect(nodes.length).toBe(10);
+            for (const node of nodes) {
+                await page.mouse.move(node.screenX, node.screenY);
+                expect(await graph.getNodeCanvasToolTip()).toBe(node.data.name);
+            }
+
+            await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
+            expect(await graph.getSelectionCount()).toBe(1);
         } finally {
             await apicalls.removeGraph(graphName);
         }
