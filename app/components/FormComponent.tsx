@@ -113,6 +113,7 @@ function toFieldConfig(field: Field, passwordLabels: string[]): FieldConfig {
                     <Combobox
                         className="w-fit"
                         id={id}
+                        disabled={field.disabled}
                         options={field.options}
                         label={field.selectType}
                         selectedValue={field.value}
