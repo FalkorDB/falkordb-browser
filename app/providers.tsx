@@ -28,7 +28,7 @@ import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } f
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 import { DemoLoadOutcome } from "./components/Tutorial";
-import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
 import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
 
@@ -220,6 +220,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // it. Keeping it a latch (instead of comparing graphName to graph.Id) is what
   // stops a /graph remount, a tab switch or a failed query from replaying it.
   const pendingAutoLoadRef = useRef<string | null>(null);
+  const [graphInfoReload, setGraphInfoReload] = useState(0);
   // Read ?tab= straight off the location at render time. useSearchParams returns
   // "" during SSR, and the state→URL sync overwrites the param as soon as the
   // tab strip settles, so by the time the strip restores it would be our own value.
@@ -227,6 +228,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("tab") || ""
       : ""
+  );
+  // Captured at render for the same reason. It also has to outlive a detour
+  // through /login: a signed-out visitor is redirected there and back
+  // client-side, and the providers stay mounted the whole way.
+  const initialShareRef = useRef(
+    typeof window !== "undefined" ? parseSharedTab(window.location.search) : null
   );
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
@@ -1138,6 +1145,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), merged];
   }, [historyQuery.queries]);
 
+  // useGraphTabs is set up after runQuery (its activation runs queries), so
+  // runQuery reaches its `markRan` through a ref.
+  const markTabRanRef = useRef<(graph: string) => void>(() => { });
+
   /**
    * @param options.readOnly Force GRAPH.RO_QUERY regardless of the user's role.
    * @param options.silent Swallow the failure: no toast, no diagnostics, no history entry.
@@ -1148,6 +1159,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Reject while a connection switch is mid-flight — its global id and React
     // state may still disagree, so starting here could hit the wrong DB.
     if (pendingSwitchesRef.current > 0) return;
+
+    // Only a tab rebuild runs silently; anything else is the user's own run, so
+    // a share link's tab no longer waits for one — if it ran on that tab's graph.
+    if (!options?.silent) markTabRanRef.current(n);
 
     // This query *is* the load for that graph, so the automatic one must not
     // also fire (it would race this one and win, being newer).
@@ -1385,7 +1400,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedParam,
     setSelectedParam,
     pendingAutoLoadRef,
-  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam]);
+    graphInfoReload,
+  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam, graphInfoReload]);
 
   // Everything a tab needs to show its results again without querying. Mirrored
   // at render so `captureGraphSession` can read it without a dependency list.
@@ -1427,9 +1443,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // into the tab — seeded from the tab on activation so a capture taken before
   // the view mounts does not carry the previous tab's state over.
   const schemaMetaRef = useRef<SchemaViewMeta>({});
+  // The schema view's layout and direction are also mirrored in state, so the
+  // address bar follows them. The rest of its metadata changes on every pan
+  // and stays in the ref; bailing out on equal values keeps this quiet.
+  const [schemaLayout, setSchemaLayout] = useState<Pick<SchemaViewMeta, "layout" | "direction">>({});
+  const mirrorSchemaLayout = useCallback(({ layout: l, direction: d }: SchemaViewMeta) => {
+    setSchemaLayout(prev => (prev.layout === l && prev.direction === d ? prev : { layout: l, direction: d }));
+  }, []);
   const setSchemaMeta = useCallback((meta: SchemaViewMeta) => {
     schemaMetaRef.current = meta;
-  }, []);
+    mirrorSchemaLayout(meta);
+  }, [mirrorSchemaLayout]);
 
   const captureGraphSession = useCallback((): GraphSession => {
     const state = sessionStateRef.current;
@@ -1523,6 +1547,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // The schema view reads this when it mounts, and writes back to it as the
     // user works — so hand it the incoming tab's state before it does either.
     schemaMetaRef.current = tab.schema ?? {};
+    mirrorSchemaLayout(schemaMetaRef.current);
 
     // The canvas follows these through ForceGraphContext, so applying them here
     // covers both branches — a restored session carries its positions, not the
@@ -1566,15 +1591,37 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       && graphNamesLoadedRef.current
       && !graphNamesRef.current.includes(tab.graphName);
 
+    // A tab that will not run its query must not keep showing the outgoing
+    // tab's results either — treat its graph as a fresh selection, which clears them.
+    if (tab.awaitingRun && !graphIsGone) {
+      // Same graph as the one shown: the reset clears its info and counts, and
+      // /graph only refetches those when the name changes — so ask it to.
+      if (graphNameRef.current === tab.graphName) setGraphInfoReload(v => v + 1);
+      graphNameRef.current = "";
+    }
     // Ordering matters: handleSetGraphName clears the editor and the selection,
     // so everything the tab carries has to be applied after it.
     handleSetGraphName(graphIsGone ? "" : tab.graphName);
     setCurrentTab(tab.view);
-    setHistoryQuery(h => ({ ...h, query: tab.query, currentQuery: defaultQueryHistory.currentQuery }));
+    // The editor falls back to `currentQuery.text` when it mounts, so the tab's
+    // text goes there too — or an editor mounting after this wipes it, and a tab
+    // that does not run its query (a share link's) never gets it back.
+    setHistoryQuery(h => ({ ...h, query: tab.query, currentQuery: { ...defaultQueryHistory.currentQuery, text: tab.query } }));
     // /graph resolves this against the results once they arrive.
     setSelectedParam(meta.selected ?? "");
 
-    if (graphIsGone || !tab.graphName || !tab.query) return;
+    if (graphIsGone || !tab.graphName) return;
+
+    // A share link hands over someone else's query: show it, but leave running
+    // it to the user. The graph page still fetches the graph's info and counts;
+    // the default-query auto-load must not fire, or it would run a query after
+    // all and replace the shared text in the editor.
+    if (tab.awaitingRun) {
+      pendingAutoLoadRef.current = null;
+      return;
+    }
+
+    if (!tab.query) return;
 
     // We run the tab's own query, so the default-query auto-load must not fire.
     pendingAutoLoadRef.current = null;
@@ -1589,7 +1636,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (meta.viewport) setViewport(meta.viewport);
       setCurrentTab(tab.view);
     });
-  }, [handleSetGraphName, restoreGraphSession, runQuery]);
+  }, [handleSetGraphName, restoreGraphSession, runQuery, mirrorSchemaLayout]);
+
+  const liveLayout = useMemo(
+    () => ({ graph: { layout, direction }, schema: schemaLayout }),
+    [layout, direction, schemaLayout],
+  );
 
   const graphTabs = useGraphTabs({
     prefixReady,
@@ -1600,14 +1652,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // The tutorial gets a strip of its own; the user's tabs come back with it.
     tutorialOpen,
     initialTabId: initialTabIdRef.current,
+    initialShare: initialShareRef.current,
     graphName,
     query: historyQuery.query,
     view: currentTab,
+    liveLayout,
     maxTabs,
     captureSession: captureGraphSession,
     captureMeta: captureTabMeta,
     onActivate: handleActivateTab,
   });
+
+  markTabRanRef.current = graphTabs.markRan;
 
   const graphTabsContext = useMemo(
     () => ({ ...graphTabs, setSchemaMeta }),
@@ -1975,7 +2031,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // The tour drives desktop-only chrome (side panels, hover targets, right-click),
       // so it never runs on a phone. Read the width rather than `useIsMobile` — this
       // effect fires before the hook has corrected its server-rendered `false`.
-      setTutorialOpen(window.innerWidth >= MOBILE_BREAKPOINT && localStorage.getItem("tutorial") !== "false");
+      // A share link is someone asking to see a particular graph, and the tour
+      // would swap it out for demo graphs — so it waits for a regular visit
+      // instead. It is not marked as seen, so that visit still shows it.
+      setTutorialOpen(
+        window.innerWidth >= MOBILE_BREAKPOINT
+        && localStorage.getItem("tutorial") !== "false"
+        && !initialShareRef.current
+      );
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
       setMaxTabs(loadedMaxTabs);
@@ -2348,9 +2411,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName, graphNamesLoaded]);
 
-  // One-way sync: context state → URL (only while on /graph). The working
-  // context itself is not in the URL — the active tab owns it — so all the URL
-  // has to name is which tab.
+  // One-way sync: context state → URL (only while on /graph). The URL names
+  // the active tab, and carries its share params so a copied address bar opens
+  // for anyone. Debounced: the query changes on every keystroke, and Safari
+  // throws once replaceState is called too often.
   const prevPathnameRef = useRef(pathname);
 
   useEffect(() => {
@@ -2363,8 +2427,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // then would strip ?tab= before it has been read back.
     if (!graphNamesLoaded) return;
 
-    syncRouteUrlParams(pathname, { tab: graphTabs.activeTabId });
-  }, [pathname, graphTabs.activeTabId, tutorialOpen, graphNamesLoaded]);
+    const timer = window.setTimeout(() => {
+      syncRouteUrlParams(pathname, { tab: graphTabs.activeTabId, share: graphTabs.activeShareParams });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [pathname, graphTabs.activeTabId, graphTabs.activeShareParams, tutorialOpen, graphNamesLoaded]);
 
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {

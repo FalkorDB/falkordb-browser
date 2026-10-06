@@ -135,6 +135,7 @@ class FalkorDBTokenStorage implements ITokenStorage {
              t.last_used as last_used,
              t.is_active as is_active,
              t.encrypted_password as encrypted_password,
+             t.kind as kind,
              t.tls as tls,
              t.ca as ca
     `;
@@ -162,6 +163,7 @@ class FalkorDBTokenStorage implements ITokenStorage {
       last_used: row.last_used,
       is_active: row.is_active,
       encrypted_password: row.encrypted_password,
+      kind: row.kind ?? 'pat',
       tls: row.tls ?? false,
       ca: row.ca || undefined,
     };

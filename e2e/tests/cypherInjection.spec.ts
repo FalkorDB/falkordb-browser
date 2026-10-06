@@ -12,11 +12,24 @@ import urls from "../config/urls.json";
  * data rather than executing — the sentinel nodes are the canary.
  */
 
-// Closes the label/type position and appends a destructive clause.
+// `label` closes the label/type position and appends a destructive clause;
+// `key` closes the `{key: value}` property map as well.
 const HOSTILE_LABEL = "Injected DETACH DELETE n //";
-// Closes the property map as well, for the `{key: value}` position.
 const HOSTILE_KEY = "k} ) DETACH DELETE n //";
+// The one character quoting has to escape: an unescaped backtick would end the
+// quoted span and let the rest run as Cypher. FalkorDB's grammar has no escape
+// for a backtick inside a quoted name, so the doubled one quoting emits is a
+// syntax error — such a name can never be stored, only refused.
+const BACKTICK_LABEL = "x` DETACH DELETE n //";
+const BACKTICK_KEY = "x`: 0} ) DETACH DELETE n //";
 const SENTINELS = 'CREATE (:Victim {name: "a"}), (:Victim {name: "b"})';
+// FalkorDB's parse error for the doubled backtick, passed through by the
+// routes. Pinning it keeps an unrelated refusal (a 403, a validation 400) from
+// passing for this one.
+const expectParseRefusal = ({ status, body }: { status: number; body: { message?: string } }) => {
+  expect(status).toBe(400);
+  expect(body.message).toMatch(/Invalid input '`'/);
+};
 
 test.describe("Cypher identifier escaping", () => {
   let browser: BrowserWrapper;
@@ -97,9 +110,10 @@ test.describe("Cypher identifier escaping", () => {
     expect(await countVictims(graphName)).toBe(2);
     const response = await apiCall.runQuery(
       graphName,
-      `MATCH (n:\`${HOSTILE_LABEL}\`) RETURN n`
+      "MATCH (n) WHERE NOT n:Victim RETURN n"
     );
     expect(response.data).toHaveLength(1);
+    expect(response.data[0].n.labels).toContain(HOSTILE_LABEL);
     expect(response.data[0].n.properties[HOSTILE_KEY]).toBe("payload");
 
     await apiCall.removeGraph(graphName);
@@ -121,10 +135,57 @@ test.describe("Cypher identifier escaping", () => {
     expect(await countVictims(graphName)).toBe(2);
     const response = await apiCall.runQuery(
       graphName,
-      `MATCH ()-[e:\`${HOSTILE_LABEL}\`]->() RETURN e`
+      "MATCH ()-[e]->() RETURN type(e) AS t, e"
     );
     expect(response.data).toHaveLength(1);
+    expect(response.data[0].t).toBe(HOSTILE_LABEL);
     expect(response.data[0].e.properties[HOSTILE_KEY]).toBe("payload");
+
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Validate that a backtick node label is refused, not executed`, async () => {
+    const graphName = getRandomString("injection");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, SENTINELS);
+
+    // FalkorDB has no backtick escape inside a quoted name, so both are syntax errors.
+    const added = await apiCall.addGraphNodeLabelWithStatus(graphName, "0", { label: BACKTICK_LABEL });
+    expectParseRefusal(added);
+    const removed = await apiCall.deleteGraphNodeLabelWithStatus(graphName, "0", { label: BACKTICK_LABEL });
+    expectParseRefusal(removed);
+
+    expect(await countVictims(graphName)).toBe(2);
+    const response = await apiCall.runQuery(
+      graphName,
+      "MATCH (n) WHERE ID(n) = 0 RETURN n"
+    );
+    expect(response.data[0].n.labels).toEqual(["Victim"]);
+
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Validate that a backtick label, type or key on element creation is refused, not executed`, async () => {
+    const graphName = getRandomString("injection");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, SENTINELS);
+
+    const attempts: Parameters<ApiCalls["createGraphElement"]>[1][] = [
+      { type: true, label: [BACKTICK_LABEL], attributes: [["k", "payload"]] },
+      { type: true, label: ["Payload"], attributes: [[BACKTICK_KEY, "payload"]] },
+      { type: false, label: [BACKTICK_LABEL], attributes: [["k", "payload"]], selectedNodes: [{ id: 0 }, { id: 1 }] },
+      { type: false, label: ["REL"], attributes: [[BACKTICK_KEY, "payload"]], selectedNodes: [{ id: 0 }, { id: 1 }] },
+    ];
+    for (const attempt of attempts) {
+      const created = await apiCall.createGraphElement(graphName, attempt);
+      expectParseRefusal(created);
+    }
+
+    expect(await countVictims(graphName)).toBe(2);
+    const nodes = await apiCall.runQuery(graphName, "MATCH (n) RETURN count(n) AS c");
+    expect(Number(nodes.data[0].c)).toBe(2);
+    const edges = await apiCall.runQuery(graphName, "MATCH ()-[e]->() RETURN count(e) AS c");
+    expect(Number(edges.data[0].c)).toBe(0);
 
     await apiCall.removeGraph(graphName);
   });

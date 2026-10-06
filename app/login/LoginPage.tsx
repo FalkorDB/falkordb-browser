@@ -10,10 +10,11 @@ import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 import type { PreconfiguredConnectionInfo } from "@/lib/preconfiguredConnection";
 import Spinning from "@/app/components/ui/spinning";
+import Button from "@/app/components/ui/Button";
 import LoginForm, { LoginFormCredentials } from "./LoginForm";
 
 const AUTO_CONNECT_FAILED =
-  "Could not connect with the preconfigured connection. Check the FALKORDB_* environment variables and the server logs, or log in manually below.";
+  "Could not connect with the preconfigured connection. Check the FALKORDB_* environment variables and the server logs, then retry, or log in manually below.";
 
 const LOOKUP_FAILED =
   "Could not read the preconfigured connection. Check the server logs, or log in manually below.";
@@ -37,6 +38,10 @@ export default function LoginPage() {
   // automatic login takes over.
   const [preconfigured, setPreconfigured] = useState<PreconfiguredConnectionInfo | undefined>();
   const [autoConnectError, setAutoConnectError] = useState("");
+  // Bumped by "Retry" to re-run the automatic login. With auto-connect on the
+  // lookup withholds the endpoint, so the form below has nothing to prefill
+  // and retrying is the only way back to the preconfigured connection.
+  const [autoConnectRetries, setAutoConnectRetries] = useState(0);
   const [lookupError, setLookupError] = useState("");
   const autoConnectAttempt = useRef<Promise<SignInResponse | undefined> | null>(null);
 
@@ -127,7 +132,7 @@ export default function LoginPage() {
     return () => {
       active = false;
     };
-  }, [preconfigured, signedOut, hasConnectionParams, router, status]);
+  }, [preconfigured, signedOut, hasConnectionParams, router, status, autoConnectRetries]);
 
   useEffect(() => {
     const hostParam = searchParams.get("host");
@@ -143,6 +148,12 @@ export default function LoginPage() {
     setInitialUsername(usernameParam ?? preconfigured?.username ?? "");
     setInitialTLS(tls !== null ? tls === "true" : preconfigured?.tls ?? false);
   }, [searchParams, preconfigured]);
+
+  const retryAutoConnect = () => {
+    autoConnectAttempt.current = null;
+    setAutoConnectError("");
+    setAutoConnectRetries((n) => n + 1);
+  };
 
   const handleLogin = async (credentials: LoginFormCredentials) => {
     const params: Record<string, unknown> & { redirect: false } = {
@@ -193,9 +204,18 @@ export default function LoginPage() {
             ) : (
               <>
                 {autoConnectError && (
-                  <p className="text-sm text-center text-red-500" data-testid="loginAutoConnectError">
-                    {autoConnectError}
-                  </p>
+                  <div className="flex flex-col gap-2 items-center">
+                    <p className="text-sm text-center text-red-500" data-testid="loginAutoConnectError">
+                      {autoConnectError}
+                    </p>
+                    <Button
+                      variant="Secondary"
+                      label="Retry"
+                      title=""
+                      onClick={retryAutoConnect}
+                      data-testid="loginAutoConnectRetry"
+                    />
+                  </div>
                 )}
                 {lookupError && (
                   <p className="text-sm text-center text-red-500" data-testid="loginPreconfiguredError">

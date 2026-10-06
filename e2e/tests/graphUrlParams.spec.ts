@@ -6,8 +6,9 @@ import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
 
 // The working context (graph, query, selection, viewport) lives on the active
-// tab, not in the URL. All the URL carries is which tab to open, so these tests
-// assert the handover: state → ?tab=, and ?tab= → rebuilt context.
+// tab. The URL names which tab to open, and carries only the portable part of
+// it — graph, query, view, layout — so a copied address bar opens for anyone.
+// These tests assert the handover: state → URL, and ?tab= → rebuilt context.
 test.describe("@admin Graph URL params", () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
@@ -42,17 +43,39 @@ test.describe("@admin Graph URL params", () => {
         await expect.poll(() => tabParam(graph), { timeout: 15000 }).toBeTruthy();
     });
 
-    test("Working context is kept off the URL", async () => {
+    test("Only the portable part of the context is on the URL", async () => {
+        const query = "MATCH (n) RETURN n LIMIT 5";
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.selectGraphByName(graphName);
+        await graph.waitForPageIdle();
+        await graph.insertQuery(query);
+        await graph.clickRunQuery();
+
+        const param = (key: string) => new URL(graph.getCurrentURL()).searchParams.get(key);
+        await expect.poll(() => param("graph"), { timeout: 15000 }).toBe(graphName);
+        await expect.poll(() => param("query"), { timeout: 15000 }).toBe(query);
+        // Selection and viewport belong to one screen, so they stay behind.
+        expect(param("selected")).toBeNull();
+        expect(param("viewport")).toBeNull();
+    });
+
+    test("A query too long for the address bar stays off it", async () => {
+        // Past MAX_SHARED_QUERY_LENGTH (lib/graphTabs.ts) once encoded.
+        const query = `RETURN '${"x".repeat(2100)}'`;
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await graph.selectGraphByName(graphName);
         await graph.waitForPageIdle();
         await graph.insertQuery("MATCH (n) RETURN n LIMIT 5");
-        await graph.clickRunQuery();
 
-        const params = new URL(graph.getCurrentURL()).searchParams;
-        expect(params.get("graph")).toBeNull();
-        expect(params.get("query")).toBeNull();
-        expect(params.get("selected")).toBeNull();
+        const param = (key: string) => new URL(graph.getCurrentURL()).searchParams.get(key);
+        await expect.poll(() => param("query"), { timeout: 15000 }).toBe("MATCH (n) RETURN n LIMIT 5");
+
+        await graph.insertQuery(query);
+
+        // The link still opens the tab's graph, just without the draft.
+        await expect.poll(() => param("query"), { timeout: 15000 }).toBeNull();
+        expect(param("graph")).toBe(graphName);
+        expect(tabParam(graph)).toBeTruthy();
     });
 
     test("Refreshing rebuilds the tab's graph and query", async () => {
@@ -71,7 +94,8 @@ test.describe("@admin Graph URL params", () => {
         await graph.refreshPage();
         await graph.waitForPageIdle();
 
-        // Same tab, and its context is back without any of it being in the URL.
+        // Same tab, and its context is back — rebuilt from the tab, which wins
+        // over the share params beside it.
         await expect.poll(() => tabParam(graph), { timeout: 15000 }).toBe(tabId);
         await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
         // The query is the other half of the context — a reload that only

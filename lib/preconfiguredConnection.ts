@@ -230,11 +230,48 @@ export function readPreconfiguredConnection(env: PreconfiguredEnv): Preconfigure
     };
 }
 
-/** Strips the secrets, leaving only what the login form would prefill anyway. */
+// On `globalThis` rather than in a module variable: Next.js may load this
+// module once per route bundle, and the warning is meant once per process.
+const AUTO_CONNECT_WARNED = Symbol.for("falkordb-browser.preconfigured.autoConnectWarned");
+
+/**
+ * Logs, once per process, that auto-connect hands the configured credentials
+ * to anyone who can reach the browser. Returns whether it logged.
+ *
+ * Auto-connect stays on by default because existing deployments rely on it,
+ * so the log is where an operator who never read the docs finds out. Only a
+ * password makes it worth saying: without one the database is open anyway.
+ */
+export function warnIfAutoConnectExposesCredentials(
+    connection: PreconfiguredConnection | null,
+    warn: (message: string) => void = console.warn
+): boolean {
+    if (!connection?.autoConnect || !connection.password) return false;
+
+    const flags = globalThis as unknown as Record<symbol, boolean | undefined>;
+    if (flags[AUTO_CONNECT_WARNED]) return false;
+    flags[AUTO_CONNECT_WARNED] = true;
+
+    warn(
+        `SECURITY: FALKORDB_AUTO_CONNECT is on with a configured password, so anyone who can reach this browser ` +
+        `is signed in to ${connection.host}:${connection.port} as "${connection.username}" without a prompt. ` +
+        "Restrict access to the browser, use a read-only FalkorDB user, or set FALKORDB_AUTO_CONNECT=false."
+    );
+    return true;
+}
+
+/**
+ * Strips the secrets, leaving only what the login form would prefill anyway.
+ *
+ * With auto-connect on the form is never shown, so there is nothing to prefill
+ * and the endpoint and username are withheld too: the route answering this is
+ * unauthenticated, and they would only tell a stranger where to aim.
+ */
 export function toPreconfiguredConnectionInfo(
     connection: PreconfiguredConnection | null
 ): PreconfiguredConnectionInfo {
     if (!connection) return { configured: false, autoConnect: false };
+    if (connection.autoConnect) return { configured: true, autoConnect: true };
 
     return {
         configured: true,
