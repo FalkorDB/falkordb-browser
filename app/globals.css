@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* FalkorDB base rules: no focus outline on anything. */
+@import "@falkordb/ui/base.css";
 @config "../tailwind.config.js";
 
 /* Desktop is authoritative down to 1100px wide; below that is the mobile layout.
@@ -190,10 +192,6 @@
 
 .dark ::-webkit-scrollbar-thumb {
     background: #666666;
-}
-
-input:focus-visible {
-    outline: none;
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {
