@@ -513,17 +513,22 @@ test.describe("@admin Mobile layout", () => {
         await graph.openGraphInfoSheet();
         await graph.clickCreateGraph();
 
-        const { dialog, children, viewport } = await graph.createGraphDialogLayout();
+        const { dialog, controls, children, viewport } = await graph.createGraphDialogLayout();
 
         // An input will not shrink below its intrinsic width, so the name row was
         // wider than the dialog and the footer's two buttons sent the confirm one
         // off the left edge. Both wrap now.
         expect(dialog.x).toBeGreaterThanOrEqual(0);
         expect(dialog.x + dialog.width).toBeLessThanOrEqual(viewport.width);
-        expect(children.length).toBeGreaterThan(0);
-        children.forEach(child => {
+        expect(dialog.y).toBeGreaterThanOrEqual(0);
+        expect(dialog.y + dialog.height).toBeLessThanOrEqual(viewport.height);
+        // The controls the fix targets are measured by name, so a missing one fails
+        // rather than leaving fewer children to check.
+        [controls.input, controls.confirm, controls.cancel, ...children].forEach(child => {
             expect(child.x).toBeGreaterThanOrEqual(dialog.x);
             expect(child.x + child.width).toBeLessThanOrEqual(dialog.x + dialog.width);
+            expect(child.y).toBeGreaterThanOrEqual(dialog.y);
+            expect(child.y + child.height).toBeLessThanOrEqual(dialog.y + dialog.height);
         });
     });
 });

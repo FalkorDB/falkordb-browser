@@ -1934,6 +1934,19 @@ export default class GraphPage extends BasePage {
     };
   }
 
+  /**
+   * Waits for `#dialog`'s open animation (it slides and zooms in) to finish:
+   * `boundingBox()` does not wait for animations, so a box taken mid-slide can
+   * still poke past the viewport.
+   */
+  private async waitForDialogSettled(): Promise<void> {
+    await this.page.locator("#dialog").waitFor({ state: "visible" });
+    await this.page.waitForFunction(() => {
+      const dialog = document.querySelector("#dialog");
+      return !!dialog && dialog.getAnimations({ subtree: true }).every(animation => animation.playState === "finished");
+    });
+  }
+
   /** Geometry of the Delete Graph dialog, the two buttons in its footer, and the viewport holding them. */
   async deleteDialogLayout(): Promise<{
     dialog: Box;
@@ -1942,6 +1955,7 @@ export default class GraphPage extends BasePage {
   }> {
     const viewport = this.page.viewportSize();
     if (!viewport) throw new Error("Headless page has no viewport");
+    await this.waitForDialogSettled();
     return {
       dialog: await GraphPage.boxOf(this.page.locator("#dialog"), "Delete Graph dialog"),
       buttons: [
@@ -1952,14 +1966,19 @@ export default class GraphPage extends BasePage {
     };
   }
 
-  /** Geometry of the Create New Graph dialog, everything laid out inside it, and the viewport. */
+  /**
+   * Geometry of the Create New Graph dialog, its name input and footer buttons,
+   * everything else laid out inside it, and the viewport.
+   */
   async createGraphDialogLayout(): Promise<{
     dialog: Box;
+    controls: { input: Box; confirm: Box; cancel: Box };
     children: Box[];
     viewport: { width: number; height: number };
   }> {
     const viewport = this.page.viewportSize();
     if (!viewport) throw new Error("Headless page has no viewport");
+    await this.waitForDialogSettled();
     const dialog = this.page.locator("#dialog");
     const children: Box[] = [];
     const boxes = await dialog.locator("button, input, p").all();
@@ -1970,6 +1989,12 @@ export default class GraphPage extends BasePage {
     }
     return {
       dialog: await GraphPage.boxOf(dialog, "Create New Graph dialog"),
+      // boxOf throws when one is missing, so a regression that drops a control fails here.
+      controls: {
+        input: await GraphPage.boxOf(this.insertInput, "Create Graph name input"),
+        confirm: await GraphPage.boxOf(this.createConfirm, "Create Graph confirm"),
+        cancel: await GraphPage.boxOf(this.createCancel, "Create Graph cancel"),
+      },
       children,
       viewport,
     };
@@ -1979,7 +2004,7 @@ export default class GraphPage extends BasePage {
    * The canvas toolbar's action buttons in render order, plus the row that holds
    * them, so a test can check both the order and where the group sits.
    */
-  async canvasToolbarActionLayout(): Promise<{ row: Box; actions: { id: string; box: Box }[] }> {
+  async canvasToolbarActionLayout(): Promise<{ row: Box; search: Box; actions: { id: string; box: Box }[] }> {
     const group = this.page.getByTestId("elementCanvasToolbarActionGraph");
     const actions: { id: string; box: Box }[] = [];
     for (const button of await group.getByRole("button").all()) {
@@ -1988,6 +2013,7 @@ export default class GraphPage extends BasePage {
     }
     return {
       row: await GraphPage.boxOf(group.locator("xpath=.."), "Canvas toolbar row"),
+      search: await GraphPage.boxOf(this.page.getByTestId("elementCanvasSearchGraph"), "Canvas search box"),
       actions,
     };
   }

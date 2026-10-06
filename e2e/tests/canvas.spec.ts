@@ -306,7 +306,7 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
 
-        const { row, actions } = await graph.canvasToolbarActionLayout();
+        const { row, search, actions } = await graph.canvasToolbarActionLayout();
 
         // Same order as mobile: Show All leads, and the group follows the search
         // rather than being reversed and pinned to the far right of the canvas.
@@ -314,6 +314,10 @@ test.describe('Canvas Tests', () => {
             "elementCanvasShowAllGraph",
             "elementCanvasAddNodeGraph",
         ]);
+        // The group starts right after the search box, not at the far edge.
+        const first = actions[0]!.box;
+        expect(first.x).toBeGreaterThanOrEqual(search.x + search.width);
+        expect(first.x - (search.x + search.width)).toBeLessThanOrEqual(32);
         const last = actions[actions.length - 1]!.box;
         expect(last.x + last.width).toBeLessThan(row.x + row.width);
 
