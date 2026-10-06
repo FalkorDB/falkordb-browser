@@ -2,7 +2,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import useLongPress from "@/lib/useLongPress";
 import { Button as UIButton, type ButtonProps as UIButtonProps } from "@falkordb/ui";
-import { Loader2 } from "lucide-react";
 import React, { forwardRef, useEffect, useRef, useState } from "react";
 
 export type Variant = "Primary" | "Secondary" | "Cancel" | "Delete" | "button";
@@ -132,19 +131,21 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
             </TooltipContent>
         </Tooltip>
     ) : (
-        // Without a tooltip the spinner joins the children rather than replacing
-        // them, so this branch composes its own content instead of handing
-        // `isLoading` to the design system.
+        // The design system swaps the children and label for its spinner while
+        // loading, and puts the label in its truncating span, as on the tooltip path.
         <UIButton
             ref={ref}
             {...LOOKS[variant]}
-            className={cn(open !== undefined && "gap-4", isLoading && "justify-center", className)}
+            className={cn(open !== undefined && "gap-4", className)}
             disabled={disabled || isLoading}
             type={type}
+            isLoading={isLoading}
+            loaderSize={loaderSize}
+            label={label || undefined}
+            labelClassName="text-center"
             {...props}
         >
             {children}
-            {isLoading ? <Loader2 className="animate-spin" /> : label}
         </UIButton>
     );
 });

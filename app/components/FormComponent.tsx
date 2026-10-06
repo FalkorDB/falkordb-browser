@@ -109,14 +109,18 @@ function toFieldConfig(field: Field, passwordLabels: string[]): FieldConfig {
             return {
                 ...base,
                 type: "custom",
-                render: ({ id }) => (
+                render: ({ id, onValueChange }) => (
                     <Combobox
                         className="w-fit"
                         id={id}
                         options={field.options}
                         label={field.selectType}
                         selectedValue={field.value}
-                        setSelectedValue={field.onChange}
+                        setSelectedValue={(value) => {
+                            field.onChange(value);
+                            // Re-checks the field, so a "required" error clears once a value is picked.
+                            onValueChange(value);
+                        }}
                     />
                 ),
             };

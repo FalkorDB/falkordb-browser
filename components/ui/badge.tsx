@@ -20,7 +20,8 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
       variant={variant}
       className={cn(
         "font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-        hoverTint[variant ?? "default"],
+        // An omitted variant gets the default tint; an explicit null opts out of any.
+        variant === null ? undefined : hoverTint[variant ?? "default"],
         className
       )}
       {...props}

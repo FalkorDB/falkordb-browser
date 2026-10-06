@@ -40,8 +40,10 @@ const DropdownMenuSubContent = React.forwardRef<
 ))
 DropdownMenuSubContent.displayName = "DropdownMenuSubContent"
 
-// The browser's checkbox items highlight with `accent` on focus rather than
-// `secondary` on hover like the rest of the menu.
+// The browser's checkbox items highlight with `accent` rather than `secondary`
+// like the rest of the menu. Radix marks the highlighted item with
+// `data-highlighted` for both keyboard focus and hover, so the accent goes there
+// too; otherwise the design system's `data-[highlighted]` style competes with it.
 const DropdownMenuCheckboxItem = React.forwardRef<
   React.ComponentRef<typeof UIDropdownMenuCheckboxItem>,
   React.ComponentPropsWithoutRef<typeof UIDropdownMenuCheckboxItem>
@@ -49,7 +51,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
   <UIDropdownMenuCheckboxItem
     ref={ref}
     className={cn(
-      "hover:bg-transparent focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-transparent",
+      "hover:bg-transparent focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
       className
     )}
     {...props}
