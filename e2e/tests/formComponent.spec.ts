@@ -108,6 +108,9 @@ test.describe("@admin Add user form validation", () => {
 
     test("@admin shows every failing field on submit and does not submit", async ({ page }) => {
         await page.getByRole("button", { name: "Submit" }).click();
+        // Every required field is empty, so each reports its first failing rule.
+        await expect(page.getByText("Username is required")).toBeVisible();
+        await expect(page.getByText("Password is required", { exact: true })).toBeVisible();
         await expect(page.getByText("Confirm password is required")).toBeVisible();
         await expect(page.getByText("Role is required")).toBeVisible();
         await expect(confirmPassword(page)).toBeVisible();

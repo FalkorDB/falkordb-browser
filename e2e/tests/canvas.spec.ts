@@ -298,6 +298,8 @@ test.describe('Canvas Tests', () => {
     });
 
     test(`@admin Validate toolbar actions sit at the far end of the row on desktop`, async () => {
+        // Selecting two nodes waits out the double-click window twice.
+        test.slow();
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -305,13 +307,23 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
+        await graph.waitForScaleToStabilize();
+
+        // Add Edge needs exactly two selected nodes and Delete any selection, so
+        // select two nodes to bring the whole group up.
+        const [first, second] = await graph.getNodesScreenPositions();
+        await graph.elementClick(first.screenX, first.screenY);
+        const secondNow = (await graph.getNodesScreenPositions()).find(node => node.id === second.id);
+        await graph.elementClick(secondNow.screenX, secondNow.screenY, true);
 
         const { row, search, actions } = await graph.canvasToolbarActionLayout();
         const ids = actions.map(action => action.id);
 
         // Desktop pins Add Node, Add Edge and Delete to the far right of the row,
         // away from the search; only mobile groups them under it.
-        expect(ids).toContain("elementCanvasAddNodeGraph");
+        expect(ids).toEqual(
+            expect.arrayContaining(["elementCanvasAddNodeGraph", "elementCanvasAddEdgeGraph", "deleteElementGraph"])
+        );
         expect(ids).not.toContain("elementCanvasShowAllGraph");
         const right = Math.max(...actions.map(({ box }) => box.x + box.width));
         const left = Math.min(...actions.map(({ box }) => box.x));
@@ -677,6 +689,8 @@ test.describe('Canvas Tests', () => {
     // #1084: with canvas fingerprinting protection on, hit detection's pixel
     // read is scrambled and random nodes stopped responding to hover and click.
     test(`@admin Every node stays hoverable and clickable when canvas pixel reads are scrambled`, async () => {
+        // Ten hover checks plus the canvas animation settle: slow on CI runners.
+        test.slow();
         const graphName = getRandomString('fingerprint');
         await apicalls.addGraph(graphName);
         try {
