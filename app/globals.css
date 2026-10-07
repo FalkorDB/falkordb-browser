@@ -352,3 +352,16 @@ input[type="color"]::-webkit-color-swatch {
     -webkit-text-fill-color: transparent;
     -webkit-tap-highlight-color: transparent;
 }
+
+/*
+ * Radix locks page scroll behind menus and dialogs with react-remove-scroll-bar,
+ * which rewrites the body's padding to its margins (0) while locked. That drops
+ * the safe-area padding the root layout puts on the body, so on an edge-to-edge
+ * screen (the Android app, a Home Screen launch on iOS) the page jumps up under
+ * the status bar whenever a menu opens. Keep the insets while locked.
+ */
+body[data-scroll-locked] {
+    padding-top: env(safe-area-inset-top) !important;
+    padding-left: env(safe-area-inset-left) !important;
+    padding-right: env(safe-area-inset-right) !important;
+}
