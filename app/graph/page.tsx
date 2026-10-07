@@ -876,7 +876,7 @@ export default function Page() {
     }
 
     return (
-        <div className="h-full w-full flex flex-col min-h-0">
+        <div className="relative h-full w-full flex flex-col min-h-0">
             <GraphSubHeader />
             <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
                 <ResizablePanel
@@ -926,27 +926,30 @@ export default function Page() {
                                 >
                                     {getCurrentPanel()}
                                 </ResizablePanel>
-                                {
-                                    chatOpen && graphName &&
-                                    <div className="absolute bottom-2 right-3 z-30">
-                                        <ResizableBox
-                                            width={chatSize.width}
-                                            height={chatSize.height}
-                                            minWidth={300}
-                                            minHeight={300}
-                                            onResizeEnd={(w, h) => onChatResize(w, h)}
-                                            direction="top-left"
-                                        >
-                                            <Chat onClose={() => setChatOpen(false)} />
-                                        </ResizableBox>
-                                    </div>
-                                }
                             </ResizablePanelGroup>
                         </div>
                         <div className="h-4 w-full Gradient" />
                     </div>
                 </ResizablePanel>
             </ResizablePanelGroup>
+            {
+                // Outside the panel groups: every panel clips its overflow, so a chat dragged wider
+                // than the canvas column would be cut off under the Graph Info panel. The offsets
+                // keep it where it sat in the canvas: the Page padding plus the bottom gradient strip.
+                chatOpen && graphName &&
+                <div className="absolute bottom-9 right-6 z-30">
+                    <ResizableBox
+                        width={chatSize.width}
+                        height={chatSize.height}
+                        minWidth={300}
+                        minHeight={300}
+                        onResizeEnd={(w, h) => onChatResize(w, h)}
+                        direction="top-left"
+                    >
+                        <Chat onClose={() => setChatOpen(false)} />
+                    </ResizableBox>
+                </div>
+            }
         </div>
     );
 }

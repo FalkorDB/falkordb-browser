@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import ChatComponent from "../logic/POM/chatComponent";
+import GraphInfoPage from "../logic/POM/graphInfoPage";
 import SettingsBrowserPage from "../logic/POM/settingsBrowserPage";
 import urls from "../config/urls.json";
 import { getRandomString } from "../infra/utils";
@@ -1049,6 +1050,44 @@ test.describe("Chat Feature Tests", () => {
 
     const modelText = await chat.getChatFooterModel();
     expect(modelText).toContain(DEFAULT_CHAT_MODEL);
+
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Verify chat dragged wider than the canvas stays above the Graph Info panel`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+    await chat.selectGraphByName(graphName);
+    await new GraphInfoPage(page).openGraphInfoButton();
+    await chat.openChat();
+
+    const panel = page.getByTestId("chatPanel");
+    const before = await panel.boundingBox();
+    const info = await page.getByTestId("graphInfoPanel").boundingBox();
+    expect(before).not.toBeNull();
+    expect(info).not.toBeNull();
+
+    // Drag the chat's left edge past the canvas column, over the Graph Info panel.
+    const y = before!.y + before!.height / 2;
+    await page.mouse.move(before!.x, y);
+    await page.mouse.down();
+    await page.mouse.move(info!.x + 40, y, { steps: 10 });
+    await page.mouse.up();
+
+    const after = await panel.boundingBox();
+    expect(after!.x).toBeLessThan(info!.x + info!.width);
+
+    // The chat's left part, over the Graph Info panel, must be what the user sees.
+    const onTop = await page.evaluate(({ x, py }) => {
+      const hit = document.elementFromPoint(x, py);
+      return !!hit?.closest('[data-testid="chatPanel"]');
+    }, { x: after!.x + 20, py: after!.y + after!.height / 2 });
+    expect(onTop).toBe(true);
 
     await apiCall.removeGraph(graphName);
   });
