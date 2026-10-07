@@ -3,9 +3,10 @@ productName: FalkorDB Browser
 copyright: Copyright © FalkorDB
 directories:
   output: dist
-# No spaces, so release download links stay readable, e.g.
-# FalkorDB-Browser-2.6.1-win-x64.exe
-artifactName: FalkorDB-Browser-${version}-${os}-${arch}.${ext}
+# No version and no spaces: the browser's "Download for …" links point at
+# releases/latest/download/<name>, which only works if the name never changes.
+# Keep in step with DESKTOP_DOWNLOADS in lib/appDownload.ts.
+artifactName: FalkorDB-Browser-${os}-${arch}.${ext}
 files:
   - main.cjs
   - package.json
@@ -21,6 +22,8 @@ mac:
   target: [dmg, zip]
 win:
   target: [nsis]
+nsis:
+  artifactName: FalkorDB-Browser-${os}-${arch}.${ext}
 linux:
   category: Development
   target: [AppImage]

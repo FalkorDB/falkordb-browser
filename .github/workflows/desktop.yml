@@ -61,8 +61,9 @@ jobs:
         working-directory: desktop
         run: npm ci --no-audit --progress=false
 
-      # Name the installers after the release (v2.6.1 -> 2.6.1), not the
-      # version last written into desktop/package.json.
+      # Stamp the app with the release's version (v2.6.1 -> 2.6.1), not the
+      # one last written into desktop/package.json. File names carry no
+      # version, so the browser's latest/download links keep working.
       - name: Use the release version
         if: github.event_name == 'release'
         working-directory: desktop
