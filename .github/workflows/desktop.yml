@@ -1,14 +1,16 @@
 name: Desktop app
 
-# Builds the Electron app on every OS and uploads the installers as workflow
-# artifacts. It publishes nothing, and runs only when the desktop shell
-# changes, on release tags, or on demand, so the web build and image release
-# workflows are unaffected.
+# Builds the Electron app on every OS. On pull requests, pushes and manual runs
+# the installers are only uploaded as workflow artifacts. When a GitHub release
+# is published, they are also attached to that release, so its page lists a
+# download for each OS. The release notes, the Docker image release and the
+# Helm chart are left alone.
 
 on:
+  release:
+    types: [published]
   push:
     branches: ["main", "staging"]
-    tags: ["v*.*.*"]
     paths:
       - "desktop/**"
       - ".github/workflows/desktop.yml"
@@ -59,6 +61,16 @@ jobs:
         working-directory: desktop
         run: npm ci --no-audit --progress=false
 
+      # Name the installers after the release (v2.6.1 -> 2.6.1), not the
+      # version last written into desktop/package.json.
+      - name: Use the release version
+        if: github.event_name == 'release'
+        working-directory: desktop
+        shell: bash
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: npm version "${TAG#v}" --no-git-tag-version --allow-same-version
+
       # Native modules in the standalone server are traced for the OS that
       # builds them, which is why each platform builds its own installer.
       - name: Build installers
@@ -76,3 +88,23 @@ jobs:
             desktop/dist/*.exe
           if-no-files-found: error
           retention-days: 14
+
+  attach-to-release:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: falkordb-browser-desktop-*
+          path: installers
+          merge-multiple: true
+
+      - name: Attach installers to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --clobber

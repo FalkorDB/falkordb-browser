@@ -3,6 +3,9 @@ productName: FalkorDB Browser
 copyright: Copyright © FalkorDB
 directories:
   output: dist
+# No spaces, so release download links stay readable, e.g.
+# FalkorDB-Browser-2.6.1-win-x64.exe
+artifactName: FalkorDB-Browser-${version}-${os}-${arch}.${ext}
 files:
   - main.cjs
   - package.json
