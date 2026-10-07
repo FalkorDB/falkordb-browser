@@ -14,7 +14,11 @@ export default function useAppDownload(): AppDownload | undefined {
     useEffect(() => {
         const { userAgent, maxTouchPoints } = navigator;
         const hasCapacitor = "Capacitor" in window;
-        if (isInsideApp(userAgent, hasCapacitor)) return undefined;
+        // iOS Safari flags a Home Screen launch on `navigator.standalone`;
+        // everything else reports it as a display mode.
+        const standalone = window.matchMedia?.("(display-mode: standalone)").matches
+            || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+        if (isInsideApp(userAgent, hasCapacitor, standalone)) return undefined;
 
         const platform = detectPlatform(userAgent, maxTouchPoints);
         if (platform !== "android" && platform !== "ios") {

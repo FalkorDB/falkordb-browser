@@ -44,9 +44,13 @@ export function detectPlatform(userAgent: string, maxTouchPoints = 0): AppPlatfo
     return undefined;
 }
 
-/** True inside the desktop (Electron) or mobile (Capacitor) app itself. */
-export function isInsideApp(userAgent: string, hasCapacitor: boolean): boolean {
-    return hasCapacitor || /\bElectron\//.test(userAgent);
+/**
+ * True inside the desktop (Electron) or mobile (Capacitor) app itself, or when
+ * the browser was opened from its Home Screen icon (`standalone`), which is
+ * the iOS "app" already.
+ */
+export function isInsideApp(userAgent: string, hasCapacitor: boolean, standalone = false): boolean {
+    return hasCapacitor || standalone || /\bElectron\//.test(userAgent);
 }
 
 export function getAppDownload(platform: AppPlatform | undefined, links: AppLinks): AppDownload | undefined {

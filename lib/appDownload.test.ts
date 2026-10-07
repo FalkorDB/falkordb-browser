@@ -47,6 +47,11 @@ test("isInsideApp recognizes the Electron and Capacitor shells", () => {
     assert.equal(isInsideApp(UA.linux, false), false);
 });
 
+test("isInsideApp treats a Home Screen launch as the app", () => {
+    assert.equal(isInsideApp(UA.iphone, false, true), true);
+    assert.equal(isInsideApp(UA.iphone, false, false), false);
+});
+
 test("getAppDownload links each desktop OS to its latest installer", () => {
     assert.deepEqual(getAppDownload("mac", {}), {
         platform: "mac", kind: "link", label: "Download for macOS", href: `${DESKTOP_RELEASE_BASE}/FalkorDB-Browser-mac-arm64.dmg`,
