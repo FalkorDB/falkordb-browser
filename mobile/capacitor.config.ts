@@ -4,11 +4,15 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // locally. The app is a native shell around a deployment of the browser
 // (see aws/), whose HTTPS URL is baked in at `cap sync` time.
 const serverUrl = process.env.FALKORDB_BROWSER_URL?.trim();
+// Development only: lets a debug build open a browser served over plain http
+// on the local network. Never set this for a release build.
+const allowHttp = process.env.FALKORDB_BROWSER_ALLOW_HTTP === "1";
 
 function parseServerUrl(value: string): URL {
     const url = new URL(value);
+    if (url.protocol === "http:" && allowHttp) return url;
     if (url.protocol !== "https:") {
-        throw new Error(`FALKORDB_BROWSER_URL must be https:// (got ${url.protocol}). iOS and Android block cleartext by default, and the session cookie is Secure.`);
+        throw new Error(`FALKORDB_BROWSER_URL must be https:// (got ${url.protocol}). iOS and Android block cleartext by default, and the session cookie is Secure. For a local-network test build only, set FALKORDB_BROWSER_ALLOW_HTTP=1.`);
     }
     return url;
 }
@@ -26,7 +30,7 @@ const config: CapacitorConfig = {
               // Keep navigation to the browser's own host inside the app;
               // every other link opens in the system browser.
               allowNavigation: [url.hostname],
-              cleartext: false,
+              cleartext: url.protocol === "http:",
           }
         : undefined,
 };
