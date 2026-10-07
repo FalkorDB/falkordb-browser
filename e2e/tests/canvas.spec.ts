@@ -297,7 +297,7 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate toolbar actions stay grouped after the search`, async () => {
+    test(`@admin Validate toolbar actions sit at the far end of the row on desktop`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -307,19 +307,21 @@ test.describe('Canvas Tests', () => {
         await graph.clickRunQuery();
 
         const { row, search, actions } = await graph.canvasToolbarActionLayout();
+        const ids = actions.map(action => action.id);
 
-        // Same order as mobile: Show All leads, and the group follows the search
-        // rather than being reversed and pinned to the far right of the canvas.
-        expect(actions.map(action => action.id).slice(0, 2)).toEqual([
-            "elementCanvasShowAllGraph",
-            "elementCanvasAddNodeGraph",
-        ]);
-        // The group starts right after the search box, not at the far edge.
-        const first = actions[0]!.box;
-        expect(first.x).toBeGreaterThanOrEqual(search.x + search.width);
-        expect(first.x - (search.x + search.width)).toBeLessThanOrEqual(32);
-        const last = actions[actions.length - 1]!.box;
-        expect(last.x + last.width).toBeLessThan(row.x + row.width);
+        // Desktop pins Add Node, Add Edge and Delete to the far right of the row,
+        // away from the search; only mobile groups them under it.
+        expect(ids).toContain("elementCanvasAddNodeGraph");
+        expect(ids).not.toContain("elementCanvasShowAllGraph");
+        const right = Math.max(...actions.map(({ box }) => box.x + box.width));
+        const left = Math.min(...actions.map(({ box }) => box.x));
+        expect(row.x + row.width - right).toBeLessThanOrEqual(2);
+        expect(left).toBeGreaterThan(search.x + search.width + 32);
+
+        // Show All belongs to Search & Filter and sits beside its toggle, left of the search box.
+        const showAll = await graph.elementCanvasShowAll.boundingBox();
+        expect(showAll).not.toBeNull();
+        expect(showAll!.x + showAll!.width).toBeLessThanOrEqual(search.x);
 
         await apicalls.removeGraph(graphName);
     });
