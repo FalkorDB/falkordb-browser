@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "private": true,
   "engines": {
     "node": ">=24.0.0"
@@ -138,7 +138,7 @@
     "prismjs": "^1.30.0",
     "postcss": "^8.5.17",
     "@babel/core": "^7.29.6",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "depcheck": {
       "js-yaml": "^3.15.0"
     },
