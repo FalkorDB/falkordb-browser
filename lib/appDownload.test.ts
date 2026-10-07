@@ -1,6 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DESKTOP_RELEASE_BASE, detectPlatform, getAppDownload, isInsideApp, readAppLinks } from "./appDownload.ts";
+import {
+    APP_PROMPT_DISMISSED_KEY,
+    APP_PROMPT_SHOWN_KEY,
+    DESKTOP_RELEASE_BASE,
+    detectPlatform,
+    dismissAppPrompt,
+    getAppDownload,
+    isInsideApp,
+    markAppPromptShown,
+    readAppLinks,
+    shouldShowAppPrompt,
+} from "./appDownload.ts";
 
 const UA = {
     android: "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36",
@@ -73,4 +84,41 @@ test("readAppLinks keeps only https URLs", () => {
     });
     assert.deepEqual(readAppLinks({ ANDROID_APP_URL: "http://play.test/app", IOS_APP_URL: "not a url" }), {});
     assert.deepEqual(readAppLinks({ ANDROID_APP_URL: "   " }), {});
+});
+
+function memoryStorage(initial: Record<string, string> = {}) {
+    const data = new Map(Object.entries(initial));
+    return {
+        data,
+        getItem: (key: string) => data.get(key) ?? null,
+        setItem: (key: string, value: string) => { data.set(key, value); },
+    };
+}
+
+const brokenStorage = {
+    getItem: (): string | null => { throw new Error("SecurityError"); },
+    setItem: (): void => { throw new Error("QuotaExceededError"); },
+};
+
+test("the app prompt shows once per session until it is dismissed", () => {
+    const local = memoryStorage();
+    const session = memoryStorage();
+    assert.equal(shouldShowAppPrompt(local, session), true);
+
+    markAppPromptShown(session);
+    assert.equal(session.data.get(APP_PROMPT_SHOWN_KEY), "true");
+    assert.equal(shouldShowAppPrompt(local, session), false);
+    // A new session shows it again...
+    assert.equal(shouldShowAppPrompt(local, memoryStorage()), true);
+
+    // ...until "Don't show this again".
+    dismissAppPrompt(local);
+    assert.equal(local.data.get(APP_PROMPT_DISMISSED_KEY), "false");
+    assert.equal(shouldShowAppPrompt(local, memoryStorage()), false);
+});
+
+test("the app prompt stays closed when storage is unavailable", () => {
+    assert.equal(shouldShowAppPrompt(brokenStorage, memoryStorage()), false);
+    assert.doesNotThrow(() => markAppPromptShown(brokenStorage));
+    assert.doesNotThrow(() => dismissAppPrompt(brokenStorage));
 });

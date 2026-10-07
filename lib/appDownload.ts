@@ -87,3 +87,40 @@ export function readAppLinks(env: Record<string, string | undefined>): AppLinks 
     if (ios) links.ios = ios;
     return links;
 }
+
+/**
+ * The "Get the app" popup opens once per browser session until the visitor
+ * ticks "Don't show this again" (or downloads), the same way the tutorial
+ * remembers that it was seen. Storage can be missing or throw (private mode,
+ * blocked site data); then the popup simply stays closed.
+ */
+export const APP_PROMPT_DISMISSED_KEY = "appDownloadPrompt";
+export const APP_PROMPT_SHOWN_KEY = "appDownloadPromptShown";
+
+type ReadableStorage = Pick<Storage, "getItem">;
+type WritableStorage = Pick<Storage, "setItem">;
+
+export function shouldShowAppPrompt(local: ReadableStorage, session: ReadableStorage): boolean {
+    try {
+        return local.getItem(APP_PROMPT_DISMISSED_KEY) !== "false"
+            && session.getItem(APP_PROMPT_SHOWN_KEY) !== "true";
+    } catch {
+        return false;
+    }
+}
+
+export function markAppPromptShown(session: WritableStorage): void {
+    try {
+        session.setItem(APP_PROMPT_SHOWN_KEY, "true");
+    } catch {
+        // Without session storage it may show again on the next page load.
+    }
+}
+
+export function dismissAppPrompt(local: WritableStorage): void {
+    try {
+        local.setItem(APP_PROMPT_DISMISSED_KEY, "false");
+    } catch {
+        // Nothing to remember it in; the session flag still holds it back.
+    }
+}
