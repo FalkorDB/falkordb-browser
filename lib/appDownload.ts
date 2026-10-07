@@ -3,9 +3,10 @@
  *
  * Desktop installers are attached to every GitHub release under names without
  * a version (see desktop/electron-builder.yml), so the `latest/download` links
- * always reach the newest one. The phone apps live in stores whose URLs the
- * operator supplies (ANDROID_APP_URL / IOS_APP_URL); without one, Android gets
- * nothing and iOS is offered "Add to Home Screen" instead.
+ * always reach the newest one. A phone app opens one particular server, so
+ * only a deployment that has its own sets ANDROID_APP_URL / IOS_APP_URL (a
+ * store page, or the release's FalkorDB-Browser-android.apk); without one,
+ * Android gets nothing and iOS is offered "Add to Home Screen" instead.
  */
 
 export type AppPlatform = "mac" | "windows" | "linux" | "android" | "ios";
@@ -72,21 +73,27 @@ export function getAppDownload(platform: AppPlatform | undefined, links: AppLink
     }
 }
 
-function readHttpsUrl(value: string | undefined): string | undefined {
+function readAppUrl(value: string | undefined, allowHttp: boolean): string | undefined {
     const trimmed = value?.trim();
     if (!trimmed) return undefined;
     try {
-        return new URL(trimmed).protocol === "https:" ? trimmed : undefined;
+        const { protocol } = new URL(trimmed);
+        return protocol === "https:" || (allowHttp && protocol === "http:") ? trimmed : undefined;
     } catch {
         return undefined;
     }
 }
 
-/** Store links from the environment. Anything but an https:// URL is ignored. */
+/**
+ * App links from the environment. Anything but an https:// URL is ignored,
+ * except that APP_LINKS_ALLOW_HTTP=1 also accepts http:// so a development
+ * setup can offer a debug APK served on the local network.
+ */
 export function readAppLinks(env: Record<string, string | undefined>): AppLinks {
     const links: AppLinks = {};
-    const android = readHttpsUrl(env.ANDROID_APP_URL);
-    const ios = readHttpsUrl(env.IOS_APP_URL);
+    const allowHttp = env.APP_LINKS_ALLOW_HTTP === "1";
+    const android = readAppUrl(env.ANDROID_APP_URL, allowHttp);
+    const ios = readAppUrl(env.IOS_APP_URL, allowHttp);
     if (android) links.android = android;
     if (ios) links.ios = ios;
     return links;

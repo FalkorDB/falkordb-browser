@@ -30,6 +30,17 @@ Parameters:
     NoEcho: true
     Description: 64 hex characters (openssl rand -hex 32). Encrypts stored credentials; keep it stable across deploys.
     AllowedPattern: "^[0-9a-fA-F]{64}$"
+  AndroidAppUrl:
+    Type: String
+    Default: ""
+    Description: >-
+      Optional https link the browser's "Get the app" offers Android visitors, e.g.
+      https://github.com/FalkorDB/falkordb-browser/releases/latest/download/FalkorDB-Browser-android.apk
+      or a Play Store page. Only for the deployment that APK was built for. Blank shows nothing.
+  IosAppUrl:
+    Type: String
+    Default: ""
+    Description: Optional https App Store link for iOS visitors. Blank offers "Add to Home Screen".
   DesiredCount:
     Type: Number
     Default: 1
@@ -160,6 +171,8 @@ Resources:
             - { Name: ALLOWED_ORIGINS, Value: !Ref BrowserUrl }
             # The ALB appends exactly one X-Forwarded-For entry.
             - { Name: TRUSTED_PROXY_HOPS, Value: "1" }
+            - { Name: ANDROID_APP_URL, Value: !Ref AndroidAppUrl }
+            - { Name: IOS_APP_URL, Value: !Ref IosAppUrl }
           Secrets:
             - { Name: AUTH_SECRET, ValueFrom: !Sub "${BrowserSecrets}:AUTH_SECRET::" }
             - { Name: ENCRYPTION_KEY, ValueFrom: !Sub "${BrowserSecrets}:ENCRYPTION_KEY::" }

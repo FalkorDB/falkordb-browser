@@ -58,9 +58,71 @@ configured" page (`www/index.html`). Only the browser's own host stays inside
 the app; other links open in the system browser.
 
 CI (`.github/workflows/mobile.yml`) lints the CloudFormation template and
-builds a debug APK. Set the repository variable `FALKORDB_BROWSER_URL` to bake
-in the real URL. Release signing and iOS builds need certificates and a macOS
-runner, so they aren't in CI yet.
+builds a debug APK on every change to `mobile/`. iOS builds need certificates
+and a macOS runner, so they aren't in CI yet.
+
+## Try it on a phone (development)
+
+No AWS or HTTPS needed: a debug APK opens a browser running on your machine.
+
+1. Run the browser where the phone can reach it, with `AUTH_URL` set to the
+   address the phone will use (sign-in redirects there):
+
+   ```sh
+   AUTH_URL=http://192.168.1.52:3000 npm run dev -- -H 0.0.0.0   # from the repo root
+   ```
+
+   To let the browser's "Get the app" popup offer the dev APK as well, add
+   `ANDROID_APP_URL=http://192.168.1.52:8000/FalkorDB-Browser-android-dev.apk APP_LINKS_ALLOW_HTTP=1`.
+
+2. Build the APK. It needs the Android SDK and a JDK 21 (`ANDROID_HOME`, `JAVA_HOME`):
+
+   ```sh
+   cd mobile
+   FALKORDB_BROWSER_URL=http://192.168.1.52:3000 npm run dev:android
+   ```
+
+   The URL defaults to `http://<this machine's LAN IP>:3300`. Plain http is
+   allowed through the debug manifest only, never in a release build.
+
+3. Serve it and install it on the phone (allow "install unknown apps" once):
+
+   ```sh
+   (cd dist && python3 -m http.server 8000)
+   # on the phone: http://192.168.1.52:8000/FalkorDB-Browser-android-dev.apk
+   ```
+
+## Release builds (Android)
+
+Publishing a GitHub release builds a signed APK that opens the production
+browser and attaches it to the release as `FalkorDB-Browser-android.apk`, next
+to the desktop installers. Until the settings below exist, the release goes
+out without it and the workflow logs a warning.
+
+One-time setup:
+
+1. Create a signing key, and keep it safe. Android only installs an update
+   signed with the same key, so losing it strands every existing install:
+
+   ```sh
+   keytool -genkeypair -v -keystore falkordb-release.jks -alias falkordb \
+     -keyalg RSA -keysize 4096 -validity 10000
+   base64 -w0 falkordb-release.jks   # value for ANDROID_KEYSTORE_BASE64
+   ```
+
+2. In the repository settings, add the secrets `ANDROID_KEYSTORE_BASE64`,
+   `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`,
+   and the variable `FALKORDB_BROWSER_URL` (the production https address).
+
+3. On that production deployment, point the browser's popup at the APK:
+   `ANDROID_APP_URL=https://github.com/FalkorDB/falkordb-browser/releases/latest/download/FalkorDB-Browser-android.apk`
+   (`AndroidAppUrl` in `aws/browser-service.yml`). Only there: the APK opens
+   that server, so other deployments should leave it unset.
+
+Each release's version becomes the app's `versionName`, and `versionCode` is
+derived from it (v2.6.1 → 20601), so a newer APK installs over the old one.
+For Google Play later, the same key and workflow can build an AAB instead
+(`--androidreleasetype AAB`).
 
 ## Store review
 

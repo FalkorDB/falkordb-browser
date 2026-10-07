@@ -91,6 +91,13 @@ test("readAppLinks keeps only https URLs", () => {
     assert.deepEqual(readAppLinks({ ANDROID_APP_URL: "   " }), {});
 });
 
+test("readAppLinks accepts http only when APP_LINKS_ALLOW_HTTP=1", () => {
+    const env = { ANDROID_APP_URL: "http://192.168.1.52:8000/app.apk", IOS_APP_URL: "ftp://apps.test/app" };
+    assert.deepEqual(readAppLinks(env), {});
+    assert.deepEqual(readAppLinks({ ...env, APP_LINKS_ALLOW_HTTP: "true" }), {});
+    assert.deepEqual(readAppLinks({ ...env, APP_LINKS_ALLOW_HTTP: "1" }), { android: "http://192.168.1.52:8000/app.apk" });
+});
+
 function memoryStorage(initial: Record<string, string> = {}) {
     const data = new Map(Object.entries(initial));
     return {

@@ -18,6 +18,9 @@ set -eu
 : "${VPC_ID:?set VPC_ID}"
 : "${SUBNET_IDS:?set SUBNET_IDS (comma-separated, at least two AZs)}"
 : "${IMAGE_URI:=docker.io/falkordb/falkordb-browser:latest}"
+# Optional: what the browser's "Get the app" offers phone visitors.
+: "${ANDROID_APP_URL:=}"
+: "${IOS_APP_URL:=}"
 
 TEMPLATE="$(dirname "$0")/browser-service.yml"
 
@@ -26,7 +29,9 @@ set -- \
   "CertificateArn=$CERTIFICATE_ARN" \
   "VpcId=$VPC_ID" \
   "SubnetIds=$SUBNET_IDS" \
-  "ImageUri=$IMAGE_URI"
+  "ImageUri=$IMAGE_URI" \
+  "AndroidAppUrl=$ANDROID_APP_URL" \
+  "IosAppUrl=$IOS_APP_URL"
 
 if ! aws cloudformation describe-stacks --stack-name "$STACK_NAME" >/dev/null 2>&1; then
   echo "Creating $STACK_NAME with newly generated secrets."
