@@ -169,9 +169,15 @@ async function startServer() {
     });
 }
 
+// The server's own redirects can name the host "localhost" even though the
+// window loads 127.0.0.1, so treat both as the app on its port.
 function isAppUrl(url) {
     try {
-        return new URL(url).origin === origin;
+        const target = new URL(url);
+        const app = new URL(origin);
+        return target.protocol === app.protocol
+            && target.port === app.port
+            && (target.hostname === "127.0.0.1" || target.hostname === "localhost");
     } catch {
         return false;
     }
