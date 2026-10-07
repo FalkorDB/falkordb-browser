@@ -5,12 +5,12 @@ import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Sparkles } from "lucide-react";
+import { Chat as ChatPanel, ChatAvatar, ChatFooter, ChatHeader, ChatInput, ChatInputField, ChatMessage, ChatMessages, ChatSendButton, ChatTitle } from "@falkordb/ui";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
-import Input from "../components/ui/Input";
 import { GraphContext, GraphTabsContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
@@ -115,7 +115,6 @@ export default function Chat({ onClose }: Props) {
     const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
     const textRefs = useRef<Map<number, HTMLElement>>(new Map());
     const observerRef = useRef<ResizeObserver | null>(null);
-    const chatContainerRef = useRef<HTMLUListElement>(null);
     // Derived from messages — automatically in sync with trimmed message history
     const totalTokens = useMemo(
         () => messages.reduce((sum, m) => sum + (m.tokenUsage ?? 0), 0),
@@ -213,14 +212,6 @@ export default function Chat({ onClose }: Props) {
 
         setMessagesList(newMessagesList);
     }, [historyKey, maxSavedMessages, messages]);
-
-    // Scroll to bottom whenever the rendered message list changes
-    useEffect(() => {
-        const el = chatContainerRef.current;
-        if (el) {
-            el.scrollTop = el.scrollHeight;
-        }
-    }, [messagesList]);
 
     const handleSetMessages = (newMessages: Message[] | Message) => {
         setMessages(newMessages instanceof Array ? newMessages : prev => [...prev, newMessages]);
@@ -552,23 +543,19 @@ export default function Chat({ onClose }: Props) {
 
     return (
         <div data-testid="chatPanel" className="border-Gradient-rounded h-full w-full">
-            <div className="bg-background relative h-full w-full flex flex-col gap-2 items-center rounded-lg p-2">
-                <Button
-                    data-testid="chatCloseButton"
-                    className="absolute top-2 right-2"
-                    title="Close"
-                    onClick={onClose}
-                >
-                    <X className="h-4 w-4" />
-                </Button>
-                <div className="w-full flex justify-between items-center pr-8">
-                    <h1 className="text-lg font-semibold">Chat</h1>
-                    <div className="flex items-center gap-2">
-                        <Sparkles size={25} />
-                    </div>
-                </div>
+            <ChatPanel className="bg-background items-center rounded-lg p-2">
+                <ChatHeader>
+                    <ChatTitle>Chat <Sparkles size={25} /></ChatTitle>
+                    <Button
+                        data-testid="chatCloseButton"
+                        title="Close"
+                        onClick={onClose}
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                </ChatHeader>
                 <span id="chat-prerequisites" className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
-                <ul ref={chatContainerRef} data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">
+                <ChatMessages data-testid="chatMessagesList" className="chat-container">
                     {
                         messagesList.map((message, index) => {
                             if (Array.isArray(message)) {
@@ -614,33 +601,27 @@ export default function Chat({ onClose }: Props) {
                             }
                             const isUser = message.role === "user";
                             const avatar = isUser
-                                ? <div className="h-8 w-8 rounded-full flex items-center justify-center bg-primary">
-                                    <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
-                                </div>
-                                : <div className="h-8 w-8 relative">
-                                    {mounted && currentTheme && <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} alt="Assistant" fill />}
-                                </div>;
+                                ? <ChatAvatar className="bg-primary text-foreground">{message.role.charAt(0).toUpperCase()}</ChatAvatar>
+                                : <ChatAvatar>
+                                    {mounted && currentTheme && <Image src={`/icons/F-${currentTheme}.svg`} alt="Assistant" fill />}
+                                </ChatAvatar>;
 
                             return (
-                                <li
+                                <ChatMessage
                                     data-testid={isUser ? "chatUserMessage" : `chatAssistantMessage-${message.type}`}
-                                    className={cn("w-full flex gap-1", isUser ? "justify-end" : "justify-start")}
                                     key={index}
+                                    from={isUser ? "user" : "assistant"}
+                                    variant={message.type === "Error" ? "error" : "default"}
+                                    avatar={avatar}
+                                    // The browser's bubbles keep their text in the page colour.
+                                    bubbleClassName="text-foreground"
                                 >
-                                    {
-                                        !isUser && avatar
-                                    }
-                                    <div className={cn("max-w-[80%] p-2 rounded-lg overflow-hidden", isUser ? "bg-primary" : "bg-secondary", message.type === "Error" && "border border-destructive")}>
-                                        {getMessage(message)}
-                                    </div>
-                                    {
-                                        isUser && avatar
-                                    }
-                                </li>
+                                    {getMessage(message)}
+                                </ChatMessage>
                             );
                         })
                     }
-                </ul>
+                </ChatMessages>
                 {
                     (totalTokens > 0 || model) && (() => {
                         const selectedChatApiKey = chatApiKeys.find(k => k.id === selectedChatApiKeyId);
@@ -648,7 +629,7 @@ export default function Chat({ onClose }: Props) {
                             ? localLlmProvider.charAt(0).toUpperCase() + localLlmProvider.slice(1)
                             : getProviderDisplayName(selectedChatApiKey?.provider ?? detectProviderFromModel(model));
                         return (
-                            <div data-testid="chatFooter" className="w-full flex items-center justify-between gap-2 px-1 py-0.5 text-xs text-muted-foreground leading-none">
+                            <ChatFooter data-testid="chatFooter" className="py-0.5">
                                 <div className="flex items-center gap-2 min-w-0">
                                     {totalTokens > 0 && (
                                         <>
@@ -685,11 +666,11 @@ export default function Chat({ onClose }: Props) {
                                         </>
                                     )}
                                 </div>
-                            </div>
+                            </ChatFooter>
                         );
                     })()
                 }
-                <form data-testid="chatForm" className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
+                <ChatInput data-testid="chatForm" onSubmit={handleSubmit}>
                     <ShadTooltip>
                         <ShadTooltipTrigger asChild>
                             <button
@@ -705,7 +686,7 @@ export default function Chat({ onClose }: Props) {
                                 }}
                                 className={cn(
                                     "shrink-0 flex items-center justify-center rounded-md transition-all duration-150 active:scale-[0.96]",
-                                    "h-8 w-8 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                                    "h-8 w-8",
                                     cypherOnly
                                         ? "bg-primary text-background hover:opacity-90"
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -718,29 +699,25 @@ export default function Chat({ onClose }: Props) {
                             <span>{cypherOnly ? "Cypher only mode is ON — click to disable" : "Cypher only mode"}</span>
                         </ShadTooltipContent>
                     </ShadTooltip>
-                    <Button
-                        data-testid="chatSendButton"
-                        type="button"
-                        disabled={newMessage.trim() === ""}
-                        title={newMessage.trim() === "" ? "Please enter a message" : "Send"}
-                        onClick={handleSubmit}
-                        isLoading={isLoading}
-                    >
-                        <Send size={25} />
-                    </Button>
                     <div className="relative flex-1 basis-0 rounded-lg overflow-hidden">
                         <ShineBorder shineColor={["#7568F2", "#B66EBD", "#EC806C"]} />
-                        <Input
+                        <ChatInputField
                             data-testid="chatInput"
-                            className="w-full bg-background rounded-md border-none text-foreground text-lg SofiaSans"
+                            className="w-full rounded-md text-foreground text-lg SofiaSans"
                             placeholder="What would you like to know?"
                             aria-describedby="chat-prerequisites"
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                         />
                     </div>
-                </form>
-            </div>
+                    <ChatSendButton
+                        data-testid="chatSendButton"
+                        canSend={newMessage.trim() !== ""}
+                        title={newMessage.trim() === "" ? "Please enter a message" : "Send"}
+                        isLoading={isLoading}
+                    />
+                </ChatInput>
+            </ChatPanel>
         </div>
     );
 }
