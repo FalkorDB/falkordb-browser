@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 /**
  * POST /api/connections
  * Adds a new connection (different ACL user) to the current session.
- * Body: { host?, port?, username?, password?, tls?, ca? }
+ * Body: { host?, port?, username?, password?, tls?, ca?, cert?, key? }
  */
 export async function POST(request: Request) {
   try {
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { host, port, username, password, tls, ca } = result.data;
+    const { host, port, username, password, tls, ca, cert, key } = result.data;
 
     const connInfo = await addSessionConnection(id, {
       host: (host as string) || session.user.host,
@@ -87,6 +87,8 @@ export async function POST(request: Request) {
       password: password as string,
       tls: tls?.toString() || String(session.user.tls),
       ca: ca as string | undefined,
+      cert: cert as string | undefined,
+      key: key as string | undefined,
     });
 
     return NextResponse.json(

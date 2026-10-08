@@ -26,7 +26,9 @@ class FalkorDBTokenStorage implements ITokenStorage {
         encrypted_password: $encrypted_password,
         kind: $kind,
         tls: $tls,
-        ca: $ca
+        ca: $ca,
+        cert: $cert,
+        encrypted_key: $encrypted_key
       })
       CREATE (t)-[:BELONGS_TO]->(u)
       RETURN t.token_id as token_id
@@ -49,6 +51,8 @@ class FalkorDBTokenStorage implements ITokenStorage {
       kind: tokenData.kind ?? 'pat',
       tls: tokenData.tls ?? false,
       ca: tokenData.ca ?? '',
+      cert: tokenData.cert ?? '',
+      encrypted_key: tokenData.encrypted_key ?? '',
     });
   }
 
@@ -82,7 +86,9 @@ class FalkorDBTokenStorage implements ITokenStorage {
              t.encrypted_password as encrypted_password,
              t.kind as kind,
              t.tls as tls,
-             t.ca as ca
+             t.ca as ca,
+             t.cert as cert,
+             t.encrypted_key as encrypted_key
       ORDER BY t.created_at DESC
     `;
 
@@ -115,6 +121,8 @@ class FalkorDBTokenStorage implements ITokenStorage {
       kind: row.kind ?? 'pat',
       tls: row.tls ?? false,
       ca: row.ca || undefined,
+      cert: row.cert || undefined,
+      encrypted_key: row.encrypted_key || undefined,
     }));
   }
 
@@ -137,7 +145,9 @@ class FalkorDBTokenStorage implements ITokenStorage {
              t.encrypted_password as encrypted_password,
              t.kind as kind,
              t.tls as tls,
-             t.ca as ca
+             t.ca as ca,
+             t.cert as cert,
+             t.encrypted_key as encrypted_key
     `;
 
     const result = await executePATQuery(query, { token_id: tokenId });
@@ -166,6 +176,8 @@ class FalkorDBTokenStorage implements ITokenStorage {
       kind: row.kind ?? 'pat',
       tls: row.tls ?? false,
       ca: row.ca || undefined,
+      cert: row.cert || undefined,
+      encrypted_key: row.encrypted_key || undefined,
     };
   }
 
@@ -278,7 +290,9 @@ class FalkorDBTokenStorage implements ITokenStorage {
              t.encrypted_password as encrypted_password,
              t.kind as kind,
              t.tls as tls,
-             t.ca as ca
+             t.ca as ca,
+             t.cert as cert,
+             t.encrypted_key as encrypted_key
       ORDER BY t.created_at DESC
     `;
     const result = await executePATQuery(query, {
@@ -304,6 +318,8 @@ class FalkorDBTokenStorage implements ITokenStorage {
       kind: row.kind ?? 'pat',
       tls: row.tls ?? false,
       ca: row.ca || undefined,
+      cert: row.cert || undefined,
+      encrypted_key: row.encrypted_key || undefined,
     }));
   }
 

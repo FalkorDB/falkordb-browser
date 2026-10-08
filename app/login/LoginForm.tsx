@@ -80,6 +80,8 @@ export interface LoginFormCredentials {
   password: string;
   tls: boolean;
   ca?: string;
+  cert?: string;
+  key?: string;
 }
 
 interface LoginFormProps {
@@ -113,6 +115,10 @@ export default function LoginForm({
   const [TLS, setTLS] = useState(initialTLS);
   const [CA, setCA] = useState<string>();
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
+  const [clientCert, setClientCert] = useState<string>();
+  const [clientCertFileName, setClientCertFileName] = useState<string>("");
+  const [clientKey, setClientKey] = useState<string>();
+  const [clientKeyFileName, setClientKeyFileName] = useState<string>("");
 
   useEffect(() => {
     setHost(initialHost);
@@ -303,6 +309,20 @@ export default function LoginForm({
       }
     }
 
+    // mTLS needs both halves. Say so here, where the missing upload is on
+    // screen, instead of letting the TLS handshake fail with a generic error.
+    if (!!clientCert !== !!clientKey) {
+      setError({
+        message: (
+          <p className="text-xs text-destructive">
+            {clientCert ? "Upload the client private key to use this client certificate." : "Upload the client certificate that matches this private key."}
+          </p>
+        ),
+        show: true,
+      });
+      return;
+    }
+
     try {
       await onSubmit({
         host: host.trim() || DEFAULT_HOST,
@@ -311,6 +331,8 @@ export default function LoginForm({
         password,
         tls: TLS,
         ca: CA,
+        cert: clientCert,
+        key: clientKey,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Connection failed";
@@ -318,18 +340,51 @@ export default function LoginForm({
     }
   };
 
-  const onFileDrop = (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-
+  // A file the browser cannot read (an unreadable private key, say) never fires
+  // `load`, so the failure has to be reported from `onerror`.
+  const readPemAsBase64 = (file: File, onRead: (base64: string, name: string) => void) => {
     const reader = new FileReader();
 
     reader.onload = () => {
       clearError();
-      setCA((reader.result as string).split(',').pop());
-      setUploadedFileName(acceptedFiles[0].name);
+      onRead((reader.result as string).split(',').pop() ?? "", file.name);
     };
 
-    reader.readAsDataURL(acceptedFiles[0]);
+    reader.onerror = () => {
+      setError({
+        message: <p className="text-xs text-destructive">{`Could not read ${file.name}`}</p>,
+        show: true,
+      });
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const onFileDrop = (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+
+    readPemAsBase64(acceptedFiles[0], (base64, name) => {
+      setCA(base64);
+      setUploadedFileName(name);
+    });
+  };
+
+  const onCertDrop = (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+
+    readPemAsBase64(acceptedFiles[0], (base64, name) => {
+      setClientCert(base64);
+      setClientCertFileName(name);
+    });
+  };
+
+  const onKeyDrop = (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+
+    readPemAsBase64(acceptedFiles[0], (base64, name) => {
+      setClientKey(base64);
+      setClientKeyFileName(name);
+    });
   };
 
   return (
@@ -377,6 +432,10 @@ export default function LoginForm({
                   if (!checked) {
                     setCA(undefined);
                     setUploadedFileName("");
+                    setClientCert(undefined);
+                    setClientCertFileName("");
+                    setClientKey(undefined);
+                    setClientKeyFileName("");
                   }
                 }}
                 data-testid="tls-checkbox"
@@ -425,6 +484,52 @@ export default function LoginForm({
                         title="Remove certificate"
                         data-testid="remove-certificate-btn"
                         aria-label="Remove certificate"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-muted">Client certificate (mTLS)</span>
+                  {!clientCertFileName ? (
+                    <Dropzone title="Upload Client Certificate" onFileDrop={onCertDrop} disabled={!TLS} />
+                  ) : (
+                    <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md" data-testid="client-cert-uploaded-status">
+                      <span className="text-sm font-medium text-foreground truncate max-w-48">{clientCertFileName}</span>
+                      <button
+                        type="button"
+                        onClick={() => { clearError(); setClientCert(undefined); setClientCertFileName(""); }}
+                        className="flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded"
+                        title="Remove client certificate"
+                        data-testid="remove-client-cert-btn"
+                        aria-label="Remove client certificate"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-muted">Client private key (mTLS)</span>
+                  {!clientKeyFileName ? (
+                    <Dropzone title="Upload Client Key" onFileDrop={onKeyDrop} disabled={!TLS} />
+                  ) : (
+                    <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md" data-testid="client-key-uploaded-status">
+                      <span className="text-sm font-medium text-foreground truncate max-w-48">{clientKeyFileName}</span>
+                      <button
+                        type="button"
+                        onClick={() => { clearError(); setClientKey(undefined); setClientKeyFileName(""); }}
+                        className="flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded"
+                        title="Remove client key"
+                        data-testid="remove-client-key-btn"
+                        aria-label="Remove client key"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

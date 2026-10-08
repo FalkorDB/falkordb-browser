@@ -20,6 +20,8 @@ declare module "next-auth" {
     tls: boolean;
     url: string;
     ca?: string;
+    cert?: string;
+    key?: string;
     username?: string;
     credentialRef?: string;
     connId?: string;
@@ -42,6 +44,8 @@ declare module "@auth/core/types" {
     tls: boolean;
     url: string;
     ca?: string;
+    cert?: string;
+    key?: string;
     username?: string;
     credentialRef?: string;
     connId?: string;
