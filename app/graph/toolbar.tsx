@@ -283,7 +283,7 @@ export default function Toolbar({
                                                                     {matchingProp && (
                                                                         <>
                                                                             <span className="font-bold">{matchingProp.key}</span>
-                                                                            {': '}{highlightMatch(matchingProp.value, searchElement)}
+                                                                            {': '}{highlightMatch(matchingProp.value, searchElement.trim())}
                                                                         </>
                                                                     )}
                                                                 </p>

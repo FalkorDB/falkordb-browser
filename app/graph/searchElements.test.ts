@@ -16,6 +16,15 @@ describe("getSearchMatch", () => {
         assert.equal(getSearchMatch(node(1, ["Person"], { name: "Alice" }), ""), null);
     });
 
+    it("returns null for a whitespace-only search", () => {
+        assert.equal(getSearchMatch(node(1, ["Person"], { name: "Mary Ann" }), " "), null);
+        assert.equal(getSearchMatch(link(1, "KNOWS", { note: "a b" }), " \t "), null);
+    });
+
+    it("ignores surrounding whitespace in the search", () => {
+        assert.deepEqual(getSearchMatch(node(1, ["Person"], { name: "Alice" }), "  lic "), { key: "name", value: "Alice" });
+    });
+
     it("matches a property value from its start", () => {
         assert.deepEqual(getSearchMatch(node(1, ["Person"], { name: "Alice" }), "Ali"), { key: "name", value: "Alice" });
     });
@@ -74,6 +83,10 @@ describe("filterSearchElements", () => {
 
     it("returns nothing for an empty search", () => {
         assert.deepEqual(filterSearchElements([alice, bob], ""), []);
+    });
+
+    it("returns nothing for a whitespace-only search", () => {
+        assert.deepEqual(filterSearchElements([node(5, ["Person"], { name: "Mary Ann" })], "   "), []);
     });
 
     it("keeps every element that contains the search, in order", () => {
