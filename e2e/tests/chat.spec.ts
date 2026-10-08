@@ -1057,38 +1057,52 @@ test.describe("Chat Feature Tests", () => {
   test(`@readwrite Verify chat dragged wider than the canvas stays above the Graph Info panel`, async () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
-    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+    try {
+      await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
 
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    const page = await browser.getPage();
-    await chat.selectGraphByName(graphName);
-    await new GraphInfoPage(page).openGraphInfoButton();
-    await chat.openChat();
+      const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+      await browser.setPageToFullScreen();
+      const page = await browser.getPage();
+      await chat.selectGraphByName(graphName);
+      await new GraphInfoPage(page).openGraphInfoButton();
+      await chat.openChat();
 
-    const panel = page.getByTestId("chatPanel");
-    const before = await panel.boundingBox();
-    const info = await page.getByTestId("graphInfoPanel").boundingBox();
-    expect(before).not.toBeNull();
-    expect(info).not.toBeNull();
+      const panel = page.getByTestId("chatPanel");
+      const before = await panel.boundingBox();
+      const info = await page.getByTestId("graphInfoPanel").boundingBox();
+      expect(before).not.toBeNull();
+      expect(info).not.toBeNull();
 
-    // Drag the chat's left edge past the canvas column, over the Graph Info panel.
-    const y = before!.y + before!.height / 2;
-    await page.mouse.move(before!.x, y);
-    await page.mouse.down();
-    await page.mouse.move(info!.x + 40, y, { steps: 10 });
-    await page.mouse.up();
+      // Drag the chat's left edge past the canvas column, over the Graph Info panel.
+      const y = before!.y + before!.height / 2;
+      await page.mouse.move(before!.x, y);
+      await page.mouse.down();
+      await page.mouse.move(info!.x + 40, y, { steps: 10 });
+      await page.mouse.up();
 
-    const after = await panel.boundingBox();
-    expect(after!.x).toBeLessThan(info!.x + info!.width);
+      const wide = await panel.boundingBox();
+      expect(wide!.x).toBeLessThan(info!.x + info!.width);
 
-    // The chat's left part, over the Graph Info panel, must be what the user sees.
-    const onTop = await page.evaluate(({ x, py }) => {
-      const hit = document.elementFromPoint(x, py);
-      return !!hit?.closest('[data-testid="chatPanel"]');
-    }, { x: after!.x + 20, py: after!.y + after!.height / 2 });
-    expect(onTop).toBe(true);
+      // The chat's left part, over the Graph Info panel, must be what the user sees.
+      const onTop = await page.evaluate(({ x, py }) => {
+        const hit = document.elementFromPoint(x, py);
+        return !!hit?.closest('[data-testid="chatPanel"]');
+      }, { x: wide!.x + 20, py: wide!.y + wide!.height / 2 });
+      expect(onTop).toBe(true);
 
-    await apiCall.removeGraph(graphName);
+      // Dragging the top edge to the top of the window stops at the graph region,
+      // which starts where the Graph Info panel does: below the sub-header.
+      const x = wide!.x + wide!.width / 2;
+      await page.mouse.move(x, wide!.y);
+      await page.mouse.down();
+      await page.mouse.move(x, 0, { steps: 10 });
+      await page.mouse.up();
+
+      const tall = await panel.boundingBox();
+      expect(tall!.height).toBeGreaterThan(wide!.height);
+      expect(tall!.y).toBeGreaterThanOrEqual(info!.y);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
   });
 });
