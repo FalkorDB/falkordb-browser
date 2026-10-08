@@ -143,6 +143,23 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    test(`@admin Validate canvas search matches text in the middle of a value`, async () => {
+        const graphName = getRandomString('canvas');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery('CREATE (a:Person {name: "Alice"}), (b:Person {name: "Bob"}) return a, b');
+        await graph.clickRunQuery();
+        await graph.fillElementCanvasSearch("LIC");
+        expect(await graph.isElementCanvasSuggestionVisible("Alice")).toBe(true);
+        await expect(graph.elementCanvasSuggestionByName("Bob")).toBeHidden();
+        await graph.searchTextAndSelectInCanvas("lic", "Alice");
+        await graph.hoverAtCanvasCenter();
+        expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
+        await apicalls.removeGraph(graphName);
+    });
+
     test(`@admin Deleting a node and ensuring its removed from the canvas`, async () => {
         const graphName = getRandomString('canvas');
         await apicalls.addGraph(graphName);

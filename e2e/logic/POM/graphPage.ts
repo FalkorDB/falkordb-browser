@@ -1425,6 +1425,16 @@ export default class GraphPage extends BasePage {
     await this.clickElementCanvasSuggestionByName(name);
   }
 
+  /** Searches the canvas for `text` and picks the suggestion for `name`. */
+  async searchTextAndSelectInCanvas(text: string, name: string): Promise<void> {
+    await this.fillElementCanvasSearch(text);
+    await this.clickElementCanvasSuggestionByName(name);
+  }
+
+  async isElementCanvasSuggestionVisible(name: string): Promise<boolean> {
+    return waitForElementToBeVisible(this.elementCanvasSuggestionByName(name));
+  }
+
   async isSearchElementInCanvasVisible(name: string): Promise<boolean> {
     await this.fillElementCanvasSearch(name);
     return this.elementCanvasSuggestionList.isVisible();
