@@ -1,17 +1,11 @@
-/* eslint-disable react/no-array-index-key */
-/* eslint-disable no-param-reassign */
-
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { EyeIcon, EyeOffIcon, ExternalLink, InfoIcon, X } from "lucide-react";
+import { InfoIcon } from "lucide-react";
+import { Form, type FieldConfig } from "@falkordb/ui";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
 import Button from "./ui/Button";
 import HelpTip from "./ui/HelpTip";
 import Combobox from "./ui/combobox";
-import Input from "./ui/Input";
 
 export type Error = {
     message: string
@@ -72,243 +66,117 @@ interface Props {
     className?: string
 }
 
-function TagInput({ field }: { field: TagField }) {
-    const [inputValue, setInputValue] = useState("");
-    const inputRef = useRef<HTMLInputElement>(null);
+const CONFIRM_PASSWORD = "Confirm Password";
 
-    const addTags = (value: string) => {
-        const parts = value.split(",").map(p => p.trim().replace(/^~/, "")).filter(Boolean);
-        const seen = new Set(field.tags.map(t => t.replace(/^~/, "")));
-        parts.forEach(part => {
-            if (!seen.has(part)) {
-                seen.add(part);
-                field.onAddTag(part);
-            }
-        });
-        setInputValue("");
+// Key and graph patterns may be typed with Redis's `~` prefix; the ACL adds it back.
+const stripKeyPrefix = (tag: string) => tag.replace(/^~/, "");
+
+/** The call sites only read `e.target.value`, so a value dressed as an event is enough. */
+const asChangeEvent = (value: string) => ({ target: { value } }) as React.ChangeEvent<HTMLInputElement>;
+
+/**
+ * The browser's field definitions on top of the design system form. Fields are
+ * keyed and identified by their label, which is what the e2e suite selects on.
+ */
+function toFieldConfig(field: Field, passwordLabels: string[]): FieldConfig {
+    // A rule's second argument is the password being confirmed, read from the
+    // form's latest values so a rule re-checked mid-keystroke sees the new one.
+    const password = passwordLabels.find(label => label !== CONFIRM_PASSWORD);
+    const base = {
+        name: field.label,
+        id: field.label,
+        label: field.label,
+        value: field.value,
+        required: field.required,
+        placeholder: field.placeholder,
+        description: field.description,
+        info: field.info,
+        disabled: field.disabled,
+        link: field.link,
+        errors: field.errors?.map(err => ({
+            message: err.message,
+            condition: (value: string, values: Record<string, string>) =>
+                err.condition(value, password === undefined ? undefined : values[password]),
+        })),
+        // Typing a new password re-checks its confirmation straight away.
+        revalidateWith: field.label === CONFIRM_PASSWORD
+            ? passwordLabels.filter(label => label !== CONFIRM_PASSWORD)
+            : undefined,
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Enter" || e.key === ",") {
-            e.preventDefault();
-            addTags(inputValue);
-        } else if (e.key === "Backspace" && inputValue === "" && field.tags.length > 0) {
-            field.onRemoveTag(field.tags.length - 1);
-        }
-    };
-
-    return (
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-        <div
-            className="flex flex-wrap items-center gap-1 border border-border p-1 rounded-lg bg-input text-foreground min-h-[34px] cursor-text"
-            onClick={() => inputRef.current?.focus()}
-        >
-            {field.tags.map((tag, index) => (
-                <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-2 py-0.5 max-w-full overflow-hidden">
-                    <span className="truncate" title={tag}>{tag}</span>
-                    {!field.disabled && (
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                field.onRemoveTag(index);
-                            }}
-                            className="hover:text-destructive shrink-0"
-                            aria-label={`Remove ${tag}`}
-                        >
-                            <X size={12} />
-                        </button>
-                    )}
-                </Badge>
-            ))}
-            <input
-                ref={inputRef}
-                id={field.label}
-                className="flex-1 min-w-[80px] bg-transparent outline-none text-sm p-0.5"
-                value={inputValue}
-                placeholder={field.tags.length === 0 ? (field.placeholder || "Type and press Enter") : ""}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onBlur={() => addTags(inputValue)}
-                disabled={field.disabled}
-            />
-        </div>
-    );
+    switch (field.type) {
+        case "select":
+            return {
+                ...base,
+                type: "custom",
+                render: ({ id, onValueChange }) => (
+                    <Combobox
+                        className="w-fit"
+                        id={id}
+                        disabled={field.disabled}
+                        options={field.options}
+                        label={field.selectType}
+                        selectedValue={field.value}
+                        setSelectedValue={(value) => {
+                            field.onChange(value);
+                            // Re-checks the field, so a "required" error clears once a value is picked.
+                            onValueChange(value);
+                        }}
+                    />
+                ),
+            };
+        case "tag":
+            return {
+                ...base,
+                type: "tag",
+                tags: field.tags,
+                onAddTag: field.onAddTag,
+                onRemoveTag: field.onRemoveTag,
+                normalize: stripKeyPrefix,
+            };
+        case "password":
+            return { ...base, type: "password", onChange: value => field.onChange(asChangeEvent(value)) };
+        default:
+            return { ...base, type: "text", onChange: value => field.onChange(asChangeEvent(value)) };
+    }
 }
 
 export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit", className = "" }: Props) {
-    const [show, setShow] = useState<{ [key: string]: boolean }>({});
-    const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
-    const [isLoading, setIsLoading] = useState(false);
-    const isMountedRef = useRef(false);
-    const prevFieldsKeyRef = useRef<string | null>(null);
-
-    // Stable identifier for the current set of fields — triggers re-validation when the form layout changes
-    const fieldsKey = fields.map(f => f.label).join(",");
-
-    useEffect(() => {
-        if (!isMountedRef.current) {
-            isMountedRef.current = true;
-            prevFieldsKeyRef.current = fieldsKey;
-            return;
-        }
-
-        // Only re-validate when the form layout changes (e.g. switching login mode),
-        // not on mount or on every value change
-        if (prevFieldsKeyRef.current !== fieldsKey) {
-            prevFieldsKeyRef.current = fieldsKey;
-
-            const newErrors: { [key: string]: boolean } = {};
-
-            fields.forEach(field => {
-                if (field.errors) {
-                    newErrors[field.label] = field.errors.some(err => err.condition(field.value));
-                }
-            });
-
-            setErrors(prev => ({ ...prev, ...newErrors }));
-        }
-    }, [fieldsKey, fields]);
-
-    const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-
-        const newErrors: { [key: string]: boolean } = {};
-        fields.forEach(field => {
-            if (field.errors) {
-                newErrors[field.label] = field.errors.some(err => err.condition(field.value));
-            }
-        });
-
-        setErrors(newErrors);
-
-        if (Object.values(newErrors).some(value => value)) {
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-            await handleSubmit(e);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const passwordLabels = fields.filter(field => field.type === "password").map(field => field.label);
 
     return (
-        <form className={cn("flex flex-col gap-4 short:gap-2 w-full", className)} onSubmit={onHandleSubmit}>
-            {
-                fields.map((field) => {
-                    const passwordType = show[field.label] ? "text" : "password";
-                    return (
-                        <div className="flex flex-col gap-1" key={field.label}>
-                            <div className={cn(field.info && "flex gap-2 items-center")}>
-                                <label className={cn(errors[field.label] && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
-                                {
-                                    field.info &&
-                                    <HelpTip trigger={<InfoIcon size={20} />}>
-                                        {field.info}
-                                    </HelpTip>
-                                }
-                            </div>
-                            <div className="relative flex flex-col gap-1">
-                                {
-                                    field.type === "password" &&
-                                    <Button
-                                        className="absolute right-2 top-2 z-10"
-                                        onClick={() => {
-                                            setShow(prev => ({
-                                                ...prev,
-                                                [field.label]: !prev[field.label]
-                                            }));
-                                        }}
-                                    >
-                                        {
-                                            show[field.label] ?
-                                                <EyeIcon className="text-foreground" />
-                                                : <EyeOffIcon className="text-foreground" />
-                                        }
-                                    </Button>
-                                }
-                                {
-                                    field.type === "select" ?
-                                        <Combobox
-                                            className="w-fit"
-                                            id={field.label}
-                                            options={field.options}
-                                            label={field.selectType}
-                                            selectedValue={field.value}
-                                            setSelectedValue={field.onChange}
-                                        />
-                                        : field.type === "tag" ?
-                                            <TagInput field={field} />
-                                        : <Input
-                                            className={cn("w-full", field.type === "password" && "pr-10")}
-                                            id={field.label}
-                                            type={field.type === "password" ? passwordType : field.type}
-                                            placeholder={field.placeholder}
-                                            value={field.value}
-                                            disabled={field.disabled}
-                                            onChange={(e) => {
-                                                field.onChange(e);
-                                                if (field.type === "password") {
-                                                    const confirmPasswordField = fields.find(f => f.label === "Confirm Password");
-                                                    if (confirmPasswordField && confirmPasswordField.errors) {
-                                                        setErrors(prev => ({
-                                                            ...prev,
-                                                            "Confirm Password": confirmPasswordField.errors!.some(err => err.condition(confirmPasswordField.value, e.target.value))
-                                                        }));
-                                                    }
-                                                }
-                                                if (field.errors) {
-                                                    setErrors(prev => ({
-                                                        ...prev,
-                                                        [field.label]: field.errors!.some(err => err.condition(e.target.value))
-                                                    }));
-                                                }
-                                            }} />
-                                }
-                                {field.description && <p className="text-sm text-gray-500">{field.description}</p>}
-                                {
-                                    field.link &&
-                                    <a
-                                        href={field.link.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm text-primary flex items-center gap-1 hover:underline w-fit"
-                                    >
-                                        {field.link.label}
-                                        <ExternalLink size={14} />
-                                    </a>
-                                }
-                                {
-                                    field.errors &&
-                                    <div className="h-5">
-                                        {
-                                            errors[field.label] &&
-                                            <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    );
-                })
-            }
-            {children}
-            <div className="min-h-8">
-                {error?.show && (typeof error.message === "string" ? <p className="text-sm text-destructive">{error.message}</p> : error?.message)}
-            </div>
-            <div className="flex justify-end gap-2">
+        <Form
+            className={cn("short:gap-2", className)}
+            fields={fields.map(field => toFieldConfig(field, passwordLabels))}
+            onSubmit={handleSubmit}
+            error={error?.show ? error.message : undefined}
+            submitLabel={submitButtonLabel}
+            submitDisabled={error?.show}
+            classNames={{
+                // The browser marks an invalid field on its label alone.
+                control: "aria-invalid:border-border",
+                description: "text-gray-500",
+                // Tags read like the browser's other badges: bolder, tinted on hover.
+                tag: "font-semibold hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            }}
+            renderInfo={info => (
+                <HelpTip trigger={<InfoIcon size={20} />}>
+                    {info}
+                </HelpTip>
+            )}
+            renderSubmit={({ isLoading, disabled, label }) => (
                 <Button
                     id="submit-button"
                     className="grow bg-primary p-4 rounded-lg flex justify-center items-center gap-2"
                     type="submit"
-                    disabled={error?.show}
+                    disabled={disabled}
                     isLoading={isLoading}
-                    label={submitButtonLabel}
+                    label={label}
                 />
-            </div>
-        </form>
+            )}
+        >
+            {children}
+        </Form>
     );
 }
 

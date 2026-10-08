@@ -1,30 +1,26 @@
 "use client"
 
 import * as React from "react"
-import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
-import { Check } from "lucide-react"
+import { Checkbox as UICheckbox } from "@falkordb/ui"
 
 import { cn } from "@/lib/utils"
 
+// The design system outlines unchecked boxes with `input` over an opaque
+// background and draws a 14px tick; the browser outlines with `primary` over
+// whatever sits behind it and fills the box with the tick.
 const Checkbox = React.forwardRef<
-  React.ElementRef<typeof CheckboxPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
+  React.ComponentRef<typeof UICheckbox>,
+  React.ComponentPropsWithoutRef<typeof UICheckbox>
 >(({ className, ...props }, ref) => (
-  <CheckboxPrimitive.Root
+  <UICheckbox
     ref={ref}
     className={cn(
-      "peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
+      "border-primary bg-transparent [&_svg]:size-4",
       className
     )}
     {...props}
-  >
-    <CheckboxPrimitive.Indicator
-      className={cn("flex items-center justify-center text-current")}
-    >
-      <Check className="h-4 w-4" />
-    </CheckboxPrimitive.Indicator>
-  </CheckboxPrimitive.Root>
+  />
 ))
-Checkbox.displayName = CheckboxPrimitive.Root.displayName
+Checkbox.displayName = "Checkbox"
 
 export { Checkbox }

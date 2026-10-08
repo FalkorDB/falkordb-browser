@@ -164,12 +164,15 @@ export default function CreateGraph({
             title={"Create New Graph"}
         >
             <form className="flex flex-col gap-4" onSubmit={isLoading ? undefined : handleCreateGraph}>
-                <div className="flex gap-2 items-center">
+                {/* An input does not shrink below its intrinsic width, so on a phone it is
+                    given a line of its own rather than pushing the row off the dialog. */}
+                <div className="flex gap-2 items-center mobile:flex-wrap">
                     <HelpTip trigger={<InfoIcon size={20} />}>
                         {"Graph names can be edited later"}
                     </HelpTip>
-                    <p className="font-normal text-2xl">Name your Graph:</p>
+                    <p className="font-normal text-2xl mobile:text-xl">Name your Graph:</p>
                     <Input
+                        className="mobile:min-w-0 mobile:basis-full"
                         data-testid={"createGraphInput"}
                         ref={ref => ref?.focus()}
                         value={graphName}
@@ -221,7 +224,9 @@ export default function CreateGraph({
                         />
                     </div>
                 )}
-                <div className="flex gap-4 justify-end">
+                {/* Two wide buttons do not fit a phone side by side, and `justify-end`
+                    pushes the overflow off the left edge of the dialog. */}
+                <div className="flex gap-4 justify-end mobile:flex-wrap">
                     <Button
                         data-testid={"createGraphConfirm"}
                         indicator={indicator}

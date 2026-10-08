@@ -6,8 +6,8 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json';
-import { BATCH_CREATE_PERSONS } from "../config/constants";
-import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomString } from "../infra/utils";
+import { BATCH_CREATE_PERSONS, CREATE_TEN_CONNECTED_NODES } from "../config/constants";
+import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomString, simulateCanvasFingerprintNoise } from "../infra/utils";
 
 test.describe('Canvas Tests', () => {
     let browser: BrowserWrapper;
@@ -273,7 +273,7 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate show all stays reachable with Search & Filter collapsed`, async () => {
+    test(`@admin Validate show all collapses with Search & Filter`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -285,13 +285,56 @@ test.describe('Canvas Tests', () => {
         await graph.clickLabelsButtonByLabel("Labels", "person1");
         expect(await graph.getVisibleElementCounts()).toEqual({ nodes: 1, links: 0 });
 
-        // Collapsing the panel must not take Show All with it.
         await graph.clickSearchAndFilterToggle();
         await expect(graph.elementCanvasSearch).toBeHidden();
+        await expect(graph.elementCanvasShowAll).toBeHidden();
+
+        await graph.clickSearchAndFilterToggle();
         await expect(graph.elementCanvasShowAll).toBeVisible();
 
         await graph.clickShowAll();
         expect(await graph.getVisibleElementCounts()).toEqual({ nodes: 2, links: 1 });
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate toolbar actions sit at the far end of the row on desktop`, async () => {
+        // Selecting two nodes waits out the double-click window twice.
+        test.slow();
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+        await graph.waitForScaleToStabilize();
+
+        // Add Edge needs exactly two selected nodes and Delete any selection, so
+        // select two nodes to bring the whole group up.
+        const [first, second] = await graph.getNodesScreenPositions();
+        await graph.elementClick(first.screenX, first.screenY);
+        const secondNow = (await graph.getNodesScreenPositions()).find(node => node.id === second.id);
+        await graph.elementClick(secondNow.screenX, secondNow.screenY, true);
+
+        const { row, search, actions } = await graph.canvasToolbarActionLayout();
+        const ids = actions.map(action => action.id);
+
+        // Desktop pins Add Node, Add Edge and Delete to the far right of the row,
+        // away from the search; only mobile groups them under it.
+        expect(ids).toEqual(
+            expect.arrayContaining(["elementCanvasAddNodeGraph", "elementCanvasAddEdgeGraph", "deleteElementGraph"])
+        );
+        expect(ids).not.toContain("elementCanvasShowAllGraph");
+        const right = Math.max(...actions.map(({ box }) => box.x + box.width));
+        const left = Math.min(...actions.map(({ box }) => box.x));
+        expect(row.x + row.width - right).toBeLessThanOrEqual(2);
+        expect(left).toBeGreaterThan(search.x + search.width + 32);
+
+        // Show All belongs to Search & Filter and sits beside its toggle, left of the search box.
+        const showAll = await graph.elementCanvasShowAll.boundingBox();
+        expect(showAll).not.toBeNull();
+        expect(showAll!.x + showAll!.width).toBeLessThanOrEqual(search.x);
+
         await apicalls.removeGraph(graphName);
     });
 
@@ -638,6 +681,40 @@ test.describe('Canvas Tests', () => {
             expect(await graph.getSelectionCount()).toBe(1);
             // A select must never expand.
             expect((await graph.getNodesScreenPositions()).length).toBe(1);
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
+    // #1084: with canvas fingerprinting protection on, hit detection's pixel
+    // read is scrambled and random nodes stopped responding to hover and click.
+    test(`@admin Every node stays hoverable and clickable when canvas pixel reads are scrambled`, async () => {
+        // Ten hover checks plus the canvas animation settle: slow on CI runners.
+        test.slow();
+        const graphName = getRandomString('fingerprint');
+        await apicalls.addGraph(graphName);
+        try {
+            await apicalls.runQuery(graphName, CREATE_TEN_CONNECTED_NODES);
+            const graph = await browser.createNewPage(GraphPage);
+            const page = await browser.getPage();
+            await page.addInitScript(simulateCanvasFingerprintNoise());
+            await browser.navigateTo(urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH (n:Person) RETURN n");
+            await graph.clickRunQuery();
+            await graph.clickCenterControl();
+            await graph.waitForScaleToStabilize();
+
+            const nodes = (await graph.getNodesScreenPositions()).filter((node) => node.isVisible);
+            expect(nodes.length).toBe(10);
+            for (const node of nodes) {
+                await page.mouse.move(node.screenX, node.screenY);
+                expect(await graph.getNodeCanvasToolTip()).toBe(node.data.name);
+            }
+
+            await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
+            expect(await graph.getSelectionCount()).toBe(1);
         } finally {
             await apicalls.removeGraph(graphName);
         }

@@ -171,7 +171,6 @@ export default function Toolbar({
 
     const stripBackground = `repeating-linear-gradient(to bottom, hsl(var(--muted)) 0px, hsl(var(--muted)) ${ITEM_HEIGHT}px, transparent ${ITEM_HEIGHT}px, transparent ${ITEM_HEIGHT + GAP}px)`;
 
-    // Mobile stacks the toolbar: search on its own row, actions on the next one.
     const showAllButton = graph.getElements().length > 0 && (
         <Button
             data-testid="elementCanvasShowAllGraph"
@@ -185,7 +184,9 @@ export default function Toolbar({
     );
 
     return (
-        <div className={cn("w-full flex flex-wrap gap-4 justify-between items-center", isMobile && "flex-col items-stretch gap-2")}>
+        // Desktop: search on the left, actions pinned to the far right. Mobile
+        // stacks them: search on its own row, actions grouped on the next one.
+        <div className={cn("w-full flex flex-wrap gap-4 items-center", isMobile ? "flex-col items-stretch gap-2" : "justify-between")}>
             <div className={cn("flex gap-2 items-center", isMobile && "w-full")}>
 
                 {
@@ -200,8 +201,8 @@ export default function Toolbar({
                         }
                     </Button>
                 }
-                {/* Not gated on `expand`: collapsing Search & Filter must not take Show All with it. */}
-                {!isMobile && showAllButton}
+                {/* Show All belongs to Search & Filter, so it shows only while that is open. */}
+                {!isMobile && expand && showAllButton}
                 <div className={cn("basis-0 grow relative pointer-events-auto min-w-[20dvw] max-w-[55dvw]", isMobile && "max-w-none")}>
                     {
                         expand && graph.getElements().length > 0 && !isLoading &&
@@ -344,8 +345,8 @@ export default function Toolbar({
                     }
                 </div>
             </div>
-            <div data-testid="elementCanvasToolbarActionGraph" className={cn("flex flex-row-reverse gap-2 pointer-events-auto", isMobile && "flex-row justify-start")}>
-                {isMobile && showAllButton}
+            <div data-testid="elementCanvasToolbarActionGraph" className={cn("flex gap-2 pointer-events-auto", !isMobile && "flex-row-reverse")}>
+                {isMobile && expand && showAllButton}
                 {
                     graphName && !isReadOnly &&
                     <>
