@@ -1145,12 +1145,13 @@ export default class GraphPage extends BasePage {
    */
   async clickNodeIn3D(index = 0): Promise<number> {
     const target = await this.page.evaluate((i) => {
-      const canvas = document.querySelector("falkordb-canvas") as HTMLElement & {
-        getGraphData(): { nodes: { id: number; x: number; y: number; z: number }[] };
+      const canvas = document.querySelector("falkordb-canvas")!;
+      const node = canvas.getGraphData().nodes[i] as ReturnType<typeof canvas.getGraphData>["nodes"][number] & { z: number };
+      // The 3D renderer is internal to the canvas; only its screen projection is needed here.
+      const { graph3d } = canvas as unknown as {
         graph3d: { graph: { graph2ScreenCoords(x: number, y: number, z: number): { x: number; y: number } } };
       };
-      const node = canvas.getGraphData().nodes[i];
-      const screen = canvas.graph3d.graph.graph2ScreenCoords(node.x, node.y, node.z);
+      const screen = graph3d.graph.graph2ScreenCoords(node.x!, node.y!, node.z);
       const rect = canvas.getBoundingClientRect();
       return { id: node.id, x: rect.left + screen.x, y: rect.top + screen.y };
     }, index);
