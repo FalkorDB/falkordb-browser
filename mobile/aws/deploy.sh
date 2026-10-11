@@ -60,12 +60,21 @@ esac
 # CloudFormation replaces the tasks by itself.
 PREVIOUS_TOKEN_STORAGE_URL=""
 if [ "$STATUS" != NONE ] && [ -n "$TOKEN_STORAGE_URL" ] && [ "$TOKEN_STORAGE_URL" != none ]; then
-  token_secret="$(aws cloudformation describe-stack-resource --stack-name "$STACK_NAME" \
-    --logical-resource-id TokenStorageSecret \
-    --query StackResourceDetail.PhysicalResourceId --output text 2>/dev/null || true)"
-  if [ -n "$token_secret" ] && [ "$token_secret" != None ]; then
-    PREVIOUS_TOKEN_STORAGE_URL="$(aws secretsmanager get-secret-value --secret-id "$token_secret" \
-      --query SecretString --output text 2>/dev/null || true)"
+  # No TokenStorageSecret yet just means the store is being switched on; any
+  # other failure would hide a change that needs a restart, so stop here.
+  if token_secret="$(aws cloudformation describe-stack-resource --stack-name "$STACK_NAME" \
+      --logical-resource-id TokenStorageSecret \
+      --query StackResourceDetail.PhysicalResourceId --output text 2>"$WORK/err")"; then
+    if ! PREVIOUS_TOKEN_STORAGE_URL="$(aws secretsmanager get-secret-value --secret-id "$token_secret" \
+        --query SecretString --output text 2>"$WORK/err")"; then
+      cat "$WORK/err" >&2
+      echo "Could not read the current token store URL; nothing was changed." >&2
+      exit 1
+    fi
+  elif ! grep -q "does not exist" "$WORK/err"; then
+    cat "$WORK/err" >&2
+    echo "Could not look up the token store secret; nothing was changed." >&2
+    exit 1
   fi
 fi
 
