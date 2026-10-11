@@ -660,4 +660,69 @@ test.describe('Canvas Tests', () => {
         }
     });
 
+    // ─── 2D / 3D tests ───────────────────────────────────────────────────────
+
+    test(`@admin The canvas switches to 3D and back to 2D`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+
+        // 2D is the default.
+        expect(await graph.isDimensionSelected("2d")).toBe(true);
+        expect(await graph.getCanvasDimension()).toBe("2d");
+
+        await graph.clickDimensionControl("3d");
+        expect(await graph.isDimensionSelected("3d")).toBe(true);
+        // The 3D renderer is downloaded on first use.
+        await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+
+        await graph.clickDimensionControl("2d");
+        expect(await graph.isDimensionSelected("2d")).toBe(true);
+        await expect.poll(() => graph.getCanvasDimension(), { timeout: 15000 }).toBe("2d");
+
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Clicking a node in 3D selects it`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+        await graph.clickDimensionControl("3d");
+        await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+
+        await graph.clickNodeIn3D();
+
+        await expect.poll(() => graph.getSelectionCount(), { timeout: 15000 }).toBe(1);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin The 3D view is remembered across a reload`, async () => {
+        // Two query runs and a reload, each waiting out the canvas.
+        test.setTimeout(90000);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+        await graph.clickDimensionControl("3d");
+        await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+
+        // The tab is written to storage as the page goes away. It comes back
+        // without results, so the query is run again to bring the canvas back.
+        await graph.refreshPage();
+        await graph.waitForPageIdle();
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+
+        await expect.poll(() => graph.isDimensionSelected("3d"), { timeout: 15000 }).toBe(true);
+        await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+        await apicalls.removeGraph(graphName);
+    });
 });

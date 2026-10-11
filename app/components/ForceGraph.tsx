@@ -70,7 +70,7 @@ export default function ForceGraph({
     const { setIndicator } = useContext(IndicatorContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
-    const { layout: ctxLayout, direction: ctxDirection, animation: ctxAnimation, pinned: ctxPinned } = useContext(ForceGraphContext);
+    const { layout: ctxLayout, direction: ctxDirection, dimension: ctxDimension, setDimension: setCtxDimension, animation: ctxAnimation, pinned: ctxPinned } = useContext(ForceGraphContext);
 
     const { theme } = useTheme();
     const { toast } = useToast();
@@ -574,6 +574,22 @@ export default function ForceGraph({
 
         canvasRef.current.setLayout(mode);
     }, [canvasRef, canvasLoaded, ctxLayout, ctxDirection]);
+
+    // The 3D renderer is downloaded the first time it is needed. Should that
+    // fail the canvas stays in 2D, so the control is put back to match.
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || !canvasLoaded) return;
+        canvas.setDimension(ctxDimension).catch(() => {
+            if (canvasRef.current !== canvas) return;
+            toast({
+                title: "Could not open the 3D view",
+                description: "The graph is still shown in 2D.",
+                variant: "destructive",
+            });
+            setCtxDimension('2d');
+        });
+    }, [canvasRef, canvasLoaded, ctxDimension, setCtxDimension, toast]);
 
     // The remaining view toggles are tab state too, so the canvas follows the
     // context rather than the control that changed it.

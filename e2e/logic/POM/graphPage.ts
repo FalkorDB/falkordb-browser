@@ -272,6 +272,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("dimContainer");
   }
 
+  public dimensionControl(dimension: "2d" | "3d"): Locator {
+    return this.page.getByTestId(`dimensionControl-${dimension}`);
+  }
+
   public get graphCanvasWrapper(): Locator {
     return this.page.getByTestId("graphCanvasWrapper");
   }
@@ -1105,6 +1109,55 @@ export default class GraphPage extends BasePage {
       (el) => el.click(),
       "Dim Control"
     );
+  }
+
+  async clickDimensionControl(dimension: "2d" | "3d"): Promise<void> {
+    await interactWhenVisible(
+      this.dimensionControl(dimension),
+      (el) => el.click(),
+      `Dimension Control ${dimension}`
+    );
+  }
+
+  async isDimensionSelected(dimension: "2d" | "3d"): Promise<boolean> {
+    await waitForElementToBeVisible(this.dimensionControl(dimension));
+    return (await this.dimensionControl(dimension).getAttribute("aria-pressed")) === "true";
+  }
+
+  /**
+   * The dimension the canvas is actually drawing in. The 3D renderer loads on
+   * first use, so this lags the control until the switch has finished.
+   */
+  async getCanvasDimension(): Promise<"2d" | "3d" | null> {
+    return this.page.evaluate(() => {
+      const canvas = document.querySelector("falkordb-canvas") as (HTMLElement & { getDimension(): "2d" | "3d"; getGraph(): unknown }) | null;
+      if (!canvas) return null;
+      // getDimension reports a switch as soon as it is asked for; the renderer
+      // in place is what shows it has happened.
+      const drawn = canvas.getGraph() === undefined ? "3d" : "2d";
+      return canvas.getDimension() === drawn ? drawn : null;
+    });
+  }
+
+  /**
+   * Click the `index`th node while the canvas is in 3D, at its projected
+   * screen position. Returns the node's id.
+   */
+  async clickNodeIn3D(index = 0): Promise<number> {
+    const target = await this.page.evaluate((i) => {
+      const canvas = document.querySelector("falkordb-canvas") as HTMLElement & {
+        getGraphData(): { nodes: { id: number; x: number; y: number; z: number }[] };
+        graph3d: { graph: { graph2ScreenCoords(x: number, y: number, z: number): { x: number; y: number } } };
+      };
+      const node = canvas.getGraphData().nodes[i];
+      const screen = canvas.graph3d.graph.graph2ScreenCoords(node.x, node.y, node.z);
+      const rect = canvas.getBoundingClientRect();
+      return { id: node.id, x: rect.left + screen.x, y: rect.top + screen.y };
+    }, index);
+    // Hover first: the library resolves what is under the pointer on move.
+    await this.page.mouse.move(target.x, target.y);
+    await this.page.mouse.click(target.x, target.y);
+    return target.id;
   }
 
   async isDimControlChecked(): Promise<boolean> {

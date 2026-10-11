@@ -2,7 +2,7 @@
 
 import { Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import type { FalkorDBCanvas, LayoutMode, ViewportState, NodeShape } from "@falkordb/canvas";
+import type { CanvasDimension, FalkorDBCanvas, LayoutMode, ViewportState, NodeShape } from "@falkordb/canvas";
 import { NODE_SIZE } from "@falkordb/canvas";
 import { useToast } from "@/components/ui/use-toast";
 import ForceGraph from "@/app/components/ForceGraph";
@@ -24,7 +24,7 @@ import {
     getSchema,
     isAbortError,
 } from "@/lib/utils";
-import { normalizeDirection, normalizeLayout, type SchemaViewMeta } from "@/lib/useGraphTabs";
+import { normalizeDimension, normalizeDirection, normalizeLayout, type SchemaViewMeta } from "@/lib/useGraphTabs";
 import {
     BrowserSettingsContext,
     ConnectionContext,
@@ -96,6 +96,7 @@ type SchemaCache = {
     viewport: ViewportState | undefined;
     layout: LayoutMode;
     direction: string;
+    dimension: CanvasDimension;
     animation: boolean;
     pinned: boolean;
     dimmed: boolean;
@@ -282,6 +283,7 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             viewport: undefined,
             layout: "force",
             direction: "",
+            dimension: "2d",
             animation: false,
             pinned: false,
             dimmed: true,
@@ -297,6 +299,7 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
     const [viewport, setViewport] = usePersisted("viewport", restored?.viewport ?? stored.viewport, persist);
     const [layout, setLayout] = usePersisted("layout", restored?.layout ?? storedLayout, persist);
     const [direction, setDirection] = usePersisted("direction", restored?.direction ?? normalizeDirection(storedLayout, stored.direction), persist);
+    const [dimension, setDimension] = usePersisted("dimension", restored?.dimension ?? normalizeDimension(stored.dimension), persist);
     const [animation, setAnimation] = usePersisted("animation", restored?.animation ?? stored.animation ?? false, persist);
     const [pinned, setPinned] = usePersisted("pinned", restored?.pinned ?? stored.pinned ?? false, persist);
     const [dimmed, setDimmed] = usePersisted("dimmed", restored?.dimmed ?? stored.dimmed ?? true, persist);
@@ -526,12 +529,13 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
                 : undefined,
             layout,
             direction,
+            dimension,
             animation,
             pinned,
             dimmed,
             expand,
         });
-    }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, animation, pinned, dimmed, expand]);
+    }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, dimension, animation, pinned, dimmed, expand]);
 
     // Colors, sizes and visibility never change the graph's shape, so they are
     // applied in place instead of costing a re-layout. The styles come from the
@@ -655,6 +659,8 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         setLayout,
         direction,
         setDirection,
+        dimension,
+        setDimension,
         animation,
         setAnimation,
         pinned,
@@ -663,7 +669,7 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         setDimmed,
     }), [
         viewport, setViewport, schemaGraph, setData, graphData, setGraphData, layout, setLayout,
-        direction, setDirection, animation, setAnimation, pinned, setPinned, dimmed, setDimmed,
+        direction, setDirection, dimension, setDimension, animation, setAnimation, pinned, setPinned, dimmed, setDimmed,
     ]);
 
     // Read-only by nature: the schema is a view of the data, not the data.

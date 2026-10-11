@@ -4,7 +4,7 @@
 
 import { ChevronDown, Circle, Pause, Pin, PinOff, Play, Shrink, Telescope, ZoomIn, ZoomOut } from "lucide-react";
 import { Dispatch, SetStateAction, useContext, useEffect, useRef } from "react";
-import type { HierarchyDirection, LayoutMode, RadialDirection } from "@falkordb/canvas";
+import type { CanvasDimension, HierarchyDirection, LayoutMode, RadialDirection } from "@falkordb/canvas";
 import { cn, GraphRef, Node, Link } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -17,6 +17,11 @@ const LAYOUTS: { value: LayoutMode; label: string }[] = [
     { value: 'force', label: 'Force' },
     { value: 'tree', label: 'Tree' },
     { value: 'radial', label: 'Radial' },
+];
+
+const DIMENSIONS: { value: CanvasDimension; label: string; title: string }[] = [
+    { value: '2d', label: '2D', title: 'Show the graph in 2D' },
+    { value: '3d', label: '3D', title: 'Show the graph in 3D' },
 ];
 
 // The icons are 18px, so the tap area has to come from the control itself to
@@ -153,6 +158,8 @@ export default function Controls({
         setLayout: setContextLayout,
         direction: contextDirection,
         setDirection: setContextDirection,
+        dimension,
+        setDimension,
         animation,
         setAnimation,
         pinned,
@@ -297,6 +304,31 @@ export default function Controls({
                     </Tooltip>
                 </>
             }
+            <div className="h-4 w-px bg-border rounded-full" />
+            <div
+                data-testid="dimensionControl"
+                role="group"
+                aria-label="Graph dimension"
+                className="flex items-center gap-0.5 rounded-md border border-border p-0.5 pointer-events-auto"
+            >
+                {DIMENSIONS.map(d => (
+                    <button
+                        key={d.value}
+                        type="button"
+                        data-testid={`dimensionControl-${d.value}`}
+                        aria-pressed={dimension === d.value}
+                        title={d.title}
+                        className={cn(
+                            "rounded px-1.5 py-0.5 text-xs font-medium disabled:opacity-50 mobile:min-h-10 mobile:min-w-10",
+                            dimension === d.value ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-secondary",
+                        )}
+                        disabled={disabled}
+                        onClick={() => setDimension(d.value)}
+                    >
+                        {d.label}
+                    </button>
+                ))}
+            </div>
             <div className="h-4 w-px bg-border rounded-full" />
             {/* Layout dropdown: click layout to select, sub-menu shows directions */}
             <DropdownMenu>

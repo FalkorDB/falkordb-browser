@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type { FalkorDBCanvas } from "@falkordb/canvas";
 import { applyCanvasLayout, captureCanvasLayout, type CanvasLayout } from "./utils.ts";
 
-// The canvas is a web component we cannot instantiate here, and only four of
+// The canvas is a web component we cannot instantiate here, and only a few of
 // its methods matter to these helpers, so a stub stands in for it. `getData()`
 // mirrors the real thing by stripping x/y — that omission is the whole reason
 // `captureCanvasLayout` has to read coordinates off `getGraphData()`.
@@ -18,7 +18,7 @@ type StubNode = {
     initialPositionCalculated?: boolean;
 };
 
-const stubCanvas = (nodes: StubNode[]) => {
+const stubCanvas = (nodes: StubNode[], dimension: "2d" | "3d" = "2d") => {
     const state = {
         nodes,
         setDataCalls: 0,
@@ -31,6 +31,7 @@ const stubCanvas = (nodes: StubNode[]) => {
         getGraphData: () => ({ nodes: state.nodes, links: [] }),
         setData: (data: unknown) => { state.setDataCalls += 1; state.lastSetData = data; },
         refresh: () => { state.refreshCalls += 1; },
+        getDimension: () => dimension,
     } as unknown as FalkorDBCanvas;
 
     return { canvas, state };
@@ -122,4 +123,21 @@ test("applyCanvasLayout leaves nodes the snapshot does not know about alone", ()
     // A node added since the snapshot keeps its own (unplaced) state so the
     // canvas can lay it out normally.
     assert.deepEqual(nodes[1], { id: 7 });
+});
+
+test("applyCanvasLayout lays a 3D canvas out again instead of pinning it flat", () => {
+    const nodes: StubNode[] = [{ id: 1 }];
+    const { canvas, state } = stubCanvas(nodes, "3d");
+
+    const layout: CanvasLayout = {
+        data: { nodes: [{ id: 1 }], links: [] } as unknown as CanvasLayout["data"],
+        positions: [{ id: 1, x: 10, y: 20 }],
+    };
+
+    applyCanvasLayout(canvas, layout);
+
+    // The snapshot has no depth: pinning x/y would squash the 3D layout flat.
+    assert.equal(state.lastSetData, layout.data);
+    assert.equal(state.refreshCalls, 0);
+    assert.deepEqual(nodes[0], { id: 1 });
 });
