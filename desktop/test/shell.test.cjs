@@ -13,6 +13,7 @@ const {
     isAppUrl,
     isExternalWebUrl,
     isPortFree,
+    isUsablePort,
     loadSecrets,
     pruneServer,
     resourcesDir,
@@ -61,6 +62,22 @@ test("choosePort keeps the same port across launches while it is free", async ()
     fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify({ port: free }));
     assert.equal(await choosePort(dir), free);
     assert.equal(await choosePort(dir), free);
+});
+
+test("isUsablePort only accepts an unprivileged TCP port", () => {
+    for (const port of [1024, 3210, 65535]) assert.equal(isUsablePort(port), true, String(port));
+    for (const port of [0, 80, 1023, 65536, -1, 3210.5, "3210", null, undefined, NaN]) {
+        assert.equal(isUsablePort(port), false, String(port));
+    }
+});
+
+test("choosePort ignores a saved port that is not usable", async (t) => {
+    if (!(await isPortFree(DEFAULT_PORT))) t.skip(`port ${DEFAULT_PORT} is in use on this machine`);
+    for (const port of [0, 22, 70000, "3300"]) {
+        const dir = tempDir();
+        fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify({ port }));
+        assert.equal(await choosePort(dir), DEFAULT_PORT, String(port));
+    }
 });
 
 test("choosePort starts from the default port", async (t) => {

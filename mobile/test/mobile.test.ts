@@ -95,8 +95,8 @@ test("a release tag becomes the app's version name and a growing version code", 
     ];
     for (const [tag, name, code] of cases) {
         const gradle = stampVersion(tag);
-        assert.match(gradle, new RegExp(`versionCode ${code}\\n`), tag);
-        assert.match(gradle, new RegExp(`versionName "${name.replace(/\./g, "\\.")}"`), tag);
+        assert.ok(gradle.includes(`versionCode ${code}\n`), `${tag}: versionCode ${code}`);
+        assert.ok(gradle.includes(`versionName "${name}"`), `${tag}: versionName "${name}"`);
     }
     // Every release installs over the one before it.
     const order = ["v2.6.1", "v2.6.2", "v2.7.0", "v2.10.0", "v3.0.0"].map((tag) => Number(stampVersion(tag).match(/versionCode (\d+)/)?.[1]));

@@ -58,13 +58,18 @@ function anyFreePort(host = HOST) {
     });
 }
 
+/** An unprivileged TCP port; anything else in settings.json is ignored. */
+function isUsablePort(value) {
+    return Number.isInteger(value) && value >= 1024 && value <= 65535;
+}
+
 // The port is part of the page's origin, and the browser keeps settings and
 // its client-side key in localStorage, so reuse the same port across launches
 // and only move when something else has taken it.
 async function choosePort(dir, { host = HOST, defaultPort = DEFAULT_PORT } = {}) {
     const file = path.join(dir, "settings.json");
     const settings = readJson(file) || {};
-    const preferred = Number.isInteger(settings.port) ? settings.port : defaultPort;
+    const preferred = isUsablePort(settings.port) ? settings.port : defaultPort;
     if (await isPortFree(preferred, host)) return preferred;
     const port = await anyFreePort(host);
     writeJson(file, { ...settings, port });
@@ -148,6 +153,7 @@ module.exports = {
     isPortFree,
     anyFreePort,
     choosePort,
+    isUsablePort,
     buildServerEnv,
     isAppUrl,
     isExternalWebUrl,
