@@ -18,6 +18,8 @@ const STARTUP_TIMEOUT_MS = 60_000;
 let serverProcess = null;
 let mainWindow = null;
 let origin = null;
+// Set once the server answers; until then startup opens the window itself.
+let serverReady = false;
 let quitting = false;
 
 function serverDir() {
@@ -84,6 +86,7 @@ async function startServer() {
     serverProcess.stderr?.on("data", (d) => process.stderr.write(d));
 
     await waitForServer(`${origin}/`, serverProcess);
+    serverReady = true;
 
     serverProcess.on("exit", (code) => {
         serverProcess = null;
@@ -150,7 +153,7 @@ if (!app.requestSingleInstanceLock()) {
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
-        } else if (origin) {
+        } else if (serverReady) {
             // macOS keeps the app running with no window; a relaunch means "open it".
             createWindow();
         }

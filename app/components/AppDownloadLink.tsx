@@ -48,11 +48,27 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
         );
     }
 
-    return item(
+    const primary = item(
         <a className={className} href={download.href} target="_blank" rel="noreferrer" data-testid="appDownload" onClick={onSelect}>
             <Download size={iconSize} />
             <span>{download.label}</span>
             <ArrowUpRight size={15} className="ml-auto" />
         </a>
+    );
+    if (!download.alternate) return primary;
+
+    // The other build for this OS (Intel next to Apple silicon), for the
+    // visitors whose browser cannot tell which one they need.
+    return (
+        <>
+            {primary}
+            {item(
+                <a className={className} href={download.alternate.href} target="_blank" rel="noreferrer" data-testid="appDownloadAlternate" onClick={onSelect}>
+                    <Download size={iconSize} />
+                    <span>{download.alternate.label}</span>
+                    <ArrowUpRight size={15} className="ml-auto" />
+                </a>
+            )}
+        </>
     );
 }

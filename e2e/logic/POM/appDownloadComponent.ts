@@ -36,6 +36,11 @@ export default class AppDownloadComponent extends BasePage {
         return this.page.getByTestId("appDownload");
     }
 
+    /** Next to `link` when the OS has a second build (the Intel Mac one). */
+    public get alternateLink(): Locator {
+        return this.page.getByTestId("appDownloadAlternate");
+    }
+
     async dismiss(dontShowAgain = false): Promise<void> {
         if (dontShowAgain) await this.promptDontShowAgain.click();
         await this.promptClose.click();

@@ -40,8 +40,9 @@ By default each task keeps API tokens on its own disk and loses them when it
 is replaced. Set `TOKEN_STORAGE_URL` (a `falkor[s]://user:password@host:port`
 FalkorDB, e.g. the one the browser serves) to keep them there instead; that
 also makes them safe with more than one task. Once set, later runs keep it even
-without the variable; `TOKEN_STORAGE_URL=none` switches it off. Setting or
-changing it restarts the browser so the running tasks pick it up. Rate-limit counters stay per
+without the variable; `TOKEN_STORAGE_URL=none` switches it off. Changing an
+existing URL restarts the browser so the running tasks pick it up; rerunning
+with the same URL does not. Rate-limit counters stay per
 task, which is why `DesiredCount` defaults to 1. The session and encryption
 secrets are kept in Secrets Manager even if the stack is deleted.
 

@@ -46,7 +46,7 @@ test("loadSecrets generates two 32-byte hex secrets once and keeps them", () => 
 });
 
 test("loadSecrets makes a replaced secrets file owner-only, whatever its old mode", (t) => {
-    if (process.platform === "win32") t.skip("POSIX file modes");
+    if (process.platform === "win32") return t.skip("POSIX file modes");
     const dir = tempDir();
     const file = path.join(dir, "secrets.json");
     fs.writeFileSync(file, "not json", { mode: 0o644 });
@@ -56,7 +56,7 @@ test("loadSecrets makes a replaced secrets file owner-only, whatever its old mod
 });
 
 test("ensurePrivateDir creates owner-only folders and tightens existing ones", (t) => {
-    if (process.platform === "win32") t.skip("POSIX file modes");
+    if (process.platform === "win32") return t.skip("POSIX file modes");
     const root = tempDir();
     const fresh = path.join(root, "data");
     ensurePrivateDir(fresh);

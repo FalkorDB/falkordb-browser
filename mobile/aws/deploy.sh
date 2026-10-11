@@ -54,6 +54,21 @@ case "$STATUS" in
     exit 1 ;;
 esac
 
+# --- The token store this stack uses now, read before deploying (the parameter
+# is NoEcho, so the stack itself will not say). Only a change to an existing
+# URL needs a restart: adding or removing one changes the task definition, so
+# CloudFormation replaces the tasks by itself.
+PREVIOUS_TOKEN_STORAGE_URL=""
+if [ "$STATUS" != NONE ] && [ -n "$TOKEN_STORAGE_URL" ] && [ "$TOKEN_STORAGE_URL" != none ]; then
+  token_secret="$(aws cloudformation describe-stack-resource --stack-name "$STACK_NAME" \
+    --logical-resource-id TokenStorageSecret \
+    --query StackResourceDetail.PhysicalResourceId --output text 2>/dev/null || true)"
+  if [ -n "$token_secret" ] && [ "$token_secret" != None ]; then
+    PREVIOUS_TOKEN_STORAGE_URL="$(aws secretsmanager get-secret-value --secret-id "$token_secret" \
+      --query SecretString --output text 2>/dev/null || true)"
+  fi
+fi
+
 # --- Parameters go through a private file, so no secret is ever in argv.
 json_escape() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
 params="$WORK/params.json"
@@ -88,9 +103,9 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_IAM \
   --parameter-overrides "file://$params"
 
-# ECS reads secrets when a task starts, and a new token-store URL keeps the
+# ECS reads secrets when a task starts, and a changed token-store URL keeps the
 # same secret ARN, so tasks already running would go on using the old one.
-if [ -n "$TOKEN_STORAGE_URL" ] && [ "$STATUS" != NONE ]; then
+if [ -n "$PREVIOUS_TOKEN_STORAGE_URL" ] && [ "$PREVIOUS_TOKEN_STORAGE_URL" != "$TOKEN_STORAGE_URL" ]; then
   echo "Restarting the browser so it picks up the token store setting."
   aws ecs update-service \
     --cluster "$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='ClusterName'].OutputValue" --output text)" \

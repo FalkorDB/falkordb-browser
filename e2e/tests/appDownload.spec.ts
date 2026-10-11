@@ -166,6 +166,9 @@ test.describe("@admin App download", () => {
 
         await expect(app.link).toHaveText("Download for macOS");
         await expect(app.link).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-mac-arm64.dmg`);
+        // Intel Macs can still find their build without the popup.
+        await expect(app.alternateLink).toHaveText("Intel Mac? Get that version");
+        await expect(app.alternateLink).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-mac-x64.dmg`);
         await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
     });
 
@@ -180,6 +183,18 @@ test.describe("@admin App download", () => {
         await expect(app.link).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-win-x64.exe`);
         // A real menu item, so the arrow keys reach it like the others.
         await expect(app.link).toHaveAttribute("role", "menuitem");
+    });
+
+    test("macOS: the help menu offers both builds, each as a menu item", async ({ browser }) => {
+        context = await openVisitor(browser, { ua: UA.mac, cpu: "none" });
+        const [page, app] = await openPage(context, urls.graphUrl);
+        await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
+        await app.dismiss(true);
+
+        await page.getByRole("button", { name: "Help" }).click();
+        await expect(app.link).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-mac-arm64.dmg`);
+        await expect(app.alternateLink).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-mac-x64.dmg`);
+        await expect(app.alternateLink).toHaveAttribute("role", "menuitem");
     });
 
     test("Android with no app link configured: no popup and no menu item", async ({ browser }) => {
