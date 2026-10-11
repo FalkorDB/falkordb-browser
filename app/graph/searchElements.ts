@@ -1,3 +1,4 @@
+import { formatValue } from "../../lib/graphValues.ts";
 import { isSchemaReservedKey, type Link, type Node } from "../../lib/utils.ts";
 
 export type SearchMatch = { key: string; value: string };
@@ -15,8 +16,10 @@ export function getSearchMatch(el: Node | Link, search: string): SearchMatch | n
     if (!lowerSearch) return null;
 
     for (const [key, value] of Object.entries(el.data)) {
-        if (!isSchemaReservedKey(key) && value != null && value.toString().toLowerCase().includes(lowerSearch)) {
-            return { key, value: value.toString() };
+        if (isSchemaReservedKey(key)) continue;
+        const text = formatValue(value);
+        if (text.toLowerCase().includes(lowerSearch)) {
+            return { key, value: text };
         }
     }
 

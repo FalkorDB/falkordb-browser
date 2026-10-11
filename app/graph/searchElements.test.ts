@@ -44,6 +44,12 @@ describe("getSearchMatch", () => {
         assert.deepEqual(getSearchMatch(node(1, ["Person"], { active: true }), "ru"), { key: "active", value: "true" });
     });
 
+    it("matches object and array values by their JSON form", () => {
+        const point = { latitude: 32.07, longitude: 34.78 };
+        assert.deepEqual(getSearchMatch(node(1, ["Place"], { location: point }), "34.78"), { key: "location", value: '{"latitude":32.07,"longitude":34.78}' });
+        assert.deepEqual(getSearchMatch(node(1, ["Person"], { tags: ["red", "blue"] }), "blu"), { key: "tags", value: '["red","blue"]' });
+    });
+
     it("skips null and undefined values", () => {
         assert.equal(getSearchMatch(node(7, ["Person"], { name: null, nick: undefined }), "null"), null);
     });
