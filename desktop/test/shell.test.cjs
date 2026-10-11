@@ -5,16 +5,14 @@ const net = require("node:net");
 const os = require("node:os");
 const path = require("node:path");
 const {
-    DEFAULT_PORT,
     HOST,
-    anyFreePort,
+    PORT_RANGE,
     buildServerEnv,
     choosePort,
     ensurePrivateDir,
     isAppUrl,
     isExternalWebUrl,
     isPortFree,
-    isUsablePort,
     loadSecrets,
     pruneServer,
     resourcesDir,
@@ -81,45 +79,75 @@ test("loadSecrets replaces a damaged or weak secrets file", () => {
     }
 });
 
-test("choosePort keeps the same port across launches while it is free", async () => {
+/** A run of free loopback ports to stand in for the app's range. */
+async function freeRange(count) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+        const probe = await listen(0);
+        const first = probe.address().port;
+        probe.close();
+        if (first + count > 65535) continue;
+        const free = await Promise.all(Array.from({ length: count }, (_, i) => isPortFree(first + i)));
+        if (free.every(Boolean)) return { first, count };
+    }
+    throw new Error("no run of free ports found");
+}
+
+function saveSettings(dir, settings) {
+    fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify(settings));
+}
+
+function readSettings(dir) {
+    return JSON.parse(fs.readFileSync(path.join(dir, "settings.json"), "utf8"));
+}
+
+test("the app's ports are 3210 onwards, all unprivileged", () => {
+    assert.equal(PORT_RANGE.first, 3210);
+    assert.ok(PORT_RANGE.first >= 1024 && PORT_RANGE.first + PORT_RANGE.count - 1 <= 65535);
+});
+
+test("choosePort starts at the first port of the range and remembers it", async () => {
+    const range = await freeRange(3);
     const dir = tempDir();
-    const free = await anyFreePort();
-    fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify({ port: free }));
-    assert.equal(await choosePort(dir), free);
-    assert.equal(await choosePort(dir), free);
+    assert.equal(await choosePort(dir, { range }), range.first);
+    assert.equal(readSettings(dir).port, range.first);
 });
 
-test("isUsablePort only accepts an unprivileged TCP port", () => {
-    for (const port of [1024, 3210, 65535]) assert.equal(isUsablePort(port), true, String(port));
-    for (const port of [0, 80, 1023, 65536, -1, 3210.5, "3210", null, undefined, NaN]) {
-        assert.equal(isUsablePort(port), false, String(port));
-    }
+test("choosePort keeps the saved port across launches while it is free", async () => {
+    const range = await freeRange(3);
+    const dir = tempDir();
+    saveSettings(dir, { port: range.first + 2 });
+    assert.equal(await choosePort(dir, { range }), range.first + 2);
+    assert.equal(await choosePort(dir, { range }), range.first + 2);
 });
 
-test("choosePort ignores a saved port that is not usable", async (t) => {
-    if (!(await isPortFree(DEFAULT_PORT))) t.skip(`port ${DEFAULT_PORT} is in use on this machine`);
-    for (const port of [0, 22, 70000, "3300"]) {
+test("choosePort ignores a saved port outside its range", async () => {
+    const range = await freeRange(2);
+    for (const port of [0, 22, range.first + 2, 70000, String(range.first + 1), null]) {
         const dir = tempDir();
-        fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify({ port }));
-        assert.equal(await choosePort(dir), DEFAULT_PORT, String(port));
+        saveSettings(dir, { port });
+        assert.equal(await choosePort(dir, { range }), range.first, String(port));
     }
-});
-
-test("choosePort starts from the default port", async (t) => {
-    if (!(await isPortFree(DEFAULT_PORT))) t.skip(`port ${DEFAULT_PORT} is in use on this machine`);
-    assert.equal(await choosePort(tempDir()), DEFAULT_PORT);
 });
 
 test("choosePort moves off a taken port and remembers the new one", async () => {
-    const dir = tempDir();
-    const busy = await listen(0);
-    const taken = busy.address().port;
+    const range = await freeRange(3);
+    const busy = await listen(range.first);
     try {
-        fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify({ port: taken, other: "kept" }));
-        const port = await choosePort(dir);
-        assert.notEqual(port, taken);
-        const saved = JSON.parse(fs.readFileSync(path.join(dir, "settings.json"), "utf8"));
-        assert.deepEqual(saved, { port, other: "kept" });
+        const dir = tempDir();
+        saveSettings(dir, { port: range.first, other: "kept" });
+        const port = await choosePort(dir, { range });
+        assert.equal(port, range.first + 1);
+        assert.deepEqual(readSettings(dir), { port, other: "kept" });
+    } finally {
+        busy.close();
+    }
+});
+
+test("choosePort says so when its whole range is taken", async () => {
+    const range = await freeRange(1);
+    const busy = await listen(range.first);
+    try {
+        await assert.rejects(choosePort(tempDir(), { range }), /is in use/);
     } finally {
         busy.close();
     }

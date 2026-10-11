@@ -7,7 +7,8 @@ const net = require("node:net");
 const path = require("node:path");
 
 const HOST = "127.0.0.1";
-const DEFAULT_PORT = 3210;
+// The ports the app may listen on, tried in order.
+const PORT_RANGE = { first: 3210, count: 90 };
 
 function readJson(file) {
     try {
@@ -55,33 +56,28 @@ function isPortFree(port, host = HOST) {
     });
 }
 
-function anyFreePort(host = HOST) {
-    return new Promise((resolve, reject) => {
-        const probe = net.createServer();
-        probe.once("error", reject);
-        probe.listen(0, host, () => {
-            const { port } = probe.address();
-            probe.close(() => resolve(port));
-        });
-    });
-}
-
-/** An unprivileged TCP port; anything else in settings.json is ignored. */
-function isUsablePort(value) {
-    return Number.isInteger(value) && value >= 1024 && value <= 65535;
+function candidatePorts({ first, count }) {
+    return Array.from({ length: count }, (_, i) => first + i);
 }
 
 // The port is part of the page's origin, and the browser keeps settings and
 // its client-side key in localStorage, so reuse the same port across launches
-// and only move when something else has taken it.
-async function choosePort(dir, { host = HOST, defaultPort = DEFAULT_PORT } = {}) {
+// and only move when something else has taken it. The saved port only decides
+// which candidate goes first: the number used always comes from the range,
+// never from settings.json itself.
+async function choosePort(dir, { host = HOST, range = PORT_RANGE } = {}) {
     const file = path.join(dir, "settings.json");
     const settings = readJson(file) || {};
-    const preferred = isUsablePort(settings.port) ? settings.port : defaultPort;
-    if (await isPortFree(preferred, host)) return preferred;
-    const port = await anyFreePort(host);
-    writeJson(file, { ...settings, port });
-    return port;
+    const candidates = candidatePorts(range);
+    const saved = candidates.indexOf(settings.port);
+    const order = saved >= 0 ? [candidates[saved], ...candidates.filter((_, i) => i !== saved)] : candidates;
+    for (const port of order) {
+        if (await isPortFree(port, host)) {
+            if (order.indexOf(port) !== 0 || saved < 0) writeJson(file, { ...settings, port });
+            return port;
+        }
+    }
+    throw new Error(`Every port from ${range.first} to ${range.first + range.count - 1} is in use.`);
 }
 
 /**
@@ -156,13 +152,11 @@ function resourcesDir(platform, appOutDir, productFilename) {
 
 module.exports = {
     HOST,
-    DEFAULT_PORT,
+    PORT_RANGE,
     loadSecrets,
     ensurePrivateDir,
     isPortFree,
-    anyFreePort,
     choosePort,
-    isUsablePort,
     buildServerEnv,
     isAppUrl,
     isExternalWebUrl,
