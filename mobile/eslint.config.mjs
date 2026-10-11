@@ -7,5 +7,6 @@ export default tseslint.config(
     { ignores: ["android/**", "ios/**", "dist/**", "node_modules/**"] },
     js.configs.recommended,
     ...tseslint.configs.recommended,
-    { languageOptions: { globals: globals.node } },
+    // ES modules throughout, so no CommonJS require/module/__dirname.
+    { languageOptions: { globals: globals.nodeBuiltin } },
 );

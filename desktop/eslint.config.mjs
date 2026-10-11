@@ -11,6 +11,7 @@ export default [
     },
     {
         files: ["**/*.mjs"],
-        languageOptions: { sourceType: "module", globals: globals.node },
+        // No require/module/__dirname in an ES module, so lint should flag them.
+        languageOptions: { sourceType: "module", globals: globals.nodeBuiltin },
     },
 ];
