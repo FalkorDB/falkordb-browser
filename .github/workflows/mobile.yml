@@ -73,6 +73,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --progress=false
 
+      - name: Run tests
+        run: npm test
+
       - name: Add or sync the Android project
         run: |
           if [ -d android ]; then npx cap sync android; else npx cap add android; fi
@@ -145,18 +148,10 @@ jobs:
         run: |
           if [ -d android ]; then npx cap sync android; else npx cap add android; fi
 
-      # v2.6.1 -> versionName 2.6.1, versionCode 20601. The code only grows, so
-      # Android installs each release over the previous one.
+      # v2.6.1 -> versionName 2.6.1, versionCode 20601 (see the script).
       - name: Use the release version
         if: steps.config.outputs.ready == 'true'
-        run: |
-          version="${TAG#v}"
-          IFS=. read -r major minor patch <<EOF
-          ${version%%-*}
-          EOF
-          code=$((major * 10000 + minor * 100 + patch))
-          sed -i "s/versionCode [0-9]*/versionCode $code/; s/versionName \"[^\"]*\"/versionName \"$version\"/" android/app/build.gradle
-          grep -q "versionCode $code" android/app/build.gradle
+        run: sh scripts/android-version.sh "$TAG" android/app/build.gradle
 
       - name: Build and sign the release APK
         if: steps.config.outputs.ready == 'true'

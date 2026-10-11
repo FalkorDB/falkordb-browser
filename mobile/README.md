@@ -57,8 +57,11 @@ The URL is baked in at `cap sync` time. A build without one shows a "no server
 configured" page (`www/index.html`). Only the browser's own host stays inside
 the app; other links open in the system browser.
 
-CI (`.github/workflows/mobile.yml`) lints the CloudFormation template and
-builds a debug APK on every change to `mobile/`. iOS builds need certificates
+`npm test` covers the server-URL rules in `capacitor.config.ts` and the
+release version stamping (`scripts/android-version.sh`).
+
+CI (`.github/workflows/mobile.yml`) runs those tests, lints the CloudFormation
+template and builds a debug APK on every change to `mobile/`. iOS builds need certificates
 and a macOS runner, so they aren't in CI yet.
 
 ## Try it on a phone (development)

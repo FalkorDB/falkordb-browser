@@ -11,7 +11,8 @@
     "open:android": "cap open android",
     "open:ios": "cap open ios",
     "dev:android": "sh scripts/dev-android.sh",
-    "deploy:aws": "sh aws/deploy.sh"
+    "deploy:aws": "sh aws/deploy.sh",
+    "test": "node --test \"test/**/*.test.ts\""
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
