@@ -61,6 +61,10 @@ jobs:
         working-directory: desktop
         run: npm ci --no-audit --progress=false
 
+      - name: Run desktop tests
+        working-directory: desktop
+        run: npm test
+
       # Stamp the app with the release's version (v2.6.1 -> 2.6.1), not the
       # one last written into desktop/package.json. File names carry no
       # version, so the browser's latest/download links keep working.

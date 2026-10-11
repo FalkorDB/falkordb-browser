@@ -5,6 +5,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { resourcesDir } = require("../lib/shell.cjs");
 
 exports.default = async function afterPack(context) {
     const source = path.join(__dirname, "..", "server");
@@ -12,9 +13,7 @@ exports.default = async function afterPack(context) {
         throw new Error("desktop/server is missing. Run `npm run prepare:server` first.");
     }
 
-    const resources = context.electronPlatformName === "darwin"
-        ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources")
-        : path.join(context.appOutDir, "resources");
+    const resources = resourcesDir(context.electronPlatformName, context.appOutDir, context.packager.appInfo.productFilename);
     const target = path.join(resources, "server");
 
     fs.rmSync(target, { recursive: true, force: true });

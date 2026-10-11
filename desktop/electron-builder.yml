@@ -9,6 +9,7 @@ directories:
 artifactName: FalkorDB-Browser-${os}-${arch}.${ext}
 files:
   - main.cjs
+  - lib/**/*
   - package.json
 # The Next.js server (desktop/server, from `npm run prepare:server`) is copied
 # to resources/server outside app.asar by this hook: server.js chdirs into its

@@ -12,6 +12,7 @@ cd desktop
 npm ci
 npm start        # uses an existing root build: run `npm run build:web` first
 npm run dist     # builds the web app, then installers into desktop/dist
+npm test         # the shell's own logic (lib/shell.cjs), no Electron needed
 ```
 
 Installers are built for the OS you run on (AppImage, dmg/zip, or nsis exe),

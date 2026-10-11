@@ -2,9 +2,12 @@
 // way the Docker image lays it out (server.js + .next/static + public).
 // Run `npm --prefix .. run build` first; this script never builds by itself.
 
-import { cpSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+const { pruneServer } = createRequire(import.meta.url)("../lib/shell.cjs");
 
 const desktopDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const rootDir = path.dirname(desktopDir);
@@ -23,10 +26,7 @@ cpSync(path.join(rootDir, "public"), path.join(out, "public"), { recursive: true
 
 // Never ship a developer's env files or local state inside the app. The
 // desktop shell supplies every setting the server needs at launch.
-for (const name of readdirSync(out)) {
-    if (name.startsWith(".env") || [".data", "uploads", "tls", "e2e", "falkordb-import"].includes(name)) {
-        rmSync(path.join(out, name), { recursive: true, force: true });
-    }
-}
+const removed = pruneServer(out);
+if (removed.length) console.log(`Left out of the app: ${removed.join(", ")}`);
 
 console.log(`Prepared server in ${out}`);
