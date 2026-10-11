@@ -73,6 +73,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --progress=false
 
+      - name: Type-check
+        run: npm run typecheck
+
       - name: Run tests
         run: npm test
 
@@ -100,7 +103,9 @@ jobs:
       contents: write
     env:
       FALKORDB_BROWSER_URL: ${{ vars.FALKORDB_BROWSER_URL }}
-      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      # All four, so a half-configured key skips with the warning below
+      # instead of failing halfway through signing.
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
       TAG: ${{ github.event.release.tag_name }}
     defaults:
       run:
@@ -123,13 +128,14 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # No dependency cache here: any workflow run can write to it, and this
+      # job holds the signing key.
       - name: Setup Node
         if: steps.config.outputs.ready == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          package-manager-cache: false
 
       - name: Setup Java
         if: steps.config.outputs.ready == 'true'

@@ -13,20 +13,20 @@ tag="$1"
 gradle="$2"
 
 version="${tag#v}"
-core="${version%%-*}"
 
-case "$core" in
-  *[!0-9.]* | *..* | .* | *. | "") echo "Not a release tag: $tag" >&2; exit 1 ;;
-esac
-
-IFS=. read -r major minor patch extra <<EOF
-$core
-EOF
-if [ -z "${major:-}" ] || [ -z "${minor:-}" ] || [ -z "${patch:-}" ] || [ -n "${extra:-}" ] \
-  || [ "$minor" -gt 99 ] || [ "$patch" -gt 99 ]; then
-  echo "Expected vMAJOR.MINOR.PATCH with MINOR and PATCH below 100: $tag" >&2
+# The whole tag is checked before any of it reaches arithmetic or sed: numbers
+# without leading zeros (sh reads 08 as octal), MINOR and PATCH below 100 so the
+# code keeps growing, and an optional -suffix of letters, digits and dots only.
+if ! printf '%s\n' "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)(-[0-9A-Za-z.]+)?$'; then
+  echo "Expected vMAJOR.MINOR.PATCH[-suffix] with MINOR and PATCH below 100: $tag" >&2
   exit 1
 fi
+
+core="${version%%-*}"
+major="${core%%.*}"
+rest="${core#*.}"
+minor="${rest%%.*}"
+patch="${rest#*.}"
 
 code=$((major * 10000 + minor * 100 + patch))
 

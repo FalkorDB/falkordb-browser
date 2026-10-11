@@ -41,10 +41,21 @@ Parameters:
     Type: String
     Default: ""
     Description: Optional https App Store link for iOS visitors. Blank offers "Add to Home Screen".
+  TokenStorageUrl:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: >-
+      Optional falkor[s]://user:password@host:port of a FalkorDB that stores the
+      browser's API tokens (API_TOKEN_FALKORDB_URL). Blank keeps them on the task's
+      own disk, which is lost whenever the task is replaced.
   DesiredCount:
     Type: Number
     Default: 1
-    Description: Rate limits and API tokens are kept per task, so raise this only if that is acceptable.
+    Description: >-
+      Rate limits are counted per task, and without TokenStorageUrl so are API
+      tokens; raise this only if that is acceptable.
+
   Cpu:
     Type: String
     Default: "512"
@@ -52,12 +63,26 @@ Parameters:
     Type: String
     Default: "1024"
 
+Conditions:
+  HasTokenStorage: !Not [!Equals [!Ref TokenStorageUrl, ""]]
+
 Resources:
+  # Kept when the stack is deleted or replaced: ENCRYPTION_KEY is the only way
+  # to read credentials encrypted with it, which can outlive this stack.
   BrowserSecrets:
     Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Description: FalkorDB Browser session and encryption secrets
       SecretString: !Sub '{"AUTH_SECRET":"${AuthSecret}","ENCRYPTION_KEY":"${EncryptionKey}"}'
+
+  TokenStorageSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: HasTokenStorage
+    Properties:
+      Description: FalkorDB Browser API token store connection
+      SecretString: !Ref TokenStorageUrl
 
   LogGroup:
     Type: AWS::Logs::LogGroup
@@ -86,7 +111,9 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: secretsmanager:GetSecretValue
-                Resource: !Ref BrowserSecrets
+                Resource:
+                  - !Ref BrowserSecrets
+                  - !If [HasTokenStorage, !Ref TokenStorageSecret, !Ref AWS::NoValue]
 
   LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -176,6 +203,10 @@ Resources:
           Secrets:
             - { Name: AUTH_SECRET, ValueFrom: !Sub "${BrowserSecrets}:AUTH_SECRET::" }
             - { Name: ENCRYPTION_KEY, ValueFrom: !Sub "${BrowserSecrets}:ENCRYPTION_KEY::" }
+            - !If
+              - HasTokenStorage
+              - { Name: API_TOKEN_FALKORDB_URL, ValueFrom: !Ref TokenStorageSecret }
+              - !Ref AWS::NoValue
           LogConfiguration:
             LogDriver: awslogs
             Options:

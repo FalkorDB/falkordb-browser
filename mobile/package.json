@@ -12,7 +12,8 @@
     "open:ios": "cap open ios",
     "dev:android": "sh scripts/dev-android.sh",
     "deploy:aws": "sh aws/deploy.sh",
-    "test": "node --test \"test/**/*.test.ts\""
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "@types/node": "^24.9.0"
   }
 }

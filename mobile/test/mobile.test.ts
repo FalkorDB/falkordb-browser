@@ -104,7 +104,7 @@ test("a release tag becomes the app's version name and a growing version code", 
 });
 
 test("a tag that is not a release version is refused instead of guessed", () => {
-    for (const tag of ["latest", "v2.6", "v2.6.1.4", "v2.100.0", "v2..1"]) {
-        assert.throws(() => stampVersion(tag), undefined, tag);
+    for (const tag of ["latest", "v2.6", "v2.6.1.4", "v2.100.0", "v2..1", "v2.6.08", "v02.6.1", 'v2.6.1-rc"1', "v2.6.1-rc|1", "v2.6.1-"]) {
+        assert.throws(() => stampVersion(tag), Error, tag);
     }
 });

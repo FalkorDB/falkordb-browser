@@ -2,7 +2,7 @@
 # Builds a debug APK that opens a browser served over plain http on your local
 # network, for trying the app on a phone before anything is deployed.
 #
-#   npm run dev:android                          # http://<this machine's LAN IP>:3300
+#   npm run dev:android                          # http://<this machine's LAN IP>:3000 (npm run dev)
 #   FALKORDB_BROWSER_URL=http://192.168.1.52:3000 npm run dev:android
 #
 # The APK lands in mobile/dist/FalkorDB-Browser-android-dev.apk. Release builds
@@ -19,8 +19,15 @@ lan_ip() {
   fi
 }
 
-: "${PORT:=3300}"
-: "${FALKORDB_BROWSER_URL:=http://$(lan_ip):$PORT}"
+: "${PORT:=3000}"
+if [ -z "${FALKORDB_BROWSER_URL:-}" ]; then
+  ip="$(lan_ip 2>/dev/null || true)"
+  if [ -z "$ip" ]; then
+    echo "Could not find this machine's LAN IP; set FALKORDB_BROWSER_URL=http://<ip>:<port> yourself." >&2
+    exit 1
+  fi
+  FALKORDB_BROWSER_URL="http://$ip:$PORT"
+fi
 export FALKORDB_BROWSER_URL
 export FALKORDB_BROWSER_ALLOW_HTTP=1
 

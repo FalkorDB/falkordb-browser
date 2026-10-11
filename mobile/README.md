@@ -36,9 +36,12 @@ redeploy by itself).
 This uses ECS rather than App Runner, which stopped accepting new customers on
 2026-04-30.
 
-Each task keeps its own API tokens (`.data/`) and rate-limit counters, and loses
-them when it is replaced. That's why `DesiredCount` defaults to 1. Mount EFS at
-`/app/.data` if tokens must survive redeploys.
+By default each task keeps API tokens on its own disk and loses them when it
+is replaced. Set `TOKEN_STORAGE_URL` (a `falkor[s]://user:password@host:port`
+FalkorDB, e.g. the one the browser serves) to keep them there instead; that
+also makes them safe with more than one task. Rate-limit counters stay per
+task, which is why `DesiredCount` defaults to 1. The session and encryption
+secrets are kept in Secrets Manager even if the stack is deleted.
 
 ## 2. Build the app
 
@@ -85,7 +88,7 @@ No AWS or HTTPS needed: a debug APK opens a browser running on your machine.
    FALKORDB_BROWSER_URL=http://192.168.1.52:3000 npm run dev:android
    ```
 
-   The URL defaults to `http://<this machine's LAN IP>:3300`. Plain http is
+   The URL defaults to `http://<this machine's LAN IP>:3000`, where step 1 runs it. Plain http is
    allowed through the debug manifest only, never in a release build.
 
 3. Serve it and install it on the phone (allow "install unknown apps" once):
@@ -110,7 +113,7 @@ One-time setup:
    ```sh
    keytool -genkeypair -v -keystore falkordb-release.jks -alias falkordb \
      -keyalg RSA -keysize 4096 -validity 10000
-   base64 -w0 falkordb-release.jks   # value for ANDROID_KEYSTORE_BASE64
+   base64 < falkordb-release.jks | tr -d '\n'   # value for ANDROID_KEYSTORE_BASE64 (Linux and macOS)
    ```
 
 2. In the repository settings, add the secrets `ANDROID_KEYSTORE_BASE64`,
