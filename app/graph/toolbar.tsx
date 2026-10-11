@@ -1,12 +1,13 @@
 import { ArrowRight, Circle, ScanEye, Search, X } from "lucide-react";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, GraphRef, isSchemaReservedKey, Link, Node } from "@/lib/utils";
+import { cn, GraphRef, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import useIsMobile from "@/lib/useIsMobile";
 import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
+import { filterSearchElements, getSearchMatch } from "./searchElements";
 import { BrowserSettingsContext, ConnectionContext, GraphContext } from "../components/provider";
 import { getNodeDisplayText } from "@falkordb/canvas";
 
@@ -94,12 +95,7 @@ export default function Toolbar({
             return;
         }
 
-        const elements = graph.getElements().filter(el =>
-            Object.entries(el.data).some(([key, value]) => !isSchemaReservedKey(key) && value != null && value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
-            || el.id.toString().toLowerCase().includes(searchElement.toLowerCase())
-            || ("relationship" in el && (el as Link).relationship.toLowerCase().includes(searchElement.toLowerCase()))
-            || ("labels" in el && (el as Node).labels.some(c => c.toLowerCase().includes(searchElement.toLowerCase())))
-        );
+        const elements = filterSearchElements(graph.getElements(), searchElement);
 
         setSuggestions(elements);
         // Recompute when the search text OR the graph changes so suggestions
@@ -128,33 +124,7 @@ export default function Toolbar({
         }
     };
 
-    const getMatchingProp = (el: Node | Link): { key: string; value: string } | null => {
-        if (!searchElement) return null;
-        const lowerSearch = searchElement.toLowerCase();
-
-        for (const [key, value] of Object.entries(el.data)) {
-            if (!isSchemaReservedKey(key) && value != null && value.toString().toLowerCase().startsWith(lowerSearch)) {
-                return { key, value: value.toString() };
-            }
-        }
-
-        if (el.id.toString().toLowerCase().includes(lowerSearch)) {
-            return { key: "id", value: el.id.toString() };
-        }
-
-        if ("relationship" in el && (el as Link).relationship.toLowerCase().includes(lowerSearch)) {
-            return { key: "type", value: (el as Link).relationship };
-        }
-
-        if ("labels" in el) {
-            const matchingLabel = (el as Node).labels.find(c => c.toLowerCase().includes(lowerSearch));
-            if (matchingLabel) {
-                return { key: "label", value: matchingLabel };
-            }
-        }
-
-        return null;
-    };
+    const getMatchingProp = (el: Node | Link) => getSearchMatch(el, searchElement);
 
     const highlightMatch = (value: string, search: string) => {
         if (!search) return <>{value}</>;
@@ -313,7 +283,7 @@ export default function Toolbar({
                                                                     {matchingProp && (
                                                                         <>
                                                                             <span className="font-bold">{matchingProp.key}</span>
-                                                                            {': '}{highlightMatch(matchingProp.value, searchElement)}
+                                                                            {': '}{highlightMatch(matchingProp.value, searchElement.trim())}
                                                                         </>
                                                                     )}
                                                                 </p>
