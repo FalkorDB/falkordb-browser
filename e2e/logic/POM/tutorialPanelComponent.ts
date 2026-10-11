@@ -39,6 +39,11 @@ export default class TutorialPanel extends GraphPage {
     );
   }
 
+  async skip(): Promise<void> {
+    await this.skipTutorial.click();
+    await waitForElementToNotBeVisible(this.tutorialSpotlight);
+  }
+
   async changeLocalStorage(value: string): Promise<void> {
     await this.page.evaluate((val) => {
       localStorage.setItem("tutorial", val);
