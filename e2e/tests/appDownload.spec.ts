@@ -32,20 +32,33 @@ const OPENS_WITHIN = 10_000;
 // How long to watch for a popup that must not open at all.
 const STAYS_CLOSED_FOR = 4_000;
 
-type Visitor = { ua: string; viewport?: { width: number; height: number }; signedIn?: boolean };
+type Visitor = {
+    ua: string;
+    viewport?: { width: number; height: number };
+    signedIn?: boolean;
+    /** Chromium's CPU hint; "none" stands for Safari and Firefox, which give none. */
+    cpu?: "arm" | "x86" | "none";
+};
 
 /**
  * A context for one kind of visitor. It reuses the admin session's cookies but
  * not its localStorage, which the suite seeds with "appDownloadPrompt=false"
  * to keep the popup away from every other test.
  */
-async function openVisitor(browser: Browser, { ua, viewport = DESKTOP, signedIn = true }: Visitor): Promise<BrowserContext> {
+async function openVisitor(browser: Browser, { ua, viewport = DESKTOP, signedIn = true, cpu }: Visitor): Promise<BrowserContext> {
     const { cookies } = signedIn ? JSON.parse(readFileSync(ADMIN_AUTH_FILE, "utf8")) : { cookies: [] };
     const context = await browser.newContext({ userAgent: ua, viewport, storageState: { cookies, origins: [] } });
     // A returning user: the tutorial was seen, so nothing else competes with the popup.
     await context.addInitScript(() => {
         if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
     });
+    // The test browser would otherwise report the runner's own CPU.
+    if (cpu) {
+        await context.addInitScript((arch) => {
+            const hints = arch === "none" ? undefined : { getHighEntropyValues: async () => ({ architecture: arch }) };
+            Object.defineProperty(navigator, "userAgentData", { get: () => hints });
+        }, cpu);
+    }
     // The download links leave the app; never let a test actually fetch an installer.
     await context.route("https://github.com/**", (route) => route.abort());
     return context;
@@ -77,7 +90,6 @@ test.describe("@admin App download", () => {
 
     for (const [os, ua, title, file] of [
         ["Windows", UA.windows, "FalkorDB Browser for Windows", "FalkorDB-Browser-win-x64.exe"],
-        ["macOS", UA.mac, "FalkorDB Browser for macOS", "FalkorDB-Browser-mac-arm64.dmg"],
         ["Linux", UA.linux, "FalkorDB Browser for Linux", "FalkorDB-Browser-linux-x86_64.AppImage"],
     ] as const) {
         test(`${os}: a signed-in user going straight to /graph is offered the ${os} installer`, async ({ browser }) => {
@@ -87,8 +99,29 @@ test.describe("@admin App download", () => {
             await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
             await expect(app.promptTitle).toHaveText(title);
             await expect(app.promptDownload).toHaveAttribute("href", `${RELEASES}/${file}`);
+            await expect(app.promptAlternate).toHaveCount(0);
         });
     }
+
+    test("macOS without a CPU hint (Safari): Apple silicon first, the Intel build beside it", async ({ browser }) => {
+        context = await openVisitor(browser, { ua: UA.mac, cpu: "none" });
+        const [, app] = await openPage(context, urls.graphUrl);
+
+        await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
+        await expect(app.promptTitle).toHaveText("FalkorDB Browser for macOS");
+        await expect(app.promptDownload).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-mac-arm64.dmg`);
+        await expect(app.promptAlternate).toHaveText("Intel Mac? Get that version");
+        await expect(app.promptAlternate).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-mac-x64.dmg`);
+    });
+
+    test("macOS on an Intel Mac that says so: the Intel build first", async ({ browser }) => {
+        context = await openVisitor(browser, { ua: UA.mac, cpu: "x86" });
+        const [, app] = await openPage(context, urls.graphUrl);
+
+        await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
+        await expect(app.promptDownload).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-mac-x64.dmg`);
+        await expect(app.promptAlternate).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-mac-arm64.dmg`);
+    });
 
     test("opens once per session, and never again after \"Don't show this again\"", async ({ browser }) => {
         context = await openVisitor(browser, { ua: UA.linux });
@@ -128,7 +161,7 @@ test.describe("@admin App download", () => {
     });
 
     test("is offered on the login page too, before anyone signs in", async ({ browser }) => {
-        context = await openVisitor(browser, { ua: UA.mac, signedIn: false });
+        context = await openVisitor(browser, { ua: UA.mac, signedIn: false, cpu: "arm" });
         const [, app] = await openPage(context, urls.loginUrl);
 
         await expect(app.link).toHaveText("Download for macOS");
@@ -145,6 +178,8 @@ test.describe("@admin App download", () => {
         await page.getByRole("button", { name: "Help" }).click();
         await expect(app.link).toHaveText("Download for Windows");
         await expect(app.link).toHaveAttribute("href", `${RELEASES}/FalkorDB-Browser-win-x64.exe`);
+        // A real menu item, so the arrow keys reach it like the others.
+        await expect(app.link).toHaveAttribute("role", "menuitem");
     });
 
     test("Android with no app link configured: no popup and no menu item", async ({ browser }) => {

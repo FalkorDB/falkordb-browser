@@ -340,7 +340,7 @@ export default function Navbar({ showUDF }: Props) {
                                         <ArrowUpRight size={15} />
                                     </a>
                                 </DropdownMenuItem>
-                                <AppDownloadLink className="flex gap-2 items-center px-2 py-1.5 rounded-sm hover:bg-secondary" iconSize={18} />
+                                <AppDownloadLink asMenuItem className="flex gap-2 items-center px-2 py-1.5 rounded-sm hover:bg-secondary focus:bg-secondary" iconSize={18} />
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="focus:bg-transparent">
                                     <DrawerTrigger asChild>

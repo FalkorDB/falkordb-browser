@@ -16,19 +16,28 @@ export type AppLinks = {
     ios?: string;
 };
 
+/** The CPU family, where the browser says (Chromium's client hints); undefined otherwise. */
+export type CpuArch = "arm" | "x86";
+
+/** A second build for the same OS, for the visitors the first one does not fit. */
+export type AppAlternate = { label: string; href: string };
+
 export type AppDownload =
-    | { platform: AppPlatform; kind: "link"; label: string; href: string }
+    | { platform: AppPlatform; kind: "link"; label: string; href: string; alternate?: AppAlternate }
     | { platform: "ios"; kind: "homeScreen"; label: string };
 
 export const DESKTOP_RELEASE_BASE = "https://github.com/FalkorDB/falkordb-browser/releases/latest/download";
 
-const DESKTOP_DOWNLOADS: Record<"mac" | "windows" | "linux", { label: string; file: string }> = {
-    // Built on Apple Silicon only. Safari reports "Intel Mac OS X" on every
-    // Mac, so the architecture cannot be told apart from here.
-    mac: { label: "Download for macOS", file: "FalkorDB-Browser-mac-arm64.dmg" },
-    windows: { label: "Download for Windows", file: "FalkorDB-Browser-win-x64.exe" },
-    linux: { label: "Download for Linux", file: "FalkorDB-Browser-linux-x86_64.AppImage" },
-};
+// Keep in step with artifactName in desktop/electron-builder.yml and the
+// runners in .github/workflows/desktop.yml.
+export const DESKTOP_FILES = {
+    macArm: "FalkorDB-Browser-mac-arm64.dmg",
+    macIntel: "FalkorDB-Browser-mac-x64.dmg",
+    windows: "FalkorDB-Browser-win-x64.exe",
+    linux: "FalkorDB-Browser-linux-x86_64.AppImage",
+} as const;
+
+const release = (file: string) => `${DESKTOP_RELEASE_BASE}/${file}`;
 
 /**
  * Reads the OS from a user agent. `maxTouchPoints` tells an iPad, whose Safari
@@ -41,6 +50,8 @@ export function detectPlatform(userAgent: string, maxTouchPoints = 0): AppPlatfo
     if (/Windows/i.test(userAgent)) return "windows";
     // ChromeOS also says "Linux" in places but cannot run an AppImage.
     if (/CrOS/i.test(userAgent)) return undefined;
+    // There is only an x86_64 AppImage; an ARM Linux machine cannot run it.
+    if (/\b(aarch64|arm64|armv\d)/i.test(userAgent)) return undefined;
     if (/Linux|X11/i.test(userAgent)) return "linux";
     return undefined;
 }
@@ -54,14 +65,23 @@ export function isInsideApp(userAgent: string, hasCapacitor: boolean, standalone
     return hasCapacitor || standalone || /\bElectron\//.test(userAgent);
 }
 
-export function getAppDownload(platform: AppPlatform | undefined, links: AppLinks): AppDownload | undefined {
+/**
+ * `arch` only matters on a Mac. Safari reports "Intel Mac OS X" on every Mac,
+ * so without client hints Apple silicon (every Mac since 2020) comes first and
+ * the Intel build is offered next to it.
+ */
+export function getAppDownload(platform: AppPlatform | undefined, links: AppLinks, arch?: CpuArch): AppDownload | undefined {
     switch (platform) {
-        case "mac":
-        case "windows":
-        case "linux": {
-            const { label, file } = DESKTOP_DOWNLOADS[platform];
-            return { platform, kind: "link", label, href: `${DESKTOP_RELEASE_BASE}/${file}` };
+        case "mac": {
+            const appleSilicon = { label: "Apple silicon Mac? Get that version", href: release(DESKTOP_FILES.macArm) };
+            const intel = { label: "Intel Mac? Get that version", href: release(DESKTOP_FILES.macIntel) };
+            const [primary, alternate] = arch === "x86" ? [intel, appleSilicon] : [appleSilicon, intel];
+            return { platform, kind: "link", label: "Download for macOS", href: primary.href, alternate };
         }
+        case "windows":
+            return { platform, kind: "link", label: "Download for Windows", href: release(DESKTOP_FILES.windows) };
+        case "linux":
+            return { platform, kind: "link", label: "Download for Linux", href: release(DESKTOP_FILES.linux) };
         case "android":
             return links.android ? { platform, kind: "link", label: "Get the Android app", href: links.android } : undefined;
         case "ios":
@@ -86,14 +106,15 @@ function readAppUrl(value: string | undefined, allowHttp: boolean): string | und
 
 /**
  * App links from the environment. Anything but an https:// URL is ignored,
- * except that APP_LINKS_ALLOW_HTTP=1 also accepts http:// so a development
- * setup can offer a debug APK served on the local network.
+ * except that APP_LINKS_ALLOW_HTTP=1 also accepts an http:// Android link so a
+ * development setup can offer a debug APK served on the local network.
  */
 export function readAppLinks(env: Record<string, string | undefined>): AppLinks {
     const links: AppLinks = {};
     const allowHttp = env.APP_LINKS_ALLOW_HTTP === "1";
     const android = readAppUrl(env.ANDROID_APP_URL, allowHttp);
-    const ios = readAppUrl(env.IOS_APP_URL, allowHttp);
+    // An App Store page is always https; the opt-in is for a dev APK only.
+    const ios = readAppUrl(env.IOS_APP_URL, false);
     if (android) links.android = android;
     if (ios) links.ios = ios;
     return links;
@@ -133,5 +154,20 @@ export function dismissAppPrompt(local: WritableStorage): void {
         local.setItem(APP_PROMPT_DISMISSED_KEY, "false");
     } catch {
         // Nothing to remember it in; the session flag still holds it back.
+    }
+}
+
+export type PromptStorage = { local: Storage; session: Storage };
+
+/**
+ * The window's localStorage and sessionStorage, or undefined where merely
+ * reading them throws (site data blocked). The popup then stays closed.
+ */
+export function getPromptStorage(win: Pick<Window, "localStorage" | "sessionStorage"> | undefined): PromptStorage | undefined {
+    if (!win) return undefined;
+    try {
+        return { local: win.localStorage, session: win.sessionStorage };
+    } catch {
+        return undefined;
     }
 }

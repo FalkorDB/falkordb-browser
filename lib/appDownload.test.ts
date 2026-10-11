@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import {
     APP_PROMPT_DISMISSED_KEY,
     APP_PROMPT_SHOWN_KEY,
+    DESKTOP_FILES,
     DESKTOP_RELEASE_BASE,
     detectPlatform,
     dismissAppPrompt,
     getAppDownload,
+    getPromptStorage,
     isInsideApp,
     markAppPromptShown,
     readAppLinks,
@@ -19,6 +21,7 @@ const UA = {
     mac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
     windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
     linux: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
+    linuxArm: "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
     chromeos: "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
     electron: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) falkordb-browser-desktop/2.6.0 Chrome/140.0 Electron/44.5.1 Safari/537.36",
 };
@@ -36,8 +39,10 @@ test("detectPlatform tells an iPad, which reports itself as a Mac, by its touch 
     assert.equal(detectPlatform(UA.mac, 0), "mac");
 });
 
-test("detectPlatform offers nothing to ChromeOS or an unknown agent", () => {
+test("detectPlatform offers nothing to ChromeOS, ARM Linux or an unknown agent", () => {
     assert.equal(detectPlatform(UA.chromeos), undefined);
+    // Only an x86_64 AppImage exists.
+    assert.equal(detectPlatform(UA.linuxArm), undefined);
     assert.equal(detectPlatform("curl/8.0"), undefined);
 });
 
@@ -53,14 +58,28 @@ test("isInsideApp treats a Home Screen launch as the app", () => {
 });
 
 test("getAppDownload links each desktop OS to its latest installer", () => {
-    assert.deepEqual(getAppDownload("mac", {}), {
-        platform: "mac", kind: "link", label: "Download for macOS", href: `${DESKTOP_RELEASE_BASE}/FalkorDB-Browser-mac-arm64.dmg`,
-    });
     assert.deepEqual(getAppDownload("windows", {}), {
-        platform: "windows", kind: "link", label: "Download for Windows", href: `${DESKTOP_RELEASE_BASE}/FalkorDB-Browser-win-x64.exe`,
+        platform: "windows", kind: "link", label: "Download for Windows", href: `${DESKTOP_RELEASE_BASE}/${DESKTOP_FILES.windows}`,
     });
     assert.deepEqual(getAppDownload("linux", {}), {
-        platform: "linux", kind: "link", label: "Download for Linux", href: `${DESKTOP_RELEASE_BASE}/FalkorDB-Browser-linux-x86_64.AppImage`,
+        platform: "linux", kind: "link", label: "Download for Linux", href: `${DESKTOP_RELEASE_BASE}/${DESKTOP_FILES.linux}`,
+    });
+    assert.equal(DESKTOP_FILES.windows, "FalkorDB-Browser-win-x64.exe");
+    assert.equal(DESKTOP_FILES.linux, "FalkorDB-Browser-linux-x86_64.AppImage");
+});
+
+test("getAppDownload offers a Mac both builds, Apple silicon first unless the browser says Intel", () => {
+    const appleSilicon = `${DESKTOP_RELEASE_BASE}/FalkorDB-Browser-mac-arm64.dmg`;
+    const intel = `${DESKTOP_RELEASE_BASE}/FalkorDB-Browser-mac-x64.dmg`;
+    for (const arch of [undefined, "arm"] as const) {
+        assert.deepEqual(getAppDownload("mac", {}, arch), {
+            platform: "mac", kind: "link", label: "Download for macOS", href: appleSilicon,
+            alternate: { label: "Intel Mac? Get that version", href: intel },
+        });
+    }
+    assert.deepEqual(getAppDownload("mac", {}, "x86"), {
+        platform: "mac", kind: "link", label: "Download for macOS", href: intel,
+        alternate: { label: "Apple silicon Mac? Get that version", href: appleSilicon },
     });
 });
 
@@ -91,10 +110,11 @@ test("readAppLinks keeps only https URLs", () => {
     assert.deepEqual(readAppLinks({ ANDROID_APP_URL: "   " }), {});
 });
 
-test("readAppLinks accepts http only when APP_LINKS_ALLOW_HTTP=1", () => {
-    const env = { ANDROID_APP_URL: "http://192.168.1.52:8000/app.apk", IOS_APP_URL: "ftp://apps.test/app" };
+test("readAppLinks accepts an http Android link only when APP_LINKS_ALLOW_HTTP=1", () => {
+    const env = { ANDROID_APP_URL: "http://192.168.1.52:8000/app.apk", IOS_APP_URL: "http://apps.test/app" };
     assert.deepEqual(readAppLinks(env), {});
     assert.deepEqual(readAppLinks({ ...env, APP_LINKS_ALLOW_HTTP: "true" }), {});
+    // An App Store page is always https; the dev opt-in never relaxes iOS.
     assert.deepEqual(readAppLinks({ ...env, APP_LINKS_ALLOW_HTTP: "1" }), { android: "http://192.168.1.52:8000/app.apk" });
 });
 
@@ -133,4 +153,17 @@ test("the app prompt stays closed when storage is unavailable", () => {
     assert.equal(shouldShowAppPrompt(brokenStorage, memoryStorage()), false);
     assert.doesNotThrow(() => markAppPromptShown(brokenStorage));
     assert.doesNotThrow(() => dismissAppPrompt(brokenStorage));
+});
+
+test("getPromptStorage hands back both storages, or nothing where reading them throws", () => {
+    const local = memoryStorage() as unknown as Storage;
+    const session = memoryStorage() as unknown as Storage;
+    assert.deepEqual(getPromptStorage({ localStorage: local, sessionStorage: session }), { local, session });
+    assert.equal(getPromptStorage(undefined), undefined);
+
+    const blocked = {
+        get localStorage(): Storage { throw new Error("SecurityError: site data is blocked"); },
+        sessionStorage: session,
+    };
+    assert.equal(getPromptStorage(blocked), undefined);
 });

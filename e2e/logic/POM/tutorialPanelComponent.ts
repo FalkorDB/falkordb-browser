@@ -41,7 +41,9 @@ export default class TutorialPanel extends GraphPage {
 
   async skip(): Promise<void> {
     await this.skipTutorial.click();
-    await waitForElementToNotBeVisible(this.tutorialSpotlight);
+    if (!(await waitForElementToNotBeVisible(this.tutorialSpotlight))) {
+      throw new Error("The tutorial stayed open after Skip");
+    }
   }
 
   async changeLocalStorage(value: string): Promise<void> {

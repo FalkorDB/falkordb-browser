@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { dismissAppPrompt, markAppPromptShown, shouldShowAppPrompt } from "@/lib/appDownload";
+import { dismissAppPrompt, getPromptStorage, markAppPromptShown, shouldShowAppPrompt } from "@/lib/appDownload";
 import useAppDownload from "@/lib/useAppDownload";
 import Button from "./ui/Button";
 
@@ -37,18 +37,27 @@ export default function AppDownloadPrompt({ blocked }: Props) {
     const primaryRef = useRef<HTMLElement | null>(null);
 
     useEffect(() => {
-        if (!download || blocked || !shouldShowAppPrompt(localStorage, sessionStorage)) return undefined;
-        const timer = setTimeout(() => {
-            markAppPromptShown(sessionStorage);
-            setOpen(true);
-        }, OPEN_DELAY_MS);
+        // Something else took the screen (the tutorial starting late, say):
+        // step aside without counting as seen, and come back once it is done.
+        if (blocked) {
+            setOpen(false);
+            return undefined;
+        }
+        const storage = getPromptStorage(window);
+        if (!download || !storage || !shouldShowAppPrompt(storage.local, storage.session)) return undefined;
+        const timer = setTimeout(() => setOpen(true), OPEN_DELAY_MS);
         return () => clearTimeout(timer);
     }, [download, blocked]);
 
     if (!download) return null;
 
+    // Only the visitor closing it counts: once per session, or for good.
     const close = (dismiss: boolean) => {
-        if (dismiss) dismissAppPrompt(localStorage);
+        const storage = getPromptStorage(window);
+        if (storage) {
+            markAppPromptShown(storage.session);
+            if (dismiss) dismissAppPrompt(storage.local);
+        }
         setOpen(false);
     };
 
@@ -79,7 +88,7 @@ export default function AppDownloadPrompt({ blocked }: Props) {
                             </ol>
                         ) : (
                             <p className="text-muted">
-                                Use the browser as an app on your {download.platform === "android" ? "phone" : "computer"}, in its own window, without a browser tab to lose.
+                                Use the browser as an app on your {download.platform === "android" || download.platform === "ios" ? "phone" : "computer"}, in its own window, without a browser tab to lose.
                             </p>
                         )}
                     </DialogDescription>
@@ -127,6 +136,18 @@ export default function AppDownloadPrompt({ blocked }: Props) {
                         </>
                     )}
                 </div>
+                {download.kind === "link" && download.alternate && (
+                    <a
+                        className="-mt-2 self-end text-sm text-muted underline-offset-2 hover:underline hover:text-foreground"
+                        href={download.alternate.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        data-testid="appDownloadPromptAlternate"
+                        onClick={() => close(true)}
+                    >
+                        {download.alternate.label}
+                    </a>
+                )}
             </DialogContent>
         </Dialog>
     );

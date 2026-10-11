@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { AppDownload, AppLinks, detectPlatform, getAppDownload, isInsideApp } from "./appDownload";
+import { AppDownload, AppLinks, CpuArch, detectPlatform, getAppDownload, isInsideApp } from "./appDownload";
 
 /**
  * The native app to offer this visitor, or undefined when there is none for
@@ -21,12 +21,30 @@ export default function useAppDownload(): AppDownload | undefined {
         if (isInsideApp(userAgent, hasCapacitor, standalone)) return undefined;
 
         const platform = detectPlatform(userAgent, maxTouchPoints);
+        let active = true;
+
+        if (platform === "mac") {
+            setDownload(getAppDownload(platform, {}));
+            // Chromium can say whether this Mac is Intel; Safari and Firefox cannot.
+            const hints = (navigator as Navigator & {
+                userAgentData?: { getHighEntropyValues(keys: string[]): Promise<{ architecture?: string }> };
+            }).userAgentData;
+            hints?.getHighEntropyValues(["architecture"])
+                .then(({ architecture }) => {
+                    const arch: CpuArch | undefined = architecture === "x86" || architecture === "arm" ? architecture : undefined;
+                    if (active && arch) setDownload(getAppDownload(platform, {}, arch));
+                })
+                .catch(() => { /* keep the default order */ });
+            return () => {
+                active = false;
+            };
+        }
+
         if (platform !== "android" && platform !== "ios") {
             setDownload(getAppDownload(platform, {}));
             return undefined;
         }
 
-        let active = true;
         const lookup = async () => {
             let links: AppLinks = {};
             try {

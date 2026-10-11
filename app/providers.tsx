@@ -2738,8 +2738,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                     </GraphTabsContext.Provider>
                                     <AiFixDialogs />
                                     {/* At the root, not on /graph or /login: a saved session skips the
-                                        login page, and the graph page is not where everyone lands. */}
-                                    <AppDownloadPrompt blocked={tutorialOpen || (status === "authenticated" && !tutorialDecided)} />
+                                        login page, and the graph page is not where everyone lands.
+                                        It waits until the session and the tutorial have both been decided. */}
+                                    <AppDownloadPrompt blocked={tutorialOpen || status === "loading" || (status === "authenticated" && !tutorialDecided)} />
                                   </AiFixContext.Provider>
                                 </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>

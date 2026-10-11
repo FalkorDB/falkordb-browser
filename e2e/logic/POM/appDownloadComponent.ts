@@ -18,6 +18,11 @@ export default class AppDownloadComponent extends BasePage {
         return this.page.getByTestId("appDownloadPromptDownload");
     }
 
+    /** The other build for the same OS, e.g. the Intel one next to Apple silicon. */
+    public get promptAlternate(): Locator {
+        return this.page.getByTestId("appDownloadPromptAlternate");
+    }
+
     public get promptClose(): Locator {
         return this.page.getByTestId("appDownloadPromptClose");
     }
