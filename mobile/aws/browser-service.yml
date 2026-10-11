@@ -240,3 +240,9 @@ Outputs:
   BrowserUrl:
     Description: Set FALKORDB_BROWSER_URL to this when building the mobile app.
     Value: !Ref BrowserUrl
+  ClusterName:
+    Description: The ECS cluster (aws/deploy.sh uses it to restart the service).
+    Value: !Ref Cluster
+  ServiceName:
+    Description: The ECS service running the browser.
+    Value: !GetAtt Service.Name

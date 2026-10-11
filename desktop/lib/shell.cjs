@@ -21,10 +21,16 @@ function readJson(file) {
 function writeJson(file, value) {
     fs.writeFileSync(file, JSON.stringify(value, null, 2), { mode: 0o600 });
     // `mode` only applies when the file is created; tighten one that already existed.
+    // POSIX only: on Windows chmod just toggles read-only, and the app-data
+    // folder is private because it sits in the user's own profile.
     fs.chmodSync(file, 0o600);
 }
 
-/** A folder only its owner can enter, also when an older install made it with looser rights. */
+/**
+ * A folder only its owner can enter, also when an older install made it with
+ * looser rights. That is a POSIX guarantee; on Windows the user's profile
+ * (%APPDATA%) is what keeps other accounts out.
+ */
 function ensurePrivateDir(dir) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     fs.chmodSync(dir, 0o700);

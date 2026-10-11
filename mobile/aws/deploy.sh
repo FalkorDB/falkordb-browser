@@ -22,7 +22,8 @@ set -eu
 : "${ANDROID_APP_URL:=}"
 : "${IOS_APP_URL:=}"
 # Optional: falkor[s]://user:pass@host:port of a FalkorDB that keeps API tokens,
-# so they survive task replacements. Only sent when set.
+# so they survive task replacements. Left unset, an existing stack keeps what
+# it has (so a rerun never drops it by accident); "none" switches it off.
 : "${TOKEN_STORAGE_URL:=}"
 
 TEMPLATE="$(dirname "$0")/browser-service.yml"
@@ -67,7 +68,11 @@ add SubnetIds "$SUBNET_IDS"
 add ImageUri "$IMAGE_URI"
 add AndroidAppUrl "$ANDROID_APP_URL"
 add IosAppUrl "$IOS_APP_URL"
-[ -n "$TOKEN_STORAGE_URL" ] && add TokenStorageUrl "$TOKEN_STORAGE_URL"
+case "$TOKEN_STORAGE_URL" in
+  "") ;;
+  none) add TokenStorageUrl "" ;;
+  *) add TokenStorageUrl "$TOKEN_STORAGE_URL" ;;
+esac
 
 if [ "$STATUS" = NONE ]; then
   echo "Creating $STACK_NAME with newly generated secrets."
@@ -82,6 +87,16 @@ aws cloudformation deploy \
   --template-file "$TEMPLATE" \
   --capabilities CAPABILITY_IAM \
   --parameter-overrides "file://$params"
+
+# ECS reads secrets when a task starts, and a new token-store URL keeps the
+# same secret ARN, so tasks already running would go on using the old one.
+if [ -n "$TOKEN_STORAGE_URL" ] && [ "$STATUS" != NONE ]; then
+  echo "Restarting the browser so it picks up the token store setting."
+  aws ecs update-service \
+    --cluster "$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='ClusterName'].OutputValue" --output text)" \
+    --service "$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='ServiceName'].OutputValue" --output text)" \
+    --force-new-deployment > /dev/null
+fi
 
 aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
   --query "Stacks[0].Outputs" --output table

@@ -58,7 +58,8 @@ async function startServer() {
     const userData = app.getPath("userData");
     const dataDir = path.join(userData, "data");
     const importDir = path.join(userData, "import");
-    // Owner-only: API tokens and uploaded CSVs live here.
+    // Owner-only (POSIX modes; on Windows, the profile's own ACL): API tokens
+    // and uploaded CSVs live here.
     ensurePrivateDir(dataDir);
     ensurePrivateDir(importDir);
 

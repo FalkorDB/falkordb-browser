@@ -27,6 +27,8 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   `%APPDATA%\FalkorDB Browser` on Windows): `secrets.json` (the generated
   `AUTH_SECRET`/`ENCRYPTION_KEY`), API tokens under `data/`, and LOAD CSV temp
   files under `import/`.
+  On Linux and macOS these are owner-only (folders 700, files 600); on Windows
+  they are private because `%APPDATA%` is inside the user's own profile.
 - The server listens on port 3210, or, if something else holds that port, on a
   free one, which it then keeps using. The browser keeps its settings in
   origin-scoped `localStorage`, so they stay put as long as the port does; a move
