@@ -10,6 +10,7 @@ const {
     anyFreePort,
     buildServerEnv,
     choosePort,
+    ensurePrivateDir,
     isAppUrl,
     isExternalWebUrl,
     isPortFree,
@@ -44,6 +45,30 @@ test("loadSecrets generates two 32-byte hex secrets once and keeps them", () => 
         const mode = fs.statSync(path.join(dir, "secrets.json")).mode & 0o777;
         assert.equal(mode, 0o600, "secrets.json must be readable by its owner only");
     }
+});
+
+test("loadSecrets makes a replaced secrets file owner-only, whatever its old mode", (t) => {
+    if (process.platform === "win32") t.skip("POSIX file modes");
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    fs.writeFileSync(file, "not json", { mode: 0o644 });
+    fs.chmodSync(file, 0o644);
+    loadSecrets(dir);
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+});
+
+test("ensurePrivateDir creates owner-only folders and tightens existing ones", (t) => {
+    if (process.platform === "win32") t.skip("POSIX file modes");
+    const root = tempDir();
+    const fresh = path.join(root, "data");
+    ensurePrivateDir(fresh);
+    assert.equal(fs.statSync(fresh).mode & 0o777, 0o700);
+
+    const old = path.join(root, "import");
+    fs.mkdirSync(old, { mode: 0o775 });
+    fs.chmodSync(old, 0o775);
+    ensurePrivateDir(old);
+    assert.equal(fs.statSync(old).mode & 0o777, 0o700);
 });
 
 test("loadSecrets replaces a damaged or weak secrets file", () => {

@@ -26,12 +26,20 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   `%APPDATA%\FalkorDB Browser` on Windows): `secrets.json` (the generated
   `AUTH_SECRET`/`ENCRYPTION_KEY`), API tokens under `data/`, and LOAD CSV temp
   files under `import/`.
-- The server listens on port 3210, or on a free port saved to `settings.json`
-  if 3210 is taken. The port stays the same across launches, because the
-  browser keeps its settings in origin-scoped `localStorage`.
+- The server listens on port 3210, or, if something else holds that port, on a
+  free one, which it then keeps using. The browser keeps its settings in
+  origin-scoped `localStorage`, so they stay put as long as the port does; a move
+  to a new port starts the settings over once.
 - Environment variables are passed through, so the documented `FALKORDB_*`
   preconfigured connection settings work here too.
 - Links to other sites open in the system browser.
+- **CSV import (LOAD CSV):** uploads are written to `import/` in the app-data
+  folder and handed to FalkorDB as `file://` paths, which FalkorDB resolves
+  against its own import folder. That works when FalkorDB runs on the same
+  machine with `IMPORT_FOLDER` pointing at that `import/` folder. For a remote
+  database, start the app with S3 settings (`CSV_STORAGE=s3` and the `S3_*`
+  variables from `.env.local.template`); for a database that cannot read files
+  at all, set `LOAD_CSV_FILE_URI=false` so the editor says so up front.
 
 ## Not done yet
 

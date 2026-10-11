@@ -11,7 +11,7 @@ const { app, BrowserWindow, shell, utilityProcess, dialog } = require("electron"
 const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
-const { HOST, buildServerEnv, choosePort, isAppUrl, isExternalWebUrl, loadSecrets } = require("./lib/shell.cjs");
+const { HOST, buildServerEnv, choosePort, ensurePrivateDir, isAppUrl, isExternalWebUrl, loadSecrets } = require("./lib/shell.cjs");
 
 const STARTUP_TIMEOUT_MS = 60_000;
 
@@ -36,14 +36,19 @@ function waitForServer(url, child) {
         });
         const attempt = () => {
             if (exited) return;
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) {
+                reject(new Error("The server did not start in time."));
+                return;
+            }
             const req = http.get(url, (res) => {
                 res.resume();
                 resolve();
             });
-            req.on("error", () => {
-                if (Date.now() > deadline) reject(new Error("The server did not start in time."));
-                else setTimeout(attempt, 250);
-            });
+            // A server that accepts the connection but never answers must not
+            // hold startup forever: give each probe only the time that is left.
+            req.setTimeout(remaining, () => req.destroy(new Error("timeout")));
+            req.on("error", () => setTimeout(attempt, 250));
         };
         attempt();
     });
@@ -53,8 +58,9 @@ async function startServer() {
     const userData = app.getPath("userData");
     const dataDir = path.join(userData, "data");
     const importDir = path.join(userData, "import");
-    fs.mkdirSync(dataDir, { recursive: true });
-    fs.mkdirSync(importDir, { recursive: true });
+    // Owner-only: API tokens and uploaded CSVs live here.
+    ensurePrivateDir(dataDir);
+    ensurePrivateDir(importDir);
 
     const secrets = loadSecrets(userData);
     const port = await choosePort(userData);
@@ -143,6 +149,9 @@ if (!app.requestSingleInstanceLock()) {
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
+        } else if (origin) {
+            // macOS keeps the app running with no window; a relaunch means "open it".
+            createWindow();
         }
     });
 

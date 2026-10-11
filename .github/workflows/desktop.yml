@@ -32,7 +32,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # macos-latest is Apple silicon (mac-arm64), macos-15-intel builds for
+        # Intel Macs (mac-x64). Each runner builds its own architecture natively.
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
@@ -85,7 +87,7 @@ jobs:
       - name: Upload installers
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: falkordb-browser-desktop-${{ runner.os }}
+          name: falkordb-browser-desktop-${{ matrix.os }}
           path: |
             desktop/dist/*.AppImage
             desktop/dist/*.dmg

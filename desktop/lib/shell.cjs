@@ -19,6 +19,14 @@ function readJson(file) {
 
 function writeJson(file, value) {
     fs.writeFileSync(file, JSON.stringify(value, null, 2), { mode: 0o600 });
+    // `mode` only applies when the file is created; tighten one that already existed.
+    fs.chmodSync(file, 0o600);
+}
+
+/** A folder only its owner can enter, also when an older install made it with looser rights. */
+function ensurePrivateDir(dir) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    fs.chmodSync(dir, 0o700);
 }
 
 const HEX_32_BYTES = /^[0-9a-f]{64}$/;
@@ -150,6 +158,7 @@ module.exports = {
     HOST,
     DEFAULT_PORT,
     loadSecrets,
+    ensurePrivateDir,
     isPortFree,
     anyFreePort,
     choosePort,
