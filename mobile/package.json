@@ -13,7 +13,8 @@
     "dev:android": "sh scripts/dev-android.sh",
     "deploy:aws": "sh aws/deploy.sh",
     "test": "node --test \"test/**/*.test.ts\"",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
@@ -22,7 +23,11 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^24.9.0",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
     "typescript": "^6.0.3",
-    "@types/node": "^24.9.0"
+    "typescript-eslint": "^8.71.1"
   }
 }

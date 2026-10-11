@@ -13,10 +13,14 @@
     "dist": "npm run build:web && npm run prepare:server && electron-builder --publish never",
     "dist:dir": "npm run build:web && npm run prepare:server && electron-builder --dir --publish never",
     "test": "npm run check && node --test \"test/**/*.test.cjs\"",
-    "check": "node --check main.cjs && node --check lib/shell.cjs && node --check scripts/after-pack.cjs && node --check scripts/prepare-server.mjs"
+    "check": "node --check main.cjs && node --check lib/shell.cjs && node --check scripts/after-pack.cjs && node --check scripts/prepare-server.mjs",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "electron": "^44.5.1",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0"
   }
 }

@@ -63,6 +63,11 @@ jobs:
         working-directory: desktop
         run: npm ci --no-audit --progress=false
 
+      - name: Lint desktop
+        if: runner.os == 'Linux'
+        working-directory: desktop
+        run: npm run lint
+
       - name: Run desktop tests
         working-directory: desktop
         run: npm test

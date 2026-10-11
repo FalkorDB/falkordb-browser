@@ -61,7 +61,8 @@ configured" page (`www/index.html`). Only the browser's own host stays inside
 the app; other links open in the system browser.
 
 `npm test` covers the server-URL rules in `capacitor.config.ts` and the
-release version stamping (`scripts/android-version.sh`).
+release version stamping (`scripts/android-version.sh`); `npm run lint` and
+`npm run typecheck` check the TypeScript.
 
 CI (`.github/workflows/mobile.yml`) runs those tests, lints the CloudFormation
 template and builds a debug APK on every change to `mobile/`. iOS builds need certificates
