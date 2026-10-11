@@ -1,3 +1,16 @@
+const fs = require('fs')
+const path = require('path')
+
+// While @falkordb/canvas is linked to a local checkout (`npm install ../falkordb-ui/web-components/canvas`),
+// Turbopack has to be rooted above both projects, or it will not resolve files outside this one.
+const linkedCanvas = (() => {
+  try {
+    return fs.lstatSync(path.join(__dirname, 'node_modules/@falkordb/canvas')).isSymbolicLink()
+  } catch {
+    return false
+  }
+})()
+
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
@@ -12,6 +25,7 @@ const nextConfig = {
   },
   // Enable Turbopack with SVG handling
   turbopack: {
+    ...(linkedCanvas && { root: path.join(__dirname, '..') }),
     rules: {
       // Convert SVG imports to React components using @svgr/webpack
       // This preserves the behavior from the webpack config below
