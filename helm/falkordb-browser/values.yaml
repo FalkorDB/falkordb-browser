@@ -103,6 +103,14 @@ podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1001
   runAsGroup: 1001
+  # The container runs as the non-root `nextjs` user (uid/gid 1001, see the
+  # Dockerfile) and so cannot chown a volume itself. A freshly provisioned PVC is
+  # typically owned by root, so without fsGroup the persistence volume mounted at
+  # persistence.mountPath is not writable and the pod fails its startup check.
+  fsGroup: 1001
+  # Only re-own the volume when its root does not already match, so restarts
+  # don't walk the whole volume.
+  fsGroupChangePolicy: OnRootMismatch
   seccompProfile:
     type: RuntimeDefault
 
