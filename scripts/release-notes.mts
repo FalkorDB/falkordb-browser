@@ -27,7 +27,7 @@ const { values, positionals } = parseArgs({
     },
 });
 
-const version = (positionals[0] ?? JSON.parse(readFileSync(PACKAGE_FILE, "utf8")).version).replace(/^v/, "");
+const version = (positionals[0] ?? JSON.parse(readFileSync(PACKAGE_FILE, "utf8")).version).trim().replace(/^v/, "");
 if (!parseVersion(version)) throw new Error(`Invalid version: ${version}`);
 
 // The newest release tag older than the one being drafted, among those already

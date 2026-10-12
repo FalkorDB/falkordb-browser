@@ -23,7 +23,8 @@ export const SKIP_TITLES: RegExp[] = [
     /^staging$/i,
     /^merge\b/i,
     // Housekeeping after a code review, not a feature that mentions reviews.
-    /\b(address|apply|fix|resolve)\b.*\breview\b|\breview (comments|feedback|fixes)\b/i,
+    /\b(address|apply|clear|resolve)\b.*\breview\b|\breview (comments|feedback|findings|fixes)\b/i,
+    /^release v?\d/i,
     /^(update|set) version\b/i,
     /^wip\b/i,
     // "1790 revert changes": a bare PR number sometimes leads a revert's title.
@@ -68,8 +69,8 @@ export function parseGitLog(log: string): MergedPr[] {
 }
 
 const CONVENTIONAL = /^(\w+)(\([^)]*\))?!?:\s*/;
-// "[codex] ", "Fix #1595 #1418 ": noise in front of the real title.
-const TITLE_NOISE = /^(\[[^\]]*\]\s*|(fix(es)?\s+)?(#\d+[\s,]*)+)+/i;
+// "[codex] ", "Fix #1595 #1418 ", "Fix #12: ": noise in front of the real title.
+const TITLE_NOISE = /^(\[[^\]]*\]\s*|(fix(es)?\s+)?(#\d+[\s,:–-]*)+)+/i;
 
 /** The title without leading tags and issue references; any conventional prefix stays. */
 export function cleanTitle(title: string): string {
@@ -152,7 +153,9 @@ export const INSERT_MARKER = "// @release-notes:insert";
 
 /** `source` with `entry` placed right after the insert marker (so newest stays first). */
 export function insertEntry(source: string, version: string, entry: string): string {
-    if (!parseVersion(version)) throw new Error(`Invalid version: ${version}`);
+    // Only the canonical form ("2.6.0", not "v2.6.0" or " 2.6.0 ") can be
+    // compared as text, and it's the form the entry is written with.
+    if (parseVersion(version)?.join(".") !== version) throw new Error(`Invalid version: ${version}`);
     // A valid version is digits and dots only, so a plain substring check is exact.
     if (source.includes(`version: "${version}"`)) {
         throw new Error(`An entry for ${version} already exists; edit or delete it first.`);

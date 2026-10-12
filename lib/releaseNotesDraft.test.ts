@@ -55,19 +55,23 @@ test("skipReason filters bots, release plumbing and housekeeping", () => {
     assert.equal(skipReason(pr({ branch: "feat/x", title: "feat: real work" })), null);
     assert.equal(skipReason(pr({ title: "Add support for serving the browser under a sub-path" })), null);
     assert.equal(skipReason(pr({ title: "feat: add a query review mode" })), null);
+    assert.equal(skipReason(pr({ title: "fix: review mode crashes" })), null);
+    assert.match(skipReason(pr({ title: "Release 2.5.1 and clear the open staging review findings" }))!, /^title/);
     assert.equal(skipReason(pr({ title: "2026 roadmap for graph viz" })), null);
     assert.equal(skipReason(pr({ title: "Fix #1234" })), "empty title");
     assert.equal(skipReason(pr({ title: "fix:" })), "empty title");
     assert.equal(skipReason(pr({ title: "Add a configurable graph list order" })), null);
 });
 
-test("cleanTitle drops leading tags, issue references and bare numbers", () => {
+test("cleanTitle drops leading tags and issue references but keeps leading numbers", () => {
     assert.equal(cleanTitle("Fix #1595 #1418 Fix connection details"), "Fix connection details");
     assert.equal(cleanTitle("Fix #1186 feat(settings): enhance settings"), "feat(settings): enhance settings");
     assert.equal(cleanTitle("[codex] docs: align"), "docs: align");
     assert.equal(cleanTitle("1790 revert changes"), "1790 revert changes");
     assert.equal(cleanTitle("2026 roadmap"), "2026 roadmap");
     assert.equal(cleanTitle("#12, #13 Add layouts"), "Add layouts");
+    assert.equal(cleanTitle("Fix #1234: Prevent a crash"), "Prevent a crash");
+    assert.equal(cleanTitle("Fix #1234 - Prevent a crash"), "Prevent a crash");
     assert.equal(cleanTitle("Fix login"), "Fix login");
     assert.equal(cleanTitle("Add 3 layouts"), "Add 3 layouts");
 });
@@ -111,6 +115,8 @@ test("renderDraftEntry produces a draft entry that insertEntry places after the 
     assert.throws(() => insertEntry(updated, "2.7.0", entry), /already exists/);
     assert.throws(() => insertEntry("[]", "2.7.0", entry), /marker/);
     assert.throws(() => insertEntry(source, "2.7.0[", entry), /Invalid version/);
+    assert.throws(() => insertEntry(source, "v2.6.0", entry), /Invalid version/);
+    assert.throws(() => insertEntry(source, " 2.6.0 ", entry), /Invalid version/);
     assert.throws(() => insertEntry(source, "2.6.0", entry), /already exists/);
     assert.ok(insertEntry(source, "2.6.1", entry).includes(INSERT_MARKER));
 });
