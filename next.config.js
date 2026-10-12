@@ -9,7 +9,9 @@ const linkedCanvasRoot = (() => {
   try {
     const link = path.join(__dirname, 'node_modules/@falkordb/canvas')
     if (!fs.lstatSync(link).isSymbolicLink()) return undefined
-    let root = __dirname
+    // Both sides resolved, or a symlinked parent (macOS /tmp -> /private/tmp)
+    // would never match and the root would climb to /.
+    let root = fs.realpathSync(__dirname)
     const target = fs.realpathSync(link)
     while (path.relative(root, target).startsWith('..')) root = path.dirname(root)
     return root
