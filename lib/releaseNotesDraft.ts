@@ -24,7 +24,7 @@ export const SKIP_TITLES: RegExp[] = [
     /^merge\b/i,
     // Housekeeping after a code review, not a feature that mentions reviews.
     /\b(address|apply|clear|resolve)\b.*\breview\b|\breview (comments|feedback|findings|fixes)\b/i,
-    /^release v?\d/i,
+    /^release v?\d+\.\d+/i,
     /^(update|set) version\b/i,
     /^wip\b/i,
     // "1790 revert changes": a bare PR number sometimes leads a revert's title.

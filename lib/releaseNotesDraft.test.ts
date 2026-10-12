@@ -57,6 +57,8 @@ test("skipReason filters bots, release plumbing and housekeeping", () => {
     assert.equal(skipReason(pr({ title: "feat: add a query review mode" })), null);
     assert.equal(skipReason(pr({ title: "fix: review mode crashes" })), null);
     assert.match(skipReason(pr({ title: "Release 2.5.1 and clear the open staging review findings" }))!, /^title/);
+    assert.match(skipReason(pr({ title: "Release v2.6" }))!, /^title/);
+    assert.equal(skipReason(pr({ title: "Release 3D graph view" })), null);
     assert.equal(skipReason(pr({ title: "2026 roadmap for graph viz" })), null);
     assert.equal(skipReason(pr({ title: "Fix #1234" })), "empty title");
     assert.equal(skipReason(pr({ title: "fix:" })), "empty title");
