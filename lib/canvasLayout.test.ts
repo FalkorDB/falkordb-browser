@@ -31,7 +31,8 @@ const stubCanvas = (nodes: StubNode[], dimension: "2d" | "3d" = "2d") => {
         getGraphData: () => ({ nodes: state.nodes, links: [] }),
         setData: (data: unknown) => { state.setDataCalls += 1; state.lastSetData = data; },
         refresh: () => { state.refreshCalls += 1; },
-        getDimension: () => dimension,
+        // The canvas only has a 2D renderer to hand back while it shows 2D.
+        getGraph: () => (dimension === "2d" ? {} : undefined),
     } as unknown as FalkorDBCanvas;
 
     return { canvas, state };
@@ -140,4 +141,20 @@ test("applyCanvasLayout lays a 3D canvas out again instead of pinning it flat", 
     assert.equal(state.lastSetData, layout.data);
     assert.equal(state.refreshCalls, 0);
     assert.deepEqual(nodes[0], { id: 1 });
+});
+
+test("applyCanvasLayout pins a canvas still drawing 2D while its 3D view loads", () => {
+    // getDimension() would already say "3d" here; the 2D renderer is what counts.
+    const nodes: StubNode[] = [{ id: 1 }];
+    const { canvas, state } = stubCanvas(nodes, "2d");
+    (canvas as unknown as { getDimension: () => string }).getDimension = () => "3d";
+
+    applyCanvasLayout(canvas, {
+        data: { nodes: [{ id: 1 }], links: [] } as unknown as CanvasLayout["data"],
+        positions: [{ id: 1, x: 10, y: 20 }],
+    });
+
+    assert.equal(state.refreshCalls, 1);
+    assert.equal(nodes[0].fx, 10);
+    assert.equal(nodes[0].fy, 20);
 });

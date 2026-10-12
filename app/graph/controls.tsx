@@ -305,18 +305,31 @@ export default function Controls({
                 </>
             }
             <div className="h-4 w-px bg-border rounded-full" />
+            {/* A single choice, so a radio group: one tab stop, arrows move between options. */}
             <div
                 data-testid="dimensionControl"
-                role="group"
+                role="radiogroup"
                 aria-label="Graph dimension"
                 className="flex items-center gap-0.5 rounded-md border border-border p-0.5 pointer-events-auto"
+                onKeyDown={(e) => {
+                    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+                    if (!step || disabled) return;
+                    e.preventDefault();
+                    const index = DIMENSIONS.findIndex(d => d.value === dimension);
+                    const next = DIMENSIONS[(index + step + DIMENSIONS.length) % DIMENSIONS.length];
+                    setDimension(next.value);
+                    e.currentTarget.querySelector<HTMLButtonElement>(`[data-value="${next.value}"]`)?.focus();
+                }}
             >
                 {DIMENSIONS.map(d => (
                     <button
                         key={d.value}
                         type="button"
+                        role="radio"
                         data-testid={`dimensionControl-${d.value}`}
-                        aria-pressed={dimension === d.value}
+                        data-value={d.value}
+                        aria-checked={dimension === d.value}
+                        tabIndex={dimension === d.value ? 0 : -1}
                         title={d.title}
                         className={cn(
                             "rounded px-1.5 py-0.5 text-xs font-medium disabled:opacity-50 mobile:min-h-10 mobile:min-w-10",

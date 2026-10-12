@@ -271,7 +271,14 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
 
     const canvasRef = useRef<FalkorDBCanvas | null>(null);
 
+    // The first write creates the cache entry, and the fields it does not patch
+    // are filled from here — so they start from what the tab restored, not the
+    // defaults, or a later remount would read the defaults back over them.
+    // Taken once: these only seed state, so later tab writes must not churn
+    // `persist` and every setter built on it.
+    const seedRef = useRef({ stored, storedLayout });
     const persist = useCallback((patch: Partial<SchemaCache>) => {
+        const { stored: seed, storedLayout: seedLayout } = seedRef.current;
         const base: SchemaCache = readCache(cacheKey) ?? {
             key: cacheKey,
             schema: EMPTY_SCHEMA,
@@ -280,14 +287,14 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             hiddenLabels: [],
             hiddenRelationships: [],
             graphData: undefined,
-            viewport: undefined,
-            layout: "force",
-            direction: "",
-            dimension: "2d",
-            animation: false,
-            pinned: false,
-            dimmed: true,
-            expand: true,
+            viewport: seed.viewport,
+            layout: seedLayout,
+            direction: normalizeDirection(seedLayout, seed.direction),
+            dimension: normalizeDimension(seed.dimension),
+            animation: seed.animation ?? false,
+            pinned: seed.pinned ?? false,
+            dimmed: seed.dimmed ?? true,
+            expand: seed.expand ?? true,
         };
 
         writeCache(cacheKey, { ...base, ...patch, key: cacheKey });

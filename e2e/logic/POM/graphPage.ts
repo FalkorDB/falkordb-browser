@@ -1121,7 +1121,7 @@ export default class GraphPage extends BasePage {
 
   async isDimensionSelected(dimension: "2d" | "3d"): Promise<boolean> {
     await waitForElementToBeVisible(this.dimensionControl(dimension));
-    return (await this.dimensionControl(dimension).getAttribute("aria-pressed")) === "true";
+    return (await this.dimensionControl(dimension).getAttribute("aria-checked")) === "true";
   }
 
   /**

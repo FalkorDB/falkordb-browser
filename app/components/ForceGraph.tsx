@@ -576,12 +576,16 @@ export default function ForceGraph({
     }, [canvasRef, canvasLoaded, ctxLayout, ctxDirection]);
 
     // The 3D renderer is downloaded the first time it is needed. Should that
-    // fail the canvas stays in 2D, so the control is put back to match.
+    // fail the canvas stays in 2D, so the control is put back to match — unless
+    // the user has picked again meanwhile, which superseded this request.
     useEffect(() => {
         const canvas = canvasRef.current;
-        if (!canvas || !canvasLoaded) return;
-        canvas.setDimension(ctxDimension).catch(() => {
-            if (canvasRef.current !== canvas) return;
+        if (!canvas || !canvasLoaded) return undefined;
+
+        let superseded = false;
+        canvas.setDimension(ctxDimension).catch((error: unknown) => {
+            if (superseded) return;
+            console.error("Could not open the 3D view", error);
             toast({
                 title: "Could not open the 3D view",
                 description: "The graph is still shown in 2D.",
@@ -589,6 +593,8 @@ export default function ForceGraph({
             });
             setCtxDimension('2d');
         });
+
+        return () => { superseded = true; };
     }, [canvasRef, canvasLoaded, ctxDimension, setCtxDimension, toast]);
 
     // The remaining view toggles are tab state too, so the canvas follows the
