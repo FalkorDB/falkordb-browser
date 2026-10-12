@@ -19,20 +19,23 @@ const linkedCanvasRoot = (() => {
       return rel.startsWith('..') || path.isAbsolute(rel)
     }
     while (outside() && root !== path.parse(root).root) root = path.dirname(root)
+
+    // Only the filesystem root holds both when the link is on another disk or
+    // mount, and Turbopack would then watch the whole filesystem. Leave the root
+    // unset and warn instead of failing: `next start` and webpack builds load
+    // this config too but never use the Turbopack root.
+    if (root === path.parse(root).root) {
+      console.warn(
+        'The linked @falkordb/canvas shares no parent folder with this project other than the filesystem root, '
+          + 'so Turbopack will not resolve it. Put both checkouts side by side, or install @falkordb/canvas from npm.',
+      )
+      return undefined
+    }
     return root
   } catch {
     return undefined
   }
 })()
-
-// Only the filesystem root holds both when the link is on another disk or mount,
-// and Turbopack would then watch the whole filesystem.
-if (linkedCanvasRoot && linkedCanvasRoot === path.parse(linkedCanvasRoot).root) {
-  throw new Error(
-    'The linked @falkordb/canvas must share a parent folder with this project, other than the filesystem root '
-      + '(e.g. both checkouts side by side). Move the canvas checkout, or install @falkordb/canvas from npm.',
-  )
-}
 
 /** @type {import('next').NextConfig} */
 
