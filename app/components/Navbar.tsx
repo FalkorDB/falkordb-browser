@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ArrowUpRight, FileCode, Info, LogOut, Menu, Monitor, Moon, Sun, Settings, FunctionSquare, GitGraph } from "lucide-react";
+import { ArrowUpRight, FileCode, Info, LogOut, Menu, Monitor, Moon, Sun, Settings, Sparkles, FunctionSquare, GitGraph } from "lucide-react";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme } from "@/lib/utils";
@@ -19,6 +19,7 @@ import useIsMobile from "@/lib/useIsMobile";
 import Button from "./ui/Button";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
+import ReleaseNotes from "./ReleaseNotes";
 
 interface Props {
     showUDF: boolean
@@ -46,6 +47,7 @@ export default function Navbar({ showUDF }: Props) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
     const [aboutOpen, setAboutOpen] = useState(false);
+    const [releasesOpen, setReleasesOpen] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
 
     const handleConfirmLogout = async () => {
@@ -87,6 +89,18 @@ export default function Navbar({ showUDF }: Props) {
                 <p className="text-sm text-nowrap mobile:text-wrap mobile:text-center">All Rights Reserved © 2024 - {new Date().getFullYear()} falkordb.com</p>
             </div>
         </div>
+    );
+
+    const releasesDrawer = (
+        <Drawer direction="right" open={releasesOpen} onOpenChange={setReleasesOpen}>
+            <DrawerContent side="right" className="w-[92vw] max-w-[480px] bg-background text-foreground" data-testid="releasesPanel">
+                <VisuallyHidden>
+                    <DrawerTitle>Releases</DrawerTitle>
+                    <DrawerDescription />
+                </VisuallyHidden>
+                <ReleaseNotes />
+            </DrawerContent>
+        </Drawer>
     );
 
     if (isMobile) {
@@ -158,8 +172,20 @@ export default function Navbar({ showUDF }: Props) {
                                     <span>Get Support</span>
                                     <ArrowUpRight size={15} className="ml-auto" />
                                 </a>
-                                {/* Opened after the nav drawer closes: two drawers at once would
+                                {/* These open after the nav drawer closes: two drawers at once would
                                     fight over focus and leave two scrims stacked. */}
+                                <button
+                                    type="button"
+                                    className={item}
+                                    data-testid="mobileReleasesButton"
+                                    onClick={() => {
+                                        setMenuOpen(false);
+                                        setReleasesOpen(true);
+                                    }}
+                                >
+                                    <Sparkles size={20} />
+                                    <span>Releases</span>
+                                </button>
                                 <button
                                     type="button"
                                     className={item}
@@ -220,6 +246,7 @@ export default function Navbar({ showUDF }: Props) {
                         {aboutContent}
                     </DrawerContent>
                 </Drawer>
+                {releasesDrawer}
                 <DialogComponent
                     open={logoutDialogOpen}
                     onOpenChange={(open) => { if (!loggingOut) setLogoutDialogOpen(open); }}
@@ -340,6 +367,15 @@ export default function Navbar({ showUDF }: Props) {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="focus:bg-transparent">
+                                    <Button
+                                        data-testid="releasesButton"
+                                        label="Releases"
+                                        title="See what changed in each release"
+                                        onClick={() => setReleasesOpen(true)}
+                                    />
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="focus:bg-transparent">
                                     <DrawerTrigger asChild>
                                         <Button
                                             label="About"
@@ -358,6 +394,7 @@ export default function Navbar({ showUDF }: Props) {
                         {aboutContent}
                     </DrawerContent>
                 </Drawer>
+                {releasesDrawer}
                 {
                     mounted &&
                     <>

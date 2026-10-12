@@ -1,0 +1,111 @@
+name: Release notes draft
+
+# When a version bump lands on staging, draft that release's notes from the PRs
+# merged since the previous tag and open a PR with them. Rewrite the draft in
+# that PR, remove `draft: true`, and merge it before staging goes to main.
+
+on:
+  push:
+    branches: ["staging"]
+    paths: ["package.json"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    defaults:
+      run:
+        # An explicit bash adds pipefail, so a failing generator fails the
+        # step instead of hiding behind `tee`.
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The draft covers everything since the previous release tag.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Check for a new version
+        id: version
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          version=$(jq -r .version package.json)
+          previous=$(git show "$BEFORE:package.json" 2>/dev/null | jq -r .version 2>/dev/null || true)
+          branch="release-notes/v$version"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Not a release version: $version"
+          elif [ "$version" = "$previous" ]; then
+            echo "Version unchanged ($version)"
+          elif grep -q "version: \"$version\"" lib/releaseNotesEntries.ts; then
+            echo "Release notes for $version already exist"
+          elif git ls-remote --exit-code --heads origin "$branch" > /dev/null 2>&1; then
+            echo "$branch already exists"
+          else
+            echo "Drafting release notes for $version (was ${previous:-unknown})"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Draft release notes
+        id: draft
+        if: steps.version.outputs.version
+        env:
+          # Lets the generator recover PR titles GitHub cut short at "…".
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          npm run -s release-notes -- "$VERSION" | tee draft.log
+          if git diff --quiet lib/releaseNotesEntries.ts; then
+            echo "Nothing to announce for $VERSION"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open pull request
+        if: steps.draft.outputs.changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BRANCH: ${{ steps.version.outputs.branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add lib/releaseNotesEntries.ts
+          git commit -m "chore(release-notes): draft notes for v$VERSION"
+          git push origin "$BRANCH"
+          {
+            echo "Draft release notes for **v$VERSION**, generated from the PRs merged since the previous release."
+            echo
+            echo "Before merging, edit \`lib/releaseNotesEntries.ts\` on this branch:"
+            echo "- rewrite each title for users and add descriptions or links where they help"
+            echo "- delete anything users don't need to hear about"
+            echo "- remove \`draft: true\` — until then the entry only shows in development"
+            echo
+            echo "Merge this before staging goes to main so the release ships with its notes. Close it to ship without notes."
+            echo
+            echo "<details><summary>What the generator kept and skipped</summary>"
+            echo
+            echo '```'
+            cat draft.log
+            echo '```'
+            echo
+            echo "</details>"
+          } > body.md
+          gh pr create --base staging --head "$BRANCH" --title "chore(release-notes): v$VERSION" --body-file body.md
