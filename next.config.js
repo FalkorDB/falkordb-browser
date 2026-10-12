@@ -13,12 +13,26 @@ const linkedCanvasRoot = (() => {
     // would never match and the root would climb to /.
     let root = fs.realpathSync(__dirname)
     const target = fs.realpathSync(link)
-    while (path.relative(root, target).startsWith('..')) root = path.dirname(root)
+    // A relative path is absolute when the two are on different Windows drives.
+    const outside = () => {
+      const rel = path.relative(root, target)
+      return rel.startsWith('..') || path.isAbsolute(rel)
+    }
+    while (outside() && root !== path.parse(root).root) root = path.dirname(root)
     return root
   } catch {
     return undefined
   }
 })()
+
+// Only the filesystem root holds both when the link is on another disk or mount,
+// and Turbopack would then watch the whole filesystem.
+if (linkedCanvasRoot && linkedCanvasRoot === path.parse(linkedCanvasRoot).root) {
+  throw new Error(
+    'The linked @falkordb/canvas must share a parent folder with this project, other than the filesystem root '
+      + '(e.g. both checkouts side by side). Move the canvas checkout, or install @falkordb/canvas from npm.',
+  )
+}
 
 /** @type {import('next').NextConfig} */
 
