@@ -42,7 +42,7 @@ export default function ReleaseNotes() {
                                 const { icon: Icon, className, label } = KINDS[item.kind];
                                 return (
                                     <li key={item.title} className="flex gap-3">
-                                        <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", className)} title={label}>
+                                        <span role="img" aria-label={label} title={label} className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", className)}>
                                             <Icon size={14} />
                                         </span>
                                         <div className="flex min-w-0 flex-col gap-0.5">

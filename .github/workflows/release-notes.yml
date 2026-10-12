@@ -44,6 +44,7 @@ jobs:
         id: version
         env:
           BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=$(jq -r .version package.json)
           previous=$(git show "$BEFORE:package.json" 2>/dev/null | jq -r .version 2>/dev/null || true)
@@ -55,16 +56,26 @@ jobs:
           elif grep -q "version: \"$version\"" lib/releaseNotesEntries.ts; then
             echo "Release notes for $version already exist"
           elif git ls-remote --exit-code --heads origin "$branch" > /dev/null 2>&1; then
-            echo "$branch already exists"
+            # A closed PR means someone chose to ship without notes; only a
+            # branch left behind by a failed run gets its PR opened again.
+            if [ "$(gh pr list --head "$branch" --state all --json number --jq length)" != "0" ]; then
+              echo "$branch already has a pull request"
+            else
+              echo "$branch exists without a pull request; opening one"
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              echo "branch=$branch" >> "$GITHUB_OUTPUT"
+              echo "mode=resume" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "Drafting release notes for $version (was ${previous:-unknown})"
             echo "version=$version" >> "$GITHUB_OUTPUT"
             echo "branch=$branch" >> "$GITHUB_OUTPUT"
+            echo "mode=new" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Draft release notes
         id: draft
-        if: steps.version.outputs.version
+        if: steps.version.outputs.mode == 'new'
         env:
           # Lets the generator recover PR titles GitHub cut short at "…".
           GH_TOKEN: ${{ github.token }}
@@ -78,18 +89,23 @@ jobs:
           fi
 
       - name: Open pull request
-        if: steps.draft.outputs.changed
+        if: steps.draft.outputs.changed || steps.version.outputs.mode == 'resume'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
           BRANCH: ${{ steps.version.outputs.branch }}
+          MODE: ${{ steps.version.outputs.mode }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$BRANCH"
-          git add lib/releaseNotesEntries.ts
-          git commit -m "chore(release-notes): draft notes for v$VERSION"
-          git push origin "$BRANCH"
+          if [ "$MODE" = "new" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+            git switch -c "$BRANCH"
+            git add lib/releaseNotesEntries.ts
+            git commit -m "chore(release-notes): draft notes for v$VERSION"
+            git push origin "$BRANCH"
+          else
+            echo "The generator's output is in the run that created this branch." > draft.log
+          fi
           {
             echo "Draft release notes for **v$VERSION**, generated from the PRs merged since the previous release."
             echo

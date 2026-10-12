@@ -366,12 +366,12 @@ export default function Navbar({ showUDF }: Props) {
                                     </a>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="focus:bg-transparent">
+                                {/* On the item, not the button, so Enter and Space open it too. */}
+                                <DropdownMenuItem className="focus:bg-transparent" onSelect={() => setReleasesOpen(true)}>
                                     <Button
                                         data-testid="releasesButton"
                                         label="Releases"
                                         title="See what changed in each release"
-                                        onClick={() => setReleasesOpen(true)}
                                     />
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />

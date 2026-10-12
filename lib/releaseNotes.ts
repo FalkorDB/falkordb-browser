@@ -25,9 +25,9 @@ export interface ReleaseNote {
     items: ReleaseNoteItem[];
 }
 
-/** "2.6.1" or "v2.6.1" → [2, 6, 1]; anything else → null. */
+/** "2.6.1" or "v2.6.1" → [2, 6, 1]; anything else (including leading zeros) → null. */
 export function parseVersion(version: string | null | undefined): [number, number, number] | null {
-    const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(version?.trim() ?? "");
+    const match = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version?.trim() ?? "");
     if (!match) return null;
     return [Number(match[1]), Number(match[2]), Number(match[3])];
 }

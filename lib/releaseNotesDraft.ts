@@ -1,7 +1,7 @@
 // Turns merged PRs into a draft release-notes entry; `scripts/release-notes.mts`
 // feeds it `git log` and writes the result into `releaseNotesEntries.ts`.
 
-import type { ReleaseNoteItem, ReleaseNoteKind } from "./releaseNotes.ts";
+import { parseVersion, type ReleaseNoteItem, type ReleaseNoteKind } from "./releaseNotes.ts";
 
 export interface MergedPr {
     number: number;
@@ -22,10 +22,12 @@ export const SKIP_TITLES: RegExp[] = [
     /\bbump(s|ed)?\b/i,
     /^staging$/i,
     /^merge\b/i,
-    /\breview\b/i,
+    // Housekeeping after a code review, not a feature that mentions reviews.
+    /\b(address|apply|fix|resolve)\b.*\breview\b|\breview (comments|feedback|fixes)\b/i,
     /^(update|set) version\b/i,
     /^wip\b/i,
-    /^revert\b/i,
+    // "1790 revert changes": a bare PR number sometimes leads a revert's title.
+    /^(\d+\s+)?revert\b/i,
     // Dependencies, tests, CI and docs: work users never see.
     /\b(deps|dependencies)\b/i,
     /\b(e2e|playwright|smoke tests?|unit tests?|flaky|pom)\b/i,
@@ -66,8 +68,8 @@ export function parseGitLog(log: string): MergedPr[] {
 }
 
 const CONVENTIONAL = /^(\w+)(\([^)]*\))?!?:\s*/;
-// "[codex] ", "Fix #1595 #1418 ", "1790 ": noise in front of the real title.
-const TITLE_NOISE = /^(\[[^\]]*\]\s*|(fix(es)?\s+)?(#\d+[\s,]*)+|\d+\s+)+/i;
+// "[codex] ", "Fix #1595 #1418 ": noise in front of the real title.
+const TITLE_NOISE = /^(\[[^\]]*\]\s*|(fix(es)?\s+)?(#\d+[\s,]*)+)+/i;
 
 /** The title without leading tags and issue references; any conventional prefix stays. */
 export function cleanTitle(title: string): string {
@@ -92,11 +94,15 @@ export function skipReason(pr: MergedPr): string | null {
     const author = SKIP_AUTHORS.find((p) => p.test(pr.author));
     if (author) return `author ${author}`;
     const clean = cleanTitle(pr.title);
-    const forms = [pr.title, clean, clean.replace(CONVENTIONAL, "")];
+    const text = clean.replace(CONVENTIONAL, "").trim();
+    // "Fix #1234" says nothing once the noise is gone.
+    if (!text) return "empty title";
+    const forms = [pr.title, clean, text];
     const title = SKIP_TITLES.find((p) => forms.some((form) => p.test(form)));
     if (title) return `title ${title}`;
     return null;
 }
+
 const KIND_BY_TYPE: Record<string, ReleaseNoteKind> = { feat: "feature", fix: "fix", perf: "improvement" };
 const KIND_ORDER: ReleaseNoteKind[] = ["feature", "improvement", "fix"];
 
@@ -146,7 +152,9 @@ export const INSERT_MARKER = "// @release-notes:insert";
 
 /** `source` with `entry` placed right after the insert marker (so newest stays first). */
 export function insertEntry(source: string, version: string, entry: string): string {
-    if (new RegExp(`version:\\s*"${version.replace(/\./g, "\\.")}"`).test(source)) {
+    if (!parseVersion(version)) throw new Error(`Invalid version: ${version}`);
+    // A valid version is digits and dots only, so a plain substring check is exact.
+    if (source.includes(`version: "${version}"`)) {
         throw new Error(`An entry for ${version} already exists; edit or delete it first.`);
     }
     const at = source.indexOf(INSERT_MARKER);

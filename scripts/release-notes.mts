@@ -30,8 +30,10 @@ const { values, positionals } = parseArgs({
 const version = (positionals[0] ?? JSON.parse(readFileSync(PACKAGE_FILE, "utf8")).version).replace(/^v/, "");
 if (!parseVersion(version)) throw new Error(`Invalid version: ${version}`);
 
-// The newest release tag older than the one being drafted.
-const from = values.from ?? git("tag", "--list", "v*").split("\n")
+// The newest release tag older than the one being drafted, among those already
+// in this branch's history: a tag cut elsewhere (a hotfix on main, say) would
+// pull the previous release's PRs back into this draft.
+const from = values.from ?? git("tag", "--list", "v*", "--merged", values.to).split("\n")
     .filter((tag) => parseVersion(tag) && compareVersions(tag, version) < 0)
     .sort(compareVersions)
     .at(-1);

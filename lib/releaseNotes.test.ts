@@ -14,6 +14,9 @@ test("parseVersion accepts plain and v-prefixed semver only", () => {
     assert.deepEqual(parseVersion(" v10.0.12 "), [10, 0, 12]);
     assert.equal(parseVersion("2.6"), null);
     assert.equal(parseVersion("v.1.4.4"), null);
+    assert.equal(parseVersion("02.6.2"), null);
+    assert.equal(parseVersion("2.06.2"), null);
+    assert.deepEqual(parseVersion("2.0.10"), [2, 0, 10]);
     assert.equal(parseVersion(""), null);
     assert.equal(parseVersion(null), null);
     assert.equal(parseVersion(undefined), null);
