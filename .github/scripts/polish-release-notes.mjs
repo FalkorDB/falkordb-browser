@@ -1,4 +1,6 @@
-// Rewrites a release's auto-generated notes into user-facing release notes.
+// Rewrites a release's auto-generated notes into user-facing release notes,
+// led by an optional "## What's New" section that the browser shows users
+// after they upgrade; edit it on the release page if it needs work.
 // Reads RELEASE_TAG and GITHUB_REPOSITORY from the environment, and needs
 // GH_TOKEN (for the gh CLI) and ANTHROPIC_API_KEY.
 import { execFileSync } from "node:child_process";
@@ -47,6 +49,12 @@ You get GitHub's auto-generated notes for a release and the description of each 
 - End each bullet with the PR link in the form ([#123](https://github.com/${repo}/pull/123)).
 - Keep the "New Contributors" section if present, and the "**Full Changelog**" line exactly as given.
 - If nothing user-facing remains, write a single line saying this release contains maintenance updates only, followed by the Full Changelog line.
+
+Before the grouped notes, add a "## What's New" section when the release has something a user would want pointed out on upgrade: a new feature, a noticeably better workflow, or a change they must act on. The browser shows this section to users after they upgrade, so it is a short highlight reel, not a summary of the release:
+- 1 to 4 bullets, most important first, each in the form "- **Short name of the change** — one sentence on what the user can now do or must do." No PR links here.
+- Leave out bug fixes, security patches, and deployment changes unless one changes what users see or do.
+- When nothing qualifies, leave the section out entirely: no heading, no placeholder. Most patch releases have nothing to highlight.
+- Use exactly the heading "## What's New"; the browser looks for it.
 
 Output only the Markdown for the release body. No title, no preamble.`;
 
