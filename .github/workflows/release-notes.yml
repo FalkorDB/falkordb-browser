@@ -39,7 +39,7 @@ jobs:
           cp .github/scripts/polish-release-notes.mjs "$RUNNER_TEMP/"
           cd "$RUNNER_TEMP"
           npm init -y > /dev/null
-          npm install --no-audit --no-fund openai
+          npm install --no-audit --no-fund openai@7.32.0
 
       - name: Rewrite release notes
         env:

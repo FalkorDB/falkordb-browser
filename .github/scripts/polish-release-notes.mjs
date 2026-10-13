@@ -29,14 +29,21 @@ if (!generated) {
   process.exit(1);
 }
 
+// PR text is untrusted and unbounded: cap it, and strip the tags that frame
+// it so a description can't close its own block and pose as something else.
+const MAX_DESCRIPTION = 4000;
+const FRAMING_TAGS = /<\/?\s*(?:pr|title|description|generated_notes|pull_requests)\b[^>]*>/gi;
+const quote = (text, max = Infinity) => String(text ?? "").replace(FRAMING_TAGS, "").slice(0, max);
+
 // The generated lines only carry PR titles; the descriptions say what changed for users.
 const prNumbers = [...new Set([...generated.matchAll(/\/pull\/(\d+)/g)].map((m) => m[1]))];
 const prs = prNumbers.map((number) => {
   const pr = JSON.parse(gh("pr", "view", number, "--repo", repo, "--json", "number,title,author,labels,body"));
   return [
-    `<pr number="${pr.number}" author="${pr.author.login}" labels="${pr.labels.map((l) => l.name).join(",")}">`,
-    `<title>${pr.title}</title>`,
-    `<description>\n${pr.body ?? ""}\n</description>`,
+    // A deleted account leaves the author null; GitHub shows it as "ghost".
+    `<pr number="${pr.number}" author="${quote(pr.author?.login ?? "ghost").replace(/"/g, "")}" labels="${quote(pr.labels.map((l) => l.name).join(",")).replace(/"/g, "")}">`,
+    `<title>${quote(pr.title)}</title>`,
+    `<description>\n${quote(pr.body, MAX_DESCRIPTION)}\n</description>`,
     `</pr>`,
   ].join("\n");
 });
@@ -64,9 +71,12 @@ Output only the Markdown for the release body. No title, no preamble.`;
 // (".../openai/responses?api-version=...") works as well as the bare one.
 let endpoint;
 try {
-  endpoint = new URL(process.env.AZURE_OPENAI_ENDPOINT?.trim() ?? "").origin;
+  const url = new URL(process.env.AZURE_OPENAI_ENDPOINT?.trim() ?? "");
+  // The key travels in a header, so never over plain http.
+  if (url.protocol !== "https:") throw new Error("not https");
+  endpoint = url.origin;
 } catch {
-  console.error("AZURE_OPENAI_ENDPOINT is not set to a URL.");
+  console.error("AZURE_OPENAI_ENDPOINT must be an https:// URL.");
   process.exit(1);
 }
 

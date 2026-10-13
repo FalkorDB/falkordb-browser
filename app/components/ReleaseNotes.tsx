@@ -3,11 +3,13 @@
 import { format, parseISO } from "date-fns";
 import { ArrowUpRight } from "lucide-react";
 import pkg from "@/package.json";
-import { compareVersions, displayBody } from "@/lib/releaseNotes";
+import { compareVersions, displayBody, parseVersion } from "@/lib/releaseNotes";
 import useReleases from "./useReleases";
 import ReleaseMarkdown from "./ReleaseMarkdown";
 
 const RELEASES_PAGE = "https://github.com/FalkorDB/falkordb-browser/releases";
+// A pre-release or dev build ("2.7.0-rc.1") matches no release tag.
+const INSTALLED_IS_RELEASE = parseVersion(pkg.version) !== null;
 
 const formatDate = (date: string) => {
     try {
@@ -43,7 +45,7 @@ export default function ReleaseNotes() {
                         <h2 className="flex flex-wrap items-center gap-2">
                             <a className="text-lg font-semibold hover:underline" href={release.url} target="_blank" rel="noreferrer">{release.name}</a>
                             {release.publishedAt && <span className="text-sm text-muted-foreground">{formatDate(release.publishedAt)}</span>}
-                            {compareVersions(release.tag, pkg.version) === 0 && (
+                            {INSTALLED_IS_RELEASE && compareVersions(release.tag, pkg.version) === 0 && (
                                 <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">Installed</span>
                             )}
                         </h2>
