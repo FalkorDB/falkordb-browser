@@ -6,6 +6,8 @@ const RELEASES_URL = "https://api.github.com/repos/FalkorDB/falkordb-browser/rel
 // list is kept for an hour and a failed refresh waits before trying again.
 const CACHE_MS = 60 * 60 * 1000;
 const RETRY_MS = 5 * 60 * 1000;
+// With nothing cached every request is failing, so try again sooner.
+const COLD_RETRY_MS = 60 * 1000;
 const TIMEOUT_MS = 10_000;
 // Enough pages for 1000 releases; a bound in case the Link header ever loops.
 const MAX_PAGES = 10;
@@ -56,7 +58,7 @@ async function refresh(): Promise<void> {
         cache = { releases: await fetchReleases(), fetchedAt: Date.now() };
     } catch (err) {
         console.error(err);
-        retryAt = Date.now() + RETRY_MS;
+        retryAt = Date.now() + (cache ? RETRY_MS : COLD_RETRY_MS);
     }
 }
 

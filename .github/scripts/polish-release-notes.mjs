@@ -31,6 +31,7 @@ if (!generated) {
 
 // PR text is untrusted and unbounded: cap it, and strip the tags that frame
 // it so a description can't close its own block and pose as something else.
+// GitHub's generated notes carry PR titles too, so they get the same stripping.
 const MAX_DESCRIPTION = 4000;
 const FRAMING_TAGS = /<\/?\s*(?:pr|title|description|generated_notes|pull_requests)\b[^>]*>/gi;
 const quote = (text, max = Infinity) => String(text ?? "").replace(FRAMING_TAGS, "").slice(0, max);
@@ -88,7 +89,7 @@ const response = await client.responses.create({
   max_output_tokens: 16000,
   reasoning: { effort: "medium" },
   instructions: system,
-  input: `Release ${tag}\n\n<generated_notes>\n${generated}\n</generated_notes>\n\n<pull_requests>\n${prs.join("\n\n")}\n</pull_requests>`,
+  input: `Release ${tag}\n\n<generated_notes>\n${quote(generated)}\n</generated_notes>\n\n<pull_requests>\n${prs.join("\n\n")}\n</pull_requests>`,
 });
 
 // A cut-off or failed response would replace good notes with half of them.
