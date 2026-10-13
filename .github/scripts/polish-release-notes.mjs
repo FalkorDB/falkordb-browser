@@ -2,9 +2,9 @@
 // led by an optional "## What's New" section that the browser shows users
 // after they upgrade; edit it on the release page if it needs work.
 // Reads RELEASE_TAG and GITHUB_REPOSITORY from the environment, and needs
-// GH_TOKEN (for the gh CLI) and ANTHROPIC_API_KEY.
+// GH_TOKEN (for the gh CLI) and OPENAI_API_KEY.
 import { execFileSync } from "node:child_process";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
 const tag = process.env.RELEASE_TAG;
 const repo = process.env.GITHUB_REPOSITORY;
@@ -58,32 +58,26 @@ Before the grouped notes, add a "## What's New" section when the release has som
 
 Output only the Markdown for the release body. No title, no preamble.`;
 
-const client = new Anthropic();
-const response = await client.beta.messages.create({
-  model: "claude-opus-5-5",
-  max_tokens: 16000,
-  output_config: { effort: "medium" },
-  betas: ["server-side-fallback-2026-07-01"],
-  fallbacks: "default",
-  system,
-  messages: [
-    {
-      role: "user",
-      content: `Release ${tag}\n\n<generated_notes>\n${generated}\n</generated_notes>\n\n<pull_requests>\n${prs.join("\n\n")}\n</pull_requests>`,
-    },
-  ],
+const client = new OpenAI();
+const response = await client.responses.create({
+  model: "gpt-5.4-mini",
+  max_output_tokens: 16000,
+  reasoning: { effort: "medium" },
+  instructions: system,
+  input: `Release ${tag}\n\n<generated_notes>\n${generated}\n</generated_notes>\n\n<pull_requests>\n${prs.join("\n\n")}\n</pull_requests>`,
 });
 
-if (response.stop_reason !== "end_turn") {
-  console.error(`Model stopped with ${response.stop_reason}; leaving the release notes unchanged.`);
+// A cut-off or failed response would replace good notes with half of them.
+if (response.status !== "completed") {
+  console.error(`Model stopped with status ${response.status} (${response.incomplete_details?.reason ?? "no reason given"}); leaving the release notes unchanged.`);
   process.exit(1);
 }
 
-const polished = response.content
-  .filter((block) => block.type === "text")
-  .map((block) => block.text)
-  .join("")
-  .trim();
+const polished = response.output_text.trim();
+if (!polished) {
+  console.error("Model returned no text; leaving the release notes unchanged.");
+  process.exit(1);
+}
 
 const body = `${MARKER}\n${polished}\n\n<details>\n<summary>Original generated notes</summary>\n\n${generated}\n</details>\n`;
 
