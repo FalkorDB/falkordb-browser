@@ -2,7 +2,9 @@
 // led by an optional "## What's New" section that the browser shows users
 // after they upgrade; edit it on the release page if it needs work.
 // Reads RELEASE_TAG and GITHUB_REPOSITORY from the environment, and needs
-// GH_TOKEN (for the gh CLI) and OPENAI_API_KEY.
+// GH_TOKEN (for the gh CLI), plus the Azure OpenAI resource: OPENAI_API_KEY,
+// AZURE_OPENAI_ENDPOINT (e.g. https://my-resource.openai.azure.com) and
+// AZURE_OPENAI_DEPLOYMENT (the deployment name; defaults to gpt-5.4-mini).
 import { execFileSync } from "node:child_process";
 import OpenAI from "openai";
 
@@ -58,9 +60,17 @@ Before the grouped notes, add a "## What's New" section when the release has som
 
 Output only the Markdown for the release body. No title, no preamble.`;
 
-const client = new OpenAI();
+const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim().replace(/\/+$/, "");
+if (!endpoint) {
+  console.error("AZURE_OPENAI_ENDPOINT is not set.");
+  process.exit(1);
+}
+
+// Azure's /openai/v1/ endpoint speaks the OpenAI API, with the deployment as the model.
+const apiKey = process.env.OPENAI_API_KEY;
+const client = new OpenAI({ apiKey, baseURL: `${endpoint}/openai/v1/`, defaultHeaders: { "api-key": apiKey } });
 const response = await client.responses.create({
-  model: "gpt-5.4-mini",
+  model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-5.4-mini",
   max_output_tokens: 16000,
   reasoning: { effort: "medium" },
   instructions: system,

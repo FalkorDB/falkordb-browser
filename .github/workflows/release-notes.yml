@@ -45,6 +45,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Repository variables (Settings → Secrets and variables → Actions → Variables).
+          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: node "$RUNNER_TEMP/polish-release-notes.mjs"
