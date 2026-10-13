@@ -87,7 +87,10 @@ test.describe("Tutorial", () => {
     test("@admin the app download popup waits until the tutorial is closed", async () => {
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const app = new AppDownloadComponent(await browser.getPage());
+        const page = await browser.getPage();
+        const app = new AppDownloadComponent(page);
+        // What's New would also wait for the tutorial and then go first; leave it out.
+        await page.route("**/api/releases", (route) => route.fulfill({ json: { releases: [] } }));
         try {
             // The suite keeps the popup away with "false"; any other value lets
             // it open, and the init script only fills in a missing one.

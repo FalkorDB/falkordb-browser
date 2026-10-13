@@ -13,6 +13,7 @@ import { PanelContext } from "./provider";
 import Header from "./Header";
 import Navbar from "./Navbar";
 import Tutorial, { DemoLoadOutcome } from "./Tutorial";
+import WhatsNewPopup from "./WhatsNewPopup";
 
 const UdfPanel = dynamic(() => import("../udf/udfPanel"), {
   ssr: false,
@@ -29,6 +30,8 @@ interface ProviderLayoutProps {
   onLoadDemoGraphs: () => Promise<DemoLoadOutcome>;
   onCleanupDemoGraphs: () => Promise<void>;
   showUDF: boolean;
+  /** Reports whether the What's New popup has the floor (see WhatsNewPopup). */
+  onWhatsNewActiveChange?: (active: boolean) => void;
 }
 
 export default function ProviderLayout({
@@ -41,6 +44,7 @@ export default function ProviderLayout({
   onLoadDemoGraphs,
   onCleanupDemoGraphs,
   showUDF,
+  onWhatsNewActiveChange,
 }: ProviderLayoutProps) {
   const pathname = usePathname();
   const isMobile = useIsMobile();
@@ -186,6 +190,7 @@ export default function ProviderLayout({
           onCleanupDemoGraphs={onCleanupDemoGraphs}
         />
       }
+      <WhatsNewPopup paused={tutorialOpen || !showNavbarAndHeader} onActiveChange={onWhatsNewActiveChange} />
       {
         showNavbarAndHeader &&
         <Header

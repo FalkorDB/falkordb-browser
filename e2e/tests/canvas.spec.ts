@@ -155,6 +155,7 @@ test.describe('Canvas Tests', () => {
         expect(await graph.isElementCanvasSuggestionVisible("Alice")).toBe(true);
         await expect(graph.elementCanvasSuggestionByName("Bob")).toBeHidden();
         await graph.searchTextAndSelectInCanvas("lic", "Alice");
+        await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
         await apicalls.removeGraph(graphName);

@@ -3,6 +3,7 @@ import { Browser, BrowserContext, Page } from "playwright";
 import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import AppDownloadComponent from "../logic/POM/appDownloadComponent";
+import pkg from "../../package.json";
 
 /**
  * The browser offers each visitor the app for their OS: a once-per-session
@@ -14,6 +15,7 @@ import AppDownloadComponent from "../logic/POM/appDownloadComponent";
 const ADMIN_AUTH_FILE = "playwright/.auth/admin.json";
 const RELEASES = "https://github.com/FalkorDB/falkordb-browser/releases/latest/download";
 const APP_LINKS_ROUTE = "**/api/app-links";
+const RELEASES_ROUTE = "**/api/releases";
 
 const UA = {
     windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
@@ -59,6 +61,8 @@ async function openVisitor(browser: Browser, { ua, viewport = DESKTOP, signedIn 
             Object.defineProperty(navigator, "userAgentData", { get: () => hints });
         }, cpu);
     }
+    // What's New would take its turn first; keep GitHub's real release notes out of these tests.
+    await context.route(RELEASES_ROUTE, (route) => route.fulfill({ json: { releases: [] } }));
     // The download links leave the app; never let a test actually fetch an installer.
     await context.route("https://github.com/**", (route) => route.abort());
     return context;
@@ -146,6 +150,32 @@ test.describe("@admin App download", () => {
         // The help menu keeps the link for whoever changes their mind.
         await thirdPage.getByRole("button", { name: "Help" }).click();
         await expect(thirdTab.link).toHaveText("Download for Linux");
+    });
+
+    test("waits for What's New: the release's news first, then the download offer", async ({ browser }) => {
+        context = await openVisitor(browser, { ua: UA.windows });
+        // Stands in for GitHub: a release for the running version with a What's New section.
+        await context.route(RELEASES_ROUTE, (route) => route.fulfill({
+            json: {
+                releases: [{
+                    tag: `v${pkg.version}`,
+                    name: `v${pkg.version}`,
+                    publishedAt: "2026-10-01T00:00:00Z",
+                    body: "## What's New\n- Something worth knowing",
+                    url: "https://github.com/FalkorDB/falkordb-browser/releases",
+                }],
+            },
+        }));
+        const [page, app] = await openPage(context, urls.graphUrl);
+
+        const whatsNew = page.getByTestId("whatsNewContent");
+        await expect(whatsNew).toBeVisible({ timeout: OPENS_WITHIN });
+        await app.waitForTimeout(STAYS_CLOSED_FOR);
+        await expect(app.prompt).toBeHidden();
+
+        await page.getByTestId("whatsNewGotIt").click();
+        await expect(whatsNew).toBeHidden();
+        await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
     });
 
     test("downloading answers the question for good", async ({ browser }) => {

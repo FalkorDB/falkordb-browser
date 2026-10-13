@@ -365,3 +365,14 @@ body[data-scroll-locked] {
     padding-left: env(safe-area-inset-left) !important;
     padding-right: env(safe-area-inset-right) !important;
 }
+
+/* Release notes: the section headings need more room than chat's compact ones. */
+.release-notes h2,
+.release-notes h3 {
+    margin-top: 1em;
+}
+
+.release-notes h2:first-child,
+.release-notes h3:first-child {
+    margin-top: 0;
+}
