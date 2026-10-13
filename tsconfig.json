@@ -33,7 +33,6 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    "scripts/**/*.mts",
     ".next/types/**/*.ts",
     "app/api/auth/[...nextauth]/route.ts",
     ".next/dev/types/**/*.ts"

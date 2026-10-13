@@ -60,9 +60,13 @@ Before the grouped notes, add a "## What's New" section when the release has som
 
 Output only the Markdown for the release body. No title, no preamble.`;
 
-const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim().replace(/\/+$/, "");
-if (!endpoint) {
-  console.error("AZURE_OPENAI_ENDPOINT is not set.");
+// Only the resource matters: a full request URL copied from the portal
+// (".../openai/responses?api-version=...") works as well as the bare one.
+let endpoint;
+try {
+  endpoint = new URL(process.env.AZURE_OPENAI_ENDPOINT?.trim() ?? "").origin;
+} catch {
+  console.error("AZURE_OPENAI_ENDPOINT is not set to a URL.");
   process.exit(1);
 }
 

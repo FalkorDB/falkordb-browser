@@ -352,3 +352,14 @@ input[type="color"]::-webkit-color-swatch {
     -webkit-text-fill-color: transparent;
     -webkit-tap-highlight-color: transparent;
 }
+
+/* Release notes: the section headings need more room than chat's compact ones. */
+.release-notes h2,
+.release-notes h3 {
+    margin-top: 1em;
+}
+
+.release-notes h2:first-child,
+.release-notes h3:first-child {
+    margin-top: 0;
+}

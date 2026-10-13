@@ -1,19 +1,13 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { ArrowUpRight, Sparkles, Wrench, Zap } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { publishedReleases, type ReleaseNoteKind } from "@/lib/releaseNotes";
-import { RELEASE_NOTES } from "@/lib/releaseNotesEntries";
+import { ArrowUpRight } from "lucide-react";
+import pkg from "@/package.json";
+import { compareVersions, displayBody } from "@/lib/releaseNotes";
+import useReleases from "./useReleases";
+import ReleaseMarkdown from "./ReleaseMarkdown";
 
-// Drafts are generated and unreviewed, so only development shows them.
-const RELEASES = publishedReleases(RELEASE_NOTES, process.env.NODE_ENV === "development");
-
-const KINDS: Record<ReleaseNoteKind, { icon: typeof Sparkles; className: string; label: string }> = {
-    feature: { icon: Sparkles, className: "bg-primary/15 text-primary", label: "New" },
-    improvement: { icon: Zap, className: "bg-sky-500/15 text-sky-500", label: "Improved" },
-    fix: { icon: Wrench, className: "bg-emerald-500/15 text-emerald-500", label: "Fixed" },
-};
+const RELEASES_PAGE = "https://github.com/FalkorDB/falkordb-browser/releases";
 
 const formatDate = (date: string) => {
     try {
@@ -23,41 +17,37 @@ const formatDate = (date: string) => {
     }
 };
 
-/** The body of the Help menu's "Releases" drawer: every release's notes, newest first. */
+/** The body of the Help menu's "Releases" drawer: every release's notes from GitHub, newest first. */
 export default function ReleaseNotes() {
+    const state = useReleases();
+
     return (
         <div className="h-full w-full overflow-y-auto" data-testid="releaseNotes">
             <div className="flex flex-col gap-6 p-6 mobile:p-4">
-                <h1 className="text-2xl font-bold">Releases</h1>
-                {RELEASES.length === 0 && <p className="text-muted-foreground">No release notes yet.</p>}
-                {RELEASES.map((release) => (
-                    <section key={release.version} className="flex flex-col gap-3" data-testid={`releaseNotes-${release.version}`}>
-                        <h2 className="flex items-center gap-2">
-                            <span className="text-lg font-semibold">v{release.version}</span>
-                            <span className="text-sm text-muted-foreground">{formatDate(release.date)}</span>
-                            {release.draft && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">Draft</span>}
+                <div className="flex items-center justify-between gap-2">
+                    <h1 className="text-2xl font-bold">Releases</h1>
+                    <a className="flex items-center gap-1 text-sm text-primary hover:underline" href={RELEASES_PAGE} target="_blank" rel="noreferrer">
+                        GitHub <ArrowUpRight size={14} />
+                    </a>
+                </div>
+                {state.status === "loading" && <p className="text-muted-foreground">Loading release notes…</p>}
+                {state.status === "error" && (
+                    <p className="text-muted-foreground">
+                        Release notes couldn&apos;t be loaded. They&apos;re also on{" "}
+                        <a className="text-primary hover:underline" href={RELEASES_PAGE} target="_blank" rel="noreferrer">GitHub</a>.
+                    </p>
+                )}
+                {state.status === "ready" && state.releases.length === 0 && <p className="text-muted-foreground">No releases yet.</p>}
+                {state.status === "ready" && state.releases.map((release) => (
+                    <section key={release.tag} className="flex flex-col gap-3 border-b border-border/50 pb-6 last:border-b-0" data-testid={`releaseNotes-${release.tag}`}>
+                        <h2 className="flex flex-wrap items-center gap-2">
+                            <a className="text-lg font-semibold hover:underline" href={release.url} target="_blank" rel="noreferrer">{release.name}</a>
+                            {release.publishedAt && <span className="text-sm text-muted-foreground">{formatDate(release.publishedAt)}</span>}
+                            {compareVersions(release.tag, pkg.version) === 0 && (
+                                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">Installed</span>
+                            )}
                         </h2>
-                        <ul className="flex flex-col gap-3">
-                            {release.items.map((item) => {
-                                const { icon: Icon, className, label } = KINDS[item.kind];
-                                return (
-                                    <li key={item.title} className="flex gap-3">
-                                        <span role="img" aria-label={label} title={label} className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", className)}>
-                                            <Icon size={14} />
-                                        </span>
-                                        <div className="flex min-w-0 flex-col gap-0.5">
-                                            <p className="text-sm font-medium leading-snug">{item.title}</p>
-                                            {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
-                                            {item.link && (
-                                                <a className="flex w-fit items-center gap-1 text-sm text-primary hover:underline" href={item.link} target="_blank" rel="noreferrer">
-                                                    Learn more <ArrowUpRight size={14} />
-                                                </a>
-                                            )}
-                                        </div>
-                                    </li>
-                                );
-                            })}
-                        </ul>
+                        <ReleaseMarkdown source={displayBody(release.body)} />
                     </section>
                 ))}
             </div>
