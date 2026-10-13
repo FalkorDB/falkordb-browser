@@ -1,127 +1,50 @@
-name: Release notes draft
-
-# When a version bump lands on staging, draft that release's notes from the PRs
-# merged since the previous tag and open a PR with them. Rewrite the draft in
-# that PR, remove `draft: true`, and merge it before staging goes to main.
-
-on:
-  push:
-    branches: ["staging"]
-    paths: ["package.json"]
+name: Polish release notes
 
 permissions:
   contents: read
 
+on:
+  release:
+    types: [published]
+
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to rewrite (e.g. v2.6.2)'
+        required: true
+      dry_run:
+        description: 'Print the new notes without updating the release'
+        type: boolean
+        default: false
+
 concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: false
+  group: release-notes-${{ github.event.release.tag_name || inputs.tag }}
 
 jobs:
-  draft:
+  polish:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
-    defaults:
-      run:
-        # An explicit bash adds pipefail, so a failing generator fails the
-        # step instead of hiding behind `tee`.
-        shell: bash
+      pull-requests: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The draft covers everything since the previous release tag.
-          fetch-depth: 0
-          fetch-tags: true
+          persist-credentials: false
+          sparse-checkout: .github/scripts
 
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "24"
-
-      - name: Check for a new version
-        id: version
-        env:
-          BEFORE: ${{ github.event.before }}
-          GH_TOKEN: ${{ github.token }}
+      # Installed outside the repo so the project's own dependencies aren't pulled in.
+      - name: Install Anthropic SDK
         run: |
-          version=$(jq -r .version package.json)
-          previous=$(git show "$BEFORE:package.json" 2>/dev/null | jq -r .version 2>/dev/null || true)
-          branch="release-notes/v$version"
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Not a release version: $version"
-          elif [ "$version" = "$previous" ]; then
-            echo "Version unchanged ($version)"
-          elif grep -q "version: \"$version\"" lib/releaseNotesEntries.ts; then
-            echo "Release notes for $version already exist"
-          elif git ls-remote --exit-code --heads origin "$branch" > /dev/null 2>&1; then
-            # A closed PR means someone chose to ship without notes; only a
-            # branch left behind by a failed run gets its PR opened again.
-            if [ "$(gh pr list --head "$branch" --state all --json number --jq length)" != "0" ]; then
-              echo "$branch already has a pull request"
-            else
-              echo "$branch exists without a pull request; opening one"
-              echo "version=$version" >> "$GITHUB_OUTPUT"
-              echo "branch=$branch" >> "$GITHUB_OUTPUT"
-              echo "mode=resume" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "Drafting release notes for $version (was ${previous:-unknown})"
-            echo "version=$version" >> "$GITHUB_OUTPUT"
-            echo "branch=$branch" >> "$GITHUB_OUTPUT"
-            echo "mode=new" >> "$GITHUB_OUTPUT"
-          fi
+          cp .github/scripts/polish-release-notes.mjs "$RUNNER_TEMP/"
+          cd "$RUNNER_TEMP"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund @anthropic-ai/sdk
 
-      - name: Draft release notes
-        id: draft
-        if: steps.version.outputs.mode == 'new'
-        env:
-          # Lets the generator recover PR titles GitHub cut short at "…".
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          npm run -s release-notes -- "$VERSION" | tee draft.log
-          if git diff --quiet lib/releaseNotesEntries.ts; then
-            echo "Nothing to announce for $VERSION"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Open pull request
-        if: steps.draft.outputs.changed || steps.version.outputs.mode == 'resume'
+      - name: Rewrite release notes
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-          BRANCH: ${{ steps.version.outputs.branch }}
-          MODE: ${{ steps.version.outputs.mode }}
-        run: |
-          if [ "$MODE" = "new" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-            git switch -c "$BRANCH"
-            git add lib/releaseNotesEntries.ts
-            git commit -m "chore(release-notes): draft notes for v$VERSION"
-            git push origin "$BRANCH"
-          else
-            echo "The generator's output is in the run that created this branch." > draft.log
-          fi
-          {
-            echo "Draft release notes for **v$VERSION**, generated from the PRs merged since the previous release."
-            echo
-            echo "Before merging, edit \`lib/releaseNotesEntries.ts\` on this branch:"
-            echo "- rewrite each title for users and add descriptions or links where they help"
-            echo "- delete anything users don't need to hear about"
-            echo "- remove \`draft: true\` — until then the entry only shows in development"
-            echo
-            echo "Merge this before staging goes to main so the release ships with its notes. Close it to ship without notes."
-            echo
-            echo "<details><summary>What the generator kept and skipped</summary>"
-            echo
-            echo '```'
-            cat draft.log
-            echo '```'
-            echo
-            echo "</details>"
-          } > body.md
-          gh pr create --base staging --head "$BRANCH" --title "chore(release-notes): v$VERSION" --body-file body.md
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: node "$RUNNER_TEMP/polish-release-notes.mjs"
