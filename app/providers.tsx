@@ -358,9 +358,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Set once the settings effect has decided whether the tour runs, so other
   // first-visit popups can wait for that answer instead of racing it.
   const [tutorialDecided, setTutorialDecided] = useState(false);
-  // What's New and the app download popup are both first-visit popups; the
-  // release's news goes first and the download offer waits for it.
-  const [whatsNewActive, setWhatsNewActive] = useState(false);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
@@ -2733,7 +2730,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                             onLoadDemoGraphs={handleLoadDemoGraphs}
                                             onCleanupDemoGraphs={handleCleanupDemoGraphs}
                                             showUDF={showUDF}
-                                            onWhatsNewActiveChange={setWhatsNewActive}
                                           >
                                             {children}
                                           </ProviderLayout>
@@ -2745,7 +2741,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                         login page, and the graph page is not where everyone lands.
                                         It waits until the session and the tutorial have both been decided,
                                         and until What's New, if there is one, has been read. */}
-                                    <AppDownloadPrompt blocked={tutorialOpen || whatsNewActive || status === "loading" || (status === "authenticated" && !tutorialDecided)} />
+                                    <AppDownloadPrompt blocked={tutorialOpen || status === "loading" || (status === "authenticated" && !tutorialDecided)} />
                                   </AiFixContext.Provider>
                                 </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>

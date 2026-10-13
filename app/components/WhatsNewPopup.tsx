@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import pkg from "@/package.json";
 import { extractWhatsNew, releaseForVersion } from "@/lib/releaseNotes";
+import { setWhatsNewActive } from "@/lib/popupTurn";
 import useReleases from "./useReleases";
 import ReleaseMarkdown from "./ReleaseMarkdown";
 import DialogComponent from "./DialogComponent";
@@ -27,11 +28,7 @@ const readSeen = () => {
  * release. Nothing appears while `paused` (tutorial open, signed out) or when
  * the release has no such section.
  */
-export default function WhatsNewPopup({ paused, onActiveChange }: {
-    paused: boolean;
-    /** True while this popup is still deciding, or has something unread, so other first-visit popups wait their turn. */
-    onActiveChange?: (active: boolean) => void;
-}) {
+export default function WhatsNewPopup({ paused }: { paused: boolean }) {
     const state = useReleases(!paused);
     const [open, setOpen] = useState(false);
     const [closed, setClosed] = useState(false);
@@ -41,9 +38,11 @@ export default function WhatsNewPopup({ paused, onActiveChange }: {
 
     const active = (!paused && state.status === "loading")
         || (!!release && !!whatsNew && !closed && readSeen() !== release.tag);
+    // While deciding, or with something unread, other first-visit popups wait their turn.
     useEffect(() => {
-        onActiveChange?.(active);
-    }, [active, onActiveChange]);
+        setWhatsNewActive(active);
+    }, [active]);
+    useEffect(() => () => setWhatsNewActive(false), []);
 
     useEffect(() => {
         if (paused || !release || !whatsNew || readSeen() === release.tag) return undefined;

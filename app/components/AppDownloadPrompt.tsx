@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Checkbox } from "@/components/ui/checkbox";
 import { dismissAppPrompt, getPromptStorage, markAppPromptShown, shouldShowAppPrompt } from "@/lib/appDownload";
 import useAppDownload from "@/lib/useAppDownload";
+import { useWhatsNewActive } from "@/lib/popupTurn";
 import Button from "./ui/Button";
 
 // Let the page settle first, so the popup lands on a loaded screen rather
@@ -29,8 +30,11 @@ interface Props {
  * Offers the visitor the app for their OS, on whichever page they land:
  * people with a saved session go straight to /graph and never see /login.
  */
-export default function AppDownloadPrompt({ blocked }: Props) {
+export default function AppDownloadPrompt({ blocked: blockedByCaller }: Props) {
     const download = useAppDownload();
+    // The release's news goes first; the download offer waits for it.
+    const whatsNewActive = useWhatsNewActive();
+    const blocked = blockedByCaller || whatsNewActive;
     const [open, setOpen] = useState(false);
     const [dontShowAgain, setDontShowAgain] = useState(false);
     const checkboxId = useId();
