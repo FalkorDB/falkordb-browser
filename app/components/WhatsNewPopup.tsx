@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import pkg from "@/package.json";
 import { extractWhatsNew, releaseForVersion } from "@/lib/releaseNotes";
+import { setWhatsNewActive } from "@/lib/popupTurn";
 import useReleases from "./useReleases";
 import ReleaseMarkdown from "./ReleaseMarkdown";
 import DialogComponent from "./DialogComponent";
@@ -30,9 +31,18 @@ const readSeen = () => {
 export default function WhatsNewPopup({ paused }: { paused: boolean }) {
     const state = useReleases(!paused);
     const [open, setOpen] = useState(false);
+    const [closed, setClosed] = useState(false);
 
     const release = state.status === "ready" ? releaseForVersion(state.releases, pkg.version) : undefined;
     const whatsNew = useMemo(() => (release ? extractWhatsNew(release.body) : null), [release]);
+
+    const active = (!paused && state.status === "loading")
+        || (!!release && !!whatsNew && !closed && readSeen() !== release.tag);
+    // While deciding, or with something unread, other first-visit popups wait their turn.
+    useEffect(() => {
+        setWhatsNewActive(active);
+    }, [active]);
+    useEffect(() => () => setWhatsNewActive(false), []);
 
     useEffect(() => {
         if (paused || !release || !whatsNew || readSeen() === release.tag) return undefined;
@@ -45,6 +55,7 @@ export default function WhatsNewPopup({ paused }: { paused: boolean }) {
     const onOpenChange = (next: boolean) => {
         setOpen(next);
         if (!next) {
+            setClosed(true);
             try {
                 localStorage.setItem(WHATS_NEW_SEEN_KEY, release.tag);
             } catch {

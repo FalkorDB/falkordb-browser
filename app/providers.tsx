@@ -27,6 +27,7 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
+import AppDownloadPrompt from "./components/AppDownloadPrompt";
 import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
@@ -354,6 +355,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const viewportResolved = useViewportResolved();
   const isMobile = useIsMobile();
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  // Set once the settings effect has decided whether the tour runs, so other
+  // first-visit popups can wait for that answer instead of racing it.
+  const [tutorialDecided, setTutorialDecided] = useState(false);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
@@ -2039,6 +2043,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         && localStorage.getItem("tutorial") !== "false"
         && !initialShareRef.current
       );
+      setTutorialDecided(true);
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
       setMaxTabs(loadedMaxTabs);
@@ -2732,6 +2737,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                       }
                                     </GraphTabsContext.Provider>
                                     <AiFixDialogs />
+                                    {/* At the root, not on /graph or /login: a saved session skips the
+                                        login page, and the graph page is not where everyone lands.
+                                        It waits until the session and the tutorial have both been decided,
+                                        and until What's New, if there is one, has been read. */}
+                                    <AppDownloadPrompt blocked={tutorialOpen || status === "loading" || (status === "authenticated" && !tutorialDecided)} />
                                   </AiFixContext.Provider>
                                 </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>

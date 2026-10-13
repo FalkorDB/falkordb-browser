@@ -57,6 +57,7 @@ export const initializeLocalStorage = (host = "localhost", port = 6379, username
         if (!localStorage.getItem("${prefix}query history")) localStorage.setItem("${prefix}query history", "[]");
         if (!localStorage.getItem("refreshInterval")) localStorage.setItem("refreshInterval", "60");
         if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
+        if (!localStorage.getItem("appDownloadPrompt")) localStorage.setItem("appDownloadPrompt", "false");
     `;
 };
 

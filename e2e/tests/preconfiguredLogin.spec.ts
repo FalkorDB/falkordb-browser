@@ -16,6 +16,12 @@ test.describe("@admin Preconfigured connection", () => {
     // project's admin storage state would redirect straight to /graph.
     test.use({ storageState: { cookies: [], origins: [] } });
 
+    // The "Get the app" popup opens over the login form a moment after load;
+    // keep it out of the way, as every other suite does (initializeLocalStorage).
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript(() => localStorage.setItem("appDownloadPrompt", "false"));
+    });
+
     test("signs in automatically and reports a connection it cannot reach", async ({ page }) => {
         await page.route(DISCOVERY_ROUTE, (route) =>
             route.fulfill({

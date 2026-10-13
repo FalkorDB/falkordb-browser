@@ -1,0 +1,189 @@
+name: Mobile app
+
+# Lints the AWS template and builds a debug Android APK of the Capacitor shell
+# when mobile/ changes or on demand. When a GitHub release is published, it
+# instead builds a signed release APK that opens the production browser
+# (vars.FALKORDB_BROWSER_URL) and attaches it to that release as
+# FalkorDB-Browser-android.apk. It deploys nothing, and leaves the release
+# notes, the Docker image and the Helm chart workflows alone.
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: ["main", "staging"]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  aws-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint CloudFormation template
+        run: pipx run cfn-lint mobile/aws/browser-service.yml
+
+  android:
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Set the repository variable to the deployed browser's URL; the
+      # placeholder still proves the shell builds.
+      FALKORDB_BROWSER_URL: ${{ vars.FALKORDB_BROWSER_URL || 'https://browser.example.com' }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --progress=false
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+      - name: Add or sync the Android project
+        run: |
+          if [ -d android ]; then npx cap sync android; else npx cap add android; fi
+
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: falkordb-browser-android-debug
+          path: mobile/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  android-release:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      FALKORDB_BROWSER_URL: ${{ vars.FALKORDB_BROWSER_URL }}
+      # All four, so a half-configured key skips with the warning below
+      # instead of failing halfway through signing.
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+      TAG: ${{ github.event.release.tag_name }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Until signing is set up, a release goes out without the APK rather
+      # than failing. See mobile/README.md, "Release builds".
+      - name: Check release configuration
+        id: config
+        run: |
+          if [ "$HAS_KEYSTORE" != "true" ] || [ -z "$FALKORDB_BROWSER_URL" ]; then
+            echo "::warning::No Android APK for this release: set the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets and the FALKORDB_BROWSER_URL variable."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # No dependency cache here: any workflow run can write to it, and this
+      # job holds the signing key.
+      - name: Setup Node
+        if: steps.config.outputs.ready == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Setup Java
+        if: steps.config.outputs.ready == 'true'
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install dependencies
+        if: steps.config.outputs.ready == 'true'
+        run: npm ci --no-audit --progress=false
+
+      # capacitor.config.ts refuses anything but https here.
+      - name: Add or sync the Android project
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          if [ -d android ]; then npx cap sync android; else npx cap add android; fi
+
+      # v2.6.1 -> versionName 2.6.1, versionCode 20601 (see the script).
+      - name: Use the release version
+        if: steps.config.outputs.ready == 'true'
+        run: sh scripts/android-version.sh "$TAG" android/app/build.gradle
+
+      - name: Build and sign the release APK
+        if: steps.config.outputs.ready == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          keystore="$RUNNER_TEMP/release.jks"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          # apksigner (v2/v3 signatures, which current Android requires) ships
+          # in the SDK build-tools, which are not on PATH by default.
+          PATH="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1):$PATH"
+          npx cap build android \
+            --androidreleasetype APK --signing-type apksigner \
+            --keystorepath "$keystore" --keystorepass "$ANDROID_KEYSTORE_PASSWORD" \
+            --keystorealias "$ANDROID_KEY_ALIAS" --keystorealiaspass "$ANDROID_KEY_PASSWORD"
+          rm -f "$keystore"
+          cp android/app/build/outputs/apk/release/app-release-signed.apk "$RUNNER_TEMP/FalkorDB-Browser-android.apk"
+
+      - name: Attach the APK to the release
+        if: steps.config.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$RUNNER_TEMP/FalkorDB-Browser-android.apk" --repo "$GITHUB_REPOSITORY" --clobber
