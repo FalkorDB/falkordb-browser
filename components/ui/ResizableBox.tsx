@@ -62,7 +62,11 @@ export default function ResizableBox({
         e.stopPropagation();
         dragging.current = dir;
         startPos.current = { x: e.clientX, y: e.clientY };
-        startSize.current = { width, height };
+        // Start from the rendered size: a CSS max-width/max-height can hold the box below the stored size.
+        startSize.current = {
+            width: boxRef.current?.offsetWidth ?? width,
+            height: boxRef.current?.offsetHeight ?? height,
+        };
     }, [width, height]);
 
     useEffect(() => {
