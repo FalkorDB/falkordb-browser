@@ -91,7 +91,6 @@ test("a release tag becomes the app's version name and a growing version code", 
         ["v2.6.1", "2.6.1", 20601],
         ["v2.10.3", "2.10.3", 21003],
         ["v3.0.0", "3.0.0", 30000],
-        ["v3.0.0-rc1", "3.0.0-rc1", 30000],
     ];
     for (const [tag, name, code] of cases) {
         const gradle = stampVersion(tag);
@@ -104,7 +103,9 @@ test("a release tag becomes the app's version name and a growing version code", 
 });
 
 test("a tag that is not a release version is refused instead of guessed", () => {
-    for (const tag of ["latest", "v2.6", "v2.6.1.4", "v2.100.0", "v2..1", "v2.6.08", "v02.6.1", 'v2.6.1-rc"1', "v2.6.1-rc|1", "v2.6.1-"]) {
+    for (const tag of ["latest", "v2.6", "v2.6.1.4", "v2.100.0", "v2..1", "v2.6.08", "v02.6.1", 'v2.6.1-rc"1', "v2.6.1-rc|1", "v2.6.1-", "v0.0.0",
+        // A pre-release would share one code with its final release, which then would not count as an update.
+        "v3.0.0-rc1", "v3.0.0-beta.2"]) {
         assert.throws(() => stampVersion(tag), Error, tag);
     }
 });

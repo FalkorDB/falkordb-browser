@@ -11,11 +11,14 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
+# The address of the interface the default route goes out of, so a Docker
+# bridge or VPN address is never baked into the APK. Anything else is left to
+# FALKORDB_BROWSER_URL.
 lan_ip() {
   if command -v ipconfig >/dev/null 2>&1 && ipconfig getifaddr en0 >/dev/null 2>&1; then
     ipconfig getifaddr en0
-  else
-    hostname -I | awk '{print $1}'
+  elif command -v ip >/dev/null 2>&1; then
+    ip -4 route get 1.1.1.1 | awk '{ for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit } }'
   fi
 }
 

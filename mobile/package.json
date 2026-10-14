@@ -4,6 +4,7 @@
   "description": "FalkorDB Browser iOS and Android app",
   "version": "2.6.2",
   "private": true,
+  "type": "module",
   "scripts": {
     "add:android": "cap add android",
     "add:ios": "cap add ios",
