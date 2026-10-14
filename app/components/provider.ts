@@ -3,7 +3,7 @@ import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { AIProvider } from "@/lib/ai-provider-utils";
 import { CanvasLayout, ConnectionInfo, ConnectionType, CustomizingRef, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
-import type { LayoutMode, ViewportState } from "@falkordb/canvas";
+import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
@@ -192,6 +192,12 @@ type GraphContextType = {
    * the initial query.
    */
   pendingAutoLoadRef: RefObject<string | null>;
+  /**
+   * Bumped when the graph is reset without its name changing (a share link's
+   * tab opening on the graph already shown), so /graph refetches its info and
+   * counts — that fetch is otherwise keyed on `graphName` alone.
+   */
+  graphInfoReload: number;
 };
 
 type HistoryQueryContextType = {
@@ -276,6 +282,9 @@ type ForceGraphContextType = {
   setLayout: Dispatch<SetStateAction<LayoutMode>>;
   direction: string;
   setDirection: Dispatch<SetStateAction<string>>;
+  /** The canvas shows the graph flat or in 3D. */
+  dimension: CanvasDimension;
+  setDimension: Dispatch<SetStateAction<CanvasDimension>>;
   /** Simulation running. Only meaningful for the force layout with nodes unpinned. */
   animation: boolean;
   setAnimation: Dispatch<SetStateAction<boolean>>;
@@ -531,6 +540,7 @@ export const GraphContext = createContext<GraphContextType>({
   selectedParam: "",
   setSelectedParam: () => { },
   pendingAutoLoadRef: { current: null },
+  graphInfoReload: 0,
 });
 
 type GraphInfoContextType = {
@@ -612,6 +622,8 @@ export const ForceGraphContext = createContext<ForceGraphContextType>({
   setLayout: () => { },
   direction: '',
   setDirection: () => { },
+  dimension: '2d',
+  setDimension: () => { },
   animation: false,
   setAnimation: () => { },
   pinned: false,

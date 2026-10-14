@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
-import { readPreconfiguredConnection, toPreconfiguredConnectionInfo } from "@/lib/preconfiguredConnection";
+import {
+  readPreconfiguredConnection,
+  toPreconfiguredConnectionInfo,
+  warnIfAutoConnectExposesCredentials,
+} from "@/lib/preconfiguredConnection";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -14,7 +18,8 @@ export async function OPTIONS(request: Request) {
  *
  * Deliberately unauthenticated — it is consulted before anyone can log in — so
  * it returns only what the existing `?host=&port=&username=` login links
- * already expose. The password and CA certificate stay on the server.
+ * already expose, and with auto-connect on not even that, since no form is
+ * shown to prefill. The password and CA certificate stay on the server.
  */
 export async function GET(request: Request) {
   if (!isRequestOriginTrusted(request)) {
@@ -26,7 +31,11 @@ export async function GET(request: Request) {
   const headers = { ...getCorsHeaders(request), "Cache-Control": "no-store" };
 
   try {
-    const info = toPreconfiguredConnectionInfo(readPreconfiguredConnection(process.env));
+    const connection = readPreconfiguredConnection(process.env);
+    // Every visit to the login page lands here first, so this is the earliest
+    // request that can tell the operator what auto-connect gives away.
+    warnIfAutoConnectExposesCredentials(connection);
+    const info = toPreconfiguredConnectionInfo(connection);
     return NextResponse.json(info, { status: 200, headers });
   } catch (err) {
     // eslint-disable-next-line no-console

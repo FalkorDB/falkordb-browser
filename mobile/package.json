@@ -1,0 +1,33 @@
+{
+  "name": "falkordb-browser-mobile",
+  "author": "FalkorDB",
+  "description": "FalkorDB Browser iOS and Android app",
+  "version": "2.6.2",
+  "private": true,
+  "scripts": {
+    "add:android": "cap add android",
+    "add:ios": "cap add ios",
+    "sync": "cap sync",
+    "open:android": "cap open android",
+    "open:ios": "cap open ios",
+    "dev:android": "sh scripts/dev-android.sh",
+    "deploy:aws": "sh aws/deploy.sh",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^24.9.0",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1"
+  }
+}

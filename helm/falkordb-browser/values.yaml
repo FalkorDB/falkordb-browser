@@ -32,6 +32,17 @@ encryption:
     name: ""
     key: "ENCRYPTION_KEY"
 
+nextauth:
+  # Read NEXTAUTH_SECRET (session signing) from an existing Secret in the release
+  # namespace instead of env.nextauthSecret or a chart-generated value. When set,
+  # the chart Secret carries no NEXTAUTH_SECRET at all. Use this when rendering
+  # without cluster access (helm template, Argo CD): there the chart cannot reuse
+  # a generated secret and would produce a new one on every render.
+  # Mutually exclusive with env.nextauthSecret.
+  existingSecret:
+    name: ""
+    key: "NEXTAUTH_SECRET"
+
 # A single FalkorDB connection supplied by the operator, so the browser starts
 # already connected instead of asking every user to fill in the login form.
 # This is the GitOps path: the connection lives in Git (and its password in a
@@ -211,6 +222,8 @@ env:
   # reuse it on every upgrade. Set it explicitly only if you need to share the
   # secret across releases; generate one with: openssl rand -base64 32
   # Known placeholders (e.g. CHANGE_ME_IN_PRODUCTION) are rejected.
+  # With helm template / Argo CD, set this or nextauth.existingSecret: without
+  # cluster access the generated secret changes on every render.
   nextauthSecret: ""
   # Google Analytics ID (optional)
   googleAnalytics: ""

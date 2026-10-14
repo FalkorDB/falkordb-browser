@@ -272,6 +272,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("dimContainer");
   }
 
+  public dimensionControl(dimension: "2d" | "3d"): Locator {
+    return this.page.getByTestId(`dimensionControl-${dimension}`);
+  }
+
   public get graphCanvasWrapper(): Locator {
     return this.page.getByTestId("graphCanvasWrapper");
   }
@@ -1107,6 +1111,65 @@ export default class GraphPage extends BasePage {
     );
   }
 
+  async clickDimensionControl(dimension: "2d" | "3d"): Promise<void> {
+    await interactWhenVisible(
+      this.dimensionControl(dimension),
+      (el) => el.click(),
+      `Dimension Control ${dimension}`
+    );
+  }
+
+  async isDimensionSelected(dimension: "2d" | "3d"): Promise<boolean> {
+    await waitForElementToBeVisible(this.dimensionControl(dimension));
+    return (await this.dimensionControl(dimension).getAttribute("aria-checked")) === "true";
+  }
+
+  /**
+   * The dimension the canvas is actually drawing in. The 3D renderer loads on
+   * first use, so this lags the control until the switch has finished.
+   */
+  async getCanvasDimension(): Promise<"2d" | "3d" | null> {
+    return this.page.evaluate(() => {
+      const canvas = document.querySelector("falkordb-canvas") as (HTMLElement & { getDimension(): "2d" | "3d"; getGraph(): unknown }) | null;
+      if (!canvas) return null;
+      // getDimension reports a switch as soon as it is asked for; the renderer
+      // in place is what shows it has happened.
+      const drawn = canvas.getGraph() === undefined ? "3d" : "2d";
+      return canvas.getDimension() === drawn ? drawn : null;
+    });
+  }
+
+  /**
+   * Click the `index`th node while the canvas is in 3D, at its projected
+   * screen position. Returns the node's id.
+   */
+  async clickNodeIn3D(index = 0): Promise<number> {
+    const target = await this.page.evaluate((i) => {
+      const canvas = document.querySelector("falkordb-canvas")!;
+      const node = canvas.getGraphData().nodes[i] as ReturnType<typeof canvas.getGraphData>["nodes"][number] & { z: number };
+      // The 3D renderer is internal to the canvas; only its screen projection is needed here.
+      const { graph3d } = canvas as unknown as {
+        graph3d: { graph: { graph2ScreenCoords(x: number, y: number, z: number): { x: number; y: number } } };
+      };
+      const screen = graph3d.graph.graph2ScreenCoords(node.x!, node.y!, node.z);
+      const rect = canvas.getBoundingClientRect();
+      return { id: node.id, x: rect.left + screen.x, y: rect.top + screen.y };
+    }, index);
+    // Hover first: the library resolves what is under the pointer on move.
+    await this.page.mouse.move(target.x, target.y);
+    await this.page.mouse.click(target.x, target.y);
+    return target.id;
+  }
+
+  /** The id the data panel shows for the selected node, or null while none is shown. */
+  async getDataPanelNodeId(): Promise<number | null> {
+    const id = this.page.getByTestId("DataPanel").locator("p", { hasText: /^ID:/ }).first();
+    // Counted first: reading the text would wait out the timeout for a panel that isn't open.
+    if (await id.count() === 0) return null;
+    const match = (await id.textContent())?.match(/ID:\s*(\d+)/);
+    return match ? Number(match[1]) : null;
+  }
+
   async isDimControlChecked(): Promise<boolean> {
     await waitForElementToBeVisible(this.dimControl);
     const state = await this.dimControl.getAttribute("data-state");
@@ -1421,8 +1484,17 @@ export default class GraphPage extends BasePage {
   async searchElementInCanvas(
     name: string
   ): Promise<void> {
-    await this.fillElementCanvasSearch(name);
+    return this.searchTextAndSelectInCanvas(name, name);
+  }
+
+  /** Searches the canvas for `text` and picks the suggestion for `name`. */
+  async searchTextAndSelectInCanvas(text: string, name: string): Promise<void> {
+    await this.fillElementCanvasSearch(text);
     await this.clickElementCanvasSuggestionByName(name);
+  }
+
+  async isElementCanvasSuggestionVisible(name: string): Promise<boolean> {
+    return waitForElementToBeVisible(this.elementCanvasSuggestionByName(name));
   }
 
   async isSearchElementInCanvasVisible(name: string): Promise<boolean> {
@@ -1934,6 +2006,19 @@ export default class GraphPage extends BasePage {
     };
   }
 
+  /**
+   * Waits for `#dialog`'s open animation (it slides and zooms in) to finish:
+   * `boundingBox()` does not wait for animations, so a box taken mid-slide can
+   * still poke past the viewport.
+   */
+  private async waitForDialogSettled(): Promise<void> {
+    await this.page.locator("#dialog").waitFor({ state: "visible" });
+    await this.page.waitForFunction(() => {
+      const dialog = document.querySelector("#dialog");
+      return !!dialog && dialog.getAnimations({ subtree: true }).every(animation => animation.playState === "finished");
+    });
+  }
+
   /** Geometry of the Delete Graph dialog, the two buttons in its footer, and the viewport holding them. */
   async deleteDialogLayout(): Promise<{
     dialog: Box;
@@ -1942,6 +2027,7 @@ export default class GraphPage extends BasePage {
   }> {
     const viewport = this.page.viewportSize();
     if (!viewport) throw new Error("Headless page has no viewport");
+    await this.waitForDialogSettled();
     return {
       dialog: await GraphPage.boxOf(this.page.locator("#dialog"), "Delete Graph dialog"),
       buttons: [
@@ -1949,6 +2035,58 @@ export default class GraphPage extends BasePage {
         await GraphPage.boxOf(this.deleteCancel, "Delete Graph cancel"),
       ],
       viewport,
+    };
+  }
+
+  /**
+   * Geometry of the Create New Graph dialog, its name input and footer buttons,
+   * everything else laid out inside it, and the viewport.
+   */
+  async createGraphDialogLayout(): Promise<{
+    dialog: Box;
+    controls: { input: Box; confirm: Box; cancel: Box };
+    children: Box[];
+    viewport: { width: number; height: number };
+  }> {
+    const viewport = this.page.viewportSize();
+    if (!viewport) throw new Error("Headless page has no viewport");
+    await this.waitForDialogSettled();
+    const dialog = this.page.locator("#dialog");
+    const children: Box[] = [];
+    const boxes = await dialog.locator("button, input, p").all();
+    for (const box of boxes) {
+      if (!(await box.isVisible())) continue;
+      const rect = await box.boundingBox();
+      if (rect) children.push(rect);
+    }
+    return {
+      dialog: await GraphPage.boxOf(dialog, "Create New Graph dialog"),
+      // boxOf throws when one is missing, so a regression that drops a control fails here.
+      controls: {
+        input: await GraphPage.boxOf(this.insertInput, "Create Graph name input"),
+        confirm: await GraphPage.boxOf(this.createConfirm, "Create Graph confirm"),
+        cancel: await GraphPage.boxOf(this.createCancel, "Create Graph cancel"),
+      },
+      children,
+      viewport,
+    };
+  }
+
+  /**
+   * The canvas toolbar's action buttons in render order, plus the row that holds
+   * them, so a test can check both the order and where the group sits.
+   */
+  async canvasToolbarActionLayout(): Promise<{ row: Box; search: Box; actions: { id: string; box: Box }[] }> {
+    const group = this.page.getByTestId("elementCanvasToolbarActionGraph");
+    const actions: { id: string; box: Box }[] = [];
+    for (const button of await group.getByRole("button").all()) {
+      const rect = await button.boundingBox();
+      if (rect) actions.push({ id: (await button.getAttribute("data-testid")) ?? "", box: rect });
+    }
+    return {
+      row: await GraphPage.boxOf(group.locator("xpath=.."), "Canvas toolbar row"),
+      search: await GraphPage.boxOf(this.page.getByTestId("elementCanvasSearchGraph"), "Canvas search box"),
+      actions,
     };
   }
 

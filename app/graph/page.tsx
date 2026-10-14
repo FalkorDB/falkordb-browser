@@ -101,6 +101,7 @@ export default function Page() {
         setSelectedParam,
         isLoading,
         pendingAutoLoadRef,
+        graphInfoReload,
         currentTab,
         chatOpen,
         setChatOpen,
@@ -385,7 +386,8 @@ export default function Page() {
         // The auto-load effect below runs the query for a freshly selected
         // graph, and that query fetches info/stats (including memory) itself —
         // skip here so the initial fetch isn't duplicated. Every other reason
-        // this effect re-runs (a restored tab, showMemoryUsage flipping on,
+        // this effect re-runs (a restored tab, a share link's tab resetting the
+        // graph already shown, showMemoryUsage flipping on,
         // refreshInterval changing) needs the fetch right away rather than at
         // the next tick of the interval.
         const willAutoLoadQuery = runDefaultQuery && pendingAutoLoadRef.current === graphName;
@@ -401,7 +403,7 @@ export default function Page() {
             clearInterval(interval);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
+    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, graphInfoReload, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
         if (graphName) return;
@@ -876,75 +878,83 @@ export default function Page() {
     return (
         <div className="h-full w-full flex flex-col min-h-0">
             <GraphSubHeader />
-            <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
-                <ResizablePanel
-                    panelRef={infoPanelRef}
-                    defaultSize="0%"
-                    collapsible
-                    minSize="15%"
-                    maxSize="30%"
-                    onResize={onInfoPanelResize}
-                >
-                    {graphInfoNode}
-                </ResizablePanel>
-                <ResizableHandle
-                    withHandle
-                    onMouseUp={() => !panelOpen && onTogglePanel()}
-                    className={cn("bg-border", !panelOpen && "hidden")}
-                    disabled={!panelOpen}
-                />
-                <ResizablePanel
-                    defaultSize="100%"
-                    minSize="70%"
-                    maxSize="100%"
-                >
-                    <div className="h-full w-full flex flex-col">
-                        <div className="Page p-3 gap-3">
-                            {selectorNode}
-                            <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
-                                <ResizablePanel
-                                    defaultSize="100%"
-                                    collapsible
-                                    minSize="30%"
-                                >
-                                    {graphViewNode}
-                                </ResizablePanel>
-                                <ResizableHandle
-                                    withHandle
-                                    onMouseUp={() => isCollapsed && handleSetSelectedElements()}
-                                    className={cn("bg-transparent", isCollapsed && "hidden")}
-                                    disabled={isCollapsed}
-                                />
-                                <ResizablePanel
-                                    panelRef={panelRef}
-                                    collapsible
-                                    defaultSize="0%"
-                                    minSize={panelMinSize}
-                                    onResize={onPanelResize}
-                                >
-                                    {getCurrentPanel()}
-                                </ResizablePanel>
-                                {
-                                    chatOpen && graphName &&
-                                    <div className="absolute bottom-2 right-3 z-30">
-                                        <ResizableBox
-                                            width={chatSize.width}
-                                            height={chatSize.height}
-                                            minWidth={300}
-                                            minHeight={300}
-                                            onResizeEnd={(w, h) => onChatResize(w, h)}
-                                            direction="top-left"
-                                        >
-                                            <Chat onClose={() => setChatOpen(false)} />
-                                        </ResizableBox>
-                                    </div>
-                                }
-                            </ResizablePanelGroup>
+            <div className="relative h-1 grow flex">
+                <ResizablePanelGroup orientation="horizontal" className="h-full grow">
+                    <ResizablePanel
+                        panelRef={infoPanelRef}
+                        defaultSize="0%"
+                        collapsible
+                        minSize="15%"
+                        maxSize="30%"
+                        onResize={onInfoPanelResize}
+                    >
+                        {graphInfoNode}
+                    </ResizablePanel>
+                    <ResizableHandle
+                        withHandle
+                        onMouseUp={() => !panelOpen && onTogglePanel()}
+                        className={cn("bg-border", !panelOpen && "hidden")}
+                        disabled={!panelOpen}
+                    />
+                    <ResizablePanel
+                        defaultSize="100%"
+                        minSize="70%"
+                        maxSize="100%"
+                    >
+                        <div className="h-full w-full flex flex-col">
+                            <div className="Page p-3 gap-3">
+                                {selectorNode}
+                                <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
+                                    <ResizablePanel
+                                        defaultSize="100%"
+                                        collapsible
+                                        minSize="30%"
+                                    >
+                                        {graphViewNode}
+                                    </ResizablePanel>
+                                    <ResizableHandle
+                                        withHandle
+                                        onMouseUp={() => isCollapsed && handleSetSelectedElements()}
+                                        className={cn("bg-transparent", isCollapsed && "hidden")}
+                                        disabled={isCollapsed}
+                                    />
+                                    <ResizablePanel
+                                        panelRef={panelRef}
+                                        collapsible
+                                        defaultSize="0%"
+                                        minSize={panelMinSize}
+                                        onResize={onPanelResize}
+                                    >
+                                        {getCurrentPanel()}
+                                    </ResizablePanel>
+                                </ResizablePanelGroup>
+                            </div>
+                            <div className="h-4 w-full Gradient" />
                         </div>
-                        <div className="h-4 w-full Gradient" />
+                    </ResizablePanel>
+                </ResizablePanelGroup>
+                {
+                    // Outside the panel groups: every panel clips its overflow, so a chat dragged wider
+                    // than the canvas column would be cut off under the Graph Info panel. The overlay
+                    // spans the graph region, below the sub-header, and caps the chat to it. Its bottom
+                    // and right padding keep the chat where it sat in the canvas: the Page padding plus
+                    // the bottom gradient strip.
+                    chatOpen && graphName &&
+                    <div className="pointer-events-none absolute inset-0 z-30 flex items-end justify-end pt-3 pl-3 pb-9 pr-6">
+                        <ResizableBox
+                            className="pointer-events-auto max-h-full max-w-full"
+                            width={chatSize.width}
+                            height={chatSize.height}
+                            minWidth={300}
+                            minHeight={300}
+                            onResizeEnd={(w, h) => onChatResize(w, h)}
+                            direction="top-left"
+                        >
+                            <Chat onClose={() => setChatOpen(false)} />
+                        </ResizableBox>
                     </div>
-                </ResizablePanel>
-            </ResizablePanelGroup>
+                }
+            </div>
         </div>
     );
 }

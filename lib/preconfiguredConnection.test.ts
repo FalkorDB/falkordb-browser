@@ -5,6 +5,7 @@ import {
     preconfiguredLoginCredentials,
     readPreconfiguredConnection,
     toPreconfiguredConnectionInfo,
+    warnIfAutoConnectExposesCredentials,
     DEFAULT_PRECONFIGURED_PORT,
 } from "./preconfiguredConnection.ts";
 
@@ -151,13 +152,14 @@ test("the public info shape never carries the password or ca", () => {
     const conn = readPreconfiguredConnection({
         FALKORDB_CONNECTION_URL: "falkors://alice:s3cr3t@db.internal:6380",
         FALKORDB_CA: "LS0tLS1CRUdJTg==",
+        FALKORDB_AUTO_CONNECT: "false",
     });
 
     const info = toPreconfiguredConnectionInfo(conn);
 
     assert.deepEqual(info, {
         configured: true,
-        autoConnect: true,
+        autoConnect: false,
         host: "db.internal",
         port: 6380,
         username: "alice",
@@ -165,6 +167,16 @@ test("the public info shape never carries the password or ca", () => {
     });
     assert.equal(JSON.stringify(info).includes("s3cr3t"), false);
     assert.equal(JSON.stringify(info).includes("LS0tLS1CRUdJTg=="), false);
+});
+
+test("with auto-connect on, the public info shape withholds the endpoint too", () => {
+    const conn = readPreconfiguredConnection({
+        FALKORDB_CONNECTION_URL: "falkors://alice:s3cr3t@db.internal:6380",
+        FALKORDB_CA: "LS0tLS1CRUdJTg==",
+    });
+
+    // No form is shown to prefill, so nothing beyond "sign in automatically".
+    assert.deepEqual(toPreconfiguredConnectionInfo(conn), { configured: true, autoConnect: true });
 });
 
 test("the public info shape reports nothing when unconfigured", () => {
@@ -291,4 +303,44 @@ test("invalid environment propagates out of the login credentials lookup", () =>
         () => preconfiguredLoginCredentials({ FALKORDB_HOST: "db", FALKORDB_PORT: "0" }),
         /FALKORDB_PORT/
     );
+});
+
+test("auto-connect with a password warns once per process, and only then", () => {
+    const warnings: string[] = [];
+    const warn = (message: string) => warnings.push(message);
+    const flag = Symbol.for("falkordb-browser.preconfigured.autoConnectWarned");
+    const flags = globalThis as unknown as Record<symbol, boolean | undefined>;
+    delete flags[flag];
+
+    try {
+        // Nothing to warn about: no connection, no password, or a prompt.
+        assert.equal(warnIfAutoConnectExposesCredentials(null, warn), false);
+        assert.equal(
+            warnIfAutoConnectExposesCredentials(readPreconfiguredConnection({ FALKORDB_HOST: "db.internal" }), warn),
+            false
+        );
+        assert.equal(
+            warnIfAutoConnectExposesCredentials(
+                readPreconfiguredConnection({
+                    FALKORDB_CONNECTION_URL: "falkor://alice:s3cr3t@db.internal",
+                    FALKORDB_AUTO_CONNECT: "false",
+                }),
+                warn
+            ),
+            false
+        );
+        assert.equal(warnings.length, 0);
+
+        const conn = readPreconfiguredConnection({ FALKORDB_CONNECTION_URL: "falkor://alice:s3cr3t@db.internal" });
+        assert.equal(warnIfAutoConnectExposesCredentials(conn, warn), true);
+        assert.equal(warnIfAutoConnectExposesCredentials(conn, warn), false);
+
+        assert.equal(warnings.length, 1);
+        assert.match(warnings[0], /FALKORDB_AUTO_CONNECT/);
+        assert.match(warnings[0], /db\.internal:6379/);
+        // The warning is a log line, so the password must not be in it.
+        assert.equal(warnings[0].includes("s3cr3t"), false);
+    } finally {
+        delete flags[flag];
+    }
 });

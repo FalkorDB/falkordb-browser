@@ -54,10 +54,50 @@ if you need the same secret across releases — and then to a real random value
 
 Reuse depends on `lookup`, which reads the existing release Secret from the
 cluster. Rendering without cluster access — `helm template`, and the GitOps
-reconcilers that build on it — gets an empty `lookup` and therefore a fresh
-secret on every render, so re-applying the manifest signs every session out.
-Those deployments must set `env.nextauthSecret` to a value they keep, from
-whatever secret store they already use.
+reconcilers that build on it such as Argo CD — gets an empty `lookup` and
+therefore a fresh secret on every render: the chart Secret differs on every
+sync, the `checksum/secret` annotation changes, pods roll, and every session is
+signed out. Those deployments must keep the secret stable themselves, either by
+setting `env.nextauthSecret` to a value they keep, or — preferably, so the value
+stays out of the values file — by pointing `nextauth.existingSecret` at a Secret
+they manage (sealed-secrets, External Secrets, etc.). Write the value to a
+file only you can read and load it with `--from-file`, so it never shows up in
+the argument list `ps` shows every user on the box:
+
+```bash
+(umask 077 && openssl rand -base64 32 | tr -d '\n' > nextauth-secret)
+
+kubectl create secret generic falkordb-browser-auth \
+  --from-file=NEXTAUTH_SECRET=nextauth-secret
+rm nextauth-secret
+
+helm install falkordb-browser ./falkordb-browser \
+  --set nextauth.existingSecret.name=falkordb-browser-auth \
+  --set nextauth.existingSecret.key=NEXTAUTH_SECRET
+```
+
+With `nextauth.existingSecret.name` set the chart neither generates nor renders
+a `NEXTAUTH_SECRET`; the pod reads it straight from that Secret. It is mutually
+exclusive with `env.nextauthSecret` and must not name the chart's own Secret.
+
+- The chart can only check the referenced value when `lookup` can read the
+  Secret, i.e. on `helm install`/`upgrade` against the cluster. Under
+  `helm template`/Argo CD (or when the Secret is created after the render) an
+  empty or placeholder value is not caught at render time. The container
+  entrypoint is the runtime backstop: it refuses to start on the well-known
+  placeholders, so one shows up as a crash-looping pod rather than forgeable
+  sessions. It does not catch other weak values, and an empty value makes each
+  container generate its own random secret (sessions break across restarts and
+  replicas) — store a random value.
+- Changing that Secret does **not** restart the pod: `NEXTAUTH_SECRET` is
+  injected as an environment variable when the container starts, and the
+  `checksum/secret` annotation only hashes the chart's own Secret. Roll it
+  yourself with `kubectl rollout restart deployment/<release>-falkordb-browser`
+  (which signs every session out once).
+
+The same `lookup` caveat applies to a generated `ENCRYPTION_KEY`, so for a fully
+stable `helm template` render also set `encryption.key` or
+`encryption.existingSecret` (see [Encryption key management](#encryption-key-management)).
 
 ### Install from a values file
 
@@ -80,6 +120,8 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `encryption.key` | 64-character hex key for server-side encryption. Generated and reused from the release Secret when empty. | `""` |
 | `encryption.existingSecret.name` | Existing Secret name for `ENCRYPTION_KEY`. Mutually exclusive with `encryption.key`. | `""` |
 | `encryption.existingSecret.key` | Key in `encryption.existingSecret.name` that contains the encryption key. | `ENCRYPTION_KEY` |
+| `nextauth.existingSecret.name` | Existing Secret name for `NEXTAUTH_SECRET`. When set the chart does not generate or render the secret. Mutually exclusive with `env.nextauthSecret`. Placeholder values are rejected at render time only when `lookup` can read the Secret (not under `helm template`/Argo CD); the container entrypoint still refuses well-known placeholders at startup. Rotating it requires `kubectl rollout restart`. | `""` |
+| `nextauth.existingSecret.key` | Key in `nextauth.existingSecret.name` that contains the session-signing secret. | `NEXTAUTH_SECRET` |
 | `service.type` | Kubernetes service type | `ClusterIP` |
 | `service.port` | Service port for browser | `3000` |
 | `service.restPort` | Service port for REST API | `8080` |
@@ -95,7 +137,7 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `autoscaling.maxReplicas` | Maximum number of replicas | `100` |
 | `env.chatUrl` | URL for chat/text-to-cypher service | `http://localhost:8080/` |
 | `env.nextauthUrl` | Base URL for the browser | `http://localhost:3000/` |
-| `env.nextauthSecret` | Secret for NextAuth.js. Empty generates a random one on first install and reuses it on upgrade. | `""` |
+| `env.nextauthSecret` | Secret for NextAuth.js. Empty generates a random one on first install and reuses it on upgrade (not under `helm template`/Argo CD — see above). Known placeholders are rejected. Mutually exclusive with `nextauth.existingSecret.name`. | `""` |
 | `env.googleAnalytics` | Google Analytics ID | `""` |
 | `env.cypher` | Enable text-to-cypher feature | `"1"` |
 | `persistence.enabled` | Enable persistence for API tokens | `false` |
@@ -186,8 +228,11 @@ helm install falkordb-browser ./falkordb-browser \
 To reference an existing Secret in the release namespace instead:
 
 ```bash
+(umask 077 && openssl rand -hex 32 | tr -d '\n' > encryption-key)
+
 kubectl create secret generic falkordb-browser-encryption \
-  --from-literal=ENCRYPTION_KEY="$(openssl rand -hex 32)"
+  --from-file=ENCRYPTION_KEY=encryption-key
+rm encryption-key
 
 helm install falkordb-browser ./falkordb-browser \
   --set encryption.existingSecret.name=falkordb-browser-encryption \
@@ -241,7 +286,7 @@ Notes:
 - `connection.url` carries a host, a port and credentials and nothing else. A database selector other than `/0`, or any query string, is rejected at startup rather than dropped — the browser only ever talks to database 0.
 - `connection.existingSecret.name` has to name a Secret this chart does not manage. Pointing it at `<release>-falkordb-browser` makes the chart skip the key it would have written while still referencing it, leaving the pod stuck on a key that exists nowhere; the render fails instead.
 - Set `connection.autoConnect: false` to prefill the login form without signing in automatically. The password is then never handed out by the server, so leave `connection.password` unset and omit the password from `connection.url` — otherwise the form is prefilled but the credential still only lives on the server.
-- Changing a Secret referenced through `connection.existingSecret` (or `encryption.existingSecret`) does **not** restart the pod: those values are resolved when the container starts and the deployment's checksum annotations only cover chart-managed objects. Roll it yourself with `kubectl rollout restart deployment/<release>-falkordb-browser`.
+- Changing a Secret referenced through `connection.existingSecret` (or `encryption.existingSecret` / `nextauth.existingSecret`) does **not** restart the pod: those values are resolved when the container starts and the deployment's checksum annotations only cover chart-managed objects. Roll it yourself with `kubectl rollout restart deployment/<release>-falkordb-browser`.
 - **Security:** with `autoConnect` enabled, anyone who can reach the browser reaches the database with these credentials. Enable it only where the browser itself is access-controlled, and prefer a read-only FalkorDB user.
 
 ### Installation with resource limits
@@ -389,6 +434,27 @@ After deployment, verify sticky sessions are working:
 ```bash
 helm upgrade falkordb-browser ./falkordb-browser
 ```
+
+### Breaking: placeholder `NEXTAUTH_SECRET` values now fail the upgrade
+
+The chart rejects well-known placeholder session secrets (`CHANGE_ME_IN_PRODUCTION`,
+`SECRET`, `changeme`, …), since anyone who knows one can forge a session
+cookie. With `nextauth.existingSecret` this render-time check only runs when
+`lookup` can read the referenced Secret — under `helm template`/Argo CD a
+placeholder there is caught instead by the container entrypoint, which refuses
+to start (the pod crash-loops). This includes a release whose Secret was first installed with such a
+value: `helm upgrade` now **fails** rather than carrying the placeholder
+forward. To upgrade, rotate the secret in one of these ways (each signs
+existing sessions out once):
+
+- set `env.nextauthSecret` to a random value (`openssl rand -base64 32`);
+- point `nextauth.existingSecret` at a Secret holding a random value, and
+  clear `env.nextauthSecret` at the same time (remove it from your values file,
+  or pass `--set env.nextauthSecret=""` — note `--reuse-values` carries the old
+  placeholder forward), since the chart rejects both being set; or
+- delete the release Secret's `NEXTAUTH_SECRET` (or the Secret itself — but
+  keep a copy of its `ENCRYPTION_KEY` and pass it back via `encryption.key`, or
+  stored credentials become unreadable) so the chart generates a new one.
 
 ## Uninstalling
 

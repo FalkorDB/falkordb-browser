@@ -1,0 +1,30 @@
+appId: com.falkordb.browser
+productName: FalkorDB Browser
+copyright: Copyright © FalkorDB
+directories:
+  output: dist
+# No version and no spaces: the browser's "Download for …" links point at
+# releases/latest/download/<name>, which only works if the name never changes.
+# Keep in step with DESKTOP_DOWNLOADS in lib/appDownload.ts.
+artifactName: FalkorDB-Browser-${os}-${arch}.${ext}
+files:
+  - main.cjs
+  - lib/**/*
+  - package.json
+# The Next.js server (desktop/server, from `npm run prepare:server`) is copied
+# to resources/server outside app.asar by this hook: server.js chdirs into its
+# own directory and loads native modules (@falkordb/text-to-cypher) from disk.
+afterPack: scripts/after-pack.cjs
+asar: true
+# The standalone build already contains exactly the server's runtime deps.
+npmRebuild: false
+mac:
+  category: public.app-category.developer-tools
+  target: [dmg, zip]
+win:
+  target: [nsis]
+nsis:
+  artifactName: FalkorDB-Browser-${os}-${arch}.${ext}
+linux:
+  category: Development
+  target: [AppImage]

@@ -1,4 +1,5 @@
 {{ include "falkordb-browser.validateEncryptionKeySecret" . }}
+{{ include "falkordb-browser.validateNextauthSecret" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -53,8 +54,13 @@ spec:
         - name: NEXTAUTH_SECRET
           valueFrom:
             secretKeyRef:
+              {{- if .Values.nextauth.existingSecret.name }}
+              name: {{ .Values.nextauth.existingSecret.name | quote }}
+              key: {{ .Values.nextauth.existingSecret.key | quote }}
+              {{- else }}
               name: {{ include "falkordb-browser.fullname" . }}
               key: NEXTAUTH_SECRET
+              {{- end }}
         - name: ENCRYPTION_KEY
           valueFrom:
             secretKeyRef:

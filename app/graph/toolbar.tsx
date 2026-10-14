@@ -1,12 +1,13 @@
 import { ArrowRight, Circle, ScanEye, Search, X } from "lucide-react";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, GraphRef, isSchemaReservedKey, Link, Node } from "@/lib/utils";
+import { cn, GraphRef, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import useIsMobile from "@/lib/useIsMobile";
 import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
+import { filterSearchElements, getSearchMatch } from "./searchElements";
 import { BrowserSettingsContext, ConnectionContext, GraphContext } from "../components/provider";
 import { getNodeDisplayText } from "@falkordb/canvas";
 
@@ -94,12 +95,7 @@ export default function Toolbar({
             return;
         }
 
-        const elements = graph.getElements().filter(el =>
-            Object.entries(el.data).some(([key, value]) => !isSchemaReservedKey(key) && value != null && value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
-            || el.id.toString().toLowerCase().includes(searchElement.toLowerCase())
-            || ("relationship" in el && (el as Link).relationship.toLowerCase().includes(searchElement.toLowerCase()))
-            || ("labels" in el && (el as Node).labels.some(c => c.toLowerCase().includes(searchElement.toLowerCase())))
-        );
+        const elements = filterSearchElements(graph.getElements(), searchElement);
 
         setSuggestions(elements);
         // Recompute when the search text OR the graph changes so suggestions
@@ -128,33 +124,7 @@ export default function Toolbar({
         }
     };
 
-    const getMatchingProp = (el: Node | Link): { key: string; value: string } | null => {
-        if (!searchElement) return null;
-        const lowerSearch = searchElement.toLowerCase();
-
-        for (const [key, value] of Object.entries(el.data)) {
-            if (!isSchemaReservedKey(key) && value != null && value.toString().toLowerCase().startsWith(lowerSearch)) {
-                return { key, value: value.toString() };
-            }
-        }
-
-        if (el.id.toString().toLowerCase().includes(lowerSearch)) {
-            return { key: "id", value: el.id.toString() };
-        }
-
-        if ("relationship" in el && (el as Link).relationship.toLowerCase().includes(lowerSearch)) {
-            return { key: "type", value: (el as Link).relationship };
-        }
-
-        if ("labels" in el) {
-            const matchingLabel = (el as Node).labels.find(c => c.toLowerCase().includes(lowerSearch));
-            if (matchingLabel) {
-                return { key: "label", value: matchingLabel };
-            }
-        }
-
-        return null;
-    };
+    const getMatchingProp = (el: Node | Link) => getSearchMatch(el, searchElement);
 
     const highlightMatch = (value: string, search: string) => {
         if (!search) return <>{value}</>;
@@ -171,7 +141,6 @@ export default function Toolbar({
 
     const stripBackground = `repeating-linear-gradient(to bottom, hsl(var(--muted)) 0px, hsl(var(--muted)) ${ITEM_HEIGHT}px, transparent ${ITEM_HEIGHT}px, transparent ${ITEM_HEIGHT + GAP}px)`;
 
-    // Mobile stacks the toolbar: search on its own row, actions on the next one.
     const showAllButton = graph.getElements().length > 0 && (
         <Button
             data-testid="elementCanvasShowAllGraph"
@@ -185,7 +154,9 @@ export default function Toolbar({
     );
 
     return (
-        <div className={cn("w-full flex flex-wrap gap-4 justify-between items-center", isMobile && "flex-col items-stretch gap-2")}>
+        // Desktop: search on the left, actions pinned to the far right. Mobile
+        // stacks them: search on its own row, actions grouped on the next one.
+        <div className={cn("w-full flex flex-wrap gap-4 items-center", isMobile ? "flex-col items-stretch gap-2" : "justify-between")}>
             <div className={cn("flex gap-2 items-center", isMobile && "w-full")}>
 
                 {
@@ -200,8 +171,8 @@ export default function Toolbar({
                         }
                     </Button>
                 }
-                {/* Not gated on `expand`: collapsing Search & Filter must not take Show All with it. */}
-                {!isMobile && showAllButton}
+                {/* Show All belongs to Search & Filter, so it shows only while that is open. */}
+                {!isMobile && expand && showAllButton}
                 <div className={cn("basis-0 grow relative pointer-events-auto min-w-[20dvw] max-w-[55dvw]", isMobile && "max-w-none")}>
                     {
                         expand && graph.getElements().length > 0 && !isLoading &&
@@ -313,7 +284,7 @@ export default function Toolbar({
                                                                     {matchingProp && (
                                                                         <>
                                                                             <span className="font-bold">{matchingProp.key}</span>
-                                                                            {': '}{highlightMatch(matchingProp.value, searchElement)}
+                                                                            {': '}{highlightMatch(matchingProp.value, searchElement.trim())}
                                                                         </>
                                                                     )}
                                                                 </p>
@@ -344,8 +315,8 @@ export default function Toolbar({
                     }
                 </div>
             </div>
-            <div data-testid="elementCanvasToolbarActionGraph" className={cn("flex flex-row-reverse gap-2 pointer-events-auto", isMobile && "flex-row justify-start")}>
-                {isMobile && showAllButton}
+            <div data-testid="elementCanvasToolbarActionGraph" className={cn("flex gap-2 pointer-events-auto", !isMobile && "flex-row-reverse")}>
+                {isMobile && expand && showAllButton}
                 {
                     graphName && !isReadOnly &&
                     <>
