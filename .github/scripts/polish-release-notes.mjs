@@ -12,6 +12,7 @@ const tag = process.env.RELEASE_TAG;
 const repo = process.env.GITHUB_REPOSITORY;
 const dryRun = process.env.DRY_RUN === "true";
 const MARKER = "<!-- polished-release-notes -->";
+const SUMMARY = "<summary>Original generated notes</summary>";
 
 const gh = (...args) => execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 
@@ -19,10 +20,21 @@ const release = JSON.parse(gh("release", "view", tag, "--repo", repo, "--json", 
 const original = release.body ?? "";
 
 // Re-running on already polished notes would rewrite the rewrite, so start
-// again from the original notes kept in the collapsed section.
-const generated = original.includes(MARKER)
-  ? (original.split("<summary>Original generated notes</summary>")[1] ?? "").replace(/<\/details>\s*$/, "").trim()
-  : original;
+// again from the original notes kept in the collapsed section. The wrapper is
+// only trusted at the body's edges (marker first, closing tag last), since PR
+// text inside the notes can contain the same strings; the polished part never
+// holds the summary line (it is stripped below), so its first occurrence opens
+// the stored notes. They are sliced out as written, whitespace and all.
+const unwrap = (body) => {
+  if (!body.startsWith(MARKER)) return body;
+  const start = body.indexOf(SUMMARY);
+  const end = body.search(/\r?\n<\/details>\s*$/);
+  if (start === -1 || end === -1) {
+    throw new Error(`Release ${tag} is marked as polished but its stored original notes are incomplete; restore them by hand.`);
+  }
+  return body.slice(start + SUMMARY.length, end).replace(/^\r?\n\r?\n/, "");
+};
+const generated = unwrap(original);
 
 if (!generated) {
   console.error(`Release ${tag} has no notes to rewrite.`);
@@ -98,7 +110,9 @@ if (response.status !== "completed") {
   process.exit(1);
 }
 
-const polished = response.output_text.trim();
+// The summary line marks where the original notes start on a rerun, so the
+// model's output must not contain it.
+const polished = response.output_text.replaceAll(SUMMARY, "").trim();
 if (!polished) {
   console.error("Model returned no text; leaving the release notes unchanged.");
   process.exit(1);

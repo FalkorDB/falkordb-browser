@@ -23,6 +23,8 @@ rmSync(out, { recursive: true, force: true });
 cpSync(standalone, out, { recursive: true, verbatimSymlinks: true });
 cpSync(path.join(rootDir, ".next", "static"), path.join(out, ".next", "static"), { recursive: true });
 cpSync(path.join(rootDir, "public"), path.join(out, "public"), { recursive: true });
+// The utility process starts here, next to server.js and outside app.asar.
+cpSync(path.join(desktopDir, "lib", "server-entry.cjs"), path.join(out, "desktop-entry.cjs"));
 
 // Never ship a developer's env files or local state inside the app. The
 // desktop shell supplies every setting the server needs at launch.

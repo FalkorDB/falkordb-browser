@@ -320,40 +320,42 @@ test.describe('Canvas Tests', () => {
         test.slow();
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
-        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraphByName(graphName);
-        await graph.insertQuery(CREATE_QUERY);
-        await graph.clickRunQuery();
-        await graph.waitForScaleToStabilize();
+        try {
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery(CREATE_QUERY);
+            await graph.clickRunQuery();
+            await graph.waitForScaleToStabilize();
 
-        // Add Edge needs exactly two selected nodes and Delete any selection, so
-        // select two nodes to bring the whole group up.
-        const [first, second] = await graph.getNodesScreenPositions();
-        await graph.elementClick(first.screenX, first.screenY);
-        const secondNow = (await graph.getNodesScreenPositions()).find(node => node.id === second.id);
-        await graph.elementClick(secondNow.screenX, secondNow.screenY, true);
+            // Add Edge needs exactly two selected nodes and Delete any selection, so
+            // select two nodes to bring the whole group up.
+            const [first, second] = await graph.getNodesScreenPositions();
+            await graph.elementClick(first.screenX, first.screenY);
+            const secondNow = (await graph.getNodesScreenPositions()).find(node => node.id === second.id);
+            await graph.elementClick(secondNow.screenX, secondNow.screenY, true);
 
-        const { row, search, actions } = await graph.canvasToolbarActionLayout();
-        const ids = actions.map(action => action.id);
+            const { row, search, actions } = await graph.canvasToolbarActionLayout();
+            const ids = actions.map(action => action.id);
 
-        // Desktop pins Add Node, Add Edge and Delete to the far right of the row,
-        // away from the search; only mobile groups them under it.
-        expect(ids).toEqual(
-            expect.arrayContaining(["elementCanvasAddNodeGraph", "elementCanvasAddEdgeGraph", "deleteElementGraph"])
-        );
-        expect(ids).not.toContain("elementCanvasShowAllGraph");
-        const right = Math.max(...actions.map(({ box }) => box.x + box.width));
-        const left = Math.min(...actions.map(({ box }) => box.x));
-        expect(row.x + row.width - right).toBeLessThanOrEqual(2);
-        expect(left).toBeGreaterThan(search.x + search.width + 32);
+            // Desktop pins Add Node, Add Edge and Delete to the far right of the row,
+            // away from the search; only mobile groups them under it.
+            expect(ids).toEqual(
+                expect.arrayContaining(["elementCanvasAddNodeGraph", "elementCanvasAddEdgeGraph", "deleteElementGraph"])
+            );
+            expect(ids).not.toContain("elementCanvasShowAllGraph");
+            const right = Math.max(...actions.map(({ box }) => box.x + box.width));
+            const left = Math.min(...actions.map(({ box }) => box.x));
+            expect(row.x + row.width - right).toBeLessThanOrEqual(2);
+            expect(left).toBeGreaterThan(search.x + search.width + 32);
 
-        // Show All belongs to Search & Filter and sits beside its toggle, left of the search box.
-        const showAll = await graph.elementCanvasShowAll.boundingBox();
-        expect(showAll).not.toBeNull();
-        expect(showAll!.x + showAll!.width).toBeLessThanOrEqual(search.x);
-
-        await apicalls.removeGraph(graphName);
+            // Show All belongs to Search & Filter and sits beside its toggle, left of the search box.
+            const showAll = await graph.elementCanvasShowAll.boundingBox();
+            expect(showAll).not.toBeNull();
+            expect(showAll!.x + showAll!.width).toBeLessThanOrEqual(search.x);
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
     });
 
     test(`@admin Validate label toggle does not hide multi-labeled node`, async () => {

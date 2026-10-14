@@ -2731,6 +2731,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                             customizingLabel={customizingLabel}
                                             setCustomizingLabel={setCustomizingLabel}
                                             tutorialOpen={tutorialOpen}
+                                            tutorialDecided={tutorialDecided}
                                             onCloseTutorial={handleCloseTutorial}
                                             onLoadDemoGraphs={handleLoadDemoGraphs}
                                             onCleanupDemoGraphs={handleCleanupDemoGraphs}
