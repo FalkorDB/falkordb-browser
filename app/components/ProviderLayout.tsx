@@ -13,6 +13,7 @@ import { PanelContext } from "./provider";
 import Header from "./Header";
 import Navbar from "./Navbar";
 import Tutorial, { DemoLoadOutcome } from "./Tutorial";
+import WhatsNewPopup from "./WhatsNewPopup";
 
 const UdfPanel = dynamic(() => import("../udf/udfPanel"), {
   ssr: false,
@@ -186,6 +187,7 @@ export default function ProviderLayout({
           onCleanupDemoGraphs={onCleanupDemoGraphs}
         />
       }
+      <WhatsNewPopup paused={tutorialOpen || !showNavbarAndHeader} />
       {
         showNavbarAndHeader &&
         <Header
