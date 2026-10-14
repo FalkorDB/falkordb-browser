@@ -781,9 +781,11 @@ test.describe('Canvas Tests', () => {
             await graph.clickDimensionControl("3d");
             await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
 
-            await graph.clickNodeIn3D();
+            const clicked = await graph.clickNodeIn3D();
 
             await expect.poll(() => graph.getSelectionCount(), { timeout: 15000 }).toBe(1);
+            // The node under the pointer, not merely some node.
+            await expect.poll(() => graph.getDataPanelNodeId(), { timeout: 15000 }).toBe(clicked);
         } finally {
             await apicalls.removeGraph(graphName);
         }

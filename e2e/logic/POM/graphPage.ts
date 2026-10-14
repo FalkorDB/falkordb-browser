@@ -1161,6 +1161,13 @@ export default class GraphPage extends BasePage {
     return target.id;
   }
 
+  /** The id the data panel shows for the selected node, or null while none is shown. */
+  async getDataPanelNodeId(): Promise<number | null> {
+    const text = await this.page.getByTestId("DataPanel").locator("p", { hasText: /^ID:/ }).first().textContent().catch(() => null);
+    const match = text?.match(/ID:\s*(\d+)/);
+    return match ? Number(match[1]) : null;
+  }
+
   async isDimControlChecked(): Promise<boolean> {
     await waitForElementToBeVisible(this.dimControl);
     const state = await this.dimControl.getAttribute("data-state");
