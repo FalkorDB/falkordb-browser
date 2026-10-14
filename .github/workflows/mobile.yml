@@ -98,16 +98,22 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  android-release:
+  # A release is built and signed in two jobs, so no dependency code ever runs
+  # where the signing key or a write token is reachable: this one installs and
+  # builds with read-only rights and no secrets, the next one only signs and
+  # uploads the APK it produced.
+  android-release-build:
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      ready: ${{ steps.config.outputs.ready }}
     env:
       FALKORDB_BROWSER_URL: ${{ vars.FALKORDB_BROWSER_URL }}
-      # All four, so a half-configured key skips with the warning below
-      # instead of failing halfway through signing.
+      # Only whether all four are set, never their values: a half-configured
+      # key skips with the warning below instead of failing halfway through.
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
       TAG: ${{ github.event.release.tag_name }}
     defaults:
@@ -131,8 +137,8 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # No dependency cache here: any workflow run can write to it, and this
-      # job holds the signing key.
+      # No dependency cache: any workflow run can write to it, and what this
+      # job builds is signed next.
       - name: Setup Node
         if: steps.config.outputs.ready == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -162,28 +168,60 @@ jobs:
         if: steps.config.outputs.ready == 'true'
         run: sh scripts/android-version.sh "$TAG" android/app/build.gradle
 
-      - name: Build and sign the release APK
+      - name: Build the unsigned release APK
         if: steps.config.outputs.ready == 'true'
+        working-directory: mobile/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Hand the APK to the signing job
+        if: steps.config.outputs.ready == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-release-unsigned
+          path: mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  android-release-sign:
+    needs: android-release-build
+    if: github.event_name == 'release' && needs.android-release-build.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    # No checkout and no npm: only the Android SDK's own tools touch the key.
+    steps:
+      - name: Download the unsigned APK
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: android-release-unsigned
+          path: ${{ runner.temp }}/apk
+
+      - name: Sign the APK
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          set -eu
+          cd "$RUNNER_TEMP/apk"
           keystore="$RUNNER_TEMP/release.jks"
+          trap 'rm -f "$keystore"' EXIT
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
-          # apksigner (v2/v3 signatures, which current Android requires) ships
-          # in the SDK build-tools, which are not on PATH by default.
-          PATH="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1):$PATH"
-          npx cap build android \
-            --androidreleasetype APK --signing-type apksigner \
-            --keystorepath "$keystore" --keystorepass "$ANDROID_KEYSTORE_PASSWORD" \
-            --keystorealias "$ANDROID_KEY_ALIAS" --keystorealiaspass "$ANDROID_KEY_PASSWORD"
-          rm -f "$keystore"
-          cp android/app/build/outputs/apk/release/app-release-signed.apk "$RUNNER_TEMP/FalkorDB-Browser-android.apk"
+          # zipalign and apksigner (v2/v3 signatures, which current Android
+          # requires) ship in the SDK build-tools, which are not on PATH.
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$BT/zipalign" -P 16 -f 4 app-release-unsigned.apk aligned.apk
+          # Passwords are read from the environment, never from argv.
+          "$BT/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:KS_PASS --key-pass env:KEY_PASS \
+            --out FalkorDB-Browser-android.apk aligned.apk
+          "$BT/apksigner" verify FalkorDB-Browser-android.apk
 
       - name: Attach the APK to the release
-        if: steps.config.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" "$RUNNER_TEMP/FalkorDB-Browser-android.apk" --repo "$GITHUB_REPOSITORY" --clobber
+        run: gh release upload "$TAG" "$RUNNER_TEMP/apk/FalkorDB-Browser-android.apk" --repo "$GITHUB_REPOSITORY" --clobber

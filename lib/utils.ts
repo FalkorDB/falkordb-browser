@@ -1625,9 +1625,17 @@ export const captureCanvasLayout = (canvas: FalkorDBCanvas): CanvasLayout | unde
  * otherwise drag them off the restored layout before it settles. That matches
  * the steady state anyway, since the canvas pins every node once the engine
  * stops while animation is off.
+ *
+ * Once the 3D view is on screen the graph is laid out again instead: the
+ * snapshot has no depth, and nodes pinned flat would collapse the 3D layout onto
+ * a plane. That is decided by the renderer in place — the 2D one is what
+ * `getGraph()` returns — not by `getDimension()`, which already reports a
+ * requested 3D while its renderer is still loading and the canvas is 2D.
  */
 export const applyCanvasLayout = (canvas: FalkorDBCanvas, layout: CanvasLayout): void => {
     canvas.setData(layout.data);
+
+    if (!canvas.getGraph()) return;
 
     const positions = new Map(layout.positions.map(position => [position.id, position]));
 

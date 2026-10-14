@@ -2,7 +2,7 @@
 
 import { Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import type { FalkorDBCanvas, LayoutMode, ViewportState, NodeShape } from "@falkordb/canvas";
+import type { CanvasDimension, FalkorDBCanvas, LayoutMode, ViewportState, NodeShape } from "@falkordb/canvas";
 import { NODE_SIZE } from "@falkordb/canvas";
 import { useToast } from "@/components/ui/use-toast";
 import ForceGraph from "@/app/components/ForceGraph";
@@ -24,7 +24,7 @@ import {
     getSchema,
     isAbortError,
 } from "@/lib/utils";
-import { normalizeDirection, normalizeLayout, type SchemaViewMeta } from "@/lib/useGraphTabs";
+import { normalizeDimension, normalizeDirection, normalizeLayout, type SchemaViewMeta } from "@/lib/useGraphTabs";
 import {
     BrowserSettingsContext,
     ConnectionContext,
@@ -96,6 +96,7 @@ type SchemaCache = {
     viewport: ViewportState | undefined;
     layout: LayoutMode;
     direction: string;
+    dimension: CanvasDimension;
     animation: boolean;
     pinned: boolean;
     dimmed: boolean;
@@ -270,7 +271,14 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
 
     const canvasRef = useRef<FalkorDBCanvas | null>(null);
 
+    // The first write creates the cache entry, and the fields it does not patch
+    // are filled from here — so they start from what the tab restored, not the
+    // defaults, or a later remount would read the defaults back over them.
+    // Taken once: these only seed state, so later tab writes must not churn
+    // `persist` and every setter built on it.
+    const seedRef = useRef({ stored, storedLayout });
     const persist = useCallback((patch: Partial<SchemaCache>) => {
+        const { stored: seed, storedLayout: seedLayout } = seedRef.current;
         const base: SchemaCache = readCache(cacheKey) ?? {
             key: cacheKey,
             schema: EMPTY_SCHEMA,
@@ -279,13 +287,14 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             hiddenLabels: [],
             hiddenRelationships: [],
             graphData: undefined,
-            viewport: undefined,
-            layout: "force",
-            direction: "",
-            animation: false,
-            pinned: false,
-            dimmed: true,
-            expand: true,
+            viewport: seed.viewport,
+            layout: seedLayout,
+            direction: normalizeDirection(seedLayout, seed.direction),
+            dimension: normalizeDimension(seed.dimension),
+            animation: seed.animation ?? false,
+            pinned: seed.pinned ?? false,
+            dimmed: seed.dimmed ?? true,
+            expand: seed.expand ?? true,
         };
 
         writeCache(cacheKey, { ...base, ...patch, key: cacheKey });
@@ -297,6 +306,7 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
     const [viewport, setViewport] = usePersisted("viewport", restored?.viewport ?? stored.viewport, persist);
     const [layout, setLayout] = usePersisted("layout", restored?.layout ?? storedLayout, persist);
     const [direction, setDirection] = usePersisted("direction", restored?.direction ?? normalizeDirection(storedLayout, stored.direction), persist);
+    const [dimension, setDimension] = usePersisted("dimension", restored?.dimension ?? normalizeDimension(stored.dimension), persist);
     const [animation, setAnimation] = usePersisted("animation", restored?.animation ?? stored.animation ?? false, persist);
     const [pinned, setPinned] = usePersisted("pinned", restored?.pinned ?? stored.pinned ?? false, persist);
     const [dimmed, setDimmed] = usePersisted("dimmed", restored?.dimmed ?? stored.dimmed ?? true, persist);
@@ -526,12 +536,13 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
                 : undefined,
             layout,
             direction,
+            dimension,
             animation,
             pinned,
             dimmed,
             expand,
         });
-    }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, animation, pinned, dimmed, expand]);
+    }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, dimension, animation, pinned, dimmed, expand]);
 
     // Colors, sizes and visibility never change the graph's shape, so they are
     // applied in place instead of costing a re-layout. The styles come from the
@@ -655,6 +666,8 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         setLayout,
         direction,
         setDirection,
+        dimension,
+        setDimension,
         animation,
         setAnimation,
         pinned,
@@ -663,7 +676,7 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         setDimmed,
     }), [
         viewport, setViewport, schemaGraph, setData, graphData, setGraphData, layout, setLayout,
-        direction, setDirection, animation, setAnimation, pinned, setPinned, dimmed, setDimmed,
+        direction, setDirection, dimension, setDimension, animation, setAnimation, pinned, setPinned, dimmed, setDimmed,
     ]);
 
     // Read-only by nature: the schema is a view of the data, not the data.

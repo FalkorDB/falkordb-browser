@@ -42,7 +42,10 @@ FalkorDB, e.g. the one the browser serves) to keep them there instead; that
 also makes them safe with more than one task. Once set, later runs keep it even
 without the variable; `TOKEN_STORAGE_URL=none` switches it off. Changing an
 existing URL restarts the browser so the running tasks pick it up; rerunning
-with the same URL does not. Rate-limit counters stay per
+with the same URL does not. The script waits for that restart to settle. If it cannot
+start it, or the new tasks never settle, it stops and prints the command that
+finishes the job: rerun with `FORCE_RESTART=1`, which restarts even when nothing
+changed. Rate-limit counters stay per
 task, which is why `DesiredCount` defaults to 1. The session and encryption
 secrets are kept in Secrets Manager even if the stack is deleted.
 
@@ -108,6 +111,12 @@ Publishing a GitHub release builds a signed APK that opens the production
 browser and attaches it to the release as `FalkorDB-Browser-android.apk`, next
 to the desktop installers. Until the settings below exist, the release goes
 out without it and the workflow logs a warning.
+
+It takes two jobs, so no dependency code runs where the signing key is
+reachable: `android-release-build` installs the packages and builds an
+unsigned APK with read-only rights and no secrets, and `android-release-sign`
+downloads only that APK, signs it with the SDK's `zipalign` and `apksigner`,
+and uploads it.
 
 One-time setup:
 
