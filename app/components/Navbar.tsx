@@ -15,7 +15,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import useIsMobile from "@/lib/useIsMobile";
+import useIsMobile, { MOBILE_BREAKPOINT } from "@/lib/useIsMobile";
 import Button from "./ui/Button";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
@@ -133,7 +133,9 @@ export default function Navbar({ showUDF }: Props) {
                             const pending = pendingDrawerRef.current;
                             pendingDrawerRef.current = null;
                             if (pending === "releases") setReleasesOpen(true);
-                            else if (pending === "about") setAboutOpen(true);
+                            // Only the mobile tree has a controlled About drawer: if the
+                            // layout switched to desktop mid-close, there is nothing to open.
+                            else if (pending === "about" && window.matchMedia(`(width < ${MOBILE_BREAKPOINT}px)`).matches) setAboutOpen(true);
                         }}
                     >
                         <VisuallyHidden>

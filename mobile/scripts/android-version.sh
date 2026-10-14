@@ -29,9 +29,10 @@ minor="${rest%%.*}"
 patch="${rest#*.}"
 
 code=$((major * 10000 + minor * 100 + patch))
-# Android requires a positive versionCode, which only v0.0.0 misses.
-if [ "$code" -lt 1 ]; then
-  echo "versionCode must be positive: $tag" >&2
+# Android requires a positive versionCode, which only v0.0.0 misses, and
+# Google Play refuses codes above 2100000000.
+if [ "$code" -lt 1 ] || [ "$code" -gt 2100000000 ]; then
+  echo "versionCode must be between 1 and 2100000000: $tag" >&2
   exit 1
 fi
 

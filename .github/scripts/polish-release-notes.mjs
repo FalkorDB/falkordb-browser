@@ -29,7 +29,9 @@ const unwrap = (body) => {
   if (!body.startsWith(MARKER)) return body;
   const start = body.indexOf(SUMMARY);
   const end = body.search(/\r?\n<\/details>\s*$/);
-  if (start === -1 || end === -1) return "";
+  if (start === -1 || end === -1) {
+    throw new Error(`Release ${tag} is marked as polished but its stored original notes are incomplete; restore them by hand.`);
+  }
   return body.slice(start + SUMMARY.length, end).replace(/^\r?\n\r?\n/, "");
 };
 const generated = unwrap(original);

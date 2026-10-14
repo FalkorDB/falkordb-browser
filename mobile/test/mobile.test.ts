@@ -103,7 +103,7 @@ test("a release tag becomes the app's version name and a growing version code", 
 });
 
 test("a tag that is not a release version is refused instead of guessed", () => {
-    for (const tag of ["latest", "v2.6", "v2.6.1.4", "v2.100.0", "v2..1", "v2.6.08", "v02.6.1", 'v2.6.1-rc"1', "v2.6.1-rc|1", "v2.6.1-", "v0.0.0",
+    for (const tag of ["latest", "v2.6", "v2.6.1.4", "v2.100.0", "v2..1", "v2.6.08", "v02.6.1", 'v2.6.1-rc"1', "v2.6.1-rc|1", "v2.6.1-", "v0.0.0", "v210001.0.0",
         // A pre-release would share one code with its final release, which then would not count as an update.
         "v3.0.0-rc1", "v3.0.0-beta.2"]) {
         assert.throws(() => stampVersion(tag), Error, tag);

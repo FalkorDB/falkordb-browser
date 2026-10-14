@@ -255,9 +255,12 @@ test("server-entry reports only the server's own listen on PORT", async () => {
         env: { ...process.env, PORT: String(port) },
         execArgv: ["--require", path.join(dir, "parent-port.cjs")],
     });
+    let timer;
     try {
         const messages = [];
         await new Promise((resolve, reject) => {
+            // A child that never reports must still reach the cleanup below.
+            timer = setTimeout(() => reject(new Error("no listening report")), 10_000);
             child.on("message", (m) => {
                 messages.push(m);
                 resolve();
@@ -268,6 +271,7 @@ test("server-entry reports only the server's own listen on PORT", async () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
         assert.deepEqual(messages, [{ type: "listening", port }]);
     } finally {
+        clearTimeout(timer);
         child.kill();
     }
 });

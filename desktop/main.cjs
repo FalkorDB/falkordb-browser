@@ -10,7 +10,7 @@
 const { app, BrowserWindow, shell, utilityProcess, dialog } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
-const { HOST, buildServerEnv, choosePort, ensurePrivateDir, isAppUrl, isExternalWebUrl, isPortFree, loadSecrets } = require("./lib/shell.cjs");
+const { HOST, buildServerEnv, choosePort, ensurePrivateDir, isAppUrl, isExternalWebUrl, loadSecrets } = require("./lib/shell.cjs");
 
 const STARTUP_TIMEOUT_MS = 60_000;
 // Launches to try when another process takes the chosen port first.
@@ -81,9 +81,10 @@ async function startServer() {
             await waitForServer(serverProcess, port);
             break;
         } catch (err) {
-            // Another process took the port between choosePort and the
-            // server's own listen: pick again rather than fail the launch.
-            if (!err.exited || attempt >= STARTUP_ATTEMPTS || await isPortFree(port)) throw err;
+            // Most likely another process took the port between choosePort
+            // and the server's own listen, perhaps only briefly: pick again
+            // rather than fail the launch.
+            if (!err.exited || attempt >= STARTUP_ATTEMPTS) throw err;
         }
     }
     serverReady = true;
