@@ -9,6 +9,7 @@ web app changes for this.
 
 ```sh
 cd desktop
+npm --prefix .. ci   # the web app the installers bundle
 npm ci
 npm start        # uses an existing root build: run `npm run build:web` first
 npm run dist     # builds the web app, then installers into desktop/dist

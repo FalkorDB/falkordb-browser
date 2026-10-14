@@ -55,6 +55,17 @@ test("loadSecrets makes a replaced secrets file owner-only, whatever its old mod
     assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 });
 
+test("loadSecrets makes a kept secrets file owner-only too", (t) => {
+    if (process.platform === "win32") return t.skip("POSIX file modes");
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    const stored = { authSecret: "a".repeat(64), encryptionKey: "b".repeat(64) };
+    fs.writeFileSync(file, JSON.stringify(stored), { mode: 0o644 });
+    fs.chmodSync(file, 0o644);
+    assert.deepEqual(loadSecrets(dir), stored);
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+});
+
 test("ensurePrivateDir creates owner-only folders and tightens existing ones", (t) => {
     if (process.platform === "win32") return t.skip("POSIX file modes");
     const root = tempDir();
@@ -222,4 +233,41 @@ test("resourcesDir points at each platform's resources folder", () => {
     assert.equal(resourcesDir("darwin", "/out", "FalkorDB Browser"), path.join("/out", "FalkorDB Browser.app", "Contents", "Resources"));
     assert.equal(resourcesDir("linux", "/out", "FalkorDB Browser"), path.join("/out", "resources"));
     assert.equal(resourcesDir("win32", "/out", "FalkorDB Browser"), path.join("/out", "resources"));
+});
+
+test("server-entry reports only the server's own listen on PORT", async () => {
+    const { fork } = require("node:child_process");
+    const port = (await freeRange(1)).first;
+    const dir = tempDir();
+    fs.copyFileSync(path.join(__dirname, "..", "lib", "server-entry.cjs"), path.join(dir, "desktop-entry.cjs"));
+    // Stands in for Next's server.js: a helper server on another port first,
+    // then the real one on PORT.
+    fs.writeFileSync(path.join(dir, "server.js"), `
+        const net = require("node:net");
+        net.createServer().listen(0, "${HOST}", () => {
+            net.createServer().listen(Number(process.env.PORT), "${HOST}");
+        });
+    `);
+    // Electron's utility process provides process.parentPort; plain Node does not.
+    fs.writeFileSync(path.join(dir, "parent-port.cjs"), "process.parentPort = { postMessage: (m) => process.send(m) };");
+
+    const child = fork(path.join(dir, "desktop-entry.cjs"), [], {
+        env: { ...process.env, PORT: String(port) },
+        execArgv: ["--require", path.join(dir, "parent-port.cjs")],
+    });
+    try {
+        const messages = [];
+        await new Promise((resolve, reject) => {
+            child.on("message", (m) => {
+                messages.push(m);
+                resolve();
+            });
+            child.once("exit", (code) => reject(new Error(`exited with ${code}`)));
+        });
+        // Give a stray second report the chance to arrive.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        assert.deepEqual(messages, [{ type: "listening", port }]);
+    } finally {
+        child.kill();
+    }
 });

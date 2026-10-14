@@ -44,6 +44,8 @@ function loadSecrets(dir) {
     const file = path.join(dir, "secrets.json");
     const stored = readJson(file);
     if (stored && HEX_32_BYTES.test(stored.authSecret) && HEX_32_BYTES.test(stored.encryptionKey)) {
+        // An older install may have left the file readable by other accounts.
+        fs.chmodSync(file, 0o600);
         return stored;
     }
     const secrets = {

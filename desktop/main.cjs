@@ -9,11 +9,12 @@
 
 const { app, BrowserWindow, shell, utilityProcess, dialog } = require("electron");
 const fs = require("node:fs");
-const http = require("node:http");
 const path = require("node:path");
-const { HOST, buildServerEnv, choosePort, ensurePrivateDir, isAppUrl, isExternalWebUrl, loadSecrets } = require("./lib/shell.cjs");
+const { HOST, buildServerEnv, choosePort, ensurePrivateDir, isAppUrl, isExternalWebUrl, isPortFree, loadSecrets } = require("./lib/shell.cjs");
 
 const STARTUP_TIMEOUT_MS = 60_000;
+// Launches to try when another process takes the chosen port first.
+const STARTUP_ATTEMPTS = 3;
 
 let serverProcess = null;
 let mainWindow = null;
@@ -28,31 +29,21 @@ function serverDir() {
         : path.join(__dirname, "server");
 }
 
-function waitForServer(url, child) {
-    const deadline = Date.now() + STARTUP_TIMEOUT_MS;
+// Resolves when the child reports that it holds the port itself (see
+// lib/server-entry.cjs), not when something answers there.
+function waitForServer(child, port) {
     return new Promise((resolve, reject) => {
-        let exited = false;
-        child.once("exit", (code) => {
-            exited = true;
-            reject(new Error(`The server exited during startup (code ${code}).`));
-        });
-        const attempt = () => {
-            if (exited) return;
-            const remaining = deadline - Date.now();
-            if (remaining <= 0) {
-                reject(new Error("The server did not start in time."));
-                return;
-            }
-            const req = http.get(url, (res) => {
-                res.resume();
+        const timer = setTimeout(() => reject(new Error("The server did not start in time.")), STARTUP_TIMEOUT_MS);
+        child.on("message", (message) => {
+            if (message?.type === "listening" && message.port === port) {
+                clearTimeout(timer);
                 resolve();
-            });
-            // A server that accepts the connection but never answers must not
-            // hold startup forever: give each probe only the time that is left.
-            req.setTimeout(remaining, () => req.destroy(new Error("timeout")));
-            req.on("error", () => setTimeout(attempt, 250));
-        };
-        attempt();
+            }
+        });
+        child.once("exit", (code) => {
+            clearTimeout(timer);
+            reject(Object.assign(new Error(`The server exited during startup (code ${code}).`), { exited: true }));
+        });
     });
 }
 
@@ -66,26 +57,35 @@ async function startServer() {
     ensurePrivateDir(importDir);
 
     const secrets = loadSecrets(userData);
-    const port = await choosePort(userData);
-    origin = `http://${HOST}:${port}`;
-    const env = buildServerEnv(process.env, { host: HOST, port, secrets, dataDir, importDir });
-
     const dir = serverDir();
-    const entry = path.join(dir, "server.js");
+    const entry = path.join(dir, "desktop-entry.cjs");
     if (!fs.existsSync(entry)) {
         throw new Error(`Missing ${entry}. Run \`npm run prepare:server\` in desktop/.`);
     }
 
-    serverProcess = utilityProcess.fork(entry, [], {
-        cwd: dir,
-        env,
-        stdio: "pipe",
-        serviceName: "FalkorDB Browser server",
-    });
-    serverProcess.stdout?.on("data", (d) => process.stdout.write(d));
-    serverProcess.stderr?.on("data", (d) => process.stderr.write(d));
+    for (let attempt = 1; ; attempt += 1) {
+        const port = await choosePort(userData);
+        origin = `http://${HOST}:${port}`;
+        const env = buildServerEnv(process.env, { host: HOST, port, secrets, dataDir, importDir });
 
-    await waitForServer(`${origin}/`, serverProcess);
+        serverProcess = utilityProcess.fork(entry, [], {
+            cwd: dir,
+            env,
+            stdio: "pipe",
+            serviceName: "FalkorDB Browser server",
+        });
+        serverProcess.stdout?.on("data", (d) => process.stdout.write(d));
+        serverProcess.stderr?.on("data", (d) => process.stderr.write(d));
+
+        try {
+            await waitForServer(serverProcess, port);
+            break;
+        } catch (err) {
+            // Another process took the port between choosePort and the
+            // server's own listen: pick again rather than fail the launch.
+            if (!err.exited || attempt >= STARTUP_ATTEMPTS || await isPortFree(port)) throw err;
+        }
+    }
     serverReady = true;
 
     serverProcess.on("exit", (code) => {
