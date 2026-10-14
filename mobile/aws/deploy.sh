@@ -25,6 +25,9 @@ set -eu
 # so they survive task replacements. Left unset, an existing stack keeps what
 # it has (so a rerun never drops it by accident); "none" switches it off.
 : "${TOKEN_STORAGE_URL:=}"
+# Optional: FORCE_RESTART=1 restarts the browser even when nothing changed,
+# e.g. to finish a restart that an earlier run could not complete.
+: "${FORCE_RESTART:=}"
 
 TEMPLATE="$(dirname "$0")/browser-service.yml"
 WORK="$(mktemp -d)"
@@ -114,12 +117,37 @@ aws cloudformation deploy \
 
 # ECS reads secrets when a task starts, and a changed token-store URL keeps the
 # same secret ARN, so tasks already running would go on using the old one.
-if [ -n "$PREVIOUS_TOKEN_STORAGE_URL" ] && [ "$PREVIOUS_TOKEN_STORAGE_URL" != "$TOKEN_STORAGE_URL" ]; then
-  echo "Restarting the browser so it picks up the token store setting."
-  aws ecs update-service \
-    --cluster "$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='ClusterName'].OutputValue" --output text)" \
-    --service "$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='ServiceName'].OutputValue" --output text)" \
-    --force-new-deployment > /dev/null
+# Once the URL is saved a rerun cannot tell that a restart is still owed, so a
+# restart that fails, or a rollout that never settles, stops with the command
+# that finishes it.
+restart_reason=""
+if [ "$FORCE_RESTART" = 1 ]; then
+  restart_reason="FORCE_RESTART=1"
+elif [ -n "$PREVIOUS_TOKEN_STORAGE_URL" ] && [ "$PREVIOUS_TOKEN_STORAGE_URL" != "$TOKEN_STORAGE_URL" ]; then
+  restart_reason="the token store URL changed"
+fi
+
+if [ -n "$restart_reason" ] && [ "$STATUS" != NONE ]; then
+  finish="FORCE_RESTART=1 STACK_NAME=$STACK_NAME sh aws/deploy.sh (with the same settings)"
+  output() {
+    aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+      --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+  }
+  if ! cluster="$(output ClusterName)" || ! service="$(output ServiceName)"; then
+    echo "Could not look up the ECS service to restart. Finish with: $finish" >&2
+    exit 1
+  fi
+
+  echo "Restarting the browser ($restart_reason)."
+  if ! aws ecs update-service --cluster "$cluster" --service "$service" --force-new-deployment > /dev/null; then
+    echo "The restart could not be started; the running browser still has the old setting. Finish with: $finish" >&2
+    exit 1
+  fi
+  echo "Waiting for the new tasks to take over..."
+  if ! aws ecs wait services-stable --cluster "$cluster" --services "$service"; then
+    echo "The new tasks did not settle. Check the service's events in the ECS console, then finish with: $finish" >&2
+    exit 1
+  fi
 fi
 
 aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
