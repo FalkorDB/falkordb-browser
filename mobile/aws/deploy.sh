@@ -28,6 +28,12 @@ set -eu
 # Optional: FORCE_RESTART=1 restarts the browser even when nothing changed,
 # e.g. to finish a restart that an earlier run could not complete.
 : "${FORCE_RESTART:=}"
+case "$FORCE_RESTART" in
+  "" | 0 | false | no) FORCE_RESTART="" ;;
+  1 | true | yes) FORCE_RESTART=1 ;;
+  # Anything else would quietly drop a restart someone meant to ask for.
+  *) echo "FORCE_RESTART must be 1 (or true/yes), or unset; got: $FORCE_RESTART" >&2; exit 1 ;;
+esac
 
 TEMPLATE="$(dirname "$0")/browser-service.yml"
 WORK="$(mktemp -d)"

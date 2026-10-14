@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,34 +50,38 @@ function deploy(stack: {
     wait?: "ok" | "fail";
 }, env: Record<string, string> = {}): Run {
     const dir = mkdtempSync(path.join(tmpdir(), "falkordb-deploy-"));
-    const aws = path.join(dir, "aws");
-    writeFileSync(aws, FAKE_AWS);
-    chmodSync(aws, 0o755);
-    const result = spawnSync("sh", [deployScript], {
-        encoding: "utf8",
-        env: {
-            PATH: `${dir}:${process.env.PATH}`,
-            FAKE_DIR: dir,
-            FAKE_STATUS: stack.status,
-            FAKE_PREVIOUS_URL: stack.previousUrl ?? "",
-            FAKE_RESTART: stack.restart ?? "ok",
-            FAKE_WAIT: stack.wait ?? "ok",
-            STACK_NAME: "s",
-            BROWSER_URL: "https://browser.example.com",
-            CERTIFICATE_ARN: "arn:aws:acm:cert",
-            VPC_ID: "vpc-1",
-            SUBNET_IDS: "subnet-a,subnet-b",
-            ...env,
-        },
-    });
-    const read = (name: string) => (existsSync(path.join(dir, name)) ? readFileSync(path.join(dir, name), "utf8") : "");
-    return {
-        status: result.status,
-        stderr: result.stderr,
-        calls: read("calls").split("\n").filter(Boolean),
-        params: read("params.json") ? (JSON.parse(read("params.json")) as string[]) : [],
-        argv: read("deploy-argv"),
-    };
+    try {
+        const aws = path.join(dir, "aws");
+        writeFileSync(aws, FAKE_AWS);
+        chmodSync(aws, 0o755);
+        const result = spawnSync("sh", [deployScript], {
+            encoding: "utf8",
+            env: {
+                PATH: `${dir}:${process.env.PATH}`,
+                FAKE_DIR: dir,
+                FAKE_STATUS: stack.status,
+                FAKE_PREVIOUS_URL: stack.previousUrl ?? "",
+                FAKE_RESTART: stack.restart ?? "ok",
+                FAKE_WAIT: stack.wait ?? "ok",
+                STACK_NAME: "s",
+                BROWSER_URL: "https://browser.example.com",
+                CERTIFICATE_ARN: "arn:aws:acm:cert",
+                VPC_ID: "vpc-1",
+                SUBNET_IDS: "subnet-a,subnet-b",
+                ...env,
+            },
+        });
+        const read = (name: string) => (existsSync(path.join(dir, name)) ? readFileSync(path.join(dir, name), "utf8") : "");
+        return {
+            status: result.status,
+            stderr: result.stderr,
+            calls: read("calls").split("\n").filter(Boolean),
+            params: read("params.json") ? (JSON.parse(read("params.json")) as string[]) : [],
+            argv: read("deploy-argv"),
+        };
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
 }
 
 const keys = (run: Run) => run.params.map((p) => p.split("=")[0]);
@@ -85,10 +89,11 @@ const keys = (run: Run) => run.params.map((p) => p.split("=")[0]);
 test("a new stack gets freshly generated secrets, and they never reach argv", () => {
     const run = deploy({ status: "missing" });
     assert.equal(run.status, 0);
-    assert.ok(keys(run).includes("AuthSecret") && keys(run).includes("EncryptionKey"));
-    const secret = run.params.find((p) => p.startsWith("AuthSecret="))?.split("=")[1];
-    assert.match(secret ?? "", /^[0-9a-f]{64}$/);
-    assert.ok(!run.argv.includes(secret ?? "-"), "the secret must not be on the command line");
+    for (const name of ["AuthSecret", "EncryptionKey"]) {
+        const value = run.params.find((p) => p.startsWith(`${name}=`))?.split("=")[1] ?? "";
+        assert.match(value, /^[0-9a-f]{64}$/, name);
+        assert.ok(!run.argv.includes(value), `${name} must not be on the command line`);
+    }
 });
 
 test("an existing stack keeps its secrets", () => {
@@ -135,4 +140,33 @@ test("FORCE_RESTART=1 on a brand-new stack has nothing to restart", () => {
     const run = deploy({ status: "missing" }, { FORCE_RESTART: "1" });
     assert.equal(run.status, 0);
     assert.deepEqual(run.calls, ["deploy"]);
+});
+
+test("an unset TOKEN_STORAGE_URL keeps the saved one, and none switches it off", () => {
+    // Not sent at all, so CloudFormation keeps the previous (NoEcho) value.
+    const unset = deploy({ status: "UPDATE_COMPLETE", previousUrl: "falkors://a@db:1" });
+    assert.equal(unset.status, 0);
+    assert.ok(!keys(unset).includes("TokenStorageUrl"));
+    assert.deepEqual(unset.calls, ["deploy"]);
+
+    const off = deploy({ status: "UPDATE_COMPLETE", previousUrl: "falkors://a@db:1" }, { TOKEN_STORAGE_URL: "none" });
+    assert.equal(off.status, 0);
+    assert.ok(off.params.includes("TokenStorageUrl="), "none sends the empty value");
+    // Removing it changes the task definition; CloudFormation replaces the tasks.
+    assert.deepEqual(off.calls, ["deploy"]);
+});
+
+test("FORCE_RESTART takes 1, true or yes, and refuses anything else before deploying", () => {
+    for (const value of ["1", "true", "yes"]) {
+        const run = deploy({ status: "UPDATE_COMPLETE" }, { FORCE_RESTART: value });
+        assert.deepEqual(run.calls, ["deploy", "restart", "wait"], value);
+    }
+    for (const value of ["", "0", "no"]) {
+        const run = deploy({ status: "UPDATE_COMPLETE" }, { FORCE_RESTART: value });
+        assert.deepEqual(run.calls, ["deploy"], JSON.stringify(value));
+    }
+    const typo = deploy({ status: "UPDATE_COMPLETE" }, { FORCE_RESTART: "ture" });
+    assert.equal(typo.status, 1);
+    assert.match(typo.stderr, /FORCE_RESTART must be 1/);
+    assert.deepEqual(typo.calls, [], "nothing deployed");
 });
