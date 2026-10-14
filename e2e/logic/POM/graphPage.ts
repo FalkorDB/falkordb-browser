@@ -1163,8 +1163,10 @@ export default class GraphPage extends BasePage {
 
   /** The id the data panel shows for the selected node, or null while none is shown. */
   async getDataPanelNodeId(): Promise<number | null> {
-    const text = await this.page.getByTestId("DataPanel").locator("p", { hasText: /^ID:/ }).first().textContent().catch(() => null);
-    const match = text?.match(/ID:\s*(\d+)/);
+    const id = this.page.getByTestId("DataPanel").locator("p", { hasText: /^ID:/ }).first();
+    // Counted first: reading the text would wait out the timeout for a panel that isn't open.
+    if (await id.count() === 0) return null;
+    const match = (await id.textContent())?.match(/ID:\s*(\d+)/);
     return match ? Number(match[1]) : null;
   }
 
