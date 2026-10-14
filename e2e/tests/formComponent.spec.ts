@@ -45,9 +45,16 @@ test.describe("@admin Login form validation", () => {
 
     test("@admin blocks submit while a field is invalid", async ({ page }) => {
         await port(page).fill("abc");
+        // Only sign-in attempts made by the click count, not anything sent on load.
+        const signIns: string[] = [];
+        page.on("request", (request) => {
+            if (request.method() !== "POST") return;
+            if (new URL(request.url()).pathname.startsWith("/api/auth/callback/")) signIns.push(request.url());
+        });
         await page.getByRole("button", { name: "Log in" }).click();
         await expect(page).toHaveURL(/\/login/);
         await expect(page.getByText("Port must be a number", { exact: true })).toBeVisible();
+        expect(signIns).toEqual([]);
     });
 
     test("@admin marks required fields with an asterisk without blocking the default connection", async ({ page }) => {
