@@ -3,14 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import pkg from "@/package.json";
-import { extractWhatsNew, releaseForVersion } from "@/lib/releaseNotes";
+import { extractWhatsNew, releaseForVersion, seenCovers } from "@/lib/releaseNotes";
 import { setWhatsNewActive } from "@/lib/popupTurn";
 import useReleases from "./useReleases";
 import ReleaseMarkdown from "./ReleaseMarkdown";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
 
-/** The release whose What's New this browser has already shown. */
+/** The newest release whose What's New this browser has shown; it and older ones stay quiet. */
 export const WHATS_NEW_SEEN_KEY = "whatsNewSeen";
 /** Lets the page settle before the popup appears. */
 const SHOW_DELAY_MS = 1000;
@@ -37,7 +37,7 @@ export default function WhatsNewPopup({ paused }: { paused: boolean }) {
     const whatsNew = useMemo(() => (release ? extractWhatsNew(release.body) : null), [release]);
 
     const active = (!paused && state.status === "loading")
-        || (!!release && !!whatsNew && !closed && readSeen() !== release.tag);
+        || (!!release && !!whatsNew && !closed && !seenCovers(readSeen(), release.tag));
     // While deciding, or with something unread, other first-visit popups wait their turn.
     useEffect(() => {
         setWhatsNewActive(active);
@@ -45,7 +45,7 @@ export default function WhatsNewPopup({ paused }: { paused: boolean }) {
     useEffect(() => () => setWhatsNewActive(false), []);
 
     useEffect(() => {
-        if (paused || !release || !whatsNew || readSeen() === release.tag) return undefined;
+        if (paused || !release || !whatsNew || seenCovers(readSeen(), release.tag)) return undefined;
         const timer = setTimeout(() => setOpen(true), SHOW_DELAY_MS);
         return () => clearTimeout(timer);
     }, [paused, release, whatsNew]);
@@ -57,7 +57,8 @@ export default function WhatsNewPopup({ paused }: { paused: boolean }) {
         if (!next) {
             setClosed(true);
             try {
-                localStorage.setItem(WHATS_NEW_SEEN_KEY, release.tag);
+                // Never move it back: a newer release seen elsewhere stays seen.
+                if (!seenCovers(readSeen(), release.tag)) localStorage.setItem(WHATS_NEW_SEEN_KEY, release.tag);
             } catch {
                 // Storage blocked: it shows again next visit, which is harmless.
             }
