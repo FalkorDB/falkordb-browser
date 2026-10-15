@@ -41,8 +41,12 @@ jobs:
             jq -cn --arg tag "$TAG" '[$tag]' > tags.json
           else
             # Drafts have no notes worth keeping, and only published releases
-            # can be edited without publishing them.
-            gh release list --repo "$REPO" --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | sort -V > all.txt
+            # can be edited without publishing them. Every page, not a capped
+            # list. A pre-release sorts before its final release (v2.6.2-rc.1 <
+            # v2.6.2): sort -V puts "~" before everything, so it stands in for
+            # the first "-" while sorting.
+            gh api --paginate "repos/$REPO/releases?per_page=100" --jq '.[] | select(.draft | not) | .tag_name' \
+              | sed 's/-/~/' | sort -V | sed 's/~/-/' > all.txt
             for t in "$FROM_TAG" "$TAG"; do
               grep -qxF -- "$t" all.txt || { echo "::error::$t is not a published release"; exit 1; }
             done
