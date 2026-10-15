@@ -8,6 +8,9 @@ module.exports = {
     './components/**/*.{ts,tsx}',
     './app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
+    // The design system ships compiled JS, so its class names only reach the
+    // scanner through the bundle. Its palette tokens resolve against ours.
+    './node_modules/@falkordb/ui/dist/index.js',
   ],
   safelist: [
     {

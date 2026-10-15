@@ -57,8 +57,29 @@ export const initializeLocalStorage = (host = "localhost", port = 6379, username
         if (!localStorage.getItem("${prefix}query history")) localStorage.setItem("${prefix}query history", "[]");
         if (!localStorage.getItem("refreshInterval")) localStorage.setItem("refreshInterval", "60");
         if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
+        if (!localStorage.getItem("appDownloadPrompt")) localStorage.setItem("appDownloadPrompt", "false");
     `;
 };
+
+/**
+ * Init script that mimics canvas fingerprinting protection (Brave Shields,
+ * Firefox's resistFingerprinting): single-pixel `getImageData` reads come back
+ * with their low bits flipped, deterministically per pixel. force-graph finds
+ * the element under the pointer by reading one pixel from a hidden canvas, so
+ * this is what made random nodes unclickable in #1084.
+ */
+export const simulateCanvasFingerprintNoise = () => `
+    (() => {
+        const read = CanvasRenderingContext2D.prototype.getImageData;
+        CanvasRenderingContext2D.prototype.getImageData = function (...args) {
+            const image = read.apply(this, args);
+            const x = Math.floor(args[0]);
+            const y = Math.floor(args[1]);
+            if (args[2] === 1 && args[3] === 1 && (x * 31 + y * 17) % 3 !== 0) image.data[(x + y) % 3] ^= 1;
+            return image;
+        };
+    })();
+`;
 
 export function delay(ms: number) {
   return new Promise((resolve) => {

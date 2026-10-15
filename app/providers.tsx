@@ -18,7 +18,7 @@ import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDi
 import { isAiFixSupported } from "@/lib/aiFix";
 import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
-import type { LayoutMode, ViewportState } from "@falkordb/canvas";
+import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
@@ -27,8 +27,9 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
+import AppDownloadPrompt from "./components/AppDownloadPrompt";
 import { DemoLoadOutcome } from "./components/Tutorial";
-import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
+import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDimension, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
 import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
 
@@ -308,6 +309,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // the layout controls belong to the tab and are applied on entry.
   const [layout, setLayout] = useState<LayoutMode>('force');
   const [direction, setDirection] = useState(() => normalizeDirection('force', undefined));
+  const [dimension, setDimension] = useState<CanvasDimension>('2d');
   const [animation, setAnimation] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [dimmed, setDimmed] = useState(true);
@@ -354,6 +356,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const viewportResolved = useViewportResolved();
   const isMobile = useIsMobile();
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  // Set once the settings effect has decided whether the tour runs, so other
+  // first-visit popups can wait for that answer instead of racing it.
+  const [tutorialDecided, setTutorialDecided] = useState(false);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
@@ -743,13 +748,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setLayout,
     direction,
     setDirection,
+    dimension,
+    setDimension,
     animation,
     setAnimation,
     pinned,
     setPinned,
     dimmed,
     setDimmed,
-  }), [canvasRef, viewport, data, graphData, layout, direction, animation, pinned, dimmed]);
+  }), [canvasRef, viewport, data, graphData, layout, direction, dimension, animation, pinned, dimmed]);
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,
@@ -1428,8 +1435,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // Mirrored for the same reason: the layout controls are tab metadata, but
   // they are read at capture time rather than on every render.
-  const layoutRef = useRef({ layout, direction, animation, pinned, dimmed, expand: expandFilter, chatOpen, customizingLabel });
-  layoutRef.current = { layout, direction, animation, pinned, dimmed, expand: expandFilter, chatOpen, customizingLabel };
+  const layoutRef = useRef({ layout, direction, dimension, animation, pinned, dimmed, expand: expandFilter, chatOpen, customizingLabel });
+  layoutRef.current = { layout, direction, dimension, animation, pinned, dimmed, expand: expandFilter, chatOpen, customizingLabel };
 
   // The graph info panel is imperative and only mounted on /graph, so its open
   // state is remembered here for captures that happen once it is gone. It is
@@ -1488,6 +1495,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         selected: state.selectedParam || undefined,
         layout: layoutRef.current.layout,
         direction: layoutRef.current.direction,
+        dimension: layoutRef.current.dimension,
         animation: layoutRef.current.animation,
         pinned: layoutRef.current.pinned,
         dimmed: layoutRef.current.dimmed,
@@ -1555,6 +1563,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const tabLayout = normalizeLayout(meta.layout);
     setLayout(tabLayout);
     setDirection(normalizeDirection(tabLayout, meta.direction));
+    setDimension(normalizeDimension(meta.dimension));
     // Non-force layouts pin their nodes, so that is the fallback for a tab that
     // never stored the toggle.
     setAnimation(meta.animation ?? false);
@@ -2039,6 +2048,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         && localStorage.getItem("tutorial") !== "false"
         && !initialShareRef.current
       );
+      setTutorialDecided(true);
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
       setMaxTabs(loadedMaxTabs);
@@ -2721,6 +2731,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                             customizingLabel={customizingLabel}
                                             setCustomizingLabel={setCustomizingLabel}
                                             tutorialOpen={tutorialOpen}
+                                            tutorialDecided={tutorialDecided}
                                             onCloseTutorial={handleCloseTutorial}
                                             onLoadDemoGraphs={handleLoadDemoGraphs}
                                             onCleanupDemoGraphs={handleCleanupDemoGraphs}
@@ -2732,6 +2743,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                       }
                                     </GraphTabsContext.Provider>
                                     <AiFixDialogs />
+                                    {/* At the root, not on /graph or /login: a saved session skips the
+                                        login page, and the graph page is not where everyone lands.
+                                        It waits until the session and the tutorial have both been decided,
+                                        and until What's New, if there is one, has been read. */}
+                                    <AppDownloadPrompt blocked={tutorialOpen || status === "loading" || (status === "authenticated" && !tutorialDecided)} />
                                   </AiFixContext.Provider>
                                 </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>

@@ -15,6 +15,16 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "FalkorDB Browser",
   description: "FalkorDB Browser is a web-based UI for FalkorDB.",
+  // "Add to Home Screen" on iOS: open full screen, under the app's own name
+  // and icon, until there is an App Store app to offer instead.
+  appleWebApp: {
+    capable: true,
+    title: "FalkorDB",
+    statusBarStyle: "default",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
