@@ -226,7 +226,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$RUNNER_TEMP/apk/FalkorDB-Browser-android.apk" --repo "$GITHUB_REPOSITORY" --clobber
 
-  # Its own job, so nothing is checked out where the signing key was.
+  # Its own job, so nothing is checked out where the signing key was, and so
+  # it can share the polish job's per-release concurrency group: no two jobs
+  # rewrite the notes at once.
   android-release-notes:
     needs: android-release-sign
     if: github.event_name == 'release'
@@ -234,6 +236,8 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: write
+    concurrency:
+      group: release-notes-${{ github.event.release.tag_name }}
     steps:
       # The release's tag may predate the script, so take the default branch's
       # copy, and nothing else: no npm, just node and gh.

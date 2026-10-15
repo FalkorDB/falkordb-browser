@@ -38,7 +38,9 @@ const unwrap = (body) => {
   return body.slice(start + SUMMARY.length, end).replace(/^\r?\n\r?\n/, "");
 };
 // The download links are added after polishing, never rewritten by the model.
-const generated = stripDownloads(unwrap(original));
+// Polished notes keep GitHub's originals apart, without the links; anything
+// else may carry the links' section at its end.
+const generated = original.startsWith(MARKER) ? unwrap(original) : stripDownloads(original);
 
 if (!generated) {
   console.error(`Release ${tag} has no notes to rewrite.`);

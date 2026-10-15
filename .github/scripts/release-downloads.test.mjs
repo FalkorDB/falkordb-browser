@@ -18,6 +18,8 @@ const ALL = [
     "FalkorDB-Browser-android.apk",
 ];
 const DETAILS = "<details>\n<summary>Original generated notes</summary>\n\nraw notes\n</details>\n";
+// What the polish step saves: its marker, the notes, the collapsed originals.
+const polishedNotes = (text = "notes") => `<!-- polished-release-notes -->\n${text}\n\n${DETAILS}`;
 
 test("every attached installer gets a link to this release's own file", () => {
     const section = downloadsSection(REPO, "v2.7.0", ALL);
@@ -68,7 +70,7 @@ test("without stored original notes, the section goes at the end", () => {
 });
 
 test("updating replaces the old section instead of adding another", () => {
-    const first = withDownloads(`notes\n\n${DETAILS}`, downloadsSection(REPO, "v2.7.0", ["FalkorDB-Browser-linux-x86_64.AppImage"]));
+    const first = withDownloads(polishedNotes(), downloadsSection(REPO, "v2.7.0", ["FalkorDB-Browser-linux-x86_64.AppImage"]));
     const second = withDownloads(first, downloadsSection(REPO, "v2.7.0", ALL));
     assert.equal(second.split(START).length - 1, 1);
     assert.ok(second.includes("**Android:**"));
@@ -77,11 +79,37 @@ test("updating replaces the old section instead of adding another", () => {
 });
 
 test("stripDownloads gives back the notes without the section", () => {
-    const notes = `notes\n\n${DETAILS}`;
+    const notes = polishedNotes();
     assert.equal(stripDownloads(withDownloads(notes, downloadsSection(REPO, "v2.7.0", ALL))), notes);
     assert.equal(stripDownloads("no section here"), "no section here");
     // An empty section removes an old one.
     assert.equal(withDownloads(withDownloads(notes, downloadsSection(REPO, "v2.7.0", ALL)), ""), notes);
+});
+
+test("unpolished notes get the section at their very end, and lose only that", () => {
+    const raw = "## What's Changed\n* A change\n";
+    const body = withDownloads(raw, downloadsSection(REPO, "v2.7.0", ALL));
+    assert.ok(body.trimEnd().endsWith(END));
+    assert.equal(stripDownloads(body), raw.trimEnd());
+});
+
+test("marker text that is not this script's section is never deleted", () => {
+    // A PR title quoting the markers, in GitHub's raw notes.
+    const quoted = `* Docs: explain ${START} and ${END} in https://github.com/${REPO}/pull/9`;
+    const raw = `## What's Changed\n${quoted}\n* Another change\n`;
+    assert.equal(stripDownloads(raw), raw, "a quote in the middle is not a section");
+    const body = withDownloads(raw, downloadsSection(REPO, "v2.7.0", ALL));
+    assert.ok(body.includes(quoted) && body.includes("* Another change"));
+    assert.equal(stripDownloads(body), raw.trimEnd());
+
+    // The same quote inside the collapsed original notes of polished notes.
+    const polished = `<!-- polished-release-notes -->\nnotes\n\n<details>\n<summary>Original generated notes</summary>\n\n${quoted}\n</details>\n`;
+    assert.equal(stripDownloads(polished), polished);
+    const updated = withDownloads(polished, downloadsSection(REPO, "v2.7.0", ALL));
+    assert.ok(updated.includes(quoted));
+    assert.equal(updated.split(START).length - 1, 2, "the quote plus one real section");
+    assert.ok(updated.indexOf("## Download") < updated.indexOf("<details>"));
+    assert.equal(stripDownloads(updated), polished);
 });
 
 test("syncDownloads catches up when another workflow attaches a file meanwhile", () => {
@@ -90,7 +118,7 @@ test("syncDownloads catches up when another workflow attaches a file meanwhile",
         // A stand-in gh: `release view` returns the stored body and files; the
         // first `release edit` also "attaches" the APK, as a concurrent job would.
         const state = path.join(dir, "state.json");
-        writeFileSync(state, JSON.stringify({ body: `notes\n\n${DETAILS}`, assets: [{ name: "FalkorDB-Browser-linux-x86_64.AppImage" }], edits: 0 }));
+        writeFileSync(state, JSON.stringify({ body: polishedNotes(), assets: [{ name: "FalkorDB-Browser-linux-x86_64.AppImage" }], edits: 0 }));
         const gh = path.join(dir, "gh");
         writeFileSync(gh, `#!/usr/bin/env node
 const fs = require("fs");

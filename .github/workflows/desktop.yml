@@ -151,6 +151,20 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: gh release upload "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --clobber
 
+  # Its own job: it shares the polish job's per-release concurrency group so
+  # no two jobs rewrite the notes at once, and a queued job in a group can be
+  # cancelled by a newer one, which must never cost an upload. A cancelled one
+  # loses nothing; the next rebuilds the links from every attached file.
+  release-download-links:
+    if: github.event_name == 'release'
+    needs: attach-to-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: release-notes-${{ github.event.release.tag_name }}
+    steps:
       # The release's tag may predate the script, so take the default branch's
       # copy, and nothing else: no npm, just node and gh.
       - name: Check out the release scripts
