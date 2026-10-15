@@ -10,19 +10,73 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to rewrite (e.g. v2.6.2)'
+        description: 'Release tag to rewrite (e.g. v2.6.2), or the newest one of a range'
         required: true
+      from_tag:
+        description: 'Oldest release tag of a range (e.g. v2.4.0); every published release from it through tag is rewritten. Leave empty for tag alone.'
+        required: false
+        default: ''
       dry_run:
         description: 'Print the new notes without updating the release'
         type: boolean
         default: false
 
-concurrency:
-  group: release-notes-${{ github.event.release.tag_name || inputs.tag }}
-
 jobs:
-  polish:
+  # The releases to rewrite: the published one, the dispatched tag, or every
+  # published release in the dispatched range, oldest first.
+  releases:
     runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.list.outputs.tags }}
+    steps:
+      - name: List releases
+        id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          FROM_TAG: ${{ inputs.from_tag }}
+        run: |
+          if [ -z "$FROM_TAG" ]; then
+            jq -cn --arg tag "$TAG" '[$tag]' > tags.json
+          else
+            # Drafts have no notes worth keeping, and only published releases
+            # can be edited without publishing them. Every page, not a capped
+            # list. A pre-release sorts before its final release (v2.6.2-rc.1 <
+            # v2.6.2): sort -V puts "~" before everything, so it stands in for
+            # the first "-" while sorting.
+            gh api --paginate "repos/$REPO/releases?per_page=100" --jq '.[] | select(.draft | not) | .tag_name' \
+              | sed 's/-/~/' | sort -V | sed 's/~/-/' > all.txt
+            for t in "$FROM_TAG" "$TAG"; do
+              grep -qxF -- "$t" all.txt || { echo "::error::$t is not a published release"; exit 1; }
+            done
+            awk -v from="$FROM_TAG" -v to="$TAG" '$0 == from { on = 1 } on { print } $0 == to { exit }' all.txt > range.txt
+            if ! grep -qxF -- "$TAG" range.txt; then
+              echo "::error::$FROM_TAG is newer than $TAG"
+              exit 1
+            fi
+            jq -cR -s 'split("\n") | map(select(length > 0))' range.txt > tags.json
+          fi
+          # A matrix takes at most 256 jobs.
+          if [ "$(jq length tags.json)" -gt 256 ]; then
+            echo "::error::More than 256 releases in range; split it up."
+            exit 1
+          fi
+          echo "Releases to rewrite: $(jq -r 'join(", ")' tags.json)"
+          echo "tags=$(cat tags.json)" >> "$GITHUB_OUTPUT"
+
+  polish:
+    needs: releases
+    runs-on: ubuntu-latest
+    strategy:
+      # One release failing must not stop the rest; a few at a time keeps
+      # within the model deployment's rate limit.
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        tag: ${{ fromJSON(needs.releases.outputs.tags) }}
+    concurrency:
+      group: release-notes-${{ matrix.tag }}
     permissions:
       contents: write
       pull-requests: read
@@ -52,6 +106,6 @@ jobs:
           # Repository variables (Settings → Secrets and variables → Actions → Variables).
           AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
           AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          RELEASE_TAG: ${{ matrix.tag }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: node "$RUNNER_TEMP/polish-release-notes.mjs"
