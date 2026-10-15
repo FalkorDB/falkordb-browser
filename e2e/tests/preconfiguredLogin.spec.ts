@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import LoginPage from "../logic/POM/loginPage";
+import { NO_RELEASES, RELEASES_ROUTE } from "../infra/utils";
 
 const DISCOVERY_ROUTE = "**/api/connections/preconfigured";
 // next-auth appends the authorization params to the callback, so the pattern
@@ -20,6 +21,8 @@ test.describe("@admin Preconfigured connection", () => {
     // keep it out of the way, as every other suite does (initializeLocalStorage).
     test.beforeEach(async ({ page }) => {
         await page.addInitScript(() => localStorage.setItem("appDownloadPrompt", "false"));
+        // Nor the What's New popup, once a sign-in lands on /graph.
+        await page.route(RELEASES_ROUTE, (route) => route.fulfill({ json: NO_RELEASES }));
     });
 
     test("signs in automatically and reports a connection it cannot reach", async ({ page }) => {

@@ -81,6 +81,15 @@ export const simulateCanvasFingerprintNoise = () => `
     })();
 `;
 
+/**
+ * The browser fetches its release notes live from GitHub, and opens a What's
+ * New popup for the running version's release. Tests must not depend on what
+ * was last published there (or on GitHub's API limits), so they get no
+ * releases; the tests that cover What's New stub their own.
+ */
+export const RELEASES_ROUTE = "**/api/releases";
+export const NO_RELEASES = { releases: [] };
+
 export function delay(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
