@@ -1,16 +1,9 @@
-import { cn } from "@/lib/utils"
+import * as React from "react"
+import { Skeleton as UISkeleton } from "@falkordb/ui"
 
-function Skeleton({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn("animate-pulse rounded-md bg-muted", className)}
-      id="skeleton"
-      {...props}
-    />
-  )
+// `#skeleton` is how the browser's tests find a loading placeholder.
+function Skeleton(props: React.HTMLAttributes<HTMLDivElement>) {
+  return <UISkeleton id="skeleton" {...props} />
 }
 
 export { Skeleton }

@@ -1,3 +1,43 @@
+const fs = require('fs')
+const path = require('path')
+
+// While @falkordb/canvas is linked to a local checkout (`npm install ../falkordb-ui/web-components/canvas`),
+// Turbopack has to be rooted above both projects, or it will not resolve files outside this one.
+// This Next.js has no narrower option for linked packages, so the root is the closest folder that
+// contains both — no wider than it must be. Without a link, nothing changes.
+const linkedCanvasRoot = (() => {
+  try {
+    const link = path.join(__dirname, 'node_modules/@falkordb/canvas')
+    if (!fs.lstatSync(link).isSymbolicLink()) return undefined
+    // Both sides resolved, or a symlinked parent (macOS /tmp -> /private/tmp)
+    // would never match and the root would climb to /.
+    let root = fs.realpathSync(__dirname)
+    const target = fs.realpathSync(link)
+    // A relative path is absolute when the two are on different Windows drives.
+    const outside = () => {
+      const rel = path.relative(root, target)
+      // `..` only as a whole component: `..canvas` is a folder inside root.
+      return rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)
+    }
+    while (outside() && root !== path.parse(root).root) root = path.dirname(root)
+
+    // Only the filesystem root holds both when the link is on another disk or
+    // mount, and Turbopack would then watch the whole filesystem. Leave the root
+    // unset and warn instead of failing: `next start` and webpack builds load
+    // this config too but never use the Turbopack root.
+    if (root === path.parse(root).root) {
+      console.warn(
+        'The linked @falkordb/canvas shares no parent folder with this project other than the filesystem root, '
+          + 'so Turbopack will not resolve it. Put both checkouts side by side, or install @falkordb/canvas from npm.',
+      )
+      return undefined
+    }
+    return root
+  } catch {
+    return undefined
+  }
+})()
+
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
@@ -12,6 +52,7 @@ const nextConfig = {
   },
   // Enable Turbopack with SVG handling
   turbopack: {
+    ...(linkedCanvasRoot && { root: linkedCanvasRoot }),
     rules: {
       // Convert SVG imports to React components using @svgr/webpack
       // This preserves the behavior from the webpack config below

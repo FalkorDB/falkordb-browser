@@ -1,0 +1,152 @@
+name: Desktop app
+
+# Builds the Electron app on every OS. On pull requests, pushes and manual runs
+# the installers are only uploaded as workflow artifacts. When a GitHub release
+# is published, they are also attached to that release, so its page lists a
+# download for each OS. The release notes, the Docker image release and the
+# Helm chart are left alone.
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: ["main", "staging"]
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+      # The web app the installers bundle (`npm run dist` builds it).
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "types/**"
+      - "auth.ts"
+      - "proxy.ts"
+      - "next.config.js"
+      - "postcss.config.js"
+      - "tailwind.config.js"
+      - "tsconfig.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".npmrc"
+  pull_request:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+      # The web app the installers bundle (`npm run dist` builds it).
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "types/**"
+      - "auth.ts"
+      - "proxy.ts"
+      - "next.config.js"
+      - "postcss.config.js"
+      - "tailwind.config.js"
+      - "tsconfig.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".npmrc"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-latest is Apple silicon (mac-arm64), macos-15-intel builds for
+        # Intel Macs (mac-x64). Each runner builds its own architecture natively.
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Unsigned builds until signing certificates are configured.
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci --no-audit --progress=false
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci --no-audit --progress=false
+
+      - name: Lint desktop
+        if: runner.os == 'Linux'
+        working-directory: desktop
+        run: npm run lint
+
+      - name: Run desktop tests
+        working-directory: desktop
+        run: npm test
+
+      # Stamp the app with the release's version (v2.6.1 -> 2.6.1), not the
+      # one last written into desktop/package.json. File names carry no
+      # version, so the browser's latest/download links keep working.
+      - name: Use the release version
+        if: github.event_name == 'release'
+        working-directory: desktop
+        shell: bash
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: npm version "${TAG#v}" --no-git-tag-version --allow-same-version
+
+      # Native modules in the standalone server are traced for the OS that
+      # builds them, which is why each platform builds its own installer.
+      - name: Build installers
+        working-directory: desktop
+        run: npm run dist
+
+      - name: Upload installers
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: falkordb-browser-desktop-${{ matrix.os }}
+          path: |
+            desktop/dist/*.AppImage
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  attach-to-release:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: falkordb-browser-desktop-*
+          path: installers
+          merge-multiple: true
+
+      - name: Attach installers to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --clobber

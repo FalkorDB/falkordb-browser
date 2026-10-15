@@ -1,4 +1,4 @@
-import type { HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
+import type { CanvasDimension, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import type { CustomizingRef, Tab } from "./utils";
 
 /**
@@ -14,6 +14,8 @@ export type ViewTabMeta = {
     /** Canvas layout mode, and the direction it is arranged in. */
     layout?: string;
     direction?: string;
+    /** Whether the canvas shows the graph in 2D or 3D. */
+    dimension?: string;
     /** Canvas view toggles: simulation, pin-on-drag and focus mode. */
     animation?: boolean;
     pinned?: boolean;
@@ -122,6 +124,10 @@ export const normalizeDirection = (layout: LayoutMode, value: string | null | un
     return "";
 };
 
+/** Falls back to 2D for anything the canvas would not accept. */
+export const normalizeDimension = (value: string | null | undefined): CanvasDimension =>
+    (value === "3d" ? "3d" : "2d");
+
 /** `gap-1` on the tab strip, and the add button's 16px icon inside `p-1`. */
 const STRIP_GAP = 4;
 const ADD_BUTTON_WIDTH = 24;
@@ -201,6 +207,7 @@ const normalizeViewMeta = (value: unknown): ViewTabMeta => {
         selected: asString(meta.selected),
         layout: asString(meta.layout),
         direction: asString(meta.direction),
+        dimension: asString(meta.dimension),
         animation: asBoolean(meta.animation),
         pinned: asBoolean(meta.pinned),
         dimmed: asBoolean(meta.dimmed),

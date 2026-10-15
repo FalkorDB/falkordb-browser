@@ -70,7 +70,7 @@ export default function ForceGraph({
     const { setIndicator } = useContext(IndicatorContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
-    const { layout: ctxLayout, direction: ctxDirection, animation: ctxAnimation, pinned: ctxPinned } = useContext(ForceGraphContext);
+    const { layout: ctxLayout, direction: ctxDirection, dimension: ctxDimension, setDimension: setCtxDimension, animation: ctxAnimation, pinned: ctxPinned } = useContext(ForceGraphContext);
 
     const { theme } = useTheme();
     const { toast } = useToast();
@@ -574,6 +574,28 @@ export default function ForceGraph({
 
         canvasRef.current.setLayout(mode);
     }, [canvasRef, canvasLoaded, ctxLayout, ctxDirection]);
+
+    // The 3D renderer is downloaded the first time it is needed. Should that
+    // fail the canvas stays in 2D, so the control is put back to match — unless
+    // the user has picked again meanwhile, which superseded this request.
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || !canvasLoaded) return undefined;
+
+        let superseded = false;
+        canvas.setDimension(ctxDimension).catch((error: unknown) => {
+            if (superseded) return;
+            console.error("Could not open the 3D view", error);
+            toast({
+                title: "Could not open the 3D view",
+                description: "The graph is still shown in 2D.",
+                variant: "destructive",
+            });
+            setCtxDimension('2d');
+        });
+
+        return () => { superseded = true; };
+    }, [canvasRef, canvasLoaded, ctxDimension, setCtxDimension, toast]);
 
     // The remaining view toggles are tab state too, so the canvas follows the
     // context rather than the control that changed it.

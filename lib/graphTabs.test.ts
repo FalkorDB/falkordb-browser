@@ -4,6 +4,7 @@ import {
     clampMaxTabs,
     createTab,
     forStorage,
+    normalizeDimension,
     normalizeDirection,
     normalizeLayout,
     parseSharedTab,
@@ -79,6 +80,14 @@ test("normalizeLayout keeps supported layouts and falls back to force", () => {
     assert.equal(normalizeLayout(undefined), "force");
 });
 
+test("normalizeDimension falls back to 2D for anything but 3D", () => {
+    assert.equal(normalizeDimension("3d"), "3d");
+    assert.equal(normalizeDimension("2d"), "2d");
+    assert.equal(normalizeDimension("3D"), "2d");
+    assert.equal(normalizeDimension(null), "2d");
+    assert.equal(normalizeDimension(undefined), "2d");
+});
+
 test("normalizeDirection resolves the direction against its layout", () => {
     // The force layout has no direction at all.
     assert.equal(normalizeDirection("force", "td"), "");
@@ -151,6 +160,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             selected: "n:12:s",
             layout: "grid",
             direction: "lr",
+            dimension: "3d",
             animation: true,
             pinned: false,
             dimmed: true,
@@ -163,6 +173,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             selected: "l:Person",
             layout: "tree",
             direction: "td",
+            dimension: "2d",
             animation: false,
             pinned: true,
             dimmed: false,
@@ -183,6 +194,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             selected: "n:12:s",
             layout: "grid",
             direction: "lr",
+            dimension: "3d",
             animation: true,
             pinned: false,
             dimmed: true,
@@ -195,6 +207,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             selected: "l:Person",
             layout: "tree",
             direction: "td",
+            dimension: "2d",
             animation: false,
             pinned: true,
             dimmed: false,
@@ -226,6 +239,7 @@ test("parseStoredTabs reads a strip written before the metadata was split per vi
         selected: "n:12",
         layout: "tree",
         direction: undefined,
+        dimension: undefined,
         animation: undefined,
         pinned: undefined,
         dimmed: undefined,
@@ -240,6 +254,7 @@ test("parseStoredTabs reads a strip written before the metadata was split per vi
         selected: undefined,
         layout: undefined,
         direction: undefined,
+        dimension: undefined,
         animation: undefined,
         pinned: undefined,
         dimmed: undefined,
@@ -263,6 +278,7 @@ test("parseStoredTabs strips metadata of the wrong type but keeps the tab", () =
             viewport: { centerX: 1, zoom: 3 },
             selected: 12,
             layout: false,
+            dimension: 3,
             animation: "yes",
             pinned: 1,
             dimmed: null,
@@ -280,6 +296,7 @@ test("parseStoredTabs strips metadata of the wrong type but keeps the tab", () =
         selected: undefined,
         layout: undefined,
         direction: undefined,
+        dimension: undefined,
         animation: undefined,
         pinned: undefined,
         dimmed: undefined,

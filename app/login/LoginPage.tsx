@@ -11,6 +11,7 @@ import { getTheme } from "@/lib/utils";
 import type { PreconfiguredConnectionInfo } from "@/lib/preconfiguredConnection";
 import Spinning from "@/app/components/ui/spinning";
 import Button from "@/app/components/ui/Button";
+import AppDownloadLink from "@/app/components/AppDownloadLink";
 import LoginForm, { LoginFormCredentials } from "./LoginForm";
 
 const AUTO_CONNECT_FAILED =
@@ -162,6 +163,8 @@ export default function LoginPage() {
       port: credentials.port,
       tls: credentials.tls,
       ca: credentials.ca,
+      cert: credentials.cert,
+      key: credentials.key,
     };
 
     if (credentials.username) {
@@ -233,13 +236,19 @@ export default function LoginPage() {
               </>
             )}
           </div>
-          <Link
-            href="/docs"
-            className="shrink-0 flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
-          >
-            <FileText className="w-4 h-4" />
-            API Documentation
-          </Link>
+          <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <Link
+              href="/docs"
+              className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
+            >
+              <FileText className="w-4 h-4" />
+              API Documentation
+            </Link>
+            <AppDownloadLink
+              className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
+              iconSize={16}
+            />
+          </div>
         </div>
       </div>
       <div className="h-5 Gradient" />

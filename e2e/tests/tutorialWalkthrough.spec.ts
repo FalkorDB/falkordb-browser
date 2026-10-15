@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
+import AppDownloadComponent from "../logic/POM/appDownloadComponent";
 import ApiCalls from "../logic/api/apiCalls";
 import { delay, getRandomString } from "../infra/utils";
 
@@ -78,6 +79,32 @@ test.describe("Tutorial", () => {
             await tutorial.refreshPage();
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
+        } finally {
+            await tutorial.changeLocalStorage("false");
+        }
+    });
+
+    test("@admin the app download popup waits until the tutorial is closed", async () => {
+        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const page = await browser.getPage();
+        const app = new AppDownloadComponent(page);
+        // What's New would also wait for the tutorial and then go first; leave it out.
+        await page.route("**/api/releases", (route) => route.fulfill({ json: { releases: [] } }));
+        try {
+            // The suite keeps the popup away with "false"; any other value lets
+            // it open, and the init script only fills in a missing one.
+            await app.evaluate(() => localStorage.setItem("appDownloadPrompt", "true"));
+            await tutorial.changeLocalStorage("true");
+            await tutorial.refreshPage();
+            await tutorial.waitForStep("Welcome to FalkorDB Browser");
+
+            // Both are first-visit popups: the tour goes first, alone.
+            await tutorial.waitForTimeout(4000);
+            await expect(app.prompt).toBeHidden();
+
+            await tutorial.skip();
+            await expect(app.prompt).toBeVisible({ timeout: 10_000 });
         } finally {
             await tutorial.changeLocalStorage("false");
         }

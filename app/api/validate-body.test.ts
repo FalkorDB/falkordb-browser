@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { updateGraphElementAttribute } from "./validate-body.ts";
+import { updateGraphElementAttribute, login, addConnection, authCredentials } from "./validate-body.ts";
 import { CALENDAR_DATE_ERROR } from "../../lib/graphValues.ts";
 
 const parse = (body: unknown) => updateGraphElementAttribute.safeParse(body);
@@ -84,5 +84,78 @@ describe("updateGraphElementAttribute", () => {
 
   it("needs to know which element is edited", () => {
     assert.equal(parse({ value: "hello" }).success, false);
+  });
+});
+
+const CERT = Buffer.from("-----BEGIN CERTIFICATE-----").toString("base64");
+const KEY = Buffer.from("-----BEGIN PRIVATE KEY-----").toString("base64");
+
+const messages = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
+  result.success ? [] : result.error!.issues.map((i) => i.message);
+
+describe("mTLS credentials", () => {
+  // A half-filled pair has to be named by the schema rather than surfacing later
+  // as a failed TLS handshake with an opaque error.
+  it("takes a client certificate only together with its key, under TLS", () => {
+    assert.equal(login.safeParse({ tls: "true", cert: CERT, key: KEY }).success, true);
+    assert.equal(login.safeParse({ tls: "true" }).success, true);
+
+    assert.match(
+      messages(login.safeParse({ tls: "true", cert: CERT })).join(),
+      /together/
+    );
+    assert.match(
+      messages(login.safeParse({ tls: "true", key: KEY })).join(),
+      /together/
+    );
+    assert.match(
+      messages(login.safeParse({ tls: "false", cert: CERT, key: KEY })).join(),
+      /TLS/
+    );
+  });
+
+  // The values are interpolated into Cypher by FalkorDBTokenStorage, so
+  // anything outside the base64 alphabet must not get that far.
+  it("takes certificate material only as base64", () => {
+    assert.equal(login.safeParse({ tls: "true", cert: "not base64!", key: KEY }).success, false);
+    assert.equal(login.safeParse({ tls: "true", cert: CERT, key: "a'b\\" }).success, false);
+  });
+
+  it("applies the same rules to a connection added mid-session", () => {
+    assert.equal(addConnection.safeParse({ tls: true, cert: CERT, key: KEY }).success, true);
+    assert.equal(addConnection.safeParse({ tls: true, cert: CERT }).success, false);
+    assert.equal(addConnection.safeParse({ tls: false, cert: CERT, key: KEY }).success, false);
+    assert.equal(addConnection.safeParse({ tls: true, cert: "%%%", key: KEY }).success, false);
+  });
+
+  // signIn() posts straight to the Auth.js callback, so this schema is the only
+  // check standing between the login form and both the TLS socket and the Token
+  // DB, which interpolates the stored certificate into Cypher.
+  it("applies the same rules to the credentials provider", () => {
+    assert.equal(authCredentials.safeParse({ tls: "true", cert: CERT, key: KEY }).success, true);
+    assert.equal(authCredentials.safeParse({ tls: "true", cert: CERT }).success, false);
+    assert.equal(authCredentials.safeParse({ tls: "false", cert: CERT, key: KEY }).success, false);
+    assert.equal(authCredentials.safeParse({ tls: "true", cert: "a'b\\", key: KEY }).success, false);
+  });
+
+  // A URL login derives its socket options from the URL alone, so certificates
+  // handed alongside one would otherwise be dropped without a word.
+  it("refuses certificate material alongside a connection URL", () => {
+    assert.match(
+      messages(
+        authCredentials.safeParse({ tls: "true", cert: CERT, key: KEY, url: "falkor://localhost:6379" })
+      ).join(),
+      /connection URL/
+    );
+  });
+
+  // next-auth serialises an absent credential, so every plain login arrives with
+  // the literal string "undefined" in these fields.
+  it("reads a stringified absent credential as absent", () => {
+    const result = authCredentials.safeParse({ tls: "false", cert: "undefined", key: "undefined", url: "" });
+    assert.equal(result.success, true);
+    assert.equal(result.data?.cert, undefined);
+    assert.equal(result.data?.key, undefined);
+    assert.equal(result.data?.url, undefined);
   });
 });
