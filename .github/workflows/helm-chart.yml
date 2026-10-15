@@ -13,6 +13,7 @@ on:
       - '.github/workflows/helm-chart.yml'
   pull_request:
     paths:
+      - 'helm/**'
       - '.github/workflows/helm-chart.yml'
   workflow_dispatch:
 
@@ -59,6 +60,10 @@ jobs:
               "runAsNonRoot": True,
               "runAsUser": 1001,
               "runAsGroup": 1001,
+              # Matches values.yaml: fsGroup lets the non-root process write the
+              # persistence PVC; OnRootMismatch avoids re-chown on every restart.
+              "fsGroup": 1001,
+              "fsGroupChangePolicy": "OnRootMismatch",
               "seccompProfile": {"type": "RuntimeDefault"},
           }
           expected_container = {
