@@ -50,9 +50,11 @@ type Visitor = {
 async function openVisitor(browser: Browser, { ua, viewport = DESKTOP, signedIn = true, cpu }: Visitor): Promise<BrowserContext> {
     const { cookies } = signedIn ? JSON.parse(readFileSync(ADMIN_AUTH_FILE, "utf8")) : { cookies: [] };
     const context = await browser.newContext({ userAgent: ua, viewport, storageState: { cookies, origins: [] } });
-    // A returning user: the tutorial was seen, so nothing else competes with the popup.
+    // A returning user: the tutorial and the latest What's New were seen, so
+    // nothing else competes with the popup.
     await context.addInitScript(() => {
         if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
+        if (!localStorage.getItem("whatsNewSeen")) localStorage.setItem("whatsNewSeen", "v999.0.0");
     });
     // The test browser would otherwise report the runner's own CPU.
     if (cpu) {
