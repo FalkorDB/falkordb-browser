@@ -16,7 +16,8 @@ const linkedCanvasRoot = (() => {
     // A relative path is absolute when the two are on different Windows drives.
     const outside = () => {
       const rel = path.relative(root, target)
-      return rel.startsWith('..') || path.isAbsolute(rel)
+      // `..` only as a whole component: `..canvas` is a folder inside root.
+      return rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)
     }
     while (outside() && root !== path.parse(root).root) root = path.dirname(root)
 

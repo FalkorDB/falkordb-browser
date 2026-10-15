@@ -26,6 +26,8 @@ interface ProviderLayoutProps {
   customizingLabel: CustomizingRef | null;
   setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>>;
   tutorialOpen: boolean;
+  /** False until the first-visit tour has been decided on, so What's New cannot open ahead of it. */
+  tutorialDecided: boolean;
   onCloseTutorial: () => void;
   onLoadDemoGraphs: () => Promise<DemoLoadOutcome>;
   onCleanupDemoGraphs: () => Promise<void>;
@@ -38,6 +40,7 @@ export default function ProviderLayout({
   customizingLabel,
   setCustomizingLabel,
   tutorialOpen,
+  tutorialDecided,
   onCloseTutorial,
   onLoadDemoGraphs,
   onCleanupDemoGraphs,
@@ -187,7 +190,7 @@ export default function ProviderLayout({
           onCleanupDemoGraphs={onCleanupDemoGraphs}
         />
       }
-      <WhatsNewPopup paused={tutorialOpen || !showNavbarAndHeader} />
+      <WhatsNewPopup paused={tutorialOpen || !tutorialDecided || !showNavbarAndHeader} />
       {
         showNavbarAndHeader &&
         <Header

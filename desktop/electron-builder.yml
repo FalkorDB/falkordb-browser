@@ -5,7 +5,7 @@ directories:
   output: dist
 # No version and no spaces: the browser's "Download for …" links point at
 # releases/latest/download/<name>, which only works if the name never changes.
-# Keep in step with DESKTOP_DOWNLOADS in lib/appDownload.ts.
+# Keep in step with DESKTOP_FILES in lib/appDownload.ts.
 artifactName: FalkorDB-Browser-${os}-${arch}.${ext}
 files:
   - main.cjs

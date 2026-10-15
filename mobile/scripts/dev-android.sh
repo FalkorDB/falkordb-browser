@@ -11,11 +11,25 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
+# The address of the interface the default route goes out of, so a Docker
+# bridge address is never baked into the APK. When that interface is a tunnel
+# (a full-tunnel VPN), the phone most likely cannot reach it, so nothing is
+# returned. Anything else is left to FALKORDB_BROWSER_URL.
+is_tunnel() {
+  case "$1" in tun*|tap*|utun*|wg*|ppp*|ipsec*|tailscale*|zt*) return 0 ;; *) return 1 ;; esac
+}
 lan_ip() {
-  if command -v ipconfig >/dev/null 2>&1 && ipconfig getifaddr en0 >/dev/null 2>&1; then
-    ipconfig getifaddr en0
-  else
-    hostname -I | awk '{print $1}'
+  if command -v route >/dev/null 2>&1 && command -v ipconfig >/dev/null 2>&1; then
+    # macOS: whichever interface the default route uses, not only en0.
+    iface="$(route -n get default 2>/dev/null | awk '$1 == "interface:" { print $2 }')"
+    [ -n "$iface" ] && ! is_tunnel "$iface" && ipconfig getifaddr "$iface"
+  elif command -v ip >/dev/null 2>&1; then
+    ip -4 route get 1.1.1.1 | awk '{
+      for (i = 1; i < NF; i++) { if ($i == "dev") dev = $(i + 1); if ($i == "src") src = $(i + 1) }
+    } END { print dev, src }' | {
+      read -r dev src
+      is_tunnel "$dev" || echo "$src"
+    }
   fi
 }
 

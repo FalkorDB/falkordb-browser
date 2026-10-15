@@ -14,10 +14,40 @@ on:
     paths:
       - "desktop/**"
       - ".github/workflows/desktop.yml"
+      # The web app the installers bundle (`npm run dist` builds it).
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "types/**"
+      - "auth.ts"
+      - "proxy.ts"
+      - "next.config.js"
+      - "postcss.config.js"
+      - "tailwind.config.js"
+      - "tsconfig.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".npmrc"
   pull_request:
     paths:
       - "desktop/**"
       - ".github/workflows/desktop.yml"
+      # The web app the installers bundle (`npm run dist` builds it).
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "types/**"
+      - "auth.ts"
+      - "proxy.ts"
+      - "next.config.js"
+      - "postcss.config.js"
+      - "tailwind.config.js"
+      - "tsconfig.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".npmrc"
   workflow_dispatch:
 
 permissions:

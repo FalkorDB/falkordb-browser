@@ -140,8 +140,13 @@ One-time setup:
 
 Each release's version becomes the app's `versionName`, and `versionCode` is
 derived from it (v2.6.1 → 20601), so a newer APK installs over the old one.
-For Google Play later, the same key and workflow can build an AAB instead
-(`--androidreleasetype AAB`).
+Pre-release tags (v3.0.0-rc1) are refused, since they would share their final
+release's code. Google Play needs an AAB rather than this APK: that means
+changing the workflow to run `./gradlew bundleRelease` instead of
+`assembleRelease`, signing `app/build/outputs/bundle/release/app-release.aab`
+with `jarsigner` (apksigner and zipalign are for APKs only), and uploading
+that file. The same key can sign it, or serve as the upload key for Play App
+Signing.
 
 ## Store review
 

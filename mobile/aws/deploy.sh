@@ -145,13 +145,23 @@ if [ -n "$restart_reason" ] && [ "$STATUS" != NONE ]; then
   fi
 
   echo "Restarting the browser ($restart_reason)."
-  if ! aws ecs update-service --cluster "$cluster" --service "$service" --force-new-deployment > /dev/null; then
+  if ! deployment="$(aws ecs update-service --cluster "$cluster" --service "$service" --force-new-deployment \
+      --query "service.deployments[?status=='PRIMARY'].id | [0]" --output text)" \
+    || [ -z "$deployment" ] || [ "$deployment" = None ]; then
     echo "The restart could not be started; the running browser still has the old setting. Finish with: $finish" >&2
     exit 1
   fi
   echo "Waiting for the new tasks to take over..."
   if ! aws ecs wait services-stable --cluster "$cluster" --services "$service"; then
     echo "The new tasks did not settle. Check the service's events in the ECS console, then finish with: $finish" >&2
+    exit 1
+  fi
+  # The circuit breaker rolls a failed deployment back to the old tasks, and
+  # the service is just as stable then, so check that ours is the one running.
+  rollout="$(aws ecs describe-services --cluster "$cluster" --services "$service" \
+    --query "services[0].deployments[?id=='$deployment'].[status, rolloutState] | [0]" --output text || true)"
+  if [ "$(printf '%s' "$rollout" | tr -s '[:space:]' ' ')" != "PRIMARY COMPLETED" ]; then
+    echo "The new tasks did not take over (deployment $deployment: ${rollout:-not found}); ECS may have rolled back to the old ones. Check the service's events in the ECS console, then finish with: $finish" >&2
     exit 1
   fi
 fi

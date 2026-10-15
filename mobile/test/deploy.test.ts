@@ -25,8 +25,13 @@ case "$*" in
   *"secretsmanager get-secret-value"*) echo "$FAKE_PREVIOUS_URL" ;;
   *describe-stacks*ClusterName*) echo "the-cluster" ;;
   *describe-stacks*ServiceName*) echo "the-service" ;;
-  *"ecs update-service"*) log restart; [ "$FAKE_RESTART" = fail ] && exit 254; : ;;
+  *"ecs update-service"*) log restart; [ "$FAKE_RESTART" = fail ] && exit 254; echo "ecs-svc/new" ;;
   *"ecs wait services-stable"*) log wait; [ "$FAKE_WAIT" = fail ] && exit 255; : ;;
+  *"ecs describe-services"*"ecs-svc/new"*)
+    case "$FAKE_ROLLOUT" in
+      ok) printf 'PRIMARY\tCOMPLETED\n' ;;
+      rolledback) printf 'INACTIVE\tFAILED\n' ;;
+    esac ;;
   *" deploy "*)
     log deploy
     for arg in "$@"; do case "$arg" in file://*) cp "\${arg#file://}" "$FAKE_DIR/params.json" ;; esac; done
@@ -48,6 +53,7 @@ function deploy(stack: {
     previousUrl?: string;
     restart?: "ok" | "fail";
     wait?: "ok" | "fail";
+    rollout?: "ok" | "rolledback";
 }, env: Record<string, string> = {}): Run {
     const dir = mkdtempSync(path.join(tmpdir(), "falkordb-deploy-"));
     try {
@@ -63,6 +69,7 @@ function deploy(stack: {
                 FAKE_PREVIOUS_URL: stack.previousUrl ?? "",
                 FAKE_RESTART: stack.restart ?? "ok",
                 FAKE_WAIT: stack.wait ?? "ok",
+                FAKE_ROLLOUT: stack.rollout ?? "ok",
                 STACK_NAME: "s",
                 BROWSER_URL: "https://browser.example.com",
                 CERTIFICATE_ARN: "arn:aws:acm:cert",
@@ -125,7 +132,8 @@ test("an unchanged or first-time token store URL does not restart", () => {
 });
 
 test("a restart that fails says how to finish it, and FORCE_RESTART=1 does", () => {
-    for (const stack of [{ restart: "fail" as const }, { wait: "fail" as const }]) {
+    // A rolled-back deployment leaves the service stable, but on the old tasks.
+    for (const stack of [{ restart: "fail" as const }, { wait: "fail" as const }, { rollout: "rolledback" as const }]) {
         const run = deploy({ status: "UPDATE_COMPLETE", previousUrl: "falkors://a@db:1", ...stack }, { TOKEN_STORAGE_URL: "falkors://b@db:2" });
         assert.equal(run.status, 1, JSON.stringify(stack));
         assert.match(run.stderr, /FORCE_RESTART=1/);

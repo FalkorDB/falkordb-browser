@@ -3,7 +3,7 @@
 'use client';
 
 import { ArrowUpRight, FileCode, Info, LogOut, Menu, Monitor, Moon, Sun, Settings, Sparkles, FunctionSquare, GitGraph } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { cn, getTheme } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
@@ -15,7 +15,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import useIsMobile from "@/lib/useIsMobile";
+import useIsMobile, { MOBILE_BREAKPOINT } from "@/lib/useIsMobile";
 import Button from "./ui/Button";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
@@ -49,6 +49,8 @@ export default function Navbar({ showUDF }: Props) {
     const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
     const [aboutOpen, setAboutOpen] = useState(false);
     const [releasesOpen, setReleasesOpen] = useState(false);
+    // The drawer to open once the nav drawer has finished closing.
+    const pendingDrawerRef = useRef<"releases" | "about" | null>(null);
     const [loggingOut, setLoggingOut] = useState(false);
 
     const handleConfirmLogout = async () => {
@@ -123,7 +125,19 @@ export default function Navbar({ showUDF }: Props) {
                             <Menu size={22} />
                         </Button>
                     </DrawerTrigger>
-                    <DrawerContent side="left" className="w-[80vw] max-w-[320px] bg-background text-foreground">
+                    <DrawerContent
+                        side="left"
+                        className="w-[80vw] max-w-[320px] bg-background text-foreground"
+                        // Fires once the close animation has run and the content unmounted.
+                        onCloseAutoFocus={() => {
+                            const pending = pendingDrawerRef.current;
+                            pendingDrawerRef.current = null;
+                            if (pending === "releases") setReleasesOpen(true);
+                            // Only the mobile tree has a controlled About drawer: if the
+                            // layout switched to desktop mid-close, there is nothing to open.
+                            else if (pending === "about" && window.matchMedia(`(width < ${MOBILE_BREAKPOINT}px)`).matches) setAboutOpen(true);
+                        }}
+                    >
                         <VisuallyHidden>
                             <DrawerTitle>Navigation</DrawerTitle>
                             <DrawerDescription />
@@ -181,8 +195,8 @@ export default function Navbar({ showUDF }: Props) {
                                     className={item}
                                     data-testid="mobileReleasesButton"
                                     onClick={() => {
+                                        pendingDrawerRef.current = "releases";
                                         setMenuOpen(false);
-                                        setReleasesOpen(true);
                                     }}
                                 >
                                     <Sparkles size={20} />
@@ -193,8 +207,8 @@ export default function Navbar({ showUDF }: Props) {
                                     className={item}
                                     data-testid="mobileAboutButton"
                                     onClick={() => {
+                                        pendingDrawerRef.current = "about";
                                         setMenuOpen(false);
-                                        setAboutOpen(true);
                                     }}
                                 >
                                     <Info size={20} />
