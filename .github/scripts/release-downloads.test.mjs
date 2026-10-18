@@ -138,8 +138,15 @@ test("two generated sections settle into one, on update and on strip", () => {
     assert.equal(updated.split(START).length - 1, 1, "one section left");
     assert.ok(updated.includes("**Android:**") && updated.includes("middle text"));
     assert.equal(withDownloads(updated, downloadsSection(REPO, "v2.7.0", ALL)), updated, "and it stays settled");
-    const stripped = stripDownloads(twice);
-    assert.ok(!stripped.includes(START) && stripped.includes("middle text"));
+    assert.equal(stripDownloads(twice), "notes\n\nmiddle text");
+});
+
+test("\\r\\n line endings still match, so no second section is added", () => {
+    const linux = downloadsSection(REPO, "v2.7.0", ["FalkorDB-Browser-linux-x86_64.AppImage"]);
+    const crlf = `notes\n\n${linux}\n`.replaceAll("\n", "\r\n");
+    assert.equal(stripDownloads(crlf), "notes");
+    const updated = withDownloads(crlf, downloadsSection(REPO, "v2.7.0", ALL));
+    assert.equal(updated, `notes\n\n${downloadsSection(REPO, "v2.7.0", ALL)}\n`);
 });
 
 test("syncDownloads catches up when another workflow attaches a file meanwhile", () => {
