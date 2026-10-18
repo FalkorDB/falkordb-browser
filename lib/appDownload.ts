@@ -175,7 +175,8 @@ export function getPromptStorage(win: Pick<Window, "localStorage" | "sessionStor
 // Installer files are downloaded in place: opening them in a new tab only
 // leaves a blank page behind (the file is the whole response). Store pages
 // and anything else still open in a new tab.
-const INSTALLER_FILE = /\.(apk|dmg|exe|appimage|zip)$/i;
+// Only what the steps below describe; an archive would get the wrong ones.
+const INSTALLER_FILE = /\.(apk|dmg|exe|appimage)$/i;
 
 /** True for a link straight to an installer file rather than to a page. */
 export function isDirectDownload(href: string): boolean {

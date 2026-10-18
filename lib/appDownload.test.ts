@@ -177,6 +177,8 @@ test("isDirectDownload tells installer files from pages", () => {
     assert.equal(isDirectDownload("https://play.google.com/store/apps/details?id=com.falkordb.browser"), false);
     assert.equal(isDirectDownload("https://apps.apple.com/app/id1"), false);
     assert.equal(isDirectDownload("not a url"), false);
+    // No install steps fit an archive, so it opens like any other link.
+    assert.equal(isDirectDownload(`${DESKTOP_RELEASE_BASE}/FalkorDB-Browser-mac-arm64.zip`), false);
 });
 
 test("every platform has install steps to show after the download starts", () => {

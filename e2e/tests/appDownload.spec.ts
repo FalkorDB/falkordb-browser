@@ -190,7 +190,7 @@ test.describe("@admin App download", () => {
         await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
         const download = page.waitForEvent("download");
         await app.promptDownload.click();
-        await download;
+        expect((await download).url()).toBe(`${RELEASES}/FalkorDB-Browser-win-x64.exe`);
         await expect(app.prompt).toBeHidden();
 
         const [, nextSession] = await openPage(context, urls.graphUrl);
@@ -206,11 +206,12 @@ test.describe("@admin App download", () => {
 
         const download = page.waitForEvent("download");
         await app.promptDownload.click();
-        await download;
+        expect((await download).url()).toBe(`${RELEASES}/FalkorDB-Browser-win-x64.exe`);
         await expect(page).toHaveURL(/\/graph/);
         expect(context.pages()).toHaveLength(1);
-        await expect(page.getByText("Downloading FalkorDB Browser")).toBeVisible();
-        await expect(page.getByText(/More info → Run anyway/)).toBeVisible();
+        // The toast also copies its text into a screen-reader announcement; check the visible one.
+        await expect(page.getByText("Downloading FalkorDB Browser").first()).toBeVisible();
+        await expect(page.getByText(/More info → Run anyway/).first()).toBeVisible();
     });
 
     test("Android: the APK downloads in place with install steps; a store page opens in a new tab", async ({ browser }) => {
@@ -221,8 +222,8 @@ test.describe("@admin App download", () => {
         await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
         const download = page.waitForEvent("download");
         await app.promptDownload.click();
-        await download;
-        await expect(page.getByText(/open it from the notification/)).toBeVisible();
+        expect((await download).url()).toBe(apk);
+        await expect(page.getByText(/open it from the notification/).first()).toBeVisible();
         await context.close();
 
         const store = "https://play.google.com/store/apps/details?id=com.falkordb.browser";
