@@ -149,6 +149,31 @@ test("\\r\\n line endings still match, so no second section is added", () => {
     assert.equal(updated, `notes\n\n${downloadsSection(REPO, "v2.7.0", ALL)}\n`);
 });
 
+test("syncDownloads leaves current links alone, even in \\r\\n notes", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "release-downloads-"));
+    try {
+        const assets = ["FalkorDB-Browser-linux-x86_64.AppImage"];
+        const body = withDownloads(polishedNotes(), downloadsSection(REPO, "v2.7.0", assets)).replaceAll("\n", "\r\n");
+        const gh = path.join(dir, "gh");
+        writeFileSync(gh, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] === "release" && args[1] === "view") { process.stdout.write(${JSON.stringify(JSON.stringify({ body, assets: assets.map((name) => ({ name })) }))}); process.exit(0); }
+process.exit(1);
+`);
+        chmodSync(gh, 0o755);
+        const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "release-downloads.mjs");
+        // The stand-in gh fails on `release edit`, so a write would fail the run.
+        const out = execFileSync(process.execPath, [script], {
+            env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}`, RELEASE_TAG: "v2.7.0", GITHUB_REPOSITORY: REPO },
+            encoding: "utf8",
+            stdio: "pipe",
+        });
+        assert.match(out, /up to date/);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
 test("syncDownloads catches up when another workflow attaches a file meanwhile", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "release-downloads-"));
     try {

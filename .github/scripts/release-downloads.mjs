@@ -144,7 +144,8 @@ export function syncDownloads(repo, tag) {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
         const { body, assets } = readRelease(repo, tag);
         const next = withDownloads(body, downloadsSection(repo, tag, assets));
-        if (next === body) {
+        // withDownloads returns \n line endings, so \r\n alone is no change.
+        if (next === normalize(body)) {
             console.log(`Release ${tag}: download links are up to date (${assets.length} files).`);
             return;
         }
