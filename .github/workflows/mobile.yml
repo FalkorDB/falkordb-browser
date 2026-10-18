@@ -4,8 +4,9 @@ name: Mobile app
 # when mobile/ changes or on demand. When a GitHub release is published, it
 # instead builds a signed release APK that opens the production browser
 # (vars.FALKORDB_BROWSER_URL) and attaches it to that release as
-# FalkorDB-Browser-android.apk. It deploys nothing, and leaves the release
-# notes, the Docker image and the Helm chart workflows alone.
+# FalkorDB-Browser-android.apk. Run it by hand with a release tag to do the
+# same for a release that is already out. It deploys nothing, and leaves the
+# Docker image and the Helm chart workflows alone.
 
 on:
   release:
@@ -20,12 +21,17 @@ on:
       - "mobile/**"
       - ".github/workflows/mobile.yml"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "An existing release (e.g. v2.7.0) to build, sign and attach the Android APK for. Leave empty for a debug build only."
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.release_tag || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -41,7 +47,7 @@ jobs:
         run: pipx run cfn-lint mobile/aws/browser-service.yml
 
   android:
-    if: github.event_name != 'release'
+    if: github.event_name != 'release' && !inputs.release_tag
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -103,7 +109,7 @@ jobs:
   # builds with read-only rights and no secrets, the next one only signs and
   # uploads the APK it produced.
   android-release-build:
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || inputs.release_tag
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -115,21 +121,30 @@ jobs:
       # Only whether all four are set, never their values: a half-configured
       # key skips with the warning below instead of failing halfway through.
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
-      TAG: ${{ github.event.release.tag_name }}
+      TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
     defaults:
       run:
         working-directory: mobile
     steps:
+      # The release's own code, also when run by hand for an older release.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.release.tag_name || inputs.release_tag }}
 
       # Until signing is set up, a release goes out without the APK rather
       # than failing. See mobile/README.md, "Release builds".
       - name: Check release configuration
         id: config
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # Run by hand, the tag must name a published release to attach to.
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq 'if .isDraft then error("draft") else empty end' > /dev/null 2>&1; then
+            echo "::error::$TAG is not a published release."
+            exit 1
+          fi
           if [ "$HAS_KEYSTORE" != "true" ] || [ -z "$FALKORDB_BROWSER_URL" ]; then
             echo "::warning::No Android APK for this release: set the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets and the FALKORDB_BROWSER_URL variable."
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -184,13 +199,13 @@ jobs:
 
   android-release-sign:
     needs: android-release-build
-    if: github.event_name == 'release' && needs.android-release-build.outputs.ready == 'true'
+    if: (github.event_name == 'release' || inputs.release_tag) && needs.android-release-build.outputs.ready == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
     env:
-      TAG: ${{ github.event.release.tag_name }}
+      TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
     # No checkout and no npm: only the Android SDK's own tools touch the key.
     steps:
       - name: Download the unsigned APK
@@ -231,26 +246,27 @@ jobs:
   # rewrite the notes at once.
   android-release-notes:
     needs: android-release-sign
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || inputs.release_tag
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
     concurrency:
-      group: release-notes-${{ github.event.release.tag_name }}
+      group: release-notes-${{ github.event.release.tag_name || inputs.release_tag }}
     steps:
       # The release's tag may predate the script, so take the default branch's
-      # copy, and nothing else: no npm, just node and gh.
+      # copy (or, run by hand, the copy on the branch it was run from), and
+      # nothing else: no npm, just node and gh.
       - name: Check out the release scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: .github/scripts
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ github.event_name == 'release' && github.event.repository.default_branch || github.sha }}
           path: release-scripts
 
       - name: List the download links in the release notes
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
         run: node release-scripts/.github/scripts/release-downloads.mjs

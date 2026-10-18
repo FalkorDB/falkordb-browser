@@ -112,6 +112,11 @@ browser and attaches it to the release as `FalkorDB-Browser-android.apk`, next
 to the desktop installers. Until the settings below exist, the release goes
 out without it and the workflow logs a warning.
 
+For a release that is already out, run the **Mobile app** workflow by hand
+(Actions → Mobile app → Run workflow) with `release_tag` set to it, e.g.
+`v2.7.0`: it builds that release's code, signs the APK, attaches it and adds
+the Android link to the notes.
+
 It takes two jobs, so no dependency code runs where the signing key is
 reachable: `android-release-build` installs the packages and builds an
 unsigned APK with read-only rights and no secrets, and `android-release-sign`
