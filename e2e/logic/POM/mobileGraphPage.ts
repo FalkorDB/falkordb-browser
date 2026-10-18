@@ -266,10 +266,24 @@ export default class MobileGraphPage extends GraphPage {
     await super.selectGraphByName(graphName);
     // The picker's popover can outlive the selection, and while it is up it
     // covers the toolbar and swallows clicks meant for the sheet behind it.
-    await this.page.keyboard.press("Escape");
-    await this.page
-      .locator("[data-radix-popper-content-wrapper]")
-      .waitFor({ state: "detached" });
+    if (await this.selectItem("Graph", graphName).isVisible()) {
+      await this.page.keyboard.press("Escape");
+    }
+    // Closing it hands focus back to the picker's button, whose tooltip opens
+    // on focus and sits over the query row, Run button included. Escape can't
+    // be relied on, as it may come before the tooltip does: blur the button
+    // until nothing is left open and nothing can reopen it.
+    const poppers = this.page.locator("[data-radix-popper-content-wrapper]");
+    await expect(async () => {
+      const focused = await this.page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null;
+        if (!active || active === document.body) return false;
+        active.blur();
+        return true;
+      });
+      expect(focused).toBe(false);
+      await expect(poppers).toHaveCount(0, { timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
   }
 
   /** The toggle is a toggle: the same button closes the sheet. */

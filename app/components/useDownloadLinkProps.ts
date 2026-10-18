@@ -20,6 +20,8 @@ export default function useDownloadLinkProps() {
         }
         return {
             href,
+            // Same tab or not, GitHub (or the APK's host) need not see the page URL.
+            rel: "noreferrer",
             onClick: () => {
                 onSelect?.();
                 toast({ title: "Downloading FalkorDB Browser", description: INSTALL_STEPS[platform], duration: STEPS_DURATION_MS });
