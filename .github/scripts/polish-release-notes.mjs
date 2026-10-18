@@ -131,7 +131,9 @@ if (response.status !== "completed") {
 // The summary line marks where the original notes start on a rerun, so the
 // model's output must not contain it.
 // Nor may it carry the download section's markers, which another step owns.
-const polished = response.output_text.replaceAll(SUMMARY, "").replaceAll(START, "").replaceAll(END, "").trim();
+// A whole section first (dropping only its markers would leave a stale copy of
+// the links behind), then any stray marker.
+const polished = stripDownloads(response.output_text.replaceAll(SUMMARY, "")).replaceAll(START, "").replaceAll(END, "").trim();
 if (!polished) {
   console.error("Model returned no text; leaving the release notes unchanged.");
   process.exit(1);

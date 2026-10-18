@@ -131,6 +131,17 @@ test("text written below the section stays, and the section is updated where it 
     assert.ok(!stripDownloads(updated).includes("## Download") && stripDownloads(updated).includes("Thanks to everyone"));
 });
 
+test("two generated sections settle into one, on update and on strip", () => {
+    const linux = downloadsSection(REPO, "v2.7.0", ["FalkorDB-Browser-linux-x86_64.AppImage"]);
+    const twice = `notes\n\n${linux}\n\nmiddle text\n\n${linux}\n`;
+    const updated = withDownloads(twice, downloadsSection(REPO, "v2.7.0", ALL));
+    assert.equal(updated.split(START).length - 1, 1, "one section left");
+    assert.ok(updated.includes("**Android:**") && updated.includes("middle text"));
+    assert.equal(withDownloads(updated, downloadsSection(REPO, "v2.7.0", ALL)), updated, "and it stays settled");
+    const stripped = stripDownloads(twice);
+    assert.ok(!stripped.includes(START) && stripped.includes("middle text"));
+});
+
 test("syncDownloads catches up when another workflow attaches a file meanwhile", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "release-downloads-"));
     try {

@@ -46,7 +46,16 @@ export default function WhatsNewPopup({ paused }: { paused: boolean }) {
 
     useEffect(() => {
         if (paused || !release || !whatsNew || seenCovers(readSeen(), release.tag)) return undefined;
-        const timer = setTimeout(() => setOpen(true), SHOW_DELAY_MS);
+        const timer = setTimeout(() => {
+            // A newer release may have been seen in another tab meanwhile.
+            if (seenCovers(readSeen(), release.tag)) {
+                setClosed(true);
+                // It may still be open from before a pause.
+                setOpen(false);
+                return;
+            }
+            setOpen(true);
+        }, SHOW_DELAY_MS);
         return () => clearTimeout(timer);
     }, [paused, release, whatsNew]);
 
