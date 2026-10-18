@@ -95,7 +95,7 @@ jobs:
       # tree can't change unreviewed in a job that holds a release-write token.
       - name: Install OpenAI SDK
         run: |
-          cp .github/scripts/polish-release-notes.mjs .github/scripts/package.json .github/scripts/package-lock.json "$RUNNER_TEMP/"
+          cp .github/scripts/polish-release-notes.mjs .github/scripts/release-downloads.mjs .github/scripts/package.json .github/scripts/package-lock.json "$RUNNER_TEMP/"
           cd "$RUNNER_TEMP"
           npm ci --ignore-scripts --no-audit --no-fund
 
