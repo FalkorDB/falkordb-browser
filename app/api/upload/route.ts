@@ -178,7 +178,7 @@ async function streamToDisk(
       fileSeen = true;
 
       const { filename: originalName, mimeType } = info;
-      const extension = path.extname(originalName).toLowerCase();
+      const extension = path.extname(originalName ?? "").toLowerCase();
 
       // Don't even stage a .dump while dump restore is disabled — there is no
       // consumer for it and it would otherwise allow large files onto disk.
