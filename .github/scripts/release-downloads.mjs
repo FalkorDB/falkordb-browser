@@ -70,36 +70,45 @@ function escapeRegExp(text) {
 }
 
 /**
- * This script's own section, wherever it sits in the visible notes (someone
- * may have written below it), but never inside the collapsed original notes.
+ * Every section this script wrote, wherever it sits in the visible notes
+ * (someone may have written below it), but never inside the collapsed original
+ * notes. Normally there is one; should there ever be more, an update or strip
+ * deals with all of them, so the notes always settle on a single section.
  */
-function findSection(body) {
+function findSections(body) {
     const visible = body.slice(0, visibleEnd(body));
-    let found = null;
-    for (const match of visible.matchAll(SECTION)) {
+    return [...visible.matchAll(SECTION)].map((match) => {
         const start = match.index + match[0].indexOf(START);
-        found = { start, end: start + match[1].length };
-    }
-    return found;
+        return { start, end: start + match[1].length };
+    });
 }
 
-/** The body without this script's downloads section. */
-export function stripDownloads(body) {
-    const at = findSection(body);
-    if (!at) return body;
-    const before = body.slice(0, at.start).replace(/\s+$/, "");
-    const after = body.slice(at.end).replace(/^\s+/, "");
+function cut(body, { start, end }) {
+    const before = body.slice(0, start).replace(/\s+$/, "");
+    const after = body.slice(end).replace(/^\s+/, "");
     return before && after ? `${before}\n\n${after}` : before || after;
 }
 
+/** The body without this script's downloads section(s). */
+export function stripDownloads(body) {
+    // Last first, so the earlier positions still hold.
+    return findSections(body).reverse().reduce(cut, body);
+}
+
 /**
- * The body with `section` in place of any old one: an existing section is
- * replaced where it stands; a new one goes last in the visible notes, so just
- * before the collapsed original notes of polished notes.
+ * The body with `section` in place of any old one: the last existing section
+ * is replaced where it stands (any others are removed); a new one goes last in
+ * the visible notes, so just before the collapsed original notes of polished
+ * notes.
  */
 export function withDownloads(body, section) {
-    const at = findSection(body);
-    if (at && section) return body.slice(0, at.start) + section + body.slice(at.end);
+    const found = findSections(body);
+    if (found.length && section) {
+        const last = found[found.length - 1];
+        const replaced = body.slice(0, last.start) + section + body.slice(last.end);
+        // The others all come before the replaced one, so their positions hold.
+        return found.slice(0, -1).reverse().reduce(cut, replaced);
+    }
     const rest = stripDownloads(body);
     if (!section) return rest;
     const end = visibleEnd(rest);
