@@ -67,8 +67,13 @@ async function openVisitor(browser: Browser, { ua, viewport = DESKTOP, signedIn 
     }
     // What's New would take its turn first; keep GitHub's real release notes out of these tests.
     await context.route(RELEASES_ROUTE, (route) => route.fulfill({ json: { releases: [] } }));
-    // The download links leave the app; never let a test actually fetch an installer.
-    await context.route("https://github.com/**", (route) => route.abort());
+    // Never fetch a real installer. GitHub serves release files as attachments,
+    // which is what lets them download in place without leaving the page.
+    await context.route("https://github.com/**", (route) => route.fulfill({
+        status: 200,
+        headers: { "content-type": "application/octet-stream", "content-disposition": "attachment; filename=installer" },
+        body: "installer",
+    }));
     return context;
 }
 
@@ -184,14 +189,54 @@ test.describe("@admin App download", () => {
 
     test("downloading answers the question for good", async ({ browser }) => {
         context = await openVisitor(browser, { ua: UA.windows });
-        const [, app] = await openPage(context, urls.graphUrl);
+        const [page, app] = await openPage(context, urls.graphUrl);
 
         await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
+        const download = page.waitForEvent("download");
         await app.promptDownload.click();
+        expect((await download).url()).toBe(`${RELEASES}/FalkorDB-Browser-win-x64.exe`);
         await expect(app.prompt).toBeHidden();
 
         const [, nextSession] = await openPage(context, urls.graphUrl);
         await expectNoPrompt(nextSession);
+    });
+
+    test("an installer downloads in place, and the page says what to do next", async ({ browser }) => {
+        context = await openVisitor(browser, { ua: UA.windows });
+        const [page, app] = await openPage(context, urls.graphUrl);
+        await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
+        // No new tab: one would hold nothing but a blank page while the file downloads.
+        await expect(app.promptDownload).not.toHaveAttribute("target", "_blank");
+
+        const download = page.waitForEvent("download");
+        await app.promptDownload.click();
+        expect((await download).url()).toBe(`${RELEASES}/FalkorDB-Browser-win-x64.exe`);
+        await expect(page).toHaveURL(/\/graph/);
+        expect(context.pages()).toHaveLength(1);
+        // The toast also copies its text into a screen-reader announcement; check the visible one.
+        await expect(page.getByText("Downloading FalkorDB Browser").first()).toBeVisible();
+        await expect(page.getByText(/More info → Run anyway/).first()).toBeVisible();
+    });
+
+    test("Android: the APK downloads in place with install steps; a store page opens in a new tab", async ({ browser }) => {
+        const apk = "https://github.com/FalkorDB/falkordb-browser/releases/latest/download/FalkorDB-Browser-android.apk";
+        context = await openVisitor(browser, { ua: UA.android, viewport: PHONE });
+        await context.route(APP_LINKS_ROUTE, (route) => route.fulfill({ json: { android: apk } }));
+        const [page, app] = await openPage(context, urls.graphUrl);
+        await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
+        const download = page.waitForEvent("download");
+        await app.promptDownload.click();
+        expect((await download).url()).toBe(apk);
+        await expect(page.getByText(/open it from the notification/).first()).toBeVisible();
+        await context.close();
+
+        const store = "https://play.google.com/store/apps/details?id=com.falkordb.browser";
+        context = await openVisitor(browser, { ua: UA.android, viewport: PHONE });
+        await context.route(APP_LINKS_ROUTE, (route) => route.fulfill({ json: { android: store } }));
+        const [, storeApp] = await openPage(context, urls.graphUrl);
+        await expect(storeApp.prompt).toBeVisible({ timeout: OPENS_WITHIN });
+        await expect(storeApp.promptDownload).toHaveAttribute("target", "_blank");
+        await expect(storeApp.promptDownload).toHaveAttribute("href", store);
     });
 
     test("is offered on the login page too, before anyone signs in", async ({ browser }) => {

@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Checkbox } from "@/components/ui/checkbox";
 import { dismissAppPrompt, getPromptStorage, markAppPromptShown, shouldShowAppPrompt } from "@/lib/appDownload";
 import useAppDownload from "@/lib/useAppDownload";
+import useDownloadLinkProps from "./useDownloadLinkProps";
 import { useWhatsNewActive } from "@/lib/popupTurn";
 import Button from "./ui/Button";
 
@@ -32,6 +33,7 @@ interface Props {
  */
 export default function AppDownloadPrompt({ blocked: blockedByCaller }: Props) {
     const download = useAppDownload();
+    const linkProps = useDownloadLinkProps();
     // The release's news goes first; the download offer waits for it.
     const whatsNewActive = useWhatsNewActive();
     const blocked = blockedByCaller || whatsNewActive;
@@ -128,11 +130,8 @@ export default function AppDownloadPrompt({ blocked: blockedByCaller }: Props) {
                             <a
                                 ref={(el) => { primaryRef.current = el; }}
                                 className="flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 bg-primary text-primary-foreground font-medium hover:opacity-90"
-                                href={download.href}
-                                target="_blank"
-                                rel="noreferrer"
                                 data-testid="appDownloadPromptDownload"
-                                onClick={() => close(true)}
+                                {...linkProps(download.href, download.platform, () => close(true))}
                             >
                                 <Download size={18} />
                                 {download.label}
@@ -143,11 +142,8 @@ export default function AppDownloadPrompt({ blocked: blockedByCaller }: Props) {
                 {download.kind === "link" && download.alternate && (
                     <a
                         className="-mt-2 self-end text-sm text-muted underline-offset-2 hover:underline hover:text-foreground"
-                        href={download.alternate.href}
-                        target="_blank"
-                        rel="noreferrer"
                         data-testid="appDownloadPromptAlternate"
-                        onClick={() => close(true)}
+                        {...linkProps(download.alternate.href, download.platform, () => close(true))}
                     >
                         {download.alternate.label}
                     </a>

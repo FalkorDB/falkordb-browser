@@ -4,7 +4,9 @@ import { ReactElement } from "react";
 import { ArrowUpRight, Download } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
+import { isDirectDownload } from "@/lib/appDownload";
 import useAppDownload from "@/lib/useAppDownload";
+import useDownloadLinkProps from "./useDownloadLinkProps";
 
 interface Props {
     className: string
@@ -21,6 +23,7 @@ interface Props {
 export default function AppDownloadLink({ className, iconSize = 20, onSelect, asMenuItem = false }: Props) {
     const download = useAppDownload();
     const { toast } = useToast();
+    const linkProps = useDownloadLinkProps();
 
     if (!download) return null;
 
@@ -49,10 +52,10 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
     }
 
     const primary = item(
-        <a className={className} href={download.href} target="_blank" rel="noreferrer" data-testid="appDownload" onClick={onSelect}>
+        <a className={className} data-testid="appDownload" {...linkProps(download.href, download.platform, onSelect)}>
             <Download size={iconSize} />
             <span>{download.label}</span>
-            <ArrowUpRight size={15} className="ml-auto" />
+            {!isDirectDownload(download.href) && <ArrowUpRight size={15} className="ml-auto" />}
         </a>
     );
     if (!download.alternate) return primary;
@@ -63,10 +66,10 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
         <>
             {primary}
             {item(
-                <a className={className} href={download.alternate.href} target="_blank" rel="noreferrer" data-testid="appDownloadAlternate" onClick={onSelect}>
+                <a className={className} data-testid="appDownloadAlternate" {...linkProps(download.alternate.href, download.platform, onSelect)}>
                     <Download size={iconSize} />
                     <span>{download.alternate.label}</span>
-                    <ArrowUpRight size={15} className="ml-auto" />
+                    {!isDirectDownload(download.alternate.href) && <ArrowUpRight size={15} className="ml-auto" />}
                 </a>
             )}
         </>
