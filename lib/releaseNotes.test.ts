@@ -6,6 +6,7 @@ import {
     extractWhatsNew,
     parseVersion,
     releaseForVersion,
+    seenCovers,
     sortReleases,
     type Release,
 } from "./releaseNotes.ts";
@@ -90,4 +91,14 @@ test("extractWhatsNew returns null without a section or with an empty one", () =
     assert.equal(extractWhatsNew("## What's Changed\n* feat: x"), null);
     assert.equal(extractWhatsNew("## What's New\n\n### ✨ New features\n- x"), null);
     assert.equal(extractWhatsNew(""), null);
+});
+
+test("seenCovers treats the seen release and older ones as done", () => {
+    assert.equal(seenCovers("v2.7.0", "v2.7.0"), true);
+    assert.equal(seenCovers("v2.7.0", "v2.6.2"), true);
+    assert.equal(seenCovers("v999.0.0", "v2.7.0"), true);
+    assert.equal(seenCovers("v2.6.2", "v2.7.0"), false);
+    assert.equal(seenCovers(null, "v2.7.0"), false);
+    assert.equal(seenCovers("garbage", "v2.7.0"), false);
+    assert.equal(seenCovers("v2.7.0", "garbage"), false);
 });

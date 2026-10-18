@@ -5,8 +5,11 @@
 // GH_TOKEN (for the gh CLI), plus the Azure OpenAI resource: OPENAI_API_KEY,
 // AZURE_OPENAI_ENDPOINT (e.g. https://my-resource.openai.azure.com) and
 // AZURE_OPENAI_DEPLOYMENT (the deployment name; defaults to gpt-5.4-mini).
+// The "## Download" section is not the model's: release-downloads.mjs writes it
+// from the files attached to the release.
 import { execFileSync } from "node:child_process";
 import OpenAI from "openai";
+import { END, START, downloadsSection, readRelease, stripDownloads, syncDownloads } from "./release-downloads.mjs";
 
 const tag = process.env.RELEASE_TAG;
 const repo = process.env.GITHUB_REPOSITORY;
@@ -34,7 +37,10 @@ const unwrap = (body) => {
   }
   return body.slice(start + SUMMARY.length, end).replace(/^\r?\n\r?\n/, "");
 };
-const generated = unwrap(original);
+// The download links are added after polishing, never rewritten by the model.
+// Polished notes keep GitHub's originals apart, without the links; anything
+// else may carry the links' section at its end.
+const generated = original.startsWith(MARKER) ? unwrap(original) : stripDownloads(original);
 
 if (!generated) {
   console.error(`Release ${tag} has no notes to rewrite.`);
@@ -50,8 +56,20 @@ const quote = (text, max = Infinity) => String(text ?? "").replace(FRAMING_TAGS,
 
 // The generated lines only carry PR titles; the descriptions say what changed for users.
 const prNumbers = [...new Set([...generated.matchAll(/\/pull\/(\d+)/g)].map((m) => m[1]))];
-const prs = prNumbers.map((number) => {
-  const pr = JSON.parse(gh("pr", "view", number, "--repo", repo, "--json", "number,title,author,labels,body"));
+// A deleted PR (spam, or removed by its author) can still be linked from the
+// notes. It has nothing to add, so it is skipped; any other failure, such as
+// an expired token or a rate limit, still stops the run.
+const viewPr = (number) => {
+  try {
+    return JSON.parse(execFileSync("gh", ["pr", "view", number, "--repo", repo, "--json", "number,title,author,labels,body"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 }));
+  } catch (err) {
+    if (!/Could not resolve to a PullRequest/.test(String(err.stderr))) throw err;
+    console.warn(`Skipping #${number}: it no longer exists on GitHub.`);
+    return null;
+  }
+};
+
+const prs = prNumbers.map(viewPr).filter(Boolean).map((pr) => {
   return [
     // A deleted account leaves the author null; GitHub shows it as "ghost".
     `<pr number="${pr.number}" author="${quote(pr.author?.login ?? "ghost").replace(/"/g, "")}" labels="${quote(pr.labels.map((l) => l.name).join(",")).replace(/"/g, "")}">`,
@@ -112,16 +130,21 @@ if (response.status !== "completed") {
 
 // The summary line marks where the original notes start on a rerun, so the
 // model's output must not contain it.
-const polished = response.output_text.replaceAll(SUMMARY, "").trim();
+// Nor may it carry the download section's markers, which another step owns.
+const polished = response.output_text.replaceAll(SUMMARY, "").replaceAll(START, "").replaceAll(END, "").trim();
 if (!polished) {
   console.error("Model returned no text; leaving the release notes unchanged.");
   process.exit(1);
 }
 
-const body = `${MARKER}\n${polished}\n\n<details>\n<summary>Original generated notes</summary>\n\n${generated}\n</details>\n`;
+// The installers attached by now (the desktop and mobile workflows attach theirs
+// while this runs); syncDownloads below catches up with any that arrive later.
+const downloads = downloadsSection(repo, tag, readRelease(repo, tag).assets);
+const body = `${MARKER}\n${polished}\n\n${downloads ? `${downloads}\n\n` : ""}<details>\n<summary>Original generated notes</summary>\n\n${generated}\n</details>\n`;
 
 console.log(body);
 
 if (!dryRun) {
   execFileSync("gh", ["release", "edit", tag, "--repo", repo, "--notes-file", "-"], { input: body, stdio: ["pipe", "inherit", "inherit"] });
+  syncDownloads(repo, tag);
 }
