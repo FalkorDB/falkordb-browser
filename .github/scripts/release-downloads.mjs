@@ -60,18 +60,27 @@ function visibleEnd(body) {
     return at === -1 ? body.length : at;
 }
 
+// The exact shape downloadsSection writes: each marker on a line of its own,
+// the heading right after the first. A marker quoted inside a line (a PR title,
+// say) never matches, so updating or stripping can't delete anyone's text.
+const SECTION = new RegExp(`(?:^|\\n)(${escapeRegExp(START)}\\n## Download\\n[\\s\\S]*?\\n${escapeRegExp(END)})(?=\\n|$)`, "g");
+
+function escapeRegExp(text) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
- * This script's own section: last in the visible notes, where it always puts
- * it. Markers anywhere else are somebody's text (a PR title, say) and are left
- * alone, so stripping never deletes notes.
+ * This script's own section, wherever it sits in the visible notes (someone
+ * may have written below it), but never inside the collapsed original notes.
  */
 function findSection(body) {
     const visible = body.slice(0, visibleEnd(body));
-    const start = visible.lastIndexOf(START);
-    if (start === -1) return null;
-    const end = visible.indexOf(END, start);
-    if (end === -1 || visible.slice(end + END.length).trim() !== "") return null;
-    return { start, end: end + END.length };
+    let found = null;
+    for (const match of visible.matchAll(SECTION)) {
+        const start = match.index + match[0].indexOf(START);
+        found = { start, end: start + match[1].length };
+    }
+    return found;
 }
 
 /** The body without this script's downloads section. */
@@ -84,15 +93,18 @@ export function stripDownloads(body) {
 }
 
 /**
- * The body with `section` in place of any old one: last in the visible notes,
- * so just before the collapsed original notes of polished notes.
+ * The body with `section` in place of any old one: an existing section is
+ * replaced where it stands; a new one goes last in the visible notes, so just
+ * before the collapsed original notes of polished notes.
  */
 export function withDownloads(body, section) {
+    const at = findSection(body);
+    if (at && section) return body.slice(0, at.start) + section + body.slice(at.end);
     const rest = stripDownloads(body);
     if (!section) return rest;
-    const at = visibleEnd(rest);
-    const before = rest.slice(0, at).replace(/\s+$/, "");
-    const after = rest.slice(at);
+    const end = visibleEnd(rest);
+    const before = rest.slice(0, end).replace(/\s+$/, "");
+    const after = rest.slice(end);
     return after ? `${before}\n\n${section}\n\n${after}` : `${before}\n\n${section}\n`;
 }
 

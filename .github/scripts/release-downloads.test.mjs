@@ -112,6 +112,25 @@ test("marker text that is not this script's section is never deleted", () => {
     assert.equal(stripDownloads(updated), polished);
 });
 
+test("a final line quoting the markers is not taken for the section", () => {
+    const raw = `## What's Changed\n* Docs: explain ${START} ... ${END}`;
+    assert.equal(stripDownloads(raw), raw);
+    const body = withDownloads(raw, downloadsSection(REPO, "v2.7.0", ALL));
+    assert.ok(body.includes(`* Docs: explain ${START} ... ${END}`), "the quoted line survives");
+    assert.equal(stripDownloads(body), raw);
+});
+
+test("text written below the section stays, and the section is updated where it is", () => {
+    const linux = downloadsSection(REPO, "v2.7.0", ["FalkorDB-Browser-linux-x86_64.AppImage"]);
+    const edited = `${withDownloads(polishedNotes(), linux).replace("\n\n<details>", "\n\nThanks to everyone who tested this release.\n\n<details>")}`;
+    const updated = withDownloads(edited, downloadsSection(REPO, "v2.7.0", ALL));
+    assert.equal(updated.split(START).length - 1, 1, "no second section");
+    assert.ok(updated.includes("**Android:**"));
+    const thanks = updated.indexOf("Thanks to everyone");
+    assert.ok(updated.indexOf("## Download") < thanks && thanks < updated.indexOf("<details>"), "the section kept its place above the note");
+    assert.ok(!stripDownloads(updated).includes("## Download") && stripDownloads(updated).includes("Thanks to everyone"));
+});
+
 test("syncDownloads catches up when another workflow attaches a file meanwhile", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "release-downloads-"));
     try {

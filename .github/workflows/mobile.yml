@@ -31,7 +31,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.release_tag || github.ref }}
+  # A release and a manual run for the same tag share a group, so they can't
+  # both sign and upload the APK at once.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.release.tag_name || inputs.release_tag || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -254,15 +256,15 @@ jobs:
     concurrency:
       group: release-notes-${{ github.event.release.tag_name || inputs.release_tag }}
     steps:
-      # The release's tag may predate the script, so take the default branch's
-      # copy (or, run by hand, the copy on the branch it was run from), and
-      # nothing else: no npm, just node and gh.
+      # The release's tag may predate the script, and a manual run may come from
+      # any branch, so it is always the default branch's reviewed copy that
+      # runs with this write token. Nothing else: no npm, just node and gh.
       - name: Check out the release scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: .github/scripts
-          ref: ${{ github.event_name == 'release' && github.event.repository.default_branch || github.sha }}
+          ref: ${{ github.event.repository.default_branch }}
           path: release-scripts
 
       - name: List the download links in the release notes
