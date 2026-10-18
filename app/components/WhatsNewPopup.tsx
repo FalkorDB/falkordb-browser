@@ -50,6 +50,8 @@ export default function WhatsNewPopup({ paused }: { paused: boolean }) {
             // A newer release may have been seen in another tab meanwhile.
             if (seenCovers(readSeen(), release.tag)) {
                 setClosed(true);
+                // It may still be open from before a pause.
+                setOpen(false);
                 return;
             }
             setOpen(true);
