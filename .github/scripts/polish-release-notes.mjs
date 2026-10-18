@@ -50,8 +50,20 @@ const quote = (text, max = Infinity) => String(text ?? "").replace(FRAMING_TAGS,
 
 // The generated lines only carry PR titles; the descriptions say what changed for users.
 const prNumbers = [...new Set([...generated.matchAll(/\/pull\/(\d+)/g)].map((m) => m[1]))];
-const prs = prNumbers.map((number) => {
-  const pr = JSON.parse(gh("pr", "view", number, "--repo", repo, "--json", "number,title,author,labels,body"));
+// A deleted PR (spam, or removed by its author) can still be linked from the
+// notes. It has nothing to add, so it is skipped; any other failure, such as
+// an expired token or a rate limit, still stops the run.
+const viewPr = (number) => {
+  try {
+    return JSON.parse(execFileSync("gh", ["pr", "view", number, "--repo", repo, "--json", "number,title,author,labels,body"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 }));
+  } catch (err) {
+    if (!/Could not resolve to a PullRequest/.test(String(err.stderr))) throw err;
+    console.warn(`Skipping #${number}: it no longer exists on GitHub.`);
+    return null;
+  }
+};
+
+const prs = prNumbers.map(viewPr).filter(Boolean).map((pr) => {
   return [
     // A deleted account leaves the author null; GitHub shows it as "ghost".
     `<pr number="${pr.number}" author="${quote(pr.author?.login ?? "ghost").replace(/"/g, "")}" labels="${quote(pr.labels.map((l) => l.name).join(",")).replace(/"/g, "")}">`,

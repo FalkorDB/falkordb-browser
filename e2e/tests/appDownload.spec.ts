@@ -40,6 +40,8 @@ type Visitor = {
     signedIn?: boolean;
     /** Chromium's CPU hint; "none" stands for Safari and Firefox, which give none. */
     cpu?: "arm" | "x86" | "none";
+    /** Whether the running release's What's New was already seen (default true). */
+    seenWhatsNew?: boolean;
 };
 
 /**
@@ -47,13 +49,15 @@ type Visitor = {
  * not its localStorage, which the suite seeds with "appDownloadPrompt=false"
  * to keep the popup away from every other test.
  */
-async function openVisitor(browser: Browser, { ua, viewport = DESKTOP, signedIn = true, cpu }: Visitor): Promise<BrowserContext> {
+async function openVisitor(browser: Browser, { ua, viewport = DESKTOP, signedIn = true, cpu, seenWhatsNew = true }: Visitor): Promise<BrowserContext> {
     const { cookies } = signedIn ? JSON.parse(readFileSync(ADMIN_AUTH_FILE, "utf8")) : { cookies: [] };
     const context = await browser.newContext({ userAgent: ua, viewport, storageState: { cookies, origins: [] } });
-    // A returning user: the tutorial was seen, so nothing else competes with the popup.
-    await context.addInitScript(() => {
+    // A returning user: the tutorial and (unless a test needs it) the latest
+    // What's New were seen, so nothing else competes with the popup.
+    await context.addInitScript((seen) => {
         if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
-    });
+        if (seen && !localStorage.getItem("whatsNewSeen")) localStorage.setItem("whatsNewSeen", "v999.0.0");
+    }, seenWhatsNew);
     // The test browser would otherwise report the runner's own CPU.
     if (cpu) {
         await context.addInitScript((arch) => {
@@ -158,7 +162,7 @@ test.describe("@admin App download", () => {
     });
 
     test("waits for What's New: the release's news first, then the download offer", async ({ browser }) => {
-        context = await openVisitor(browser, { ua: UA.windows });
+        context = await openVisitor(browser, { ua: UA.windows, seenWhatsNew: false });
         // Stands in for GitHub: a release for the running version with a What's New section.
         await context.route(RELEASES_ROUTE, (route) => route.fulfill({
             json: {
