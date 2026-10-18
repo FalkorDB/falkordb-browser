@@ -65,3 +65,11 @@ export function extractWhatsNew(body: string): string | null {
     const section = (end === -1 ? rest : rest.slice(0, end)).join("\n").trim();
     return section || null;
 }
+
+/**
+ * Whether a browser that last saw `seen`'s What's New is done with `tag`'s:
+ * the same release or an older one. Anything unreadable counts as unseen.
+ */
+export function seenCovers(seen: string | null, tag: string): boolean {
+    return !!parseVersion(seen) && !!parseVersion(tag) && compareVersions(seen!, tag) >= 0;
+}
