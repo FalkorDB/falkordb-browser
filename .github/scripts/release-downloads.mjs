@@ -89,8 +89,12 @@ function cut(body, { start, end }) {
     return before && after ? `${before}\n\n${after}` : before || after;
 }
 
+// Text from an editor or a model may come with \r\n line endings.
+const normalize = (body) => body.replace(/\r\n?/g, "\n");
+
 /** The body without this script's downloads section(s). */
-export function stripDownloads(body) {
+export function stripDownloads(text) {
+    const body = normalize(text);
     // Last first, so the earlier positions still hold.
     return findSections(body).reverse().reduce(cut, body);
 }
@@ -101,7 +105,8 @@ export function stripDownloads(body) {
  * the visible notes, so just before the collapsed original notes of polished
  * notes.
  */
-export function withDownloads(body, section) {
+export function withDownloads(text, section) {
+    const body = normalize(text);
     const found = findSections(body);
     if (found.length && section) {
         const last = found[found.length - 1];
@@ -139,7 +144,8 @@ export function syncDownloads(repo, tag) {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
         const { body, assets } = readRelease(repo, tag);
         const next = withDownloads(body, downloadsSection(repo, tag, assets));
-        if (next === body) {
+        // withDownloads returns \n line endings, so \r\n alone is no change.
+        if (next === normalize(body)) {
             console.log(`Release ${tag}: download links are up to date (${assets.length} files).`);
             return;
         }

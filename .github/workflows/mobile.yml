@@ -245,10 +245,12 @@ jobs:
 
   # Its own job, so nothing is checked out where the signing key was, and so
   # it can share the polish job's per-release concurrency group: no two jobs
-  # rewrite the notes at once.
+  # rewrite the notes at once. It runs even when signing failed or was
+  # skipped: the links are rebuilt from the files actually attached, so a run
+  # that replaced a cancelled one still lists an APK the older run uploaded.
   android-release-notes:
     needs: android-release-sign
-    if: github.event_name == 'release' || inputs.release_tag
+    if: ${{ !cancelled() && (github.event_name == 'release' || inputs.release_tag) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
