@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import LoginPage from "../logic/POM/loginPage";
-import { NO_RELEASES, RELEASES_ROUTE } from "../infra/utils";
 
 const DISCOVERY_ROUTE = "**/api/connections/preconfigured";
 // next-auth appends the authorization params to the callback, so the pattern
@@ -17,12 +16,13 @@ test.describe("@admin Preconfigured connection", () => {
     // project's admin storage state would redirect straight to /graph.
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    // The "Get the app" popup opens over the login form a moment after load;
-    // keep it out of the way, as every other suite does (initializeLocalStorage).
+    // The "Get the app" and What's New popups open a moment after load; keep
+    // them out of the way, as every other suite does (initializeLocalStorage).
     test.beforeEach(async ({ page }) => {
-        await page.addInitScript(() => localStorage.setItem("appDownloadPrompt", "false"));
-        // Nor the What's New popup, once a sign-in lands on /graph.
-        await page.route(RELEASES_ROUTE, (route) => route.fulfill({ json: NO_RELEASES }));
+        await page.addInitScript(() => {
+            localStorage.setItem("appDownloadPrompt", "false");
+            localStorage.setItem("whatsNewSeen", "v999.0.0");
+        });
     });
 
     test("signs in automatically and reports a connection it cannot reach", async ({ page }) => {

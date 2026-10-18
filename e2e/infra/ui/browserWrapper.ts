@@ -2,7 +2,7 @@ import { chromium, Browser, BrowserContext, Page, firefox } from 'playwright';
 import { existsSync } from 'fs';
 import { test } from '@playwright/test';
 import BasePage from './basePage';
-import { NO_RELEASES, RELEASES_ROUTE, initializeLocalStorage } from '../utils';
+import { initializeLocalStorage } from '../utils';
 
 // Map each Playwright project to its pre-created auth state file so that
 // BrowserWrapper contexts are authenticated.  The 'setup' project and special
@@ -63,8 +63,6 @@ export default class BrowserWrapper {
                 ...(isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] }),
                 ...(storageState ? { storageState } : {}),
             });
-            // No live release notes, so no What's New popup over the page (see RELEASES_ROUTE).
-            await this.context.route(RELEASES_ROUTE, (route) => route.fulfill({ json: NO_RELEASES }));
         }
         if (!this.page) {
             this.page = await this.context.newPage();

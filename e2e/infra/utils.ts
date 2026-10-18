@@ -57,6 +57,8 @@ export const initializeLocalStorage = (host = "localhost", port = 6379, username
         if (!localStorage.getItem("${prefix}query history")) localStorage.setItem("${prefix}query history", "[]");
         if (!localStorage.getItem("refreshInterval")) localStorage.setItem("refreshInterval", "60");
         if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
+        // A release far in the future counts as seen, so the What's New popup never covers a test.
+        if (!localStorage.getItem("whatsNewSeen")) localStorage.setItem("whatsNewSeen", "v999.0.0");
         if (!localStorage.getItem("appDownloadPrompt")) localStorage.setItem("appDownloadPrompt", "false");
     `;
 };
@@ -80,15 +82,6 @@ export const simulateCanvasFingerprintNoise = () => `
         };
     })();
 `;
-
-/**
- * The browser fetches its release notes live from GitHub, and opens a What's
- * New popup for the running version's release. Tests must not depend on what
- * was last published there (or on GitHub's API limits), so they get no
- * releases; the tests that cover What's New stub their own.
- */
-export const RELEASES_ROUTE = "**/api/releases";
-export const NO_RELEASES = { releases: [] };
 
 export function delay(ms: number) {
   return new Promise((resolve) => {
