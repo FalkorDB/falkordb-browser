@@ -31,7 +31,7 @@ jobs:
       contents: write       # edit the release
       pull-requests: read   # read the PRs it lists
       id-token: write       # lets the shared workflow find its own commit
-    uses: FalkorDB/.github/.github/workflows/release-notes.yml@1a2a38d562fdf7093c8672de22dc6248077344b7
+    uses: FalkorDB/.github/.github/workflows/release-notes.yml@9dc7e9632a3576ed32316fe553f9b3dd6a79b61b
     with:
       product: FalkorDB Browser
       product-description: a web UI for exploring and querying FalkorDB graph databases
