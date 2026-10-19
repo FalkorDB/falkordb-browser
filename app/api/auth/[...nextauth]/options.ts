@@ -207,11 +207,13 @@ export async function newClient(
     // Guard with identity check: if concurrent requests recreated the
     // connection under the same key, only close OUR client — not the
     // replacement that another request already stored.
+    // A stateless server caches nothing, so no lookup ever finds the client:
+    // close it here rather than leaving it open until after() runs, which
+    // for a long streamed response is when the stream ends.
     // eslint-disable-next-line no-console
     console.error("FalkorDB Client Error", err);
-    const current = connections.get(id);
-    if (current === client) {
-      connections.delete(id);
+    if (stateless || connections.get(id) === client) {
+      if (!stateless) connections.delete(id);
       client.close().catch((e) => {
         // eslint-disable-next-line no-console
         console.warn("FalkorDB Client Disconnect Error", e);
