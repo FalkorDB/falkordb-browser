@@ -77,9 +77,6 @@ jobs:
         tag: ${{ fromJSON(needs.releases.outputs.tags) }}
     concurrency:
       group: release-notes-${{ matrix.tag }}
-      # Queue every waiting job (up to 100) instead of letting a newer one
-      # replace it: each must still run, one at a time.
-      queue: max
     permissions:
       contents: write
       pull-requests: read
@@ -98,7 +95,7 @@ jobs:
       # tree can't change unreviewed in a job that holds a release-write token.
       - name: Install OpenAI SDK
         run: |
-          cp .github/scripts/polish-release-notes.mjs .github/scripts/release-downloads.mjs .github/scripts/package.json .github/scripts/package-lock.json "$RUNNER_TEMP/"
+          cp .github/scripts/polish-release-notes.mjs .github/scripts/package.json .github/scripts/package-lock.json "$RUNNER_TEMP/"
           cd "$RUNNER_TEMP"
           npm ci --ignore-scripts --no-audit --no-fund
 
