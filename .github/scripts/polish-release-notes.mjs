@@ -5,11 +5,8 @@
 // GH_TOKEN (for the gh CLI), plus the Azure OpenAI resource: OPENAI_API_KEY,
 // AZURE_OPENAI_ENDPOINT (e.g. https://my-resource.openai.azure.com) and
 // AZURE_OPENAI_DEPLOYMENT (the deployment name; defaults to gpt-6-luna).
-// The "## Download" section is not the model's: release-downloads.mjs writes it
-// from the files attached to the release.
 import { execFileSync } from "node:child_process";
 import OpenAI from "openai";
-import { END, START, downloadsSection, readRelease, stripDownloads, syncDownloads } from "./release-downloads.mjs";
 
 const tag = process.env.RELEASE_TAG;
 const repo = process.env.GITHUB_REPOSITORY;
@@ -37,10 +34,13 @@ const unwrap = (body) => {
   }
   return body.slice(start + SUMMARY.length, end).replace(/^\r?\n\r?\n/, "");
 };
-// The download links are added after polishing, never rewritten by the model.
-// Polished notes keep GitHub's originals apart, without the links; anything
-// else may carry the links' section at its end.
-const generated = original.startsWith(MARKER) ? unwrap(original) : stripDownloads(original);
+// Notes written before the "## Download" section was dropped may still carry
+// it; an unpolished body has it among GitHub's notes, so it is cut out there
+// (a polished body keeps the originals apart, without it). Only its exact
+// shape, markers on lines of their own, so quoted marker text stays.
+const OLD_DOWNLOAD_MARKERS = ["<!-- release-downloads:start -->", "<!-- release-downloads:end -->"];
+const OLD_DOWNLOADS = /(?:^|\r?\n)<!-- release-downloads:start -->\r?\n## Download\r?\n[\s\S]*?\r?\n<!-- release-downloads:end -->(?=\r?\n|$)/g;
+const generated = original.startsWith(MARKER) ? unwrap(original) : original.replace(OLD_DOWNLOADS, "").trim();
 
 if (!generated) {
   console.error(`Release ${tag} has no notes to rewrite.`);
@@ -129,24 +129,21 @@ if (response.status !== "completed") {
 }
 
 // The summary line marks where the original notes start on a rerun, so the
-// model's output must not contain it.
-// Nor may it carry the download section's markers, which another step owns.
-// A whole section first (dropping only its markers would leave a stale copy of
-// the links behind), then any stray marker.
-const polished = stripDownloads(response.output_text.replaceAll(SUMMARY, "")).replaceAll(START, "").replaceAll(END, "").trim();
+// model's output must not contain it. Nor a Download section, should the model
+// reproduce one: a whole section first, then any stray marker.
+const polished = OLD_DOWNLOAD_MARKERS.reduce(
+  (text, marker) => text.replaceAll(marker, ""),
+  response.output_text.replaceAll(SUMMARY, "").replace(OLD_DOWNLOADS, ""),
+).trim();
 if (!polished) {
   console.error("Model returned no text; leaving the release notes unchanged.");
   process.exit(1);
 }
 
-// The installers attached by now (the desktop and mobile workflows attach theirs
-// while this runs); syncDownloads below catches up with any that arrive later.
-const downloads = downloadsSection(repo, tag, readRelease(repo, tag).assets);
-const body = `${MARKER}\n${polished}\n\n${downloads ? `${downloads}\n\n` : ""}<details>\n<summary>Original generated notes</summary>\n\n${generated}\n</details>\n`;
+const body = `${MARKER}\n${polished}\n\n<details>\n<summary>Original generated notes</summary>\n\n${generated}\n</details>\n`;
 
 console.log(body);
 
 if (!dryRun) {
   execFileSync("gh", ["release", "edit", tag, "--repo", repo, "--notes-file", "-"], { input: body, stdio: ["pipe", "inherit", "inherit"] });
-  syncDownloads(repo, tag);
 }
