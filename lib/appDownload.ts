@@ -172,26 +172,3 @@ export function getPromptStorage(win: Pick<Window, "localStorage" | "sessionStor
     }
 }
 
-// Installer files are downloaded in place: opening them in a new tab only
-// leaves a blank page behind (the file is the whole response). Store pages
-// and anything else still open in a new tab.
-// Only what the steps below describe; an archive would get the wrong ones.
-const INSTALLER_FILE = /\.(apk|dmg|exe|appimage)$/i;
-
-/** True for a link straight to an installer file rather than to a page. */
-export function isDirectDownload(href: string): boolean {
-    try {
-        return INSTALLER_FILE.test(new URL(href).pathname);
-    } catch {
-        return false;
-    }
-}
-
-/** What to do once the download finishes, shown after the visitor starts it. */
-export const INSTALL_STEPS: Record<AppPlatform, string> = {
-    android: "When the download finishes, open it from the notification (or Files → Downloads). If Android asks, allow installs from your browser, then tap Install.",
-    mac: "Open the downloaded .dmg and drag FalkorDB Browser into Applications. The app is not code-signed yet, so the first time, right-click it and choose Open.",
-    windows: "Run the downloaded installer. The app is not code-signed yet, so if Windows SmartScreen warns, choose More info → Run anyway.",
-    linux: "Make the downloaded AppImage executable (chmod +x, or Properties → Allow executing) and run it.",
-    ios: "Follow the App Store page to install it.",
-};
