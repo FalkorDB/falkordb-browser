@@ -2,19 +2,20 @@
 // attached to that release. It lists only files that are actually there, so a
 // build that failed never leaves a dead link, and it is rebuilt from the
 // release's current files on every run, so the order the workflows finish in
-// does not matter. It runs:
-//   - from polish-release-notes.mjs, right before the polished notes are saved;
-//   - after desktop.yml attaches the installers and mobile.yml the APK, as
-//     `node .github/scripts/release-downloads.mjs` with RELEASE_TAG,
-//     GITHUB_REPOSITORY and GH_TOKEN set.
+// does not matter. It runs after desktop.yml attaches the installers and
+// mobile.yml the APK, as `node .github/scripts/release-downloads.mjs` with
+// RELEASE_TAG, GITHUB_REPOSITORY and GH_TOKEN set. The shared release-notes
+// workflow (FalkorDB/.github) keeps the section as it is when it polishes the
+// notes, so the two can run in either order.
 // No dependencies: only node and the gh CLI.
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 export const START = "<!-- release-downloads:start -->";
 export const END = "<!-- release-downloads:end -->";
-// The polish step's wrapper (see polish-release-notes.mjs): its marker first,
-// then the notes, then GitHub's original notes collapsed at the end.
+// The polish step's wrapper (see polish-release-notes.mjs in FalkorDB/.github):
+// its marker first, then the notes, then GitHub's original notes collapsed at
+// the end.
 const POLISHED = "<!-- polished-release-notes -->";
 const ORIGINAL_NOTES = "<details>\n<summary>Original generated notes</summary>";
 
