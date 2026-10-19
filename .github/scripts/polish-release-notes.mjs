@@ -4,7 +4,7 @@
 // Reads RELEASE_TAG and GITHUB_REPOSITORY from the environment, and needs
 // GH_TOKEN (for the gh CLI), plus the Azure OpenAI resource: OPENAI_API_KEY,
 // AZURE_OPENAI_ENDPOINT (e.g. https://my-resource.openai.azure.com) and
-// AZURE_OPENAI_DEPLOYMENT (the deployment name; defaults to gpt-5.4-mini).
+// AZURE_OPENAI_DEPLOYMENT (the deployment name; defaults to gpt-6-luna).
 import { execFileSync } from "node:child_process";
 import OpenAI from "openai";
 
@@ -115,7 +115,7 @@ try {
 const apiKey = process.env.OPENAI_API_KEY;
 const client = new OpenAI({ apiKey, baseURL: `${endpoint}/openai/v1/`, defaultHeaders: { "api-key": apiKey } });
 const response = await client.responses.create({
-  model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-5.4-mini",
+  model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-6-luna",
   max_output_tokens: 16000,
   reasoning: { effort: "medium" },
   instructions: system,
