@@ -1,9 +1,11 @@
-// SERVER_STATE picks whether the server keeps FalkorDB connections between
-// requests. "stateful" (the default) caches one client per connection and
-// reuses it; "stateless" caches nothing, so each request opens its own client
-// and closes it once the response is done. Stateless costs a connect (and a
-// role check) per request, but nothing a request leaves behind outlives it,
-// which suits replicas behind a load balancer and serverless hosts.
+// SERVER_STATE picks whether the server keeps users' FalkorDB connections
+// between requests. "stateful" (the default) caches one client per connection
+// and reuses it; "stateless" caches nothing, so each request opens its own
+// client and closes it once the response is done. Stateless costs a connect
+// (and a role check) per request, but no user connection outlives the request
+// that opened it, which suits replicas behind a load balancer and serverless
+// hosts. The server's own Token DB connection (lib/token-storage) is not a
+// user connection: it stays one shared client per process in either mode.
 
 export type ServerState = "stateful" | "stateless";
 

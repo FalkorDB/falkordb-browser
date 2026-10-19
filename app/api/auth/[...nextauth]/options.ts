@@ -1534,8 +1534,10 @@ export async function getClient(
   }
 
   // Slow path (with lock): connection is not in the cache or unhealthy.
-  // Use the lock to prevent multiple simultaneous recreation attempts.
-  return withConnectionLock(connKey, async () => {
+  // Use the lock to prevent multiple simultaneous recreation attempts. A
+  // stateless server has no shared client to recreate — each request opens
+  // its own — so it skips the lock rather than queueing requests behind it.
+  const resolveConnection = async () => {
   try {
     const connResult = await getConnectionClient(id, connId);
     if (connResult) {
@@ -1590,7 +1592,8 @@ export async function getClient(
       },
     }
   );
-  });
+  };
+  return stateless ? resolveConnection() : withConnectionLock(connKey, resolveConnection);
 }
 
 export default authOptions;
