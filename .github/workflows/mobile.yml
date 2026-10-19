@@ -242,38 +242,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$RUNNER_TEMP/apk/FalkorDB-Browser-android.apk" --repo "$GITHUB_REPOSITORY" --clobber
-
-  # Its own job, so nothing is checked out where the signing key was, and so
-  # it can share the polish job's per-release concurrency group: no two jobs
-  # rewrite the notes at once. It runs even when signing failed or was
-  # skipped: the links are rebuilt from the files actually attached, so a run
-  # that replaced a cancelled one still lists an APK the older run uploaded.
-  android-release-notes:
-    needs: android-release-sign
-    if: ${{ !cancelled() && (github.event_name == 'release' || inputs.release_tag) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    concurrency:
-      group: release-notes-${{ github.event.release.tag_name || inputs.release_tag }}
-      # Queue every waiting job (up to 100) instead of letting a newer one
-      # replace it: each must still run, one at a time.
-      queue: max
-    steps:
-      # The release's tag may predate the script, and a manual run may come from
-      # any branch, so it is always the default branch's reviewed copy that
-      # runs with this write token. Nothing else: no npm, just node and gh.
-      - name: Check out the release scripts
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: .github/scripts
-          ref: ${{ github.event.repository.default_branch }}
-          path: release-scripts
-
-      - name: List the download links in the release notes
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
-        run: node release-scripts/.github/scripts/release-downloads.mjs
