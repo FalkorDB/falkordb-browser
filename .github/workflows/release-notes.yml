@@ -77,6 +77,9 @@ jobs:
         tag: ${{ fromJSON(needs.releases.outputs.tags) }}
     concurrency:
       group: release-notes-${{ matrix.tag }}
+      # Queue every waiting run (up to 100) instead of letting a newer one
+      # replace it: a manual run during a release's own must not cancel it.
+      queue: max
     permissions:
       contents: write
       pull-requests: read

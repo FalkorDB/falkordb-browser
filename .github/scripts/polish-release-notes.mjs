@@ -34,7 +34,12 @@ const unwrap = (body) => {
   }
   return body.slice(start + SUMMARY.length, end).replace(/^\r?\n\r?\n/, "");
 };
-const generated = unwrap(original);
+// Notes written before the "## Download" section was dropped may still carry
+// it; an unpolished body has it among GitHub's notes, so it is cut out there
+// (a polished body keeps the originals apart, without it). Only its exact
+// shape, markers on lines of their own, so quoted marker text stays.
+const OLD_DOWNLOADS = /(?:^|\r?\n)<!-- release-downloads:start -->\r?\n## Download\r?\n[\s\S]*?\r?\n<!-- release-downloads:end -->(?=\r?\n|$)/g;
+const generated = original.startsWith(MARKER) ? unwrap(original) : original.replace(OLD_DOWNLOADS, "").trim();
 
 if (!generated) {
   console.error(`Release ${tag} has no notes to rewrite.`);
