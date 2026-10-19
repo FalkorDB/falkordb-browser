@@ -2,7 +2,8 @@ name: Polish release notes
 
 # Runs FalkorDB's shared release-notes workflow; its header explains what it
 # does and what it needs (the OPENAI_API_KEY secret and the
-# AZURE_OPENAI_ENDPOINT variable, set on the organization).
+# AZURE_OPENAI_ENDPOINT variable, set on the organization). It follows main,
+# so changes merged there apply here on the next release.
 
 permissions:
   contents: read
@@ -31,7 +32,7 @@ jobs:
       contents: write       # edit the release
       pull-requests: read   # read the PRs it lists
       id-token: write       # lets the shared workflow find its own commit
-    uses: FalkorDB/.github/.github/workflows/release-notes.yml@9dc7e9632a3576ed32316fe553f9b3dd6a79b61b
+    uses: FalkorDB/.github/.github/workflows/release-notes.yml@main
     with:
       product: FalkorDB Browser
       product-description: a web UI for exploring and querying FalkorDB graph databases
