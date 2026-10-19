@@ -38,6 +38,7 @@ const unwrap = (body) => {
 // it; an unpolished body has it among GitHub's notes, so it is cut out there
 // (a polished body keeps the originals apart, without it). Only its exact
 // shape, markers on lines of their own, so quoted marker text stays.
+const OLD_DOWNLOAD_MARKERS = ["<!-- release-downloads:start -->", "<!-- release-downloads:end -->"];
 const OLD_DOWNLOADS = /(?:^|\r?\n)<!-- release-downloads:start -->\r?\n## Download\r?\n[\s\S]*?\r?\n<!-- release-downloads:end -->(?=\r?\n|$)/g;
 const generated = original.startsWith(MARKER) ? unwrap(original) : original.replace(OLD_DOWNLOADS, "").trim();
 
@@ -128,8 +129,12 @@ if (response.status !== "completed") {
 }
 
 // The summary line marks where the original notes start on a rerun, so the
-// model's output must not contain it.
-const polished = response.output_text.replaceAll(SUMMARY, "").trim();
+// model's output must not contain it. Nor a Download section, should the model
+// reproduce one: a whole section first, then any stray marker.
+const polished = OLD_DOWNLOAD_MARKERS.reduce(
+  (text, marker) => text.replaceAll(marker, ""),
+  response.output_text.replaceAll(SUMMARY, "").replace(OLD_DOWNLOADS, ""),
+).trim();
 if (!polished) {
   console.error("Model returned no text; leaving the release notes unchanged.");
   process.exit(1);
