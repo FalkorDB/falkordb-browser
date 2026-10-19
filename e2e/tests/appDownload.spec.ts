@@ -67,14 +67,26 @@ async function openVisitor(browser: Browser, { ua, viewport = DESKTOP, signedIn 
     }
     // What's New would take its turn first; keep GitHub's real release notes out of these tests.
     await context.route(RELEASES_ROUTE, (route) => route.fulfill({ json: { releases: [] } }));
-    // Never fetch a real installer. GitHub serves release files as attachments,
-    // which is what lets them download in place without leaving the page.
+    // Never fetch a real installer: stand in for GitHub, which serves release
+    // files as attachments.
     await context.route("https://github.com/**", (route) => route.fulfill({
         status: 200,
         headers: { "content-type": "application/octet-stream", "content-disposition": "attachment; filename=installer" },
         body: "installer",
     }));
     return context;
+}
+
+/**
+ * Resolves once a new tab requests `url`. The request, not the tab's download
+ * event: the tab may have finished downloading before a listener reaches it.
+ */
+async function fetchedInNewTab(context: BrowserContext, url: string): Promise<void> {
+    const [request] = await Promise.all([
+        context.waitForEvent("request", (r) => r.url() === url),
+        context.waitForEvent("page"),
+    ]);
+    expect(request.isNavigationRequest()).toBe(true);
 }
 
 async function openPage(context: BrowserContext, url: string): Promise<[Page, AppDownloadComponent]> {
@@ -192,42 +204,44 @@ test.describe("@admin App download", () => {
         const [page, app] = await openPage(context, urls.graphUrl);
 
         await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
-        const download = page.waitForEvent("download");
+        const fetched = fetchedInNewTab(context, `${RELEASES}/FalkorDB-Browser-win-x64.exe`);
         await app.promptDownload.click();
-        expect((await download).url()).toBe(`${RELEASES}/FalkorDB-Browser-win-x64.exe`);
+        await fetched;
         await expect(app.prompt).toBeHidden();
+        await expect(page).toHaveURL(/\/graph/);
 
         const [, nextSession] = await openPage(context, urls.graphUrl);
         await expectNoPrompt(nextSession);
     });
 
-    test("an installer downloads in place, and the page says what to do next", async ({ browser }) => {
+    // Downloading in place sent Chrome on Android to the file's page, where it
+    // stuck without its download sheet; a new tab gets the sheet, and the
+    // browser stays where it was.
+    test("an installer opens in a new tab, and the browser stays where it was", async ({ browser }) => {
         context = await openVisitor(browser, { ua: UA.windows });
         const [page, app] = await openPage(context, urls.graphUrl);
         await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
-        // No new tab: one would hold nothing but a blank page while the file downloads.
-        await expect(app.promptDownload).not.toHaveAttribute("target", "_blank");
+        await expect(app.promptDownload).toHaveAttribute("target", "_blank");
 
-        const download = page.waitForEvent("download");
+        const fetched = fetchedInNewTab(context, `${RELEASES}/FalkorDB-Browser-win-x64.exe`);
         await app.promptDownload.click();
-        expect((await download).url()).toBe(`${RELEASES}/FalkorDB-Browser-win-x64.exe`);
+        await fetched;
         await expect(page).toHaveURL(/\/graph/);
-        expect(context.pages()).toHaveLength(1);
-        // The toast also copies its text into a screen-reader announcement; check the visible one.
-        await expect(page.getByText("Downloading FalkorDB Browser").first()).toBeVisible();
-        await expect(page.getByText(/More info → Run anyway/).first()).toBeVisible();
+        await expect(page.getByText("Downloading FalkorDB Browser")).toHaveCount(0);
     });
 
-    test("Android: the APK downloads in place with install steps; a store page opens in a new tab", async ({ browser }) => {
+    test("Android: the APK and a store page both open in a new tab", async ({ browser }) => {
         const apk = "https://github.com/FalkorDB/falkordb-browser/releases/latest/download/FalkorDB-Browser-android.apk";
         context = await openVisitor(browser, { ua: UA.android, viewport: PHONE });
         await context.route(APP_LINKS_ROUTE, (route) => route.fulfill({ json: { android: apk } }));
         const [page, app] = await openPage(context, urls.graphUrl);
         await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
-        const download = page.waitForEvent("download");
+        await expect(app.promptDownload).toHaveAttribute("target", "_blank");
+        await expect(app.promptDownload).toHaveAttribute("href", apk);
+        const fetched = fetchedInNewTab(context, apk);
         await app.promptDownload.click();
-        expect((await download).url()).toBe(apk);
-        await expect(page.getByText(/open it from the notification/).first()).toBeVisible();
+        await fetched;
+        await expect(page).toHaveURL(/\/graph/);
         await context.close();
 
         const store = "https://play.google.com/store/apps/details?id=com.falkordb.browser";
