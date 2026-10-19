@@ -1,7 +1,7 @@
 name: Polish release notes
 
 # Runs FalkorDB's shared release-notes workflow; its header explains what it
-# does and what it needs (the OPENAI_API_KEY secret and the
+# does and what it needs (the AZURE_OPENAI_API_KEY secret and the
 # AZURE_OPENAI_ENDPOINT variable, set on the organization). It follows main,
 # so changes merged there apply here on the next release.
 
@@ -42,4 +42,4 @@ jobs:
       from-tag: ${{ inputs.from_tag }}
       dry-run: ${{ inputs.dry_run || false }}
     secrets:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
