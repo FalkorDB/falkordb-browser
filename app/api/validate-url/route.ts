@@ -29,7 +29,9 @@ export async function POST(request: NextRequest) {
 
     if (isMissingPasswordAndUsername) {
         try {
-            await FalkorDB.connect({ url });
+            const client = await FalkorDB.connect({ url });
+            // Only the attempt matters; don't leave the connection open.
+            await client.close().catch(() => { /* already closed */ });
         } catch (err) {
             if (err instanceof Error && err.message.includes("NOAUTH")) {
                 return NextResponse.json({ result: true }, { status: 200 });
