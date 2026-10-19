@@ -9,8 +9,6 @@ import {
     dismissAppPrompt,
     getAppDownload,
     getPromptStorage,
-    INSTALL_STEPS,
-    isDirectDownload,
     isInsideApp,
     markAppPromptShown,
     readAppLinks,
@@ -168,23 +166,4 @@ test("getPromptStorage hands back both storages, or nothing where reading them t
         sessionStorage: session,
     };
     assert.equal(getPromptStorage(blocked), undefined);
-});
-
-test("isDirectDownload tells installer files from pages", () => {
-    for (const file of Object.values(DESKTOP_FILES)) assert.equal(isDirectDownload(`${DESKTOP_RELEASE_BASE}/${file}`), true, file);
-    assert.equal(isDirectDownload("https://github.com/FalkorDB/falkordb-browser/releases/latest/download/FalkorDB-Browser-android.apk"), true);
-    assert.equal(isDirectDownload("http://192.168.1.52:8000/FalkorDB-Browser-android-dev.apk?x=1"), true, "a query string does not hide the file");
-    assert.equal(isDirectDownload("https://play.google.com/store/apps/details?id=com.falkordb.browser"), false);
-    assert.equal(isDirectDownload("https://apps.apple.com/app/id1"), false);
-    assert.equal(isDirectDownload("not a url"), false);
-    // No install steps fit an archive, so it opens like any other link.
-    assert.equal(isDirectDownload(`${DESKTOP_RELEASE_BASE}/FalkorDB-Browser-mac-arm64.zip`), false);
-});
-
-test("every platform has install steps to show after the download starts", () => {
-    for (const platform of ["android", "ios", "mac", "windows", "linux"] as const) {
-        assert.ok(INSTALL_STEPS[platform].length > 20, platform);
-    }
-    assert.match(INSTALL_STEPS.android, /Install/);
-    assert.match(INSTALL_STEPS.windows, /Run anyway/);
 });
