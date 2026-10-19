@@ -2,13 +2,14 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import type { User } from "next-auth";
 import type { Role } from "next-auth";
 import type { NextAuthConfig } from "next-auth";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { FalkorDB, type FalkorDBOptions } from "falkordb";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
 import { LRUCache } from "lru-cache";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
+import { NoConnectionCache, readServerState, type ConnectionCache } from "@/lib/serverState";
 import {
   preconfiguredLoginCredentials,
   readPreconfiguredConnection,
@@ -81,15 +82,22 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
  * because another in-flight request may still hold a reference to the old
  * client. Callers that `.delete()` are expected to close the client
  * themselves when safe.
+ *
+ * With SERVER_STATE=stateless the cache holds nothing: every lookup misses,
+ * so each request connects anew, and newClient() closes the client once the
+ * response is done.
  */
-const connections = new LRUCache<string, FalkorDB>({
-  max: (() => { const n = parseInt(process.env.MAX_CONNECTION_CACHE_SIZE || '100', 10); return Number.isFinite(n) && n > 0 ? n : 100; })(),
-  ttl: 30 * 60 * 1000, // 30 minutes idle TTL
-  dispose(client, _key, reason) {
-    if (reason === 'set' || reason === 'delete') return;
-    try { client.close(); } catch { /* ignore */ }
-  },
-});
+const stateless = readServerState() === "stateless";
+const connections: ConnectionCache<FalkorDB> = stateless
+  ? new NoConnectionCache<FalkorDB>()
+  : new LRUCache<string, FalkorDB>({
+    max: (() => { const n = parseInt(process.env.MAX_CONNECTION_CACHE_SIZE || '100', 10); return Number.isFinite(n) && n > 0 ? n : 100; })(),
+    ttl: 30 * 60 * 1000, // 30 minutes idle TTL
+    dispose(client, _key, reason) {
+      if (reason === 'set' || reason === 'delete') return;
+      try { client.close(); } catch { /* ignore */ }
+    },
+  });
 
 enableAutoNextAuthUrl();
 
@@ -186,6 +194,13 @@ export async function newClient(
 
   // Save connection in connections map for later use
   connections.set(id, client);
+
+  // Nothing keeps a stateless server's client, so it lives as long as the
+  // request that opened it: after() runs once the response has finished,
+  // streamed responses included, and also when the request failed.
+  if (stateless) {
+    after(() => client.close().catch(() => { /* already closed */ }));
+  }
 
   client.on("error", (err) => {
     // Close connection on error and remove from connections map.
