@@ -215,6 +215,18 @@ export default defineConfig({
       testMatch: /.*smoke\.spec\.ts$/,
     },
 
+    // Stateless tests (run separately, against a server started with
+    // SERVER_STATE=stateless and a FalkorDB no other test uses: they count
+    // the server's connections to it).
+    {
+      name: '[Stateless] - Chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      grep: /@stateless/,
+      testMatch: /.*stateless\.spec\.ts$/,
+    },
+
     // TLS tests (run separately)
     {
       name: '[TLS - Chromium]',
