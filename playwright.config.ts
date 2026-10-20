@@ -217,7 +217,8 @@ export default defineConfig({
 
     // Stateless tests (run separately, against a server started with
     // SERVER_STATE=stateless and a FalkorDB no other test uses: they count
-    // the server's connections to it).
+    // the server's connections to it). One at a time, in one worker: another
+    // worker's own connection to FalkorDB would be counted as the server's.
     {
       name: '[Stateless] - Chromium',
       use: {
@@ -225,6 +226,7 @@ export default defineConfig({
       },
       grep: /@stateless/,
       testMatch: /.*stateless\.spec\.ts$/,
+      fullyParallel: false,
     },
 
     // TLS tests (run separately)
