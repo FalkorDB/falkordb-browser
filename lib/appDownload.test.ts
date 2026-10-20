@@ -7,11 +7,14 @@ import {
     DESKTOP_RELEASE_BASE,
     detectPlatform,
     dismissAppPrompt,
+    ANDROID_DOWNLOAD_ROUTE,
     getAppDownload,
     getPromptStorage,
+    isGitHubReleaseFile,
     isInsideApp,
     markAppPromptShown,
     readAppLinks,
+    resolveReleaseFile,
     shouldShowAppPrompt,
 } from "./appDownload.ts";
 
@@ -166,4 +169,55 @@ test("getPromptStorage hands back both storages, or nothing where reading them t
         sessionStorage: session,
     };
     assert.equal(getPromptStorage(blocked), undefined);
+});
+
+const APK = "https://github.com/FalkorDB/falkordb-browser/releases/latest/download/FalkorDB-Browser-android.apk";
+
+test("an APK on a GitHub release is linked through the download route, so the GitHub app cannot open it", () => {
+    assert.deepEqual(getAppDownload("android", { android: APK }), {
+        platform: "android", kind: "link", label: "Get the Android app", href: ANDROID_DOWNLOAD_ROUTE,
+    });
+    // Anything else (a store page, a dev APK on the network) is linked as it is.
+    const dev = "http://192.168.1.52:8000/FalkorDB-Browser-android-dev.apk";
+    assert.equal((getAppDownload("android", { android: dev }) as { href: string }).href, dev);
+});
+
+test("isGitHubReleaseFile matches release files only", () => {
+    assert.equal(isGitHubReleaseFile(APK), true);
+    assert.equal(isGitHubReleaseFile("https://github.com/FalkorDB/falkordb-browser/releases/download/v2.7.2/FalkorDB-Browser-android.apk"), true);
+    assert.equal(isGitHubReleaseFile("https://github.com/FalkorDB/falkordb-browser/releases"), false);
+    assert.equal(isGitHubReleaseFile("https://github.com/FalkorDB/falkordb-browser"), false);
+    assert.equal(isGitHubReleaseFile("http://github.com/FalkorDB/falkordb-browser/releases/latest/download/x.apk"), false);
+    assert.equal(isGitHubReleaseFile("https://github.com.evil.test/a/b/releases/latest/download/x.apk"), false);
+    assert.equal(isGitHubReleaseFile("https://play.google.com/store/apps/details?id=com.falkordb.browser"), false);
+    assert.equal(isGitHubReleaseFile("not a url"), false);
+});
+
+/** A stand-in fetch answering each URL with the given status and Location. */
+function fakeFetch(answers: Record<string, [number, string?]>) {
+    const seen: string[] = [];
+    const impl = (async (input: string | URL | Request) => {
+        const url = String(input);
+        seen.push(url);
+        const [status, location] = answers[url] ?? [404];
+        // GitHub's redirects carry a short body, which is discarded unread.
+        return new Response(location ? "Moved" : null, { status, headers: location ? { location } : {} });
+    }) as typeof fetch;
+    return { impl, seen };
+}
+
+test("resolveReleaseFile follows GitHub's redirects to the file host", async () => {
+    const tagged = "https://github.com/FalkorDB/falkordb-browser/releases/download/v2.7.2/FalkorDB-Browser-android.apk";
+    const file = "https://release-assets.githubusercontent.com/github-production-release-asset/1/2?sig=abc";
+    const { impl, seen } = fakeFetch({ [APK]: [302, tagged], [tagged]: [302, file] });
+    assert.equal(await resolveReleaseFile(APK, impl), file);
+    assert.deepEqual(seen, [APK, tagged], "it stops at the file host and never fetches the file");
+});
+
+test("resolveReleaseFile gives up on anything but redirects within GitHub", async () => {
+    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [404] }).impl), undefined, "no such file");
+    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [200] }).impl), undefined, "no redirect");
+    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [302, "https://evil.test/x.apk"] }).impl), undefined, "off GitHub");
+    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [302, "http://x.githubusercontent.com/f"] }).impl), undefined, "not https");
+    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [302, APK] }).impl), undefined, "a redirect loop ends");
 });

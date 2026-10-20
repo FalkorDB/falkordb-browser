@@ -83,7 +83,9 @@ export function getAppDownload(platform: AppPlatform | undefined, links: AppLink
         case "linux":
             return { platform, kind: "link", label: "Download for Linux", href: release(DESKTOP_FILES.linux) };
         case "android":
-            return links.android ? { platform, kind: "link", label: "Get the Android app", href: links.android } : undefined;
+            return links.android
+                ? { platform, kind: "link", label: "Get the Android app", href: isGitHubReleaseFile(links.android) ? ANDROID_DOWNLOAD_ROUTE : links.android }
+                : undefined;
         case "ios":
             return links.ios
                 ? { platform, kind: "link", label: "Get the iOS app", href: links.ios }
@@ -91,6 +93,53 @@ export function getAppDownload(platform: AppPlatform | undefined, links: AppLink
         default:
             return undefined;
     }
+}
+
+/**
+ * Android hands a tapped github.com link to the GitHub app when it is
+ * installed, and that app opens a release file in its own in-app browser,
+ * where Chrome's download prompt never shows. So an APK attached to a GitHub
+ * release is linked through this route instead, which redirects to the file's
+ * address on GitHub's file host: no app claims that one, so Chrome downloads it.
+ */
+export const ANDROID_DOWNLOAD_ROUTE = "/api/app-download/android";
+
+const GITHUB_RELEASE_FILE = /^\/[^/]+\/[^/]+\/releases\/(?:latest\/download|download\/[^/]+)\/[^/]+$/;
+
+/** True for a file attached to a GitHub release, latest or tagged. */
+export function isGitHubReleaseFile(href: string): boolean {
+    try {
+        const url = new URL(href);
+        return url.protocol === "https:" && url.hostname === "github.com" && GITHUB_RELEASE_FILE.test(url.pathname);
+    } catch {
+        return false;
+    }
+}
+
+// Where GitHub serves release files from, past its own redirects.
+const isGitHubFileHost = (url: URL) => url.protocol === "https:" && url.hostname.endsWith(".githubusercontent.com");
+
+/**
+ * The address GitHub's file host serves a release file from. GitHub answers a
+ * release download with redirects, first from latest/ to the tagged release,
+ * then to a short-lived signed URL; they are followed here, on github.com only,
+ * until that URL. Going through the download URL keeps GitHub's download count.
+ * Undefined when GitHub answers anything else, so the caller can fall back to
+ * the plain link.
+ */
+export async function resolveReleaseFile(href: string, fetchImpl: typeof fetch): Promise<string | undefined> {
+    let url = new URL(href);
+    for (let hop = 0; hop < 5; hop += 1) {
+        // Sequential by nature: each hop is where the previous one pointed.
+        const res = await fetchImpl(url, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(5_000) });
+        await res.body?.cancel();
+        const location = res.headers.get("location");
+        if (res.status < 300 || res.status >= 400 || !location) return undefined;
+        url = new URL(location, url);
+        if (isGitHubFileHost(url)) return url.toString();
+        if (url.protocol !== "https:" || url.hostname !== "github.com") return undefined;
+    }
+    return undefined;
 }
 
 function readAppUrl(value: string | undefined, allowHttp: boolean): string | undefined {
