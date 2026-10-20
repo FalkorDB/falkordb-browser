@@ -8,6 +8,8 @@ import {
     detectPlatform,
     dismissAppPrompt,
     ANDROID_DOWNLOAD_ROUTE,
+    createAndroidDownloadHandler,
+    RESOLVED_FILE_TTL_MS,
     getAppDownload,
     getPromptStorage,
     isGitHubReleaseFile,
@@ -193,13 +195,22 @@ test("isGitHubReleaseFile matches release files only", () => {
     assert.equal(isGitHubReleaseFile("not a url"), false);
 });
 
-/** A stand-in fetch answering each URL with the given status and Location. */
-function fakeFetch(answers: Record<string, [number, string?]>) {
+/**
+ * A stand-in for GitHub, answering each URL with the given status and Location.
+ * Any other URL fails the test: the resolver must never reach one. Every
+ * request must leave redirects to the resolver and carry its deadline.
+ */
+function fakeFetch(answers: Record<string, [number, string?] | Error>) {
     const seen: string[] = [];
-    const impl = (async (input: string | URL | Request) => {
+    const impl = (async (input: string | URL | Request, init?: RequestInit) => {
         const url = String(input);
         seen.push(url);
-        const [status, location] = answers[url] ?? [404];
+        assert.equal(init?.redirect, "manual", `${url} must not follow redirects itself`);
+        assert.ok(init?.signal, `${url} must have a deadline`);
+        const answer = answers[url];
+        if (!answer) throw new Error(`Unexpected fetch: ${url}`);
+        if (answer instanceof Error) throw answer;
+        const [status, location] = answer;
         // GitHub's redirects carry a short body, which is discarded unread.
         return new Response(location ? "Moved" : null, { status, headers: location ? { location } : {} });
     }) as typeof fetch;
@@ -214,10 +225,70 @@ test("resolveReleaseFile follows GitHub's redirects to the file host", async () 
     assert.deepEqual(seen, [APK, tagged], "it stops at the file host and never fetches the file");
 });
 
-test("resolveReleaseFile gives up on anything but redirects within GitHub", async () => {
-    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [404] }).impl), undefined, "no such file");
-    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [200] }).impl), undefined, "no redirect");
-    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [302, "https://evil.test/x.apk"] }).impl), undefined, "off GitHub");
-    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [302, "http://x.githubusercontent.com/f"] }).impl), undefined, "not https");
-    assert.equal(await resolveReleaseFile(APK, fakeFetch({ [APK]: [302, APK] }).impl), undefined, "a redirect loop ends");
+test("resolveReleaseFile gives up on anything but redirects within GitHub, without following the rest", async () => {
+    for (const [why, answer, calls] of [
+        ["no such file", [404], 1],
+        ["no redirect", [200], 1],
+        ["off GitHub", [302, "https://evil.test/x.apk"], 1],
+        ["not https", [302, "http://x.githubusercontent.com/f"], 1],
+        ["a redirect loop ends", [302, APK], 5],
+    ] as const) {
+        const { impl, seen } = fakeFetch({ [APK]: [...answer] });
+        assert.equal(await resolveReleaseFile(APK, impl), undefined, why);
+        assert.deepEqual(seen, Array(calls).fill(APK), `${why}: only github.com is ever fetched`);
+    }
+});
+
+const FILE = "https://release-assets.githubusercontent.com/github-production-release-asset/1/2?sig=abc";
+const CONFIGURED = { ANDROID_APP_URL: APK };
+
+/** A handler on a clock the test moves by hand. */
+function handlerWith(answers: Record<string, [number, string?] | Error>) {
+    const github = fakeFetch(answers);
+    let time = 1_000;
+    const handle = createAndroidDownloadHandler(github.impl, () => time);
+    return { handle, seen: github.seen, advance: (ms: number) => { time += ms; } };
+}
+
+const expectRedirect = (res: Response, location: string) => {
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get("location"), location);
+    assert.equal(res.headers.get("cache-control"), "no-store");
+};
+
+test("the download route: 404 without an Android app, and other links as they are", async () => {
+    const { handle, seen } = handlerWith({});
+    const none = await handle({});
+    assert.equal(none.status, 404);
+    assert.deepEqual(await none.json(), { message: "No Android app is configured." });
+    const store = "https://play.google.com/store/apps/details?id=com.falkordb.browser";
+    expectRedirect(await handle({ ANDROID_APP_URL: store }), store);
+    assert.deepEqual(seen, [], "GitHub is never asked about a link that is not its own");
+});
+
+test("the download route sends a release APK to GitHub's file host, and reuses it for a minute", async () => {
+    const { handle, seen, advance } = handlerWith({ [APK]: [302, FILE] });
+    expectRedirect(await handle(CONFIGURED), FILE);
+    advance(RESOLVED_FILE_TTL_MS - 1);
+    expectRedirect(await handle(CONFIGURED), FILE);
+    assert.equal(seen.length, 1, "reused while fresh");
+    advance(1);
+    expectRedirect(await handle(CONFIGURED), FILE);
+    assert.equal(seen.length, 2, "looked up again once stale");
+});
+
+test("the download route shares one lookup between requests that arrive together", async () => {
+    const { handle, seen } = handlerWith({ [APK]: [302, FILE] });
+    const all = await Promise.all([handle(CONFIGURED), handle(CONFIGURED), handle(CONFIGURED)]);
+    for (const res of all) expectRedirect(res, FILE);
+    assert.equal(seen.length, 1);
+});
+
+test("the download route falls back to the plain link when GitHub fails, and tries again next time", async () => {
+    for (const answer of [[404] as [number], new Error("network down")]) {
+        const { handle, seen } = handlerWith({ [APK]: answer });
+        expectRedirect(await handle(CONFIGURED), APK);
+        expectRedirect(await handle(CONFIGURED), APK);
+        assert.equal(seen.length, 2, "a failure is not cached");
+    }
 });
