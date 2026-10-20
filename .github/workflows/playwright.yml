@@ -270,7 +270,6 @@ jobs:
           export PAT_FALKORDB_HOST=localhost
           export PAT_FALKORDB_PORT=6380
           export PAT_FALKORDB_USERNAME=default
-          export PAT_FALKORDB_PASSWORD=""
           export PAT_FALKORDB_GRAPH_NAME=token_management
           npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
