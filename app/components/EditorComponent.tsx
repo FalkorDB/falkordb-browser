@@ -210,6 +210,8 @@ export default function EditorComponent({
     const onMountRef = useRef(onMount);
     const onMonacoReadyRef = useRef(onMonacoReady);
     const valueRef = useRef(value);
+    // Values the editor emitted that the `value` prop has not echoed back yet.
+    const inFlightRef = useRef<Set<string>>(new Set());
     const overflowHostRef = useRef<HTMLDivElement | null>(null);
 
     // Keep refs in sync; also update model-specific and shared registry configs when languageConfig changes.
@@ -342,6 +344,7 @@ export default function EditorComponent({
 
             // Listen for content changes — skip callback when change is from our own setValue
             editor.onDidChangeModelContent(() => {
+                inFlightRef.current.add(editor.getValue());
                 onChangeRef.current?.(editor.getValue());
             });
 
@@ -404,7 +407,13 @@ export default function EditorComponent({
     useEffect(() => {
         const editor = editorRef.current;
         if (!editor || value === undefined) return;
-        if (editor.getValue() === value) return;
+        if (editor.getValue() === value) {
+            inFlightRef.current.clear();
+            return;
+        }
+        // A stale echo of our own earlier keystroke: the editor is already ahead of it.
+        // Resetting it here would throw away the newer text and move the caret to the end.
+        if (inFlightRef.current.has(value)) return;
 
         editor.setValue(value);
 
