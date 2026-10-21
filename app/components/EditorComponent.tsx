@@ -212,6 +212,8 @@ export default function EditorComponent({
     const valueRef = useRef(value);
     // Values the editor emitted that the `value` prop has not echoed back yet.
     const inFlightRef = useRef<Set<string>>(new Set());
+    // True while the sync effect itself calls setValue: that change is not a keystroke.
+    const applyingExternalRef = useRef(false);
     const overflowHostRef = useRef<HTMLDivElement | null>(null);
 
     // Keep refs in sync; also update model-specific and shared registry configs when languageConfig changes.
@@ -344,7 +346,7 @@ export default function EditorComponent({
 
             // Listen for content changes — skip callback when change is from our own setValue
             editor.onDidChangeModelContent(() => {
-                inFlightRef.current.add(editor.getValue());
+                if (!applyingExternalRef.current) inFlightRef.current.add(editor.getValue());
                 onChangeRef.current?.(editor.getValue());
             });
 
@@ -415,7 +417,11 @@ export default function EditorComponent({
         // Resetting it here would throw away the newer text and move the caret to the end.
         if (inFlightRef.current.has(value)) return;
 
+        // An external value supersedes anything still in flight.
+        inFlightRef.current.clear();
+        applyingExternalRef.current = true;
         editor.setValue(value);
+        applyingExternalRef.current = false;
 
         // Move cursor to end so context keys (isFirstLine/isLastLine) stay accurate
         const model = editor.getModel();
