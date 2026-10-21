@@ -9,6 +9,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 import useIsMobile from "@/lib/useIsMobile";
+import { reconcileEcho } from "@/lib/editorEchoes";
 
 if (typeof window !== 'undefined') {
     (window as Window & { MonacoEnvironment?: { getWorker: (_moduleId: unknown, label: string) => Worker } }).MonacoEnvironment = {
@@ -210,8 +211,8 @@ export default function EditorComponent({
     const onMountRef = useRef(onMount);
     const onMonacoReadyRef = useRef(onMonacoReady);
     const valueRef = useRef(value);
-    // Values the editor emitted that the `value` prop has not echoed back yet.
-    const inFlightRef = useRef<Set<string>>(new Set());
+    // Texts the editor emitted that the `value` prop has not echoed back yet, oldest first.
+    const pendingRef = useRef<string[]>([]);
     // True while the sync effect itself calls setValue: that change is not a keystroke.
     const applyingExternalRef = useRef(false);
     const overflowHostRef = useRef<HTMLDivElement | null>(null);
@@ -346,7 +347,7 @@ export default function EditorComponent({
 
             // Listen for content changes — skip callback when change is from our own setValue
             editor.onDidChangeModelContent(() => {
-                if (!applyingExternalRef.current) inFlightRef.current.add(editor.getValue());
+                if (!applyingExternalRef.current) pendingRef.current.push(editor.getValue());
                 onChangeRef.current?.(editor.getValue());
             });
 
@@ -409,16 +410,10 @@ export default function EditorComponent({
     useEffect(() => {
         const editor = editorRef.current;
         if (!editor || value === undefined) return;
-        if (editor.getValue() === value) {
-            inFlightRef.current.clear();
-            return;
-        }
         // A stale echo of our own earlier keystroke: the editor is already ahead of it.
         // Resetting it here would throw away the newer text and move the caret to the end.
-        if (inFlightRef.current.has(value)) return;
+        if (reconcileEcho(pendingRef.current, editor.getValue(), value) === "keep") return;
 
-        // An external value supersedes anything still in flight.
-        inFlightRef.current.clear();
         applyingExternalRef.current = true;
         editor.setValue(value);
         applyingExternalRef.current = false;
