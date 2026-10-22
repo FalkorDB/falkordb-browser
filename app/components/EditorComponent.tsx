@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 import useIsMobile from "@/lib/useIsMobile";
-import { reconcileEcho } from "@/lib/editorEchoes";
+import { reconcileEcho, recordEcho } from "@/lib/editorEchoes";
 
 if (typeof window !== 'undefined') {
     (window as Window & { MonacoEnvironment?: { getWorker: (_moduleId: unknown, label: string) => Worker } }).MonacoEnvironment = {
@@ -173,6 +173,9 @@ export interface EditorComponentProps {
     height?: number | string;
     className?: string;
     editorKey?: string;
+    /** Change this whenever `value` is replaced from outside the editor (e.g. history navigation),
+     * so the new value is applied even if it matches text the editor itself emitted moments ago. */
+    externalKey?: string | number;
     onMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void;
     /** Callback fired with the Monaco instance after beforeMount completes */
     onMonacoReady?: (monacoInstance: Monaco) => void;
@@ -192,6 +195,7 @@ export default function EditorComponent({
     height,
     className,
     editorKey,
+    externalKey,
     onMount,
     onMonacoReady,
     readOnly = false,
@@ -215,6 +219,7 @@ export default function EditorComponent({
     const pendingRef = useRef<string[]>([]);
     // True while the sync effect itself calls setValue: that change is not a keystroke.
     const applyingExternalRef = useRef(false);
+    const externalKeyRef = useRef(externalKey);
     const overflowHostRef = useRef<HTMLDivElement | null>(null);
 
     // Keep refs in sync; also update model-specific and shared registry configs when languageConfig changes.
@@ -345,9 +350,9 @@ export default function EditorComponent({
                 if (editorModel) modelConfigRegistry.set(editorModel.uri.toString(), currentLc);
             }
 
-            // Listen for content changes — skip callback when change is from our own setValue
+            // Listen for content changes — our own setValue still calls onChange but is not a pending echo
             editor.onDidChangeModelContent(() => {
-                if (!applyingExternalRef.current) pendingRef.current.push(editor.getValue());
+                if (!applyingExternalRef.current) recordEcho(pendingRef.current, editor.getValue());
                 onChangeRef.current?.(editor.getValue());
             });
 
@@ -410,13 +415,18 @@ export default function EditorComponent({
     useEffect(() => {
         const editor = editorRef.current;
         if (!editor || value === undefined) return;
+        const external = externalKeyRef.current !== externalKey;
+        externalKeyRef.current = externalKey;
         // A stale echo of our own earlier keystroke: the editor is already ahead of it.
         // Resetting it here would throw away the newer text and move the caret to the end.
-        if (reconcileEcho(pendingRef.current, editor.getValue(), value) === "keep") return;
+        if (reconcileEcho(pendingRef.current, editor.getValue(), value, external) === "keep") return;
 
         applyingExternalRef.current = true;
-        editor.setValue(value);
-        applyingExternalRef.current = false;
+        try {
+            editor.setValue(value);
+        } finally {
+            applyingExternalRef.current = false;
+        }
 
         // Move cursor to end so context keys (isFirstLine/isLastLine) stay accurate
         const model = editor.getModel();
@@ -426,7 +436,7 @@ export default function EditorComponent({
             editor.setPosition({ lineNumber: lastLine, column: lastCol });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [value]);
+    }, [value, externalKey]);
 
     // Update options when they change
     useEffect(() => {
