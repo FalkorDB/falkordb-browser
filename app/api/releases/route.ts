@@ -42,6 +42,9 @@ async function fetchReleases(): Promise<Release[]> {
         releases.push(...((await res.json()) as GithubRelease[]));
         url = nextPage(res.headers.get("link"));
     }
+    // GitHub sometimes answers 200 with an empty list; this repository always
+    // has releases, so treat that as a failure rather than cache it for an hour.
+    if (releases.length === 0) throw new Error("GitHub releases request returned no releases");
     return releases
         .filter((r) => !r.draft && !r.prerelease)
         .map((r) => ({
