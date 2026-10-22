@@ -44,9 +44,9 @@ async function fetchReleases(): Promise<Release[]> {
     }
     // GitHub sometimes answers 200 with an empty list; this repository always
     // has releases, so treat that as a failure rather than cache it for an hour.
-    if (releases.length === 0) throw new Error("GitHub releases request returned no releases");
-    return releases
-        .filter((r) => !r.draft && !r.prerelease)
+    const published = releases.filter((r) => !r.draft && !r.prerelease);
+    if (published.length === 0) throw new Error("GitHub releases request returned no published releases");
+    return published
         .map((r) => ({
             tag: r.tag_name,
             name: r.name || r.tag_name,
