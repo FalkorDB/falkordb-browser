@@ -3,7 +3,7 @@
   "productName": "FalkorDB Browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser desktop app",
-  "version": "2.7.2",
+  "version": "2.7.3",
   "private": true,
   "main": "main.cjs",
   "scripts": {
@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "electron": "^44.5.1",
+    "electron": "^44.9.1",
     "electron-builder": "^26.15.3",
     "eslint": "^9.39.5",
     "globals": "^17.13.0"

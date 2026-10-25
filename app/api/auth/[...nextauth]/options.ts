@@ -1573,6 +1573,12 @@ export async function getClient(
         { status: 500, headers: getCorsHeaders(request) }
       );
     }
+    // A stateless server closes a request's client when the request ends, so
+    // one the caller abandoned mid-connect fails here. Nobody is waiting for
+    // the answer, and it says nothing about the session.
+    if (stateless && request.signal.aborted) {
+      return new NextResponse(null, { status: 499, headers: getCorsHeaders(request) });
+    }
     // eslint-disable-next-line no-console
     console.warn("Failed to resolve connection:", connErr);
   }

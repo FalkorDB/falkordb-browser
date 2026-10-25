@@ -1,6 +1,6 @@
 ARG CYPHER_VERSION=latest
 
-FROM node:24-alpine3.23@sha256:0388af2af070cd4736a1567cfed02469ba117848845b4165d87a333edb53d2ca AS base
+FROM node:24-alpine3.23@sha256:0468540aa58203ff9e40c2aab3907c52644ab818af6176b1c70a026137dc92a2 AS base
 
 # Update all Alpine packages to fix security vulnerabilities
 RUN apk upgrade --no-cache --available

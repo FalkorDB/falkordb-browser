@@ -49,6 +49,9 @@ jobs:
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
+          # Without this the action drops `severity` for SARIF output, so any
+          # fixable finding, even LOW or MEDIUM, would fail the scan.
+          limit-severities-for-sarif: true
           version: 'v0.72.0'
 
       - name: Check SARIF output
@@ -63,6 +66,6 @@ jobs:
 
       - name: Upload Trivy results to GitHub Security tab
         if: always() && steps.check-sarif.outputs.sarif_exists == 'true'
-        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           sarif_file: 'trivy-results.sarif'
