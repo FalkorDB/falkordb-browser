@@ -181,6 +181,21 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const graphIdRef = useRef(graph.Id);
     const graphNameRef = useRef(graphName);
     const queryRef = useRef(historyQuery.query);
+    // Bumped by Clear, which replaces the query without moving through history: the editor must
+    // treat "" as a new value from outside even if it once emitted "" itself.
+    const [clearVersion, setClearVersion] = useState(0);
+    const externalKey = `${historyQuery.counter}:${clearVersion}`;
+
+    // The editor's own setValue does not report back through onChange, so the draft is
+    // cleared here too, when the cleared text is the draft rather than a history entry.
+    const clearQuery = () => {
+        setHistoryQuery(prev => ({
+            ...prev,
+            query: "",
+            ...(prev.counter ? {} : { currentQuery: { ...prev.currentQuery, text: "" } }),
+        }));
+        setClearVersion(version => version + 1);
+    };
     const tutorialOpenRef = useRef(tutorialOpen);
     const isReadOnlyRef = useRef(isReadOnly);
     const monacoRef = useRef<Monaco | null>(null);
@@ -1221,7 +1236,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     <EditorComponent
                         className="SofiaSans"
                         editorKey={editorKey}
-                        externalKey={historyQuery.counter}
+                        externalKey={externalKey}
                         height={editorHeight}
                         language={LANGUAGE_NAME}
                         languageConfig={cypherLanguageConfig}
@@ -1279,10 +1294,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                             data-testid="clearEditor"
                                             className="gap-3 rounded-lg px-3 py-2.5 text-sm cursor-pointer"
                                             onSelect={() => {
-                                                setHistoryQuery(prev => ({
-                                                    ...prev,
-                                                    query: "",
-                                                }));
+                                                clearQuery();
                                             }}
                                         >
                                             <X size={18} />
@@ -1345,10 +1357,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                     data-testid="clearEditor"
                                     title="Clear"
                                     onClick={() => {
-                                        setHistoryQuery(prev => ({
-                                            ...prev,
-                                            query: "",
-                                        }));
+                                        clearQuery();
                                         editorRef.current?.focus();
                                     }}
                                 >
@@ -1406,6 +1415,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             so there they join the run button on the bottom row. */}
                         <div className="z-10 absolute right-0 top-0 bottom-0 p-2 flex flex-col items-end justify-between pointer-events-none mobile:top-auto mobile:flex-row mobile:items-center mobile:gap-2">
                             <CloseDialog
+                                data-testid="editorMinimize"
                                 className="pointer-events-auto"
                             >
                                 <Minimize2 size={20} />
@@ -1417,10 +1427,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                         data-testid="clearEditor"
                                         title="Clear"
                                         onClick={() => {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                query: "",
-                                            }));
+                                            clearQuery();
                                             dialogEditorRef.current?.focus();
                                         }}
                                     >
@@ -1442,7 +1449,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         </div>
                         <EditorComponent
                             editorKey={editorKey}
-                            externalKey={historyQuery.counter}
+                            externalKey={externalKey}
                             className="w-full h-full"
                             language={LANGUAGE_NAME}
                             languageConfig={cypherLanguageConfig}

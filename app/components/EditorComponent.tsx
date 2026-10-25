@@ -354,8 +354,9 @@ export default function EditorComponent({
             // the parent already holds that value, and it is not a pending echo.
             editor.onDidChangeModelContent(() => {
                 if (applyingExternalRef.current) return;
-                recordEcho(pendingRef.current, editor.getValue());
-                onChangeRef.current?.(editor.getValue());
+                const text = editor.getValue();
+                recordEcho(pendingRef.current, text);
+                onChangeRef.current?.(text);
             });
 
             onMountRef.current?.(editor);

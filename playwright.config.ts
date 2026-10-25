@@ -219,8 +219,11 @@ export default defineConfig({
     // SERVER_STATE=stateless and a FalkorDB no other test uses: they count
     // the server's connections to it). One at a time, in one worker: another
     // worker's own connection to FalkorDB would be counted as the server's.
+    // Not a default project: a plain `playwright test` runs against the stateful
+    // server, where these assertions cannot hold. Select it with --project.
     {
       name: '[Stateless] - Chromium',
+      default: false,
       use: {
         ...devices['Desktop Chrome'],
       },

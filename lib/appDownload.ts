@@ -164,7 +164,9 @@ const redirectTo = (location: string) => new Response(null, {
  * request. A resolved address is reused for RESOLVED_FILE_TTL_MS, and requests
  * arriving while one is being looked up share that lookup, so the route never
  * sends GitHub more than one lookup at a time. If GitHub doesn't answer as
- * expected, the plain link is used, which still works in Chrome.
+ * expected, the plain link is used: it still downloads in a browser, but where
+ * the GitHub app is installed Android may hand it to that app instead, the very
+ * case this route exists to avoid.
  */
 export function createAndroidDownloadHandler(fetchImpl: typeof fetch, now: () => number) {
     const resolved = new Map<string, { url: string; expires: number }>();
