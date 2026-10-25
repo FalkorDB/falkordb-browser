@@ -199,8 +199,8 @@ test("isGitHubReleaseFile matches release files only", () => {
  * A stand-in for GitHub, answering each URL with the given status and Location.
  * Any other URL is a violation: the resolver must never reach one. Every
  * request must leave redirects to the resolver and carry its deadline.
- * Violations are recorded rather than thrown, since the code under test turns
- * a throwing fetch into a quiet fallback; each test asserts there were none.
+ * Violations are recorded, not thrown: the code under test turns a throwing
+ * fetch into a quiet fallback. Each test asserts there were none.
  */
 function fakeFetch(answers: Record<string, [number, string?] | Error>) {
     const seen: string[] = [];
@@ -212,8 +212,9 @@ function fakeFetch(answers: Record<string, [number, string?] | Error>) {
         if (!init?.signal) violations.push(`${url} must have a deadline`);
         const answer = answers[url];
         if (!answer) {
+            // Answered rather than thrown, so it never takes the network-failure path.
             violations.push(`Unexpected fetch: ${url}`);
-            throw new Error(`Unexpected fetch: ${url}`);
+            return new Response(null, { status: 200 });
         }
         if (answer instanceof Error) throw answer;
         const [status, location] = answer;
