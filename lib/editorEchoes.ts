@@ -27,3 +27,21 @@ export function recordEcho(pending: string[], text: string): void {
   pending.push(text);
   if (pending.length > MAX_PENDING_ECHOES) pending.shift();
 }
+
+// The shared query state carries `revision`, which advances whenever `query` is replaced from
+// outside the editors: history navigation, Clear, a restored tab, an inserted AI fix. The
+// editors pass it as `externalKey`, so such a replacement is applied even when its text
+// matches a pending echo. An editor's own write sets `fromEditor`, which is never stored.
+type QueryState = { query: string; counter: number; currentQuery: { text: string }; revision?: number; fromEditor?: boolean };
+
+export function settleQueryUpdate<T extends QueryState>(prev: T, next: T): T {
+  if (next === prev) return prev;
+  const { fromEditor, ...rest } = next;
+  const revision = prev.revision ?? 0;
+  return { ...rest, revision: !fromEditor && next.query !== prev.query ? revision + 1 : revision } as T;
+}
+
+// Replaces `query`, and the draft with it when the query is the draft rather than a history entry.
+export function withQuery<T extends QueryState>(prev: T, query: string): T {
+  return prev.counter ? { ...prev, query } : { ...prev, query, currentQuery: { ...prev.currentQuery, text: query } };
+}
