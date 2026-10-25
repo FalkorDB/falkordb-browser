@@ -779,6 +779,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                         renderWhitespace: "none"
                                     }}
                                     value={historyQuery.query}
+                                    externalKey={historyQuery.counter}
                                     onChange={(value) => {
                                         setHistoryQuery(prev => {
                                             const newHistoryQuery = {

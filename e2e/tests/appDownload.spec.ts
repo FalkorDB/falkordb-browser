@@ -16,6 +16,9 @@ const ADMIN_AUTH_FILE = "playwright/.auth/admin.json";
 const RELEASES = "https://github.com/FalkorDB/falkordb-browser/releases/latest/download";
 const APP_LINKS_ROUTE = "**/api/app-links";
 const RELEASES_ROUTE = "**/api/releases";
+// An APK on a GitHub release is linked through this route: on github.com the
+// GitHub app, when installed, would open it without Chrome's download prompt.
+const ANDROID_DOWNLOAD = "/api/app-download/android";
 
 const UA = {
     windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
@@ -111,6 +114,8 @@ test.describe("@admin App download", () => {
         const response = await request.get(`${urls.localHost}/api/app-links`);
         expect(response.ok()).toBeTruthy();
         expect(await response.json()).toEqual({});
+        const download = await request.get(`${urls.localHost}${ANDROID_DOWNLOAD}`, { maxRedirects: 0 });
+        expect(download.status()).toBe(404);
     });
 
     for (const [os, ua, title, file] of [
@@ -230,15 +235,15 @@ test.describe("@admin App download", () => {
         await expect(page.getByText("Downloading FalkorDB Browser")).toHaveCount(0);
     });
 
-    test("Android: the APK and a store page both open in a new tab", async ({ browser }) => {
+    test("Android: the APK (through the download route) and a store page both open in a new tab", async ({ browser }) => {
         const apk = "https://github.com/FalkorDB/falkordb-browser/releases/latest/download/FalkorDB-Browser-android.apk";
         context = await openVisitor(browser, { ua: UA.android, viewport: PHONE });
         await context.route(APP_LINKS_ROUTE, (route) => route.fulfill({ json: { android: apk } }));
         const [page, app] = await openPage(context, urls.graphUrl);
         await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
         await expect(app.promptDownload).toHaveAttribute("target", "_blank");
-        await expect(app.promptDownload).toHaveAttribute("href", apk);
-        const fetched = fetchedInNewTab(context, apk);
+        await expect(app.promptDownload).toHaveAttribute("href", ANDROID_DOWNLOAD);
+        const fetched = fetchedInNewTab(context, new URL(ANDROID_DOWNLOAD, urls.localHost).toString());
         await app.promptDownload.click();
         await fetched;
         await expect(page).toHaveURL(/\/graph/);
@@ -308,12 +313,12 @@ test.describe("@admin App download", () => {
 
         await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
         await expect(app.promptTitle).toHaveText("FalkorDB Browser for Android");
-        await expect(app.promptDownload).toHaveAttribute("href", apk);
+        await expect(app.promptDownload).toHaveAttribute("href", ANDROID_DOWNLOAD);
         await app.dismiss();
 
         await page.getByTestId("mobileNavToggle").click();
         await expect(app.link).toHaveText("Get the Android app");
-        await expect(app.link).toHaveAttribute("href", apk);
+        await expect(app.link).toHaveAttribute("href", ANDROID_DOWNLOAD);
     });
 
     test("iOS: offers Add to Home Screen until there is an App Store app", async ({ browser }) => {
