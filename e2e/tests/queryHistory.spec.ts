@@ -142,6 +142,8 @@ test.describe('Query history Tests', () => {
         await graph.insertQuery("MATCH (n) RETURN n");
         await graph.editorMaximize.click();
         await graph.clickClearInEditorDialog();
+        // The Monaco model itself, not just the React state behind data-value.
+        await expect(graph.dialogEditor.locator(".view-lines")).toHaveText("");
         await graph.clickMinimizeEditorDialog();
         await expect(graph.editorDialog).toBeHidden();
 
