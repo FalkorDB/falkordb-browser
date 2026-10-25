@@ -83,7 +83,9 @@ export function getAppDownload(platform: AppPlatform | undefined, links: AppLink
         case "linux":
             return { platform, kind: "link", label: "Download for Linux", href: release(DESKTOP_FILES.linux) };
         case "android":
-            return links.android ? { platform, kind: "link", label: "Get the Android app", href: links.android } : undefined;
+            return links.android
+                ? { platform, kind: "link", label: "Get the Android app", href: isGitHubReleaseFile(links.android) ? ANDROID_DOWNLOAD_ROUTE : links.android }
+                : undefined;
         case "ios":
             return links.ios
                 ? { platform, kind: "link", label: "Get the iOS app", href: links.ios }
@@ -91,6 +93,102 @@ export function getAppDownload(platform: AppPlatform | undefined, links: AppLink
         default:
             return undefined;
     }
+}
+
+/**
+ * Android hands a tapped github.com link to the GitHub app when it is
+ * installed, and that app opens a release file in its own in-app browser,
+ * where Chrome's download prompt never shows. So an APK attached to a GitHub
+ * release is linked through this route instead, which redirects to the file's
+ * address on GitHub's file host: no app claims that one, so Chrome downloads it.
+ */
+export const ANDROID_DOWNLOAD_ROUTE = "/api/app-download/android";
+
+const GITHUB_RELEASE_FILE = /^\/[^/]+\/[^/]+\/releases\/(?:latest\/download|download\/[^/]+)\/[^/]+$/;
+
+/** True for a file attached to a GitHub release, latest or tagged. */
+export function isGitHubReleaseFile(href: string): boolean {
+    try {
+        const url = new URL(href);
+        return url.protocol === "https:" && url.hostname === "github.com" && GITHUB_RELEASE_FILE.test(url.pathname);
+    } catch {
+        return false;
+    }
+}
+
+// Where GitHub serves release files from, past its own redirects.
+const isGitHubFileHost = (url: URL) => url.protocol === "https:" && url.hostname.endsWith(".githubusercontent.com");
+
+/**
+ * The address GitHub's file host serves a release file from. GitHub answers a
+ * release download with redirects, first from latest/ to the tagged release,
+ * then to a short-lived signed URL; they are followed here, on github.com only,
+ * until that URL. Going through the download URL keeps GitHub's download count.
+ * Undefined when GitHub answers anything else, so the caller can fall back to
+ * the plain link.
+ */
+export async function resolveReleaseFile(href: string, fetchImpl: typeof fetch): Promise<string | undefined> {
+    let url = new URL(href);
+    // One deadline for the whole lookup, however many redirects it takes.
+    const signal = AbortSignal.timeout(5_000);
+    for (let hop = 0; hop < 5; hop += 1) {
+        // Sequential by nature: each hop is where the previous one pointed.
+        const res = await fetchImpl(url, { method: "GET", redirect: "manual", signal });
+        await res.body?.cancel();
+        const location = res.headers.get("location");
+        if (res.status < 300 || res.status >= 400 || !location) return undefined;
+        url = new URL(location, url);
+        if (isGitHubFileHost(url)) return url.toString();
+        if (url.protocol !== "https:" || url.hostname !== "github.com") return undefined;
+    }
+    return undefined;
+}
+
+/**
+ * How long a resolved file address is reused. GitHub signs it for an hour; a
+ * minute keeps a burst of taps to one lookup. Downloads still count: GitHub
+ * counts the file being fetched from its file host, which every tap does.
+ */
+export const RESOLVED_FILE_TTL_MS = 60_000;
+
+const redirectTo = (location: string) => new Response(null, {
+    status: 302,
+    // The file host's address is signed and short-lived.
+    headers: { Location: location, "Cache-Control": "no-store" },
+});
+
+/**
+ * The handler behind ANDROID_DOWNLOAD_ROUTE. It sends the visitor to the
+ * configured Android app, an APK on a GitHub release by way of GitHub's file
+ * host. The target only ever comes from the server's configuration, never the
+ * request. A resolved address is reused for RESOLVED_FILE_TTL_MS, and requests
+ * arriving while one is being looked up share that lookup, so the route never
+ * sends GitHub more than one lookup at a time. If GitHub doesn't answer as
+ * expected, the plain link is used, which still works in Chrome.
+ */
+export function createAndroidDownloadHandler(fetchImpl: typeof fetch, now: () => number) {
+    const resolved = new Map<string, { url: string; expires: number }>();
+    const pending = new Map<string, Promise<string | undefined>>();
+
+    return async (env: Record<string, string | undefined>): Promise<Response> => {
+        const { android } = readAppLinks(env);
+        if (!android) return Response.json({ message: "No Android app is configured." }, { status: 404 });
+        if (!isGitHubReleaseFile(android)) return redirectTo(android);
+
+        const cached = resolved.get(android);
+        if (cached && now() < cached.expires) return redirectTo(cached.url);
+
+        let lookup = pending.get(android);
+        if (!lookup) {
+            lookup = resolveReleaseFile(android, fetchImpl)
+                .catch(() => undefined)
+                .finally(() => pending.delete(android));
+            pending.set(android, lookup);
+        }
+        const url = await lookup;
+        if (url) resolved.set(android, { url, expires: now() + RESOLVED_FILE_TTL_MS });
+        return redirectTo(url ?? android);
+    };
 }
 
 function readAppUrl(value: string | undefined, allowHttp: boolean): string | undefined {
