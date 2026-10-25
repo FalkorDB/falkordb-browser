@@ -1221,6 +1221,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     <EditorComponent
                         className="SofiaSans"
                         editorKey={editorKey}
+                        externalKey={historyQuery.counter}
                         height={editorHeight}
                         language={LANGUAGE_NAME}
                         languageConfig={cypherLanguageConfig}
@@ -1441,6 +1442,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         </div>
                         <EditorComponent
                             editorKey={editorKey}
+                            externalKey={historyQuery.counter}
                             className="w-full h-full"
                             language={LANGUAGE_NAME}
                             languageConfig={cypherLanguageConfig}
