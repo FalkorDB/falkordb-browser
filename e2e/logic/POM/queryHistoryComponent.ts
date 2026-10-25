@@ -112,6 +112,24 @@ export default class QueryHistory extends GraphPage {
         return this.page.locator('[role="dialog"] .monaco-editor').first();
     }
 
+    /** The fullscreen dialog, opened by the editor's Maximize button. */
+    public get editorDialog(): Locator {
+        return this.page.getByRole("dialog");
+    }
+
+    async clickClearInEditorDialog(): Promise<void> {
+        await interactWhenVisible(this.editorDialog.getByTestId("clearEditor"), (el) => el.click(), "Clear in editor dialog");
+    }
+
+    async clickMinimizeEditorDialog(): Promise<void> {
+        await interactWhenVisible(this.editorDialog.getByTestId("editorMinimize"), (el) => el.click(), "Minimize editor dialog");
+    }
+
+    /** Press a key in the focused editor, e.g. ArrowUp to step back through history. */
+    async pressEditorKey(key: string): Promise<void> {
+        await this.page.keyboard.press(key);
+    }
+
     /** Click inside the history panel Monaco editor to give it focus. */
     async clickHistoryPanelEditor(): Promise<void> {
         await interactWhenVisible(this.historyPanelEditor, (el) => el.click(), `history panel editor`);

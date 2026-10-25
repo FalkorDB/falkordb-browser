@@ -122,6 +122,7 @@ test.describe("Stateless server (SERVER_STATE=stateless)", () => {
 
   test("@stateless Abandoned requests don't leave connections open", async () => {
     const request = await signIn();
+    const before = await connectionsReceived();
 
     // A timeout this short gives up on each request while the server is still
     // connecting, which closes the client from under it.
@@ -129,6 +130,10 @@ test.describe("Stateless server (SERVER_STATE=stateless)", () => {
       Array.from({ length: 10 }, () => request.get(`${urls.api.graphUrl}`, { timeout: 5 }).catch(() => undefined))
     );
     expect(responses.filter((response) => response === undefined).length).toBeGreaterThan(0);
+    // Each request that got through opened a connection; one more shows an abandoned
+    // request reached FalkorDB too, so the cleanup below is really exercised.
+    const succeeded = responses.filter((response) => response !== undefined).length;
+    await expect.poll(connectionsReceived, { timeout: 15000 }).toBeGreaterThan(before + succeeded);
 
     await expectServerClients();
     expect((await request.get(`${urls.api.graphUrl}`)).status()).toBe(200);

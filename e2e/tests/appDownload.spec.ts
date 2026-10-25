@@ -235,7 +235,9 @@ test.describe("@admin App download", () => {
         await expect(page.getByText("Downloading FalkorDB Browser")).toHaveCount(0);
     });
 
-    test("Android: the APK (through the download route) and a store page both open in a new tab", async ({ browser }) => {
+    // Only the link target is checked here: the server under test has no ANDROID_APP_URL,
+    // so the route answers 404. Where it redirects is covered in lib/appDownload.test.ts.
+    test("Android: the APK link (to the download route) and a store page both open in a new tab", async ({ browser }) => {
         const apk = "https://github.com/FalkorDB/falkordb-browser/releases/latest/download/FalkorDB-Browser-android.apk";
         context = await openVisitor(browser, { ua: UA.android, viewport: PHONE });
         await context.route(APP_LINKS_ROUTE, (route) => route.fulfill({ json: { android: apk } }));

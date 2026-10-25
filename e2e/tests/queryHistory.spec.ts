@@ -130,4 +130,28 @@ test.describe('Query history Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    test(`@admin Clearing a draft in the fullscreen editor stays cleared after browsing history`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery("RETURN 1");
+        await graph.clickRunQuery(false);
+
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.editorMaximize.click();
+        await graph.clickClearInEditorDialog();
+        await graph.clickMinimizeEditorDialog();
+        await expect(graph.editorDialog).toBeHidden();
+
+        // Up to the history entry and Down back to the draft, which must be the cleared one.
+        await graph.clickEditorInput();
+        await graph.pressEditorKey("ArrowUp");
+        await expect(graph.editorContainer).toHaveAttribute("data-value", "RETURN 1");
+        await graph.pressEditorKey("ArrowDown");
+        await expect(graph.editorContainer).toHaveAttribute("data-value", "");
+        await apicalls.removeGraph(graphName);
+    });
+
 });
