@@ -350,9 +350,11 @@ export default function EditorComponent({
                 if (editorModel) modelConfigRegistry.set(editorModel.uri.toString(), currentLc);
             }
 
-            // Listen for content changes — our own setValue still calls onChange but is not a pending echo
+            // Listen for content changes — skip both when the change is from our own setValue:
+            // the parent already holds that value, and it is not a pending echo.
             editor.onDidChangeModelContent(() => {
-                if (!applyingExternalRef.current) recordEcho(pendingRef.current, editor.getValue());
+                if (applyingExternalRef.current) return;
+                recordEcho(pendingRef.current, editor.getValue());
                 onChangeRef.current?.(editor.getValue());
             });
 
@@ -413,10 +415,12 @@ export default function EditorComponent({
 
     // Sync external value changes (history navigation, etc.) into the editor.
     useEffect(() => {
-        const editor = editorRef.current;
-        if (!editor || value === undefined) return;
+        // Track the key even before Monaco mounts: the editor is created with the latest value,
+        // so a key change that happened before mount must not count as external afterwards.
         const external = externalKeyRef.current !== externalKey;
         externalKeyRef.current = externalKey;
+        const editor = editorRef.current;
+        if (!editor || value === undefined) return;
         // A stale echo of our own earlier keystroke: the editor is already ahead of it.
         // Resetting it here would throw away the newer text and move the caret to the end.
         if (reconcileEcho(pendingRef.current, editor.getValue(), value, external) === "keep") return;
