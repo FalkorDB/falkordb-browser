@@ -49,6 +49,9 @@ jobs:
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
+          # Without this the action drops `severity` for SARIF output, so any
+          # fixable finding, even LOW or MEDIUM, would fail the scan.
+          limit-severities-for-sarif: true
           version: 'v0.72.0'
 
       - name: Check SARIF output
