@@ -4,6 +4,7 @@
 "use client";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { withQuery } from "@/lib/editorEchoes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Monaco } from "@monaco-editor/react";
 import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo, useCallback } from "react";
@@ -181,21 +182,9 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const graphIdRef = useRef(graph.Id);
     const graphNameRef = useRef(graphName);
     const queryRef = useRef(historyQuery.query);
-    // Bumped by Clear, which replaces the query without moving through history: the editor must
-    // treat "" as a new value from outside even if it once emitted "" itself.
-    const [clearVersion, setClearVersion] = useState(0);
-    const externalKey = `${historyQuery.counter}:${clearVersion}`;
-
     // The editor's own setValue does not report back through onChange, so the draft is
     // cleared here too, when the cleared text is the draft rather than a history entry.
-    const clearQuery = () => {
-        setHistoryQuery(prev => ({
-            ...prev,
-            query: "",
-            ...(prev.counter ? {} : { currentQuery: { ...prev.currentQuery, text: "" } }),
-        }));
-        setClearVersion(version => version + 1);
-    };
+    const clearQuery = () => setHistoryQuery(prev => withQuery(prev, ""));
     const tutorialOpenRef = useRef(tutorialOpen);
     const isReadOnlyRef = useRef(isReadOnly);
     const monacoRef = useRef<Monaco | null>(null);
@@ -1236,7 +1225,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     <EditorComponent
                         className="SofiaSans"
                         editorKey={editorKey}
-                        externalKey={externalKey}
+                        externalKey={historyQuery.revision}
                         height={editorHeight}
                         language={LANGUAGE_NAME}
                         languageConfig={cypherLanguageConfig}
@@ -1247,22 +1236,9 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         onChange={(val) => {
                             if (blur) return;
                             const newVal = val || "";
-                            if (newVal === historyQuery.query) return;
-                            if (!historyQuery.counter) {
-                                setHistoryQuery(prev => ({
-                                    ...prev,
-                                    currentQuery: {
-                                        ...prev.currentQuery,
-                                        text: newVal,
-                                    },
-                                    query: newVal,
-                                }));
-                            } else {
-                                setHistoryQuery(prev => ({
-                                    ...prev,
-                                    query: newVal,
-                                }));
-                            }
+                            // Compared with the latest state, not this render's props: two quick
+                            // edits can arrive before a re-render, and the second must not be lost.
+                            setHistoryQuery(prev => (prev.query === newVal ? prev : { ...withQuery(prev, newVal), fromEditor: true }));
                         }}
                         onMonacoReady={handleMonacoReady}
                         onMount={(e) => {
@@ -1449,7 +1425,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         </div>
                         <EditorComponent
                             editorKey={editorKey}
-                            externalKey={externalKey}
+                            externalKey={historyQuery.revision}
                             className="w-full h-full"
                             language={LANGUAGE_NAME}
                             languageConfig={cypherLanguageConfig}
@@ -1466,21 +1442,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             }}
                             value={historyQuery.query}
                             onChange={(val) => {
-                                if (historyQuery.counter) {
-                                    setHistoryQuery(prev => ({
-                                        ...prev,
-                                        query: val || ""
-                                    }));
-                                } else {
-                                    setHistoryQuery(prev => ({
-                                        ...prev,
-                                        query: val || "",
-                                        currentQuery: {
-                                            ...prev.currentQuery,
-                                            text: val || "",
-                                        },
-                                    }));
-                                }
+                                setHistoryQuery(prev => ({ ...withQuery(prev, val || ""), fromEditor: true }));
                             }}
                             onMount={(e) => {
                                 handleEditorDidMount(e, () => setMaximize(false));

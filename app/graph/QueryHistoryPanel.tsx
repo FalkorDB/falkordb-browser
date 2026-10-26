@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { withQuery } from "@/lib/editorEchoes";
 import * as monaco from "monaco-editor";
 import { Monaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
@@ -779,20 +780,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                         renderWhitespace: "none"
                                     }}
                                     value={historyQuery.query}
-                                    externalKey={historyQuery.counter}
+                                    externalKey={historyQuery.revision}
                                     onChange={(value) => {
-                                        setHistoryQuery(prev => {
-                                            const newHistoryQuery = {
-                                                ...prev,
-                                                query: value || "",
-                                                currentQuery: {
-                                                    ...prev.currentQuery,
-                                                    text: prev.counter ? prev.currentQuery.text : value || ""
-                                                }
-                                            };
-
-                                            return newHistoryQuery;
-                                        });
+                                        setHistoryQuery(prev => ({ ...withQuery(prev, value || ""), fromEditor: true }));
                                     }}
                                     onMount={handleEditorDidMount}
                                 />

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_PENDING_ECHOES, reconcileEcho, recordEcho } from "./editorEchoes.ts";
+import { MAX_PENDING_ECHOES, reconcileEcho, recordEcho, settleQueryUpdate, withQuery } from "./editorEchoes.ts";
 
 describe("reconcileEcho", () => {
   it("keeps a stale echo of our own earlier keystroke", () => {
@@ -64,5 +64,53 @@ describe("recordEcho", () => {
     assert.equal(pending.length, MAX_PENDING_ECHOES);
     assert.equal(pending[0], "q5");
     assert.equal(pending.at(-1), `q${MAX_PENDING_ECHOES + 4}`);
+  });
+});
+
+type State = { query: string; counter: number; currentQuery: { text: string }; revision?: number; fromEditor?: boolean };
+
+describe("settleQueryUpdate", () => {
+  const state: State = { query: "RETURN 1", counter: 0, currentQuery: { text: "RETURN 1" }, revision: 3 };
+
+  it("keeps the same state when the update returned it unchanged", () => {
+    assert.equal(settleQueryUpdate(state, state), state);
+  });
+
+  it("advances the revision when the query is replaced from outside the editors", () => {
+    assert.equal(settleQueryUpdate(state, { ...state, query: "RETURN 2" }).revision, 4);
+  });
+
+  it("keeps the revision for the editor's own write, and drops the marker", () => {
+    const next = settleQueryUpdate(state, { ...state, query: "RETURN 12", fromEditor: true });
+    assert.equal(next.revision, 3);
+    assert.equal(next.query, "RETURN 12");
+    assert.equal("fromEditor" in next, false);
+  });
+
+  it("advances the revision on a move through history, even to an entry with the same text", () => {
+    assert.equal(settleQueryUpdate(state, { ...state, counter: 1 }).revision, 4);
+  });
+
+  it("keeps the revision when neither the query nor the history position changed", () => {
+    assert.equal(settleQueryUpdate(state, { ...state, currentQuery: { text: "draft" } }).revision, 3);
+  });
+
+  it("starts counting from zero", () => {
+    const fresh: State = { ...state, revision: undefined };
+    assert.equal(settleQueryUpdate(fresh, { ...fresh, query: "" }).revision, 1);
+  });
+});
+
+describe("withQuery", () => {
+  it("replaces the draft too when the query is the draft", () => {
+    const next = withQuery({ query: "RETURN 1", counter: 0, currentQuery: { text: "RETURN 1" } }, "RETURN 2");
+    assert.equal(next.query, "RETURN 2");
+    assert.equal(next.currentQuery.text, "RETURN 2");
+  });
+
+  it("leaves the draft alone while a history entry is shown", () => {
+    const next = withQuery({ query: "RETURN 1", counter: 2, currentQuery: { text: "draft" } }, "");
+    assert.equal(next.query, "");
+    assert.equal(next.currentQuery.text, "draft");
   });
 });
