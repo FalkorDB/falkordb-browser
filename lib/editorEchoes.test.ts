@@ -87,8 +87,12 @@ describe("settleQueryUpdate", () => {
     assert.equal("fromEditor" in next, false);
   });
 
-  it("keeps the revision when the query text did not change", () => {
-    assert.equal(settleQueryUpdate(state, { ...state, counter: 1 }).revision, 3);
+  it("advances the revision on a move through history, even to an entry with the same text", () => {
+    assert.equal(settleQueryUpdate(state, { ...state, counter: 1 }).revision, 4);
+  });
+
+  it("keeps the revision when neither the query nor the history position changed", () => {
+    assert.equal(settleQueryUpdate(state, { ...state, currentQuery: { text: "draft" } }).revision, 3);
   });
 
   it("starts counting from zero", () => {
