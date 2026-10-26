@@ -1,4 +1,5 @@
 import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, prepareArg, securedFetch, Query } from "@/lib/utils";
+import { getStatsLines } from "@/lib/queryStats";
 import { JSONTree } from "react-json-tree";
 import { useContext, useMemo, useState } from "react";
 import { Info } from "lucide-react";
@@ -123,7 +124,7 @@ export function Metadata({ query, hideTitle }: {
         <>
             {!hideTitle && <h1 className="text-2xl font-bold">Metadata</h1>}
             <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs">
-                {query.metadata.map((m, i) => (
+                {getStatsLines(query).map((m, i) => (
                     <li key={i}>{m}</li>
                 ))}
             </ul>

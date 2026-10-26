@@ -13,6 +13,7 @@ import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMe
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 import { quoteCypherIdentifier } from "./cypher.ts";
 import { getActiveConnectionIdGlobal } from "./active-connection.ts";
+import type { QueryStatistics } from "falkordb";
 import type { PropertyValue } from "./graphValues.ts";
 
 export { parseSyntaxError };
@@ -55,7 +56,10 @@ export type HistoryQuery = {
 
 export type Query = {
   text: string;
-  metadata: string[];
+  /** The query's statistics, see `getStatsLines` and `getExecutionTime` */
+  stats?: QueryStatistics;
+  /** Raw statistic lines, kept by queries saved before `stats` existed */
+  metadata?: string[];
   explain: string[];
   profile: string[];
   graphName: string;

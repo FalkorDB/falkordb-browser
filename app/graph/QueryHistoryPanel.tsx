@@ -6,6 +6,7 @@ import { Monaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import { Download, History, Info, ListChecks, ListX, Star, StarX, Trash2, X } from "lucide-react";
 import { cn, getTheme, Query } from "@/lib/utils";
+import { getStatsLines } from "@/lib/queryStats";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -315,7 +316,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
     const isTabEnabled = useCallback((tabName: Tab) => {
         if (tabName === "text") return !!currentQuery;
-        if (tabName === "metadata") return !!currentQuery && currentQuery.metadata.length > 0;
+        if (tabName === "metadata") return !!currentQuery && getStatsLines(currentQuery).length > 0;
         if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
         return true;
     }, [currentQuery]);

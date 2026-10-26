@@ -19,6 +19,7 @@ import { isAiFixSupported } from "@/lib/aiFix";
 import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
+import type { QueryStatistics } from "falkordb";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
@@ -1216,7 +1217,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
         query: q,
         connectionId: cid,
-      }) as { data: Data; metadata: string[] };
+      }) as { data: Data; stats: QueryStatistics };
 
       if (!result) throw new Error("Failed to execute query");
       if (!isCurrent()) return;
@@ -1264,7 +1265,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         elementsCount: g.getElements().length,
         explain: explainJson.result,
         graphName: n,
-        metadata: result.metadata,
+        stats: result.stats,
         status: "Success",
       };
 

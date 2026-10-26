@@ -1,5 +1,4 @@
-import { FalkorDB } from "falkordb";
-import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
+import { FalkorDB, type FalkorDBOptions } from "falkordb";
 
 /**
  * Dedicated FalkorDB instance for Personal Access Token (PAT) management

@@ -42,9 +42,10 @@ export async function PATCH(
       }
 
       const { sourceName } = validation.data;
-      const result = await client.selectGraph(sourceName).copy(graphId);
+      const copy = await client.selectGraph(sourceName).copy(graphId);
 
-      return NextResponse.json({ result }, { headers: getCorsHeaders(request) });
+      // The name of the graph the copy created, which the UI then selects
+      return NextResponse.json({ result: copy.name }, { headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(

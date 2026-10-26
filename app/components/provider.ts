@@ -562,7 +562,6 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
     query: "",
     currentQuery: {
       text: "",
-      metadata: [],
       explain: [],
       profile: [],
       graphName: "",

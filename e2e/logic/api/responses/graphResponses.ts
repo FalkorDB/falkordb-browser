@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { QueryStatistics } from "falkordb";
 
 export interface AddGraphResponse {
   result: {
-    metadata: string[];
+    stats: QueryStatistics;
     data: {
       [key: string]: number;
     }[];
@@ -18,7 +19,8 @@ export interface GetGraphsResponse {
 }
 
 export interface DuplicateGraphresponse {
-  success: string;
+  /** Name of the new graph */
+  result: string;
 }
 
 export interface ChangeGraphNameResponse {
@@ -26,13 +28,7 @@ export interface ChangeGraphNameResponse {
 }
 
 export interface RunQueryResponse {
-  metadata: {
-    "Labels added": number;
-    "Nodes created": number;
-    "Relationships created": number;
-    "Cached execution": number;
-    "Query internal execution time": string;
-  };
+  stats: QueryStatistics;
   data: Array<Record<string, any>>;
 }
 
