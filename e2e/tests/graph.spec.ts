@@ -463,9 +463,9 @@ test.describe("Graph Tests", () => {
       const originalCount = await apiCall.getGraphCount(graphName);
       expect(duplicatedCount.result.nodes).toBe(originalCount.result.nodes);
     } finally {
-      await apiCall.removeGraph(graphName);
+      await apiCall.removeGraph(graphName, "admin");
       // Absent when the duplicate failed
-      await apiCall.removeGraph(duplicatedGraphName).catch(() => undefined);
+      await apiCall.removeGraph(duplicatedGraphName, "admin").catch(() => undefined);
     }
   });
 });

@@ -39,7 +39,7 @@ test.describe('Query history Tests', () => {
             await expect(graph.historyTab("Metadata")).toHaveAttribute("data-state", "active");
             await expect(graph.historyTabPanel).toContainText("Query internal execution time:");
         } finally {
-            await apicalls.removeGraph(graphName);
+            await apicalls.removeGraph(graphName, "admin");
         }
     });
 
