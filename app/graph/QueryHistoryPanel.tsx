@@ -28,6 +28,9 @@ import { Explain, Metadata, Profile } from "./MetadataView";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
 
+// The tabs a query can fall back to, in order, when the selected one is empty
+const TABS: Tab[] = ["text", "metadata", "explain", "profile"];
+
 /** Serializes queries into a runnable `.cypher` batch, one statement per query.
  *  The terminator sits on its own line so a trailing `//` comment can't swallow it. */
 const buildCypherBatch = (queries: Query[]) => queries.map(query => {
@@ -332,10 +335,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             return;
         }
 
-        const currentValue = currentQuery?.[tab];
-
-        if (!currentValue || currentValue.length === 0) {
-            const fallbackTab = (Object.keys(currentQuery) as Tab[]).find(isTabEnabled);
+        if (!isTabEnabled(tab)) {
+            const fallbackTab = TABS.find(isTabEnabled);
 
             if (fallbackTab && fallbackTab !== tab) {
                 setTab(fallbackTab);

@@ -453,15 +453,19 @@ test.describe("Graph Tests", () => {
     const graphName = getRandomString("graph");
     const duplicatedGraphName = `${graphName} (copy)`;
     await apiCall.addGraph(graphName);
-    await apiCall.runQuery(graphName, CREATE_QUERY);
+    try {
+      await apiCall.runQuery(graphName, CREATE_QUERY);
 
-    const response = await apiCall.duplicateGraph(graphName, duplicatedGraphName);
-    expect(response.result).toBe(duplicatedGraphName);
+      const response = await apiCall.duplicateGraph(graphName, duplicatedGraphName);
+      expect(response.result).toBe(duplicatedGraphName);
 
-    const duplicatedCount = await apiCall.getGraphCount(duplicatedGraphName);
-    const originalCount = await apiCall.getGraphCount(graphName);
-    expect(duplicatedCount.result.nodes).toBe(originalCount.result.nodes);
-    await apiCall.removeGraph(graphName);
-    await apiCall.removeGraph(duplicatedGraphName);
+      const duplicatedCount = await apiCall.getGraphCount(duplicatedGraphName);
+      const originalCount = await apiCall.getGraphCount(graphName);
+      expect(duplicatedCount.result.nodes).toBe(originalCount.result.nodes);
+    } finally {
+      await apiCall.removeGraph(graphName);
+      // Absent when the duplicate failed
+      await apiCall.removeGraph(duplicatedGraphName).catch(() => undefined);
+    }
   });
 });

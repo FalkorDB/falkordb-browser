@@ -1,13 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { QueryStatistics } from "falkordb";
 
+// The query's streamed result, as getSSEGraphResult returns it
 export interface AddGraphResponse {
-  result: {
-    stats: QueryStatistics;
-    data: {
-      [key: string]: number;
-    }[];
-  };
+  stats: QueryStatistics;
+  data: {
+    [key: string]: number;
+  }[];
 }
 
 export interface RemoveGraphResponse {

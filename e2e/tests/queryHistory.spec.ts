@@ -19,6 +19,30 @@ test.describe('Query history Tests', () => {
         await browser.closeBrowser();
     });
 
+    test(`@admin The history Metadata tab stays open and shows the query statistics`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        try {
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            const query = "CREATE (n:Person { name: 'Alice' }) RETURN n";
+            await graph.insertQuery(query);
+            await graph.clickRunQuery();
+            await graph.clickQueryHistoryButton();
+            await graph.selectQueryInHistory(query);
+            await graph.clickHistoryTab("Metadata");
+
+            await expect(graph.historyTabPanel).toContainText("Nodes created: 1");
+            // The panel used to switch away from a tab it judged empty right after it opened
+            await new Promise((resolve) => { setTimeout(resolve, 1000); });
+            await expect(graph.historyTab("Metadata")).toHaveAttribute("data-state", "active");
+            await expect(graph.historyTabPanel).toContainText("Query internal execution time:");
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
     test(`@admin Validate that running a query in the UI saves it in the query history`, async () => {
         const graphName = getRandomString('queryhistory');
         await apicalls.addGraph(graphName);

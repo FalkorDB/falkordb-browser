@@ -65,7 +65,6 @@ const defaultQueryHistory: HistoryQuery = {
   query: "",
   currentQuery: {
     text: "",
-    metadata: [],
     explain: [],
     profile: [],
     graphName: "",
@@ -1192,7 +1191,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       elementsCount: 0,
       explain: [],
       graphName: n,
-      metadata: [],
       profile: [],
       status: "Failed",
       text: q,
