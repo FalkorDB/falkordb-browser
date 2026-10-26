@@ -52,6 +52,10 @@ export type HistoryQuery = {
   currentQuery: Query;
   query: string;
   counter: number;
+  /** Advances whenever `query` is replaced from outside the editors; see settleQueryUpdate. */
+  revision?: number;
+  /** Set by an editor's own write so it does not advance `revision`. Never stored. */
+  fromEditor?: boolean;
 };
 
 export type Query = {

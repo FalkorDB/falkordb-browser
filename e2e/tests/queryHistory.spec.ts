@@ -175,8 +175,10 @@ test.describe('Query history Tests', () => {
         await graph.clickEditorInput();
         await graph.pressEditorKey("ArrowUp");
         await expect(graph.editorContainer).toHaveAttribute("data-value", "RETURN 1");
+        await expect(graph.editorContainer.locator(".view-lines")).toHaveText("RETURN 1");
         await graph.pressEditorKey("ArrowDown");
         await expect(graph.editorContainer).toHaveAttribute("data-value", "");
+        await expect(graph.editorContainer.locator(".view-lines")).toHaveText("");
         await apicalls.removeGraph(graphName);
     });
 
