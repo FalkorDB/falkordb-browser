@@ -50,7 +50,10 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
             if (getConnectionEpoch() !== startEpoch) return;
             if (!result.ok) return;
 
-            onDuplicate(duplicateName);
+            const { result: newGraphName } = await result.json() as { result: string };
+            if (getConnectionEpoch() !== startEpoch) return;
+
+            onDuplicate(newGraphName);
             onOpenChange(false);
             toast({
                 title: "Graph duplicated successfully",

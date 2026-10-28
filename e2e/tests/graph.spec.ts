@@ -435,6 +435,9 @@ test.describe("Graph Tests", () => {
     await graph.duplicateGraph(graphName);
     const duplicatedGraphName = `${graphName} (copy)`;
 
+    // The UI selects the graph the duplicate created
+    await expect.poll(() => graph.getSelectedGraphName()).toBe(duplicatedGraphName);
+
     const response = await apiCall.getGraphs();
     expect(response.opts.includes(duplicatedGraphName)).toBeTruthy();
 
@@ -444,5 +447,25 @@ test.describe("Graph Tests", () => {
     expect(duplicatedCount.result.edges).toBe(originalCount.result.edges);
     await apiCall.removeGraph(graphName);
     await apiCall.removeGraph(duplicatedGraphName);
+  });
+
+  test(`@admin Validate duplicate graph API returns the new graph's name`, async () => {
+    const graphName = getRandomString("graph");
+    const duplicatedGraphName = `${graphName} (copy)`;
+    await apiCall.addGraph(graphName);
+    try {
+      await apiCall.runQuery(graphName, CREATE_QUERY);
+
+      const response = await apiCall.duplicateGraph(graphName, duplicatedGraphName);
+      expect(response.result).toBe(duplicatedGraphName);
+
+      const duplicatedCount = await apiCall.getGraphCount(duplicatedGraphName);
+      const originalCount = await apiCall.getGraphCount(graphName);
+      expect(duplicatedCount.result.nodes).toBe(originalCount.result.nodes);
+    } finally {
+      await apiCall.removeGraph(graphName, "admin");
+      // Absent when the duplicate failed
+      await apiCall.removeGraph(duplicatedGraphName, "admin").catch(() => undefined);
+    }
   });
 });

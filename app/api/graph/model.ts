@@ -516,7 +516,7 @@ export class Graph {
 
   public static async create(
     id: string,
-    results: { data: Data; metadata: any[] },
+    results: { data: Data },
     showPropertyKeyPrefix: boolean,
     currentLimit: number,
     graphInfo?: GraphInfo,
@@ -784,7 +784,7 @@ export class Graph {
   }
 
   public async extend(
-    results: { data: Data; metadata: any[] },
+    results: { data: Data },
     collapsed = false,
     isMerge = false
   ): Promise<(Node | Link)[]> {
