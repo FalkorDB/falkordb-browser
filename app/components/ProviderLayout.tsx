@@ -30,10 +30,13 @@ function restorePanelSize(panel: PanelImperativeHandle, storageKey: string, rest
 
   restoring.current = true;
   let rafId = requestAnimationFrame(() => {
-    panel.resize(`${size}%`);
-    rafId = requestAnimationFrame(() => {
-      restoring.current = false;
-    });
+    try {
+      panel.resize(`${size}%`);
+    } finally {
+      rafId = requestAnimationFrame(() => {
+        restoring.current = false;
+      });
+    }
   });
 
   return () => {

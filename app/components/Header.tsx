@@ -6,7 +6,7 @@ import { useCallback, useContext, useEffect, useMemo, useState, ReactNode } from
 import { useSession } from "next-auth/react";
 import { Copy, Database, Ellipsis, GitGraph, Loader2, MemoryStick, Server, User } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { cn, securedFetch } from "@/lib/utils";
+import { cn, getConnectionEpoch, securedFetch } from "@/lib/utils";
 import useIsMobile from "@/lib/useIsMobile";
 import ConnectionManager from "./ConnectionManager";
 
@@ -78,24 +78,31 @@ export default function Header({ mobileLeading = null }: Props) {
         const fetchMemory = async () => {
             if (status !== "authenticated") return;
 
-            let result: Response;
+            // A poll that outlives its effect or connection must not touch the indicator.
+            const epoch = getConnectionEpoch();
+            const isCurrent = () => !cancelled && getConnectionEpoch() === epoch;
+            const setIndicatorIfCurrent = (value: "online" | "offline") => {
+                if (isCurrent()) setIndicator(value);
+            };
+
+            let data: string;
             try {
-                result = await securedFetch("/api/info?section=memory", {
+                const result = await securedFetch("/api/info?section=memory", {
                     method: "GET"
-                }, toast, setIndicator);
+                }, toast, setIndicatorIfCurrent);
+
+                if (!result.ok) return;
+
+                data = (await result.json()).result;
             } catch {
-                if (!cancelled) setIndicator("offline");
+                setIndicatorIfCurrent("offline");
                 return;
             }
-
-            if (!result.ok) return;
-
-            const data = (await result.json()).result;
 
             const match = data.match(/used_memory_human:(\S+)/);
 
             if (!match) return;
-            if (cancelled) return;
+            if (!isCurrent()) return;
 
             setUsedMemory(match[1]);
         };

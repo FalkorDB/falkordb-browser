@@ -43,7 +43,8 @@ export async function GET(request: Request) {
           const sep = address.lastIndexOf(":");
           const ip = (sep === -1 ? address : address.slice(0, sep)).replace(/^\[(.*)\]$/, "$1");
           const portStr = sep === -1 ? "" : address.slice(sep + 1);
-          const host = hostname || ip;
+          // Bracket IPv6 so the UI's `host:port` stays unambiguous.
+          const host = hostname || (ip.includes(":") ? `[${ip}]` : ip);
           const flags = parts[2] ?? "";
           const flagList = flags.split(",");
           // Skip nodes with non-standard flags (e.g., handshake, noaddr)
