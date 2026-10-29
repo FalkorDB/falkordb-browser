@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, getProviderDisplayName, type AIProvider } from "@/lib/ai-provider-utils";
-import { normalizeLocalEndpoint, normalizeLocalProvider, LOCAL_PROVIDER_DEFAULT_ENDPOINTS, type LocalProvider } from "@/lib/local-llm-utils";
+import { normalizeLocalEndpoint, normalizeLocalProvider, type LocalProvider } from "@/lib/local-llm-utils";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { buildFalkorDBConnection, getCorsHeaders, corsPreflight } from "../../utils";
 
