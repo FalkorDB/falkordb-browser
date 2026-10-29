@@ -9,6 +9,10 @@ export const LOCAL_PROVIDER_DEFAULT_ENDPOINTS: Record<LocalProvider, string> = {
     lmstudio: "http://localhost:1234/v1",
 };
 
+/** Coerce any stored/posted value to a known provider; Ollama is the default. */
+export const normalizeLocalProvider = (value?: string | null): LocalProvider =>
+    value === "lmstudio" ? "lmstudio" : "ollama";
+
 /**
  * Normalize and validate a local LLM endpoint URL.
  *

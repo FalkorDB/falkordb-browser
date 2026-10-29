@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
+import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin, corsPreflight } from "@/app/api/utils";
 import {
   readPreconfiguredConnection,
   toPreconfiguredConnectionInfo,
   warnIfAutoConnectExposesCredentials,
 } from "@/lib/preconfiguredConnection";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * GET /api/connections/preconfigured

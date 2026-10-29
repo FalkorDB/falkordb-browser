@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, corsPreflight } from "@/app/api/utils";
 import { readAppLinks } from "@/lib/appDownload";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * GET /api/app-links
