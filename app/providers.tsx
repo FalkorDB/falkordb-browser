@@ -13,6 +13,7 @@ import { settleQueryUpdate, withQuery } from "@/lib/editorEchoes";
 import { syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
 import { detectProviderFromApiKey, getProviderDisplayName, detectProviderFromModel } from "@/lib/ai-provider-utils";
+import { LOCAL_PROVIDER_DEFAULT_ENDPOINTS, normalizeLocalProvider } from "@/lib/local-llm-utils";
 import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
@@ -92,21 +93,14 @@ const NO_OFFLOADED_GRAPHS: string[] = [];
 // The graph list waits on the stub probe, so this bounds how long a hung
 // GRAPH.STUBS can hold the selector empty.
 const STUBS_PROBE_TIMEOUT = 10000;
-const DEFAULT_LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
-  ollama: "http://localhost:11434",
-  lmstudio: "http://localhost:1234/v1",
-};
 
 const normalizeChatModelSource = (value: string | null | undefined): ChatModelSource =>
   value === "local" ? "local" : "api-key";
 
-const normalizeLocalLlmProvider = (value: string | null | undefined): LocalLlmProvider =>
-  value === "lmstudio" ? "lmstudio" : "ollama";
-
 const normalizeLocalLlmEndpoint = (
   provider: LocalLlmProvider,
   endpoint: string | null | undefined
-) => endpoint?.trim() || DEFAULT_LOCAL_LLM_ENDPOINTS[provider];
+) => endpoint?.trim() || LOCAL_PROVIDER_DEFAULT_ENDPOINTS[provider];
 
 const createChatApiKey = (key: string): ChatApiKey => {
   const provider = detectProviderFromApiKey(key);
@@ -347,10 +341,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [selectedChatApiKeyId, setSelectedChatApiKeyId] = useState("");
   const [chatModelSource, setChatModelSource] = useState<ChatModelSource>("api-key");
   const [localLlmProvider, setLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
-  const [localLlmEndpoint, setLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
+  const [localLlmEndpoint, setLocalLlmEndpoint] = useState(LOCAL_PROVIDER_DEFAULT_ENDPOINTS.ollama);
   const [newChatModelSource, setNewChatModelSource] = useState<ChatModelSource>("api-key");
   const [newLocalLlmProvider, setNewLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
-  const [newLocalLlmEndpoint, setNewLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
+  const [newLocalLlmEndpoint, setNewLocalLlmEndpoint] = useState(LOCAL_PROVIDER_DEFAULT_ENDPOINTS.ollama);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
@@ -414,7 +408,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const prevActiveConnectionIdRef = useRef<string | null>(null);
   const connectionSwitchFetchedRef = useRef(false);
 
-  // ── Graph-operation ownership guards (see idea-6 plan) ──────────────────────
+  // ── Graph-operation ownership guards (see docs/design/idea-6-connection-epoch-pinning-plan.md) ──────────────────────
   // contextGen: "what connection + graph the UI represents" — bumped on a
   // connection-switch begin, a connection reset, and a graph-name change.
   const contextGenRef = useRef(0);
@@ -580,7 +574,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("perSourceModels", JSON.stringify(next));
       // chatModelSource and localLlmProvider are non-secret enum values
       localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource === "local" ? "local" : "api-key");
-      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider === "lmstudio" ? "lmstudio" : "ollama");
+      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, normalizeLocalProvider(newLocalLlmProvider));
       localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
       localStorage.setItem("model", sanitizeModelName(newModel));
       // Reset has changes
@@ -2072,7 +2066,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
       const loadedChatModelSource = normalizeChatModelSource(localStorage.getItem(CHAT_MODEL_SOURCE_STORAGE_KEY));
-      const loadedLocalLlmProvider = normalizeLocalLlmProvider(localStorage.getItem(LOCAL_LLM_PROVIDER_STORAGE_KEY));
+      const loadedLocalLlmProvider = normalizeLocalProvider(localStorage.getItem(LOCAL_LLM_PROVIDER_STORAGE_KEY));
       const rawEndpoint = localStorage.getItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY);
       const loadedLocalLlmEndpoint = normalizeLocalLlmEndpoint(
         loadedLocalLlmProvider,
@@ -2339,14 +2333,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const udfData = await result.json();
         setSelectedUdf(prev => prev ?? udfData.result[0]);
       }
-    })();
+    })().catch((error) => console.error("Failed to load UDFs:", error));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, activeConnectionId]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
       method: "GET",
-    }, toast, setIndicator);
+    }, toast, setIndicator).catch(() => setIndicator("offline"));
   }, [toast]);
 
   useEffect(() => {

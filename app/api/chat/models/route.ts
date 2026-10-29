@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, getProviderDisplayName, type AIProvider } from "@/lib/ai-provider-utils";
-import { normalizeLocalEndpoint, LOCAL_PROVIDER_DEFAULT_ENDPOINTS, type LocalProvider } from "@/lib/local-llm-utils";
+import { normalizeLocalEndpoint, normalizeLocalProvider, LOCAL_PROVIDER_DEFAULT_ENDPOINTS, type LocalProvider } from "@/lib/local-llm-utils";
 import { getClient } from "../../auth/[...nextauth]/options";
-import { buildFalkorDBConnection, getCorsHeaders } from "../../utils";
+import { buildFalkorDBConnection, getCorsHeaders, corsPreflight } from "../../utils";
 
 type ProviderModelResponse = {
     data?: Array<{ id?: string }>;
@@ -57,9 +57,7 @@ class ModelFetchConnectionError extends Error {
     status = 503;
 }
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 export async function GET(request: NextRequest) {
     try {
@@ -99,8 +97,6 @@ const withProviderPrefix = (provider: AIProvider, models: string[]) =>
 
 const withLocalProviderPrefix = (provider: LocalProvider, models: string[]) =>
     models.map(model => provider === "ollama" ? `ollama::${model}` : `openai::${model}`);
-
-const normalizeLocalProvider = (provider?: string): LocalProvider => provider === "lmstudio" ? "lmstudio" : "ollama";
 
 const ensureOk = async (response: Response, provider: AIProvider) => {
     if (!response.ok) {

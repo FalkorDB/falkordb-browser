@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders } from "../utils";
+import { getCorsHeaders, corsPreflight } from "../utils";
 import { encryptForOwner, decryptForOwner, UnboundCiphertextError } from "../auth/encryption";
 import { getClient, generateConsistentUserId } from "../auth/[...nextauth]/options";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * POST /api/encrypt

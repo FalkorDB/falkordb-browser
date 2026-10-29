@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
-import { getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly, runQuery } from "../../utils";
+import { getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly, runQuery, corsPreflight } from "../../utils";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 export async function DELETE(
   request: NextRequest,

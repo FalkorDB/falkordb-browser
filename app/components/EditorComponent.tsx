@@ -68,9 +68,9 @@ const modelConfigRegistry = new Map<string, LanguageConfig>();
 
 export const LINE_HEIGHT = 22;
 
-export const MOBILE_FONT_SIZE = 14;
+const MOBILE_FONT_SIZE = 14;
 
-export const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
+const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
     glyphMargin: false,
     lineDecorationsWidth: 5,
@@ -103,7 +103,7 @@ export const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstruction
     },
 };
 
-export const setEditorTheme = (monacoI: Monaco, themeName: string, backgroundColor: string, isDark: boolean) => {
+const setEditorTheme = (monacoI: Monaco, themeName: string, backgroundColor: string, isDark: boolean) => {
     monacoI.editor.defineTheme(themeName, {
         base: isDark ? 'vs-dark' : 'vs',
         inherit: true,
@@ -132,9 +132,6 @@ export const setEditorTheme = (monacoI: Monaco, themeName: string, backgroundCol
         },
     });
 };
-
-// Keep backward-compatible alias
-export const setTheme = setEditorTheme;
 
 export interface LanguageConfig {
     /** Monarch tokenizer rules for syntax highlighting */

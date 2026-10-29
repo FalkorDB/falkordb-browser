@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders, resolveReadOnly } from "../utils";
+import { getCorsHeaders, resolveReadOnly, corsPreflight } from "../utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { getCsvStorageProvider, getResolvedCsvStorageMode } from "@/app/lib/csv-storage";
 import { generateCsvKey, hashOwner } from "@/app/lib/csv-key";
 import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 import { streamCsvUpload } from "./stream-csv";
 
-export async function OPTIONS(request: Request) {
-    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * Upload a CSV file into per-user temporary storage.

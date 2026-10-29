@@ -78,9 +78,15 @@ export default function Header({ mobileLeading = null }: Props) {
         const fetchMemory = async () => {
             if (status !== "authenticated") return;
 
-            const result = await securedFetch("/api/info?section=memory", {
-                method: "GET"
-            }, toast, setIndicator);
+            let result: Response;
+            try {
+                result = await securedFetch("/api/info?section=memory", {
+                    method: "GET"
+                }, toast, setIndicator);
+            } catch {
+                if (!cancelled) setIndicator("offline");
+                return;
+            }
 
             if (!result.ok) return;
 

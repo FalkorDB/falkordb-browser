@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { addSessionConnection, getSessionFromRequest, listSessionConnections } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
+import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin, corsPreflight } from "@/app/api/utils";
 import { addConnection, validateBody } from "@/app/api/validate-body";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * GET /api/connections
