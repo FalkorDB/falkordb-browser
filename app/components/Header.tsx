@@ -74,13 +74,15 @@ export default function Header({ mobileLeading = null }: Props) {
         setUsedMemory(null);
         const intervalSeconds = Number.isFinite(refreshInterval) && refreshInterval > 0 ? refreshInterval : 30;
         let cancelled = false;
+        let latestPoll = 0;
 
         const fetchMemory = async () => {
             if (status !== "authenticated") return;
 
-            // A poll that outlives its effect or connection must not touch the indicator.
+            // Only the newest poll of this effect, on its starting connection, may publish.
+            const seq = (latestPoll += 1);
             const epoch = getConnectionEpoch();
-            const isCurrent = () => !cancelled && getConnectionEpoch() === epoch;
+            const isCurrent = () => !cancelled && seq === latestPoll && getConnectionEpoch() === epoch;
             const setIndicatorIfCurrent = (value: "online" | "offline") => {
                 if (isCurrent()) setIndicator(value);
             };
