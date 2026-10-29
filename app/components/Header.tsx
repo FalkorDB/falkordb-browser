@@ -74,18 +74,21 @@ export default function Header({ mobileLeading = null }: Props) {
         setUsedMemory(null);
         const intervalSeconds = Number.isFinite(refreshInterval) && refreshInterval > 0 ? refreshInterval : 30;
         let cancelled = false;
-        let latestPoll = 0;
+        let startedPolls = 0;
+        let publishedPoll = 0;
 
         const fetchMemory = async () => {
             if (status !== "authenticated") return;
 
-            // Only the newest poll of this effect, on its starting connection, may publish.
-            const seq = (latestPoll += 1);
+            // A poll may publish unless cancelled, superseded by a newer published poll, or from another connection.
+            const seq = (startedPolls += 1);
             const epoch = getConnectionEpoch();
-            const isCurrent = () => !cancelled && seq === latestPoll && getConnectionEpoch() === epoch;
-            const setIndicatorIfCurrent = (value: "online" | "offline") => {
-                if (isCurrent()) setIndicator(value);
+            const publish = (apply: () => void) => {
+                if (cancelled || seq < publishedPoll || getConnectionEpoch() !== epoch) return;
+                publishedPoll = seq;
+                apply();
             };
+            const setIndicatorIfCurrent = (value: "online" | "offline") => publish(() => setIndicator(value));
 
             let data: string;
             try {
@@ -104,9 +107,8 @@ export default function Header({ mobileLeading = null }: Props) {
             const match = data.match(/used_memory_human:(\S+)/);
 
             if (!match) return;
-            if (!isCurrent()) return;
 
-            setUsedMemory(match[1]);
+            publish(() => setUsedMemory(match[1]));
         };
 
         fetchMemory();

@@ -2337,13 +2337,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, activeConnectionId]);
 
-  // Only the newest status poll, on the connection it started on, may set the indicator.
-  const statusSeqRef = useRef(0);
+  // A poll may publish unless a newer poll already published or the connection changed.
+  const statusStartedRef = useRef(0);
+  const statusPublishedRef = useRef(0);
   const checkStatus = useCallback(() => {
-    const seq = (statusSeqRef.current += 1);
+    const seq = (statusStartedRef.current += 1);
     const epoch = getConnectionEpoch();
     const setIndicatorIfCurrent = (value: "online" | "offline") => {
-      if (statusSeqRef.current === seq && getConnectionEpoch() === epoch) setIndicator(value);
+      if (seq < statusPublishedRef.current || getConnectionEpoch() !== epoch) return;
+      statusPublishedRef.current = seq;
+      setIndicator(value);
     };
 
     securedFetch("/api/status", {
