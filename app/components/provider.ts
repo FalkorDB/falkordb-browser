@@ -1,6 +1,7 @@
 import { createContext, Dispatch, RefObject, SetStateAction } from "react";
 import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { AIProvider } from "@/lib/ai-provider-utils";
+import type { LocalProvider } from "@/lib/local-llm-utils";
 import { CanvasLayout, ConnectionInfo, ConnectionType, CustomizingRef, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
@@ -19,7 +20,7 @@ export type ChatApiKey = {
 };
 
 export type ChatModelSource = "api-key" | "local";
-export type LocalLlmProvider = "ollama" | "lmstudio";
+export type LocalLlmProvider = LocalProvider;
 
 type BrowserSettingsContextType = {
   newSettings: {

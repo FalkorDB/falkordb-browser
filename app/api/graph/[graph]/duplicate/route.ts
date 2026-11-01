@@ -1,11 +1,9 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextResponse, NextRequest } from "next/server";
 import { duplicateGraph, validateBody } from "../../../validate-body";
-import { getCorsHeaders } from "../../../utils";
+import { getCorsHeaders, corsPreflight } from "../../../utils";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * Copies data from the source specified by the JSON body property `sourceName` into the destination `graph` provided by route params.

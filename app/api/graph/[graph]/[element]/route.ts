@@ -6,11 +6,9 @@ import {
   deleteGraphElement,
   validateBody,
 } from "../../../validate-body";
-import { getCorsHeaders, resolveReadOnly } from "../../../utils";
+import { getCorsHeaders, resolveReadOnly, corsPreflight } from "../../../utils";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(

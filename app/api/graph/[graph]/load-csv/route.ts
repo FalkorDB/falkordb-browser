@@ -1,6 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders, resolveReadOnly } from "../../../utils";
+import { getCorsHeaders, resolveReadOnly, corsPreflight } from "../../../utils";
 import { getCsvStorageProvider } from "@/app/lib/csv-storage";
 import { hashOwner, isValidCsvKey, normalizeCsvKey } from "@/app/lib/csv-key";
 import { assertFalkorFetchableCsvUrl, CsvUrlConfigError } from "@/app/lib/csv-load-url";
@@ -46,9 +46,7 @@ interface LoadCsvBody {
     body?: string;
 }
 
-export async function OPTIONS(request: Request) {
-    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * Execute a native `LOAD CSV [WITH HEADERS] FROM $csvUrl AS row <body>` query.

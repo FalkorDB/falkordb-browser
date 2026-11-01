@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, corsPreflight } from "@/app/api/utils";
 import { hasLdapServers, LDAP_SERVERS_CONFIG } from "@/lib/enterprise";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * Reports whether the enterprise module has LDAP servers configured. Only the
