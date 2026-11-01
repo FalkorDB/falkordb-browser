@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildFixMessages, parseFixResponse, getProviderModelName, getChatCompletionsUrl, resolveFixTarget } from "@/lib/aiFix";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { fixRequest, validateBody } from "../../validate-body";
-import { getCorsHeaders } from "../../utils";
+import { getCorsHeaders, corsPreflight } from "../../utils";
 
-export async function OPTIONS(request: NextRequest) {
-    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 const REQUEST_TIMEOUT_MS = 30_000;
 

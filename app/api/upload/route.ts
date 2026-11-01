@@ -6,7 +6,7 @@ import { pipeline } from "stream/promises";
 import fs from "fs";
 import { randomUUID } from "crypto";
 import Busboy from "busboy";
-import { getCorsHeaders, resolveReadOnly } from "../utils";
+import { getCorsHeaders, resolveReadOnly, corsPreflight } from "../utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import {
   getAllowedFileType,
@@ -27,9 +27,7 @@ const BINARY_EXTENSIONS = new Set([".dump"]);
 const TEXT_LIKE_EXTENSIONS = new Set([".txt", ".cypher"]);
 const MAX_DUMP_SIZE = 1024 * 1024 * 1024; // 1 GiB
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 type StreamResult =
   | { ok: true; filename: string }

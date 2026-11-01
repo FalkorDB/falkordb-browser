@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, corsPreflight } from "@/app/api/utils";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 function parseInfoField(info: string, field: string): string | undefined {
   const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -41,13 +39,17 @@ export async function GET(request: Request) {
           const addressPart = parts[1] ?? "";
           const [addrWithPort, hostname] = addressPart.split(",");
           const address = addrWithPort?.split("@")[0] ?? "";
-          const [ip, portStr] = address.split(":");
-          const host = hostname || ip;
+          // Split on the LAST colon: an IPv6 address carries colons of its own.
+          const sep = address.lastIndexOf(":");
+          const ip = (sep === -1 ? address : address.slice(0, sep)).replace(/^\[(.*)\]$/, "$1");
+          const portStr = sep === -1 ? "" : address.slice(sep + 1);
+          // Bracket IPv6 so the UI's `host:port` stays unambiguous.
+          const host = hostname || (ip.includes(":") ? `[${ip}]` : ip);
           const flags = parts[2] ?? "";
           const flagList = flags.split(",");
-          // Skip nodes with non-standard flags (e.g., fail, handshake, noaddr)
-          const isMaster = flagList.includes("master") || flagList.includes("myself,master");
-          const isSlave = flagList.includes("slave") || flagList.includes("myself,slave");
+          // Skip nodes with non-standard flags (e.g., handshake, noaddr)
+          const isMaster = flagList.includes("master");
+          const isSlave = flagList.includes("slave");
           if (!isMaster && !isSlave) return null;
           const nodeRole = isMaster ? "master" : "slave";
           const port = Number(portStr);
