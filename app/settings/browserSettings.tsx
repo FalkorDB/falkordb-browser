@@ -35,6 +35,18 @@ const LOCAL_LLM_LABELS: Record<LocalLlmProvider, string> = {
     lmstudio: "LM Studio",
 };
 
+type EditingKeyVisibility = { id: string; wasVisible: boolean };
+
+function withRestoredKeyVisibility(prev: Set<string>, { id, wasVisible }: EditingKeyVisibility): Set<string> {
+    const next = new Set(prev);
+    if (wasVisible) {
+        next.add(id);
+    } else {
+        next.delete(id);
+    }
+    return next;
+}
+
 export default function BrowserSettings() {
     const {
         newSettings: {
@@ -106,6 +118,10 @@ export default function BrowserSettings() {
     const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
     const [editingKeyValue, setEditingKeyValue] = useState("");
     const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
+    const editingKeyVisibilityRef = useRef<EditingKeyVisibility | null>(null);
+    // Bumped whenever a key edit starts or ends, so a save that finishes after
+    // its edit was cancelled or replaced can be recognised before it commits.
+    const editGenerationRef = useRef(0);
     const [activeSelectedChatApiKeyId, setActiveSelectedChatApiKeyId] = useState("");
     const [modelLoadNonce, setModelLoadNonce] = useState(0);
     const [loadingChatApiKeyId, setLoadingChatApiKeyId] = useState("");
@@ -298,6 +314,12 @@ export default function BrowserSettings() {
         setNewLimit(limit);
         setNewSecretKey(secretKey);
         setKeyInput("");
+        editGenerationRef.current += 1;
+        const abandonedEdit = editingKeyVisibilityRef.current;
+        if (abandonedEdit) {
+            editingKeyVisibilityRef.current = null;
+            setVisibleKeyIds(prev => withRestoredKeyVisibility(prev, abandonedEdit));
+        }
         setEditingKeyId(null);
         setEditingKeyValue("");
         setNewRefreshInterval(refreshInterval);
@@ -473,7 +495,11 @@ export default function BrowserSettings() {
         return `${key.slice(0, 6)}••••••••${key.slice(-4)}`;
     };
 
-    const persistChatApiKeys = async (keys: typeof chatApiKeys, selectedId: string): Promise<boolean> => {
+    const persistChatApiKeys = async (
+        keys: typeof chatApiKeys,
+        selectedId: string,
+        isCurrent: () => boolean = () => true,
+    ): Promise<boolean> => {
         const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
         const nextSelectedId = selectedApiKey?.id ?? "";
         // `serverEncrypt` binds the ciphertext to the connection behind the
@@ -513,6 +539,9 @@ export default function BrowserSettings() {
                     });
                     return false;
                 }
+                // The edit this save belongs to was cancelled or replaced while
+                // encrypting; committing now would overwrite newer state.
+                if (!isCurrent()) return false;
                 if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
                     toast({
                         title: "Error",
@@ -583,6 +612,7 @@ export default function BrowserSettings() {
 
     const handleSelectKey = (id: string) => {
         if (isLoadingModels && id === loadingChatApiKeyId) return;
+        if (editingKeyId) handleCancelEditKey();
         modelFetchRequestIdRef.current += 1;
         modelFetchAbortRef.current?.abort();
         setActiveSelectedChatApiKeyId(id);
@@ -608,9 +638,23 @@ export default function BrowserSettings() {
         setModelLoadNonce(nonce => nonce + 1);
     };
 
+    const restoreEditingKeyVisibility = (id: string) => {
+        const previousVisibility = editingKeyVisibilityRef.current;
+        if (!previousVisibility || previousVisibility.id !== id) return;
+
+        setVisibleKeyIds(prev => withRestoredKeyVisibility(prev, previousVisibility));
+        editingKeyVisibilityRef.current = null;
+    };
+
     const handleEditKey = (id: string) => {
         const keyToEdit = chatApiKeys.find(item => item.id === id);
         if (!keyToEdit) return;
+
+        if (editingKeyVisibilityRef.current) {
+            restoreEditingKeyVisibility(editingKeyVisibilityRef.current.id);
+        }
+        editingKeyVisibilityRef.current = { id, wasVisible: visibleKeyIds.has(id) };
+        editGenerationRef.current += 1;
         setEditingKeyId(id);
         setEditingKeyValue(keyToEdit.key);
         setVisibleKeyIds(prev => new Set(prev).add(id));
@@ -630,14 +674,23 @@ export default function BrowserSettings() {
                 label: item.label || `${providerName} key`,
             }
             : item);
-        const saved = await persistChatApiKeys(nextKeys, id);
-        if (saved) {
+        // Each save attempt takes its own generation, so a newer submission of
+        // the same edit supersedes an older one that is still encrypting.
+        editGenerationRef.current += 1;
+        const generation = editGenerationRef.current;
+        const isCurrentEdit = () => editGenerationRef.current === generation && editingKeyVisibilityRef.current?.id === id;
+        const saved = await persistChatApiKeys(nextKeys, id, isCurrentEdit);
+        if (saved && isCurrentEdit()) {
+            editGenerationRef.current += 1;
+            restoreEditingKeyVisibility(id);
             setEditingKeyId(null);
             setEditingKeyValue("");
         }
     };
 
     const handleCancelEditKey = () => {
+        editGenerationRef.current += 1;
+        if (editingKeyId) restoreEditingKeyVisibility(editingKeyId);
         setEditingKeyId(null);
         setEditingKeyValue("");
     };
@@ -654,6 +707,8 @@ export default function BrowserSettings() {
             localStorage.setItem("model", "");
         }
         if (editingKeyId === id) {
+            editGenerationRef.current += 1;
+            editingKeyVisibilityRef.current = null;
             setEditingKeyId(null);
             setEditingKeyValue("");
         }
