@@ -2,6 +2,7 @@
 /* eslint-disable no-plusplus */
 /* eslint-disable no-await-in-loop */
 import { expect, test } from "@playwright/test";
+import type { FalkorDBCanvas } from "@falkordb/canvas";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
@@ -20,6 +21,42 @@ test.describe('Canvas Tests', () => {
 
     test.afterEach(async () => {
         await browser.closeBrowser();
+    });
+
+    test("@admin Warn before rendering a large graph in 3D and allow falling back", async () => {
+        const graph = await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        await page.addInitScript(() => {
+            Object.defineProperty(navigator, "deviceMemory", { value: 2, configurable: true });
+            Object.defineProperty(navigator, "hardwareConcurrency", { value: 2, configurable: true });
+            localStorage.setItem("limit", "1000");
+        });
+        await browser.navigateTo(urls.graphUrl);
+        const graphName = getRandomString("3d-warning");
+        await graph.addGraph(graphName);
+        try {
+            const canvas = page.getByTestId("graphCanvasWrapper").locator("falkordb-canvas");
+            await graph.insertQuery("UNWIND range(1, 501) AS i CREATE (n:ResourceTest {id: i}) RETURN n");
+            await graph.clickRunQuery();
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(501);
+            const dimensions = page.getByTestId("dimensionControl");
+            const warning = page.getByTestId("graph3DWarning");
+
+            await dimensions.getByRole("radio", { name: "3D", exact: true }).click();
+            await expect(warning).toBeVisible();
+            await expect(warning).toContainText("501 nodes");
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getDimension())).toBe("2d");
+            await warning.getByRole("button", { name: "Use 2D (recommended)" }).click();
+            await expect(warning).toBeHidden();
+            await expect(dimensions.getByRole("radio", { name: "2D", exact: true })).toHaveAttribute("aria-checked", "true");
+
+            await dimensions.getByRole("radio", { name: "3D", exact: true }).click();
+            await expect(warning).toBeVisible();
+            await expect(warning.getByRole("button", { name: "Proceed with 3D" })).toBeVisible();
+            await warning.getByRole("button", { name: "Use 2D (recommended)" }).click();
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
     });
 
     const testNodes = [1, 5, 10];

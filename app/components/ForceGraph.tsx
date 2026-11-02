@@ -3,12 +3,15 @@
 
 "use client";
 
-import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection, NodeShape } from "@falkordb/canvas";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import useLongPress from "@/lib/useLongPress";
+import { setCanvasGraphData } from "@/lib/graph3DResources";
+import { createGraphAppearanceLookup } from "@/lib/graphAppearance";
+import use3DWarning from "./use3DWarning";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
 
@@ -75,6 +78,7 @@ export default function ForceGraph({
     const { theme } = useTheme();
     const { toast } = useToast();
     const { background, foreground } = getTheme(theme);
+    const { check3D, approval, warning } = use3DWarning(ctxDimension, setCtxDimension, canvasRef);
 
     // A click only selects once the double-click window has passed, so a
     // double-click expands without selecting first. `select` lets a click on a
@@ -237,7 +241,7 @@ export default function ForceGraph({
                         }))
                 };
 
-                canvas.setGraphData(newData);
+                setCanvasGraphData(canvas, newData);
             }
         }
     }, [canvasRef, canvasLoaded, graph, toast, setIndicator]);
@@ -273,7 +277,7 @@ export default function ForceGraph({
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)));
 
-        canvas.setGraphData(convertToCanvasData(graph.Elements, nodeShape));
+        setCanvasGraphData(canvas, convertToCanvasData(graph.Elements, nodeShape));
     }, [canvasRef, canvasLoaded, graph, setRelationships, nodeShape]);
 
     // When focus mode is on, pan the canvas to the centroid of the selected elements.
@@ -464,84 +468,16 @@ export default function ForceGraph({
         setSelectedElements([]);
     }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, consumeClick]);
 
-    const checkIsNodeSelected = useCallback((node: GraphNode) =>
-        selectedElements.some(el => el.id === node.id && !('source' in el)) ||
-        (!!hoverElement && !('source' in hoverElement) && hoverElement.id === node.id)
-        , [selectedElements, hoverElement]);
+    const appearance = useMemo(() => createGraphAppearanceLookup(selectedElements, hoverElement, () => graph.Elements.links),
+        [selectedElements, hoverElement, graph]);
 
-    const checkIsLinkSelected = useCallback((link: GraphLink) =>
-        selectedElements.some(el => el.id === link.id && 'source' in el) ||
-        (!!hoverElement && 'source' in hoverElement && hoverElement.id === link.id)
-        , [selectedElements, hoverElement]);
-
-    // Dim everything not in the selected/hovered neighbourhood.
-    // - Selected nodes: the node itself AND its direct neighbours are undimmed.
-    // - Selected/hovered links: only the two endpoints are undimmed (no neighbour expansion).
-    // - Toggle off: no dimming at all.
-    const buildDimSets = useCallback(() => {
-        // selectedNodeIds: directly selected nodes — neighbours are also shown.
-        const selectedNodeIds = new Set<number>();
-        // linkEndpointIds: endpoints of selected/hovered links — only the endpoints themselves are shown.
-        const linkEndpointIds = new Set<number>();
-
-        for (const el of selectedElements) {
-            if (!('source' in el)) selectedNodeIds.add(el.id);
-            else {
-                linkEndpointIds.add(el.source as number);
-                linkEndpointIds.add(el.target as number);
-            }
-        }
-        if (hoverElement) {
-            if (!('source' in hoverElement)) selectedNodeIds.add(hoverElement.id);
-            else {
-                linkEndpointIds.add(hoverElement.source as number);
-                linkEndpointIds.add(hoverElement.target as number);
-            }
-        }
-        return { selectedNodeIds, linkEndpointIds };
-    }, [selectedElements, hoverElement]);
-
-    const checkIsNodeDimmed = useCallback((node: GraphNode) => {
-        if (!dimmed) return false;
-        if (selectedElements.length === 0 && !hoverElement) return false;
-
-        const { selectedNodeIds, linkEndpointIds } = buildDimSets();
-        const allActiveIds = new Set([...selectedNodeIds, ...linkEndpointIds]);
-
-        if (allActiveIds.size === 0) return false;
-        if (allActiveIds.has(node.id)) return false;
-
-        // Expand neighbourhood only for directly selected nodes, not for link endpoints
-        for (const link of graph.Elements.links) {
-            if ((selectedNodeIds.has(link.source as number) && link.target === node.id) ||
-                (selectedNodeIds.has(link.target as number) && link.source === node.id)) {
-                return false;
-            }
-        }
-
-        return true;
-    }, [dimmed, selectedElements, hoverElement, buildDimSets, graph.Elements.links]);
-
-    const checkIsLinkDimmed = useCallback((link: GraphLink) => {
-        if (!dimmed) return false;
-        if (selectedElements.length === 0 && !hoverElement) return false;
-
-        // The hovered or directly selected link is never dimmed
-        if (hoverElement && 'source' in hoverElement && hoverElement.id === link.id) return false;
-        if (selectedElements.some(el => 'source' in el && el.id === link.id)) return false;
-
-        const { selectedNodeIds } = buildDimSets();
-
-        // Normalize endpoints: during simulation they may be numeric IDs or full objects
-        const srcId = typeof link.source === 'object' ? (link.source as { id: number }).id : link.source as number;
-        const tgtId = typeof link.target === 'object' ? (link.target as { id: number }).id : link.target as number;
-
-        // A link is undimmed only if one of its endpoints is a directly selected node
-        // (which expands its neighbourhood). Links touching only link-endpoints are dimmed.
-        if (selectedNodeIds.has(srcId) || selectedNodeIds.has(tgtId)) return false;
-
-        return true;
-    }, [dimmed, selectedElements, hoverElement, buildDimSets]);
+    const checkIsNodeSelected = useCallback((node: GraphNode) => appearance().selectedNodeIds.has(node.id), [appearance]);
+    const checkIsLinkSelected = useCallback((link: GraphLink) => appearance().selectedLinkIds.has(link.id), [appearance]);
+    const hasFocus = dimmed && (selectedElements.length > 0 || !!hoverElement);
+    const checkIsNodeDimmed = useCallback((node: GraphNode) =>
+        hasFocus && !appearance().activeNodeIds.has(node.id), [hasFocus, appearance]);
+    const checkIsLinkDimmed = useCallback((link: GraphLink) =>
+        hasFocus && !appearance().activeLinkIds.has(link.id), [hasFocus, appearance]);
 
     // Update colors
     useEffect(() => {
@@ -574,28 +510,6 @@ export default function ForceGraph({
 
         canvasRef.current.setLayout(mode);
     }, [canvasRef, canvasLoaded, ctxLayout, ctxDirection]);
-
-    // The 3D renderer is downloaded the first time it is needed. Should that
-    // fail the canvas stays in 2D, so the control is put back to match — unless
-    // the user has picked again meanwhile, which superseded this request.
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas || !canvasLoaded) return undefined;
-
-        let superseded = false;
-        canvas.setDimension(ctxDimension).catch((error: unknown) => {
-            if (superseded) return;
-            console.error("Could not open the 3D view", error);
-            toast({
-                title: "Could not open the 3D view",
-                description: "The graph is still shown in 2D.",
-                variant: "destructive",
-            });
-            setCtxDimension('2d');
-        });
-
-        return () => { superseded = true; };
-    }, [canvasRef, canvasLoaded, ctxDimension, setCtxDimension, toast]);
 
     // The remaining view toggles are tab state too, so the canvas follows the
     // context rather than the control that changed it.
@@ -643,6 +557,7 @@ export default function ForceGraph({
 
         let nodeCount: number;
         if (graphData) {
+            check3D({ nodes: graphData.data.nodes.length, links: graphData.data.links.length });
             // Restore a saved canvas layout. Store the current data snapshot so
             // the cleanup re-run can verify data hasn't changed before skipping.
             pendingRestoreDataRef.current = data;
@@ -685,6 +600,7 @@ export default function ForceGraph({
         viewportRestoreTimerRef.current = undefined;
         const canvasData = convertToCanvasData(data, nodeShape);
         nodeCount = canvasData.nodes.length;
+        check3D({ nodes: nodeCount, links: canvasData.links.length });
         canvas.setData(canvasData);
 
         // With the npm @falkordb/canvas package the canvas's zoomToFit fires asynchronously
@@ -711,7 +627,31 @@ export default function ForceGraph({
         }
 
         return undefined;
-    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape]);
+    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape, check3D]);
+
+    // Run after data/restore effects: the live counts must be checked, including
+    // a consumed restore whose data prop may still describe an earlier result.
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || !canvasLoaded) return undefined;
+
+        const currentData = canvas.getGraphData();
+        if (!check3D({ nodes: currentData.nodes.length, links: currentData.links.length })) return undefined;
+
+        let superseded = false;
+        canvas.setDimension(ctxDimension).catch((error: unknown) => {
+            if (superseded) return;
+            console.error("Could not open the 3D view", error);
+            toast({
+                title: "Could not open the 3D view",
+                description: "The graph is still shown in 2D.",
+                variant: "destructive",
+            });
+            setCtxDimension('2d');
+        });
+
+        return () => { superseded = true; };
+    }, [canvasRef, canvasLoaded, ctxDimension, setCtxDimension, toast, check3D, approval, data, graphData]);
 
     return (
         <div
@@ -728,6 +668,7 @@ export default function ForceGraph({
             }}
         >
             <falkordb-canvas ref={canvasRef} className="w-full h-full" />
+            {warning}
             {
                 setMultiSelect && multiSelect &&
                 <div

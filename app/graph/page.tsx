@@ -17,6 +17,7 @@ import { useResizableSize } from "@/lib/useResizableSize";
 import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import GraphSubHeader from "./GraphSubHeader";
+import { setCanvasGraphData } from "@/lib/graph3DResources";
 
 const GraphInfoPanel = dynamicImport(() => import("./graphInfo"), {
     ssr: false,
@@ -626,7 +627,7 @@ export default function Page() {
             setSelectedElements([]);
         }
 
-        canvasRef.current?.setGraphData(convertToCanvasData(graph.Elements));
+        if (canvasRef.current) setCanvasGraphData(canvasRef.current, convertToCanvasData(graph.Elements));
 
         return result.ok;
     }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
@@ -682,7 +683,7 @@ export default function Page() {
         graph.removeElements(deletedElements);
 
         setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
-        canvasRef.current.setGraphData(convertToCanvasData(graph.Elements));
+        setCanvasGraphData(canvasRef.current, convertToCanvasData(graph.Elements));
         fetchCount(graphName);
         setSelectedElements([]);
 
