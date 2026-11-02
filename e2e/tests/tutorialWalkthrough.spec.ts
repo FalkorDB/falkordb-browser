@@ -16,15 +16,13 @@ import { delay, getRandomString } from "../infra/utils";
  */
 
 test.describe("Tutorial", () => {
-    // Every test here drives the tutorial, which loads and drops the same fixed
-    // `social-demo` graphs. `fullyParallel` would otherwise run them against one
-    // server at once, so they all live in this one file and run in order.
+    // Keep the walkthroughs sequential within each project; each tour creates
+    // unique demo graphs so separate browser projects do not share graph names.
     test.describe.configure({ mode: "default" });
 
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
     const userGraph = getRandomString("tutorialTest");
-    const DEMO_GRAPHS = ["social-demo", "social-demo-test"];
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
@@ -32,24 +30,80 @@ test.describe("Tutorial", () => {
     });
 
     test.afterEach(async () => {
-        // Close first: a live graph page polls graph info, and that poll
-        // re-creates a graph deleted out from under it.
-        await browser.closeBrowser();
+        let ownedTutorialGraphs: string[] = [];
+        let teardownError: unknown;
+        try {
+            if (browser.getContext()) {
+                const page = await browser.getPage();
+                ownedTutorialGraphs = await page.evaluate(() => {
+                    const ownerId = sessionStorage.getItem("tutorialDemoOwnerId");
+                    if (!ownerId || !/^[a-zA-Z0-9-]+$/.test(ownerId)) return [];
 
-        // Every test here opens the tutorial, which creates the demo graphs,
-        // but only the one that reaches Finish drops them again. Without the
-        // admin role the delete goes out unauthenticated, and the 401 it comes
-        // back with reads exactly like the graph having never been created.
-        await Promise.all(
-            [userGraph, ...DEMO_GRAPHS].map(async name => {
-                const { message } = await apiCall.removeGraph(name, "admin");
-                // A graph this test never created, or already dropped, is the
-                // one failure this teardown may ignore.
+                    const suffix = `tutorialDemoGraphOwnership:${ownerId}`;
+                    const key = Object.keys(localStorage).find(name => name.endsWith(suffix));
+                    if (!key) return [];
+
+                    const stored = localStorage.getItem(key);
+                    if (!stored) return [];
+
+                    const ownership: unknown = JSON.parse(stored);
+                    if (
+                        typeof ownership !== "object" ||
+                        ownership === null ||
+                        !("scope" in ownership) ||
+                        typeof ownership.scope !== "string" ||
+                        !ownership.scope ||
+                        key !== `${ownership.scope}${suffix}` ||
+                        !("ownerId" in ownership) ||
+                        ownership.ownerId !== ownerId ||
+                        !("names" in ownership) ||
+                        !Array.isArray(ownership.names)
+                    ) {
+                        throw new Error("Tutorial graph ownership is invalid; refusing broad test cleanup");
+                    }
+
+                    const names = ownership.names.filter((name): name is string =>
+                        typeof name === "string" && /^tutorial-social-(?:demo|test)-[a-zA-Z0-9-]+$/.test(name));
+                    if (names.length !== ownership.names.length) {
+                        throw new Error("Tutorial graph ownership is invalid; refusing broad test cleanup");
+                    }
+
+                    return [...new Set(names)];
+                });
+            }
+        } catch (error) {
+            teardownError = error;
+        }
+
+        // Close before cleanup: a live graph page polls graph info and can
+        // recreate a graph deleted out from under it. Always close, even if the
+        // ownership record is malformed.
+        try {
+            await browser.closeBrowser();
+        } catch (error) {
+            teardownError ??= error;
+        }
+
+        for (const graph of ownedTutorialGraphs) {
+            try {
+                const { message } = await apiCall.removeGraph(graph, "admin");
                 if (!message.includes("deleted") && !message.includes("empty key")) {
-                    throw new Error(`Failed to remove ${name}: ${message}`);
+                    throw new Error(`Failed to remove owned tutorial graph ${graph}: ${message}`);
                 }
-            })
-        );
+            } catch (error) {
+                teardownError ??= error;
+            }
+        }
+
+        try {
+            const { message } = await apiCall.removeGraph(userGraph, "admin");
+            if (!message.includes("deleted") && !message.includes("empty key")) {
+                throw new Error(`Failed to remove ${userGraph}: ${message}`);
+            }
+        } catch (error) {
+            teardownError ??= error;
+        }
+        if (teardownError) throw teardownError;
     });
 
     test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
@@ -59,8 +113,33 @@ test.describe("Tutorial", () => {
         await browser.setPageToFullScreen();
 
         const countPeople = async () => {
+            const page = await browser.getPage();
+            const demoGraph = await page.evaluate(() => {
+                const ownerId = sessionStorage.getItem("tutorialDemoOwnerId");
+                if (!ownerId) throw new Error("Tutorial graph owner ID was not recorded");
+
+                const suffix = `tutorialDemoGraphOwnership:${ownerId}`;
+                const key = Object.keys(localStorage).find(name => name.endsWith(suffix));
+                const stored = key ? localStorage.getItem(key) : null;
+                if (!stored) throw new Error("Tutorial graph ownership was not recorded");
+
+                const ownership: unknown = JSON.parse(stored);
+                if (
+                    typeof ownership !== "object" ||
+                    ownership === null ||
+                    !("names" in ownership) ||
+                    !Array.isArray(ownership.names)
+                ) {
+                    throw new Error("Tutorial graph ownership is invalid");
+                }
+
+                const name = ownership.names.find((graph: unknown) =>
+                    typeof graph === "string" && graph.startsWith("tutorial-social-demo-"));
+                if (typeof name !== "string") throw new Error("Tutorial demo graph was not recorded");
+                return name;
+            });
             const result = await apiCall.runQuery(
-                "social-demo",
+                demoGraph,
                 "MATCH (n:Person) RETURN count(n) AS cnt"
             );
             const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
@@ -80,7 +159,48 @@ test.describe("Tutorial", () => {
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
         } finally {
-            await tutorial.changeLocalStorage("false");
+            await tutorial.skip();
+        }
+    });
+
+    test("@admin the tutorial leaves user graphs named social-demo and social-demo-test untouched", async ({ browserName }) => {
+        // These names are fixed, so every browser project would share them.
+        test.skip(browserName !== "chromium", "Runs in one project to avoid sharing fixed graph names");
+        test.setTimeout(120_000);
+
+        const userGraphs = ["social-demo", "social-demo-test"];
+        const { opts: existingGraphs } = await apiCall.getGraphs();
+        test.skip(
+            userGraphs.some(name => existingGraphs.includes(name)),
+            "A real graph already uses a fixed demo name; leave it alone"
+        );
+
+        for (const name of userGraphs) {
+            await apiCall.runQuery(name, "CREATE (:Mine {keep: true})");
+        }
+
+        try {
+            const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await tutorial.changeLocalStorage("true");
+            await tutorial.refreshPage();
+            await tutorial.waitForStep("Welcome to FalkorDB Browser");
+            await tutorial.skip();
+
+            const { opts: graphsAfter } = await apiCall.getGraphs();
+            expect(graphsAfter).toEqual(expect.arrayContaining(userGraphs));
+            for (const name of userGraphs) {
+                const result = await apiCall.runQuery(
+                    name,
+                    "MATCH (n) RETURN count(n) AS total, sum(CASE WHEN n:Mine THEN 1 ELSE 0 END) AS mine"
+                );
+                expect(Number(result.data[0].total)).toBe(1);
+                expect(Number(result.data[0].mine)).toBe(1);
+            }
+        } finally {
+            for (const name of userGraphs) {
+                await apiCall.removeGraph(name, "admin");
+            }
         }
     });
 
@@ -161,9 +281,15 @@ test.describe("Tutorial", () => {
         await tutorial.waitForStep("Close Manage Graphs Window");
         await tutorial.clickTutorialTarget('[data-testid="closeManage"]');
 
-        // Step 6: "Select a Demo Graph" — advanceOn: "click" on selectGraphsocial-demoButton
+        // Step 6: "Select a Demo Graph" — advanceOn: "click" on the generated demo graph option
         await tutorial.waitForStep("Select a Demo Graph");
-        await tutorial.clickTutorialTarget('[data-testid="selectGraphsocial-demoButton"]');
+        const page = await browser.getPage();
+        const demoOptionId = await page.locator('[data-testid^="selectGraphtutorial-social-demo-"]').first().getAttribute("data-testid");
+        if (!demoOptionId) throw new Error("Tutorial demo graph option was not found");
+        const demoGraph = demoOptionId.replace(/^selectGraph/, "").replace(/Button$/, "");
+        const demoSuffix = demoGraph.slice("tutorial-social-demo-".length);
+        const activeDemoGraphs = [demoGraph, `tutorial-social-test-${demoSuffix}`];
+        await tutorial.clickTutorialTarget('[data-testid^="selectGraphtutorial-social-demo-"]');
 
         // Step 7: "Graph Info Panel" — no advanceOn, has Next button
         await tutorial.waitForStep("Graph Info Panel");
@@ -415,10 +541,11 @@ test.describe("Tutorial", () => {
         // Wait for cleanup to complete (demo graphs deleted, user graphs restored)
         await tutorial.waitForTimeout(3000);
 
-        // 4. Verify demo graphs are gone
+        // 4. Verify this tutorial's demo graphs are gone
         const graphsAfter = await tutorial.getGraphList();
-        expect(graphsAfter).not.toContain("social-demo");
-        expect(graphsAfter).not.toContain("social-demo-test");
+        for (const demoGraph of activeDemoGraphs) {
+            expect(graphsAfter).not.toContain(demoGraph);
+        }
 
         // 5. Verify the user's original graph is still present
         expect(graphsAfter).toContain(userGraph);
@@ -427,7 +554,6 @@ test.describe("Tutorial", () => {
         expect(await tutorial.getStripTabCount()).toBe(userTabs);
 
         // 6. Verify the tutorial flag is set to "false" (completed)
-        const page = await browser.getPage();
         const tutorialFlag = await page.evaluate(() =>
             localStorage.getItem("tutorial")
         );

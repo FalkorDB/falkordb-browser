@@ -39,6 +39,7 @@ interface TutorialTrack {
 
 /** Context passed to track setup functions so they can manipulate React state directly */
 interface TrackSetupContext {
+    demoGraphName: string;
     handleSetGraphName: (name: string) => void;
     setGraph: (graph: Graph) => void;
     runQuery: (query: string, name?: string) => Promise<void>;
@@ -133,9 +134,9 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Select a Demo Graph",
-        description: "Click on the 'social-demo' option to select and load this demo graph. It contains sample social network data with users, posts, and relationships that you can explore.",
+        description: "Click on the tutorial's social demo graph to select and load it. It contains sample social network data with users, posts, and relationships that you can explore.",
         placementAxis: "x",
-        targetSelector: '[data-testid="selectGraphsocial-demoButton"]',
+        targetSelector: '[data-testid^="selectGraphtutorial-social-demo-"][data-testid$="Button"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
         hidePrev: true
@@ -392,7 +393,7 @@ const tutorialSteps: TutorialStep[] = [
         forward: ["mouseenter", "mouseleave", "pointerdown", "mousedown"],
         hidePrev: true,
         advanceAction: async (ctx) => {
-            await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
+            await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", ctx.demoGraphName);
         }
     },
     {
@@ -581,13 +582,13 @@ function closeStaleOverlays(): void {
 }
 
 /**
- * Shared setup for the tracks that resume with the social-demo graph laid out
+ * Shared setup for the tracks that resume with the demo graph laid out
  * radially — the state steps 45-48 leave behind.
  */
 async function setupSocialDemoRadial(ctx: TrackSetupContext) {
     closeStaleOverlays();
-    ctx.handleSetGraphName("social-demo");
-    await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
+    ctx.handleSetGraphName(ctx.demoGraphName);
+    await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", ctx.demoGraphName);
     ctx.setCurrentTab("Graph");
     ctx.setLayout('radial');
     ctx.setDirection('out');
@@ -615,7 +616,7 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 6 (Select a Demo Graph): social-demo selected & loaded,
+        // State after step 6 (Select a Demo Graph): the social demo graph is selected & loaded,
         // popover closed, Graph tab active (no elements yet — first query happens in this track),
         // no DataPanel, no query history
         name: "Graph Info & Styling",
@@ -623,7 +624,7 @@ const tutorialTracks: TutorialTrack[] = [
         setup: (ctx) => {
             closeStaleOverlays();
             // Graph selected but no query run yet — clears any existing results
-            ctx.handleSetGraphName("social-demo");
+            ctx.handleSetGraphName(ctx.demoGraphName);
             ctx.setGraph(Graph.empty());
             ctx.setCurrentTab("Graph");
             ctx.setLayout('force');
@@ -632,15 +633,15 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 20 (Get KNOWS edge): social-demo selected,
+        // State after step 20 (Get KNOWS edge): the social demo graph is selected,
         // KNOWS query was run → graph has edges visible, Graph tab active,
         // no DataPanel open, no query history open, style panel closed
         name: "Query & Results",
         startIndex: 21,
         setup: async (ctx) => {
             closeStaleOverlays();
-            ctx.handleSetGraphName("social-demo");
-            await ctx.runQuery("MATCH p=()-[r:KNOWS]-() RETURN p", "social-demo");
+            ctx.handleSetGraphName(ctx.demoGraphName);
+            await ctx.runQuery("MATCH p=()-[r:KNOWS]-() RETURN p", ctx.demoGraphName);
             ctx.setCurrentTab("Graph");
             ctx.setLayout('force');
             ctx.setDirection('');
@@ -648,15 +649,15 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 36 (Close Query History Window): social-demo selected,
+        // State after step 36 (Close Query History Window): the social demo graph is selected,
         // query was run (graph has elements), the Schema tab is active (from the
         // schema steps), query history panel is CLOSED (step 36 closed it), no DataPanel
         name: "Layouts & Canvas",
         startIndex: 37,
         setup: async (ctx) => {
             closeStaleOverlays();
-            ctx.handleSetGraphName("social-demo");
-            await ctx.runQuery("MATCH p=()-[r:KNOWS]-() WHERE r.since > 2018 RETURN p ", "social-demo");
+            ctx.handleSetGraphName(ctx.demoGraphName);
+            await ctx.runQuery("MATCH p=()-[r:KNOWS]-() WHERE r.since > 2018 RETURN p ", ctx.demoGraphName);
             // Set the tab directly — the auto-tab-switch useEffect is suppressed during tutorial
             ctx.setCurrentTab("Schema");
             ctx.setLayout('force');
@@ -665,14 +666,14 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 48 (Zoom Controls): social-demo selected, graph has elements,
+        // State after step 48 (Zoom Controls): the social demo graph is selected and has elements,
         // Graph tab active, radial layout active, no overlays open
         name: "Graph Tabs",
         startIndex: 49,
         setup: setupSocialDemoRadial,
     },
     {
-        // State after step 53 (Close a Tab): social-demo selected, graph has elements,
+        // State after step 53 (Close a Tab): the social demo graph is selected and has elements,
         // Graph tab active, controls visible, radial layout active, no overlays open
         name: "Theme & Navigation",
         startIndex: 54,
@@ -1650,7 +1651,7 @@ function TutorialPortal({
 
 // A load that is superseded by a connection switch is neither a success nor an
 // error: the caller must not advance, and must not close the tutorial either.
-export type DemoLoadOutcome = "loaded" | "cancelled";
+export type DemoLoadOutcome = { status: "loaded"; graphName: string } | { status: "cancelled" };
 
 interface TutorialProps {
     open: boolean;
@@ -1757,6 +1758,7 @@ function TutorialSpotlight({ targetSelector, spotlightSelector, passthrough }: {
 function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: TutorialProps) {
     const [step, setStep] = useState(0);
     const [demoLoaded, setDemoLoaded] = useState(false);
+    const [demoGraphName, setDemoGraphName] = useState("");
     // `demoLoaded` is only set once the load RESOLVES, and the loader itself
     // changes the graph list — which gives it a new identity and re-runs the
     // effect below while the first load is still in flight.
@@ -1789,13 +1791,14 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
                         // A connection switch cancels the load without publishing the
                         // demo graphs; advancing then walks the user into steps that
                         // query a dataset that was never loaded.
-                        if (outcome === "cancelled") {
+                        if (outcome.status === "cancelled") {
                             // Let the effect try again once the new connection settles,
                             // rather than leave the tutorial parked on step 0.
                             demoLoadStartedRef.current = false;
                             return;
                         }
 
+                        setDemoGraphName(outcome.graphName);
                         setDemoLoaded(true);
                         // Auto-advance to the welcome step after loading
                         setStep(1);
@@ -1814,14 +1817,14 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
         const currentStepDef = tutorialSteps[step];
         if (currentStepDef.advanceAction) {
             try {
-                await currentStepDef.advanceAction({ handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
+                await currentStepDef.advanceAction({ demoGraphName, handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
             } catch {
                 // Keep the current step if the advance action fails
                 return;
             }
         }
         setStep(prev => Math.min(prev + 1, tutorialSteps.length - 1));
-    }, [step, handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef]);
+    }, [step, demoGraphName, handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef]);
 
     const handlePrevStep = useCallback(() => {
         setStep(prev => Math.max(prev - 1, 1)); // Don't go back to step 0 (loading)
@@ -1830,12 +1833,12 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
     const handleGoToTrack = useCallback(async (trackIndex: number) => {
         const track = tutorialTracks[trackIndex];
         try {
-            await track.setup({ handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
+            await track.setup({ demoGraphName, handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
             setStep(track.startIndex);
         } catch {
             // Keep the current step if track setup fails
         }
-    }, [handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef]);
+    }, [demoGraphName, handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef]);
 
     const handleClose = async () => {
         // Cleanup demo graphs before closing
@@ -1844,6 +1847,7 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
         }
 
         setDemoLoaded(false);
+        setDemoGraphName("");
         setStep(0);
         localStorage.setItem("tutorial", "false");
         onClose();
