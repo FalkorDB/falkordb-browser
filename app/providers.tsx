@@ -319,6 +319,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [graphName, setGraphName] = useState<string>("");
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
+  const [timeoutLoaded, setTimeoutLoaded] = useState(false);
   const [limit, setLimit] = useState(0);
   const [lastLimit, setLastLimit] = useState(0);
   const [newLimit, setNewLimit] = useState(0);
@@ -1654,8 +1655,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const graphTabs = useGraphTabs({
     prefixReady,
     // Rebuilding a tab queries its graph, and querying a graph that has since
-    // been dropped would make FalkorDB re-create it — wait for the list.
-    canRestore: graphNamesLoaded,
+    // been dropped would make FalkorDB re-create it — wait for the list. It
+    // must also wait for the saved timeout, or the rebuild runs with timeout=0.
+    canRestore: graphNamesLoaded && timeoutLoaded,
     connectionKey: activeConnectionId,
     // The tutorial gets a strip of its own; the user's tabs come back with it.
     tutorialOpen,
@@ -2031,6 +2033,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         timeoutVal = fallback;
       }
       setTimeout(timeoutVal);
+      setTimeoutLoaded(true);
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);
       setLastLimit(l);

@@ -137,6 +137,32 @@ test.describe("@admin Graph tabs", () => {
         await expect(graph.stripTab(custom)).toBeVisible({ timeout: 15000 });
     });
 
+    test("Reloading re-runs the restored tab's query with the saved timeout, not 0", async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+
+        await graph.selectGraphByName(graphOne);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.clickRunQuery();
+        await graph.waitForPageIdle();
+
+        const restoredQueries: URL[] = [];
+        page.on("request", (request) => {
+            const url = new URL(request.url());
+            if (/^\/api\/graph\/[^/]+$/.test(url.pathname) && url.searchParams.has("query")) {
+                restoredQueries.push(url);
+            }
+        });
+
+        await graph.refreshPage();
+        await graph.waitForPageIdle();
+
+        await expect.poll(() => restoredQueries.length, { timeout: 15000 }).toBeGreaterThan(0);
+        for (const url of restoredQueries) {
+            expect(Number(url.searchParams.get("timeout"))).toBeGreaterThan(0);
+        }
+    });
+
     test("Closing a tab drops it and falls back to a neighbour", async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const page = await browser.getPage();
