@@ -52,8 +52,8 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
         onSelect?.();
         if (platform === "mac") {
             toast({
-                title: "macOS app is not signed yet",
-                description: "Gatekeeper may block this download. For the official release only, see the desktop README for the manual launch workaround.",
+                title: "If macOS blocks the app",
+                description: "Gatekeeper may block builds that are not signed and notarized. For the official release only, see the desktop README for the manual launch workaround.",
             });
         }
     };

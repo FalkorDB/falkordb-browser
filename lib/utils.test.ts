@@ -72,6 +72,12 @@ describe("getQueryWithLimit", () => {
       getQueryWithLimit(escapedProcedureQuery, 300),
       [`${escapedProcedureQuery} LIMIT 300`, 300],
     );
+
+    const callInIdentifierQuery = "MATCH (n:`CALL {`) RETURN n UNION MATCH (m) RETURN m";
+    assert.deepEqual(
+      getQueryWithLimit(callInIdentifierQuery, 300),
+      [`CALL { ${callInIdentifierQuery}\n} RETURN * LIMIT 300`, 300],
+    );
   });
 
   it("does not treat backslashes as escapes inside backtick identifiers", () => {

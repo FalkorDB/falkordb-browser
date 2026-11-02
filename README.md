@@ -42,7 +42,7 @@ Access the Browser: (https://browser.falkordb.com)
 
 ### Desktop app
 
-The desktop app is available from the release downloads. Until macOS release
+Desktop installers are attached to successful GitHub releases. Until macOS release
 builds are signed and notarized, Gatekeeper may block them. For the workaround
 and its security caveat, see the [desktop app notes](./desktop/README.md#not-done-yet).
 

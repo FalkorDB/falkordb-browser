@@ -1526,17 +1526,25 @@ function hasCallBlockWithReturnNoLimit(query: string): boolean {
   return false;
 }
 
-function hasCallClause(query: string): boolean {
-  const identifier = String.raw`(?:[\w]+|` + "`(?:``|[^`])*`" + String.raw`)`;
-  return new RegExp(
-    String.raw`(?:^|[^\w.:])CALL\s*(?:\{|${identifier}(?:\s*\.\s*${identifier})*\s*\()`,
-    "i",
-  ).test(query);
+// `code` has strings, comments and backtick identifiers masked, so a CALL
+// keyword is only found outside them. The procedure name after it is matched
+// against the original query so backtick-escaped names are still recognised.
+function hasCallClause(query: string, code: string): boolean {
+  const identifier = String.raw`(?:\w+|` + "`(?:``|[^`])*`" + String.raw`)`;
+  const callTarget = new RegExp(
+    String.raw`^\s*(?:\{|${identifier}(?:\s*\.\s*${identifier})*\s*\()`,
+  );
+  const callKeyword = /(?:^|[^\w.:])CALL\b/gi;
+  let match = callKeyword.exec(code);
+  while (match) {
+    if (callTarget.test(query.slice(match.index + match[0].length))) return true;
+    match = callKeyword.exec(code);
+  }
+  return false;
 }
 
-function analyzeCypher(query: string): { code: string; callCode: string; lastCodeEnd: number } {
+function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
   const code = query.split("");
-  const callCode = query.split("");
   let lastCodeEnd = 0;
   let i = 0;
 
@@ -1555,7 +1563,6 @@ function analyzeCypher(query: string): { code: string; callCode: string; lastCod
       i += 2;
       while (i < query.length && query[i] !== "\n" && query[i] !== "\r") i += 1;
       maskRange(code, start, i);
-      maskRange(callCode, start, i);
       continue;
     }
 
@@ -1565,7 +1572,6 @@ function analyzeCypher(query: string): { code: string; callCode: string; lastCod
       while (i < query.length && !(query[i] === "*" && query[i + 1] === "/")) i += 1;
       i = Math.min(query.length, i + 2);
       maskRange(code, start, i);
-      maskRange(callCode, start, i);
       continue;
     }
 
@@ -1590,7 +1596,6 @@ function analyzeCypher(query: string): { code: string; callCode: string; lastCod
       }
       i = Math.min(query.length, i);
       maskRange(code, start, i);
-      if (quote !== "`") maskRange(callCode, start, i);
       lastCodeEnd = i;
       continue;
     }
@@ -1599,7 +1604,7 @@ function analyzeCypher(query: string): { code: string; callCode: string; lastCod
     i += 1;
   }
 
-  return { code: code.join(""), callCode: callCode.join(""), lastCodeEnd };
+  return { code: code.join(""), lastCodeEnd };
 }
 
 function insertLimit(query: string, analysis: { code: string; lastCodeEnd: number }, limit: number): string {
@@ -1631,7 +1636,7 @@ export function getQueryWithLimit(
   if (limit === 0) return [query, existingLimit];
 
   if (/\bUNION\b/i.test(analysis.code)) {
-    if (!hasCallClause(analysis.callCode)) {
+    if (!hasCallClause(query, analysis.code)) {
       const body = withoutTrailingSemicolon(query, analysis);
       return [`CALL { ${body}\n} RETURN * LIMIT ${limit}`, limit];
     }
