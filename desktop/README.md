@@ -54,8 +54,8 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   repository Actions secrets below are configured. Release builds fail before
   packaging if any are missing, and fail after packaging if the app is not
   signed, accepted by Gatekeeper and stapled, rather than silently publishing
-  an unsigned macOS app. Installers from the platforms that did build are still
-  attached to the release. Windows and Linux installers remain unsigned.
+  an unsigned macOS app. Installers from the platforms that passed their checks
+  are still attached to the release. Windows and Linux installers remain unsigned.
   Pull-request, push, and local builds for every platform also remain unsigned.
 
   Configure these repository Actions secrets:
