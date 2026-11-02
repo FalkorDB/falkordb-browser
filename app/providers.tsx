@@ -85,6 +85,10 @@ const TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX = "tutorialDemoGraphOwnership:";
 const TUTORIAL_DEMO_OWNER_LOCK_PREFIX = "falkordb-browser:tutorialDemoOwner:";
 
 type TutorialDemoOwnership = { scope: string; ownerId: string; names: string[] };
+type TutorialConnection = { cid: string | null; scope: string };
+
+const TUTORIAL_CONNECTION_POLL_MS = 100;
+const TUTORIAL_CONNECTION_TIMEOUT_MS = 30_000;
 
 function isTutorialDemoGraphName(name: unknown): name is string {
   return typeof name === "string" && /^tutorial-social-(?:demo|test)-[a-zA-Z0-9-]+$/.test(name);
@@ -357,15 +361,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // the session, which lags `activeConnectionId` through a switch, so anything
   // writing connection-scoped storage has to know whether the two agree yet.
   const [prefixConnectionId, setPrefixConnectionId] = useState<string | null>(null);
+  // Updated together with the module-level prefix, so async code can compare
+  // the two without waiting for a render.
+  const prefixConnectionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
       setConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default");
+      prefixConnectionIdRef.current = sessionData.activeConnectionId ?? null;
       migrateToScopedStorage();
       setPrefixReady(true);
       setPrefixConnectionId(sessionData.activeConnectionId ?? null);
     } else if (status === "unauthenticated") {
       clearConnectionPrefix();
+      prefixConnectionIdRef.current = null;
       setPrefixReady(false);
       setPrefixConnectionId(null);
     }
@@ -526,6 +535,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
   const demoGraphNamesRef = useRef<string[]>([]);
+  // The connection and storage scope the current tutorial's graphs were
+  // created in, so cleanup deletes and records against that same pair.
+  const tutorialConnectionRef = useRef<TutorialConnection | null>(null);
 
   // The tour points at desktop-only chrome, so narrowing past the breakpoint
   // while it is open has to close it rather than leave it over the mobile layout.
@@ -2732,10 +2744,41 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return remaining;
   }, [deleteTutorialGraphs]);
 
-  const handleLoadDemoGraphs = useCallback(async (): Promise<DemoLoadOutcome> => {
-    const startEpoch = getConnectionEpoch();
-    const cid = getActiveConnectionIdGlobal();
+  // The storage prefix follows the session, which lags the pinned connection
+  // during a switch or the bootstrap restore. Tutorial graphs are only recorded
+  // when both name the same connection, and requests are then pinned to the
+  // prefix's connection explicitly so a later session change cannot redirect them.
+  const readTutorialConnection = useCallback((): TutorialConnection | null => {
     const scope = getConnectionPrefix();
+    if (!scope || pendingSwitchesRef.current > 0) return null;
+    const cid = prefixConnectionIdRef.current;
+    const pinned = getActiveConnectionIdGlobal();
+    if (pinned !== null && pinned !== cid) return null;
+    return { cid, scope };
+  }, []);
+
+  const isTutorialConnectionCurrent = useCallback((connection: TutorialConnection, epoch: number): boolean => {
+    const current = readTutorialConnection();
+    return getConnectionEpoch() === epoch
+      && current !== null
+      && current.scope === connection.scope
+      && current.cid === connection.cid;
+  }, [readTutorialConnection]);
+
+  const waitForTutorialConnection = useCallback(async (): Promise<TutorialConnection> => {
+    const deadline = Date.now() + TUTORIAL_CONNECTION_TIMEOUT_MS;
+    for (;;) {
+      const connection = readTutorialConnection();
+      if (connection) return connection;
+      if (Date.now() >= deadline) throw new Error("The connection did not finish switching in time for the tutorial");
+      await new Promise(resolve => { window.setTimeout(resolve, TUTORIAL_CONNECTION_POLL_MS); });
+    }
+  }, [readTutorialConnection]);
+
+  const handleLoadDemoGraphs = useCallback(async (): Promise<DemoLoadOutcome> => {
+    const { cid, scope } = await waitForTutorialConnection();
+    const startEpoch = getConnectionEpoch();
+    const isCurrent = () => isTutorialConnectionCurrent({ cid, scope }, startEpoch);
     let ownerId = "";
     let demoGraphNames: string[] = [];
 
@@ -2763,7 +2806,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       ownerId = await getTutorialDemoOwnerId();
       let ownership = readTutorialDemoOwnership(scope, ownerId);
       let currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
-      if (getConnectionEpoch() !== startEpoch) {
+      if (!isCurrent()) {
         restorePreTutorialState();
         return { status: "cancelled" };
       }
@@ -2780,7 +2823,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             await cleanupAndPersistTutorialGraphs(scope, cid, otherOwnerId, otherOwnership.names);
           });
           if (acquired) reclaimedOwnerships += 1;
-          if (getConnectionEpoch() !== startEpoch) {
+          if (!isCurrent()) {
             restorePreTutorialState();
             return { status: "cancelled" };
           }
@@ -2788,7 +2831,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       }
       if (reclaimedOwnerships > 0) {
         currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
-        if (getConnectionEpoch() !== startEpoch) {
+        if (!isCurrent()) {
           restorePreTutorialState();
           return { status: "cancelled" };
         }
@@ -2798,13 +2841,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (ownership.names.length > 0) {
         const remaining = await cleanupAndPersistTutorialGraphs(scope, cid, ownerId, ownership.names);
         demoGraphNamesRef.current = remaining;
-        if (getConnectionEpoch() !== startEpoch) {
+        if (!isCurrent()) {
           restorePreTutorialState();
           return { status: "cancelled" };
         }
         ownership = readTutorialDemoOwnership(scope, ownerId);
         currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
-        if (getConnectionEpoch() !== startEpoch) {
+        if (!isCurrent()) {
           restorePreTutorialState();
           return { status: "cancelled" };
         }
@@ -2819,6 +2862,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // Keep any earlier graphs whose cleanup failed so they are retried later.
       writeTutorialDemoOwnership(scope, ownerId, [...ownership.names, ...demoGraphNames]);
       demoGraphNamesRef.current = demoGraphNames;
+      tutorialConnectionRef.current = { cid, scope };
 
       // Snapshot the fresh verified list, excluding only exact graphs recorded
       // as tutorial-owned when a prior cleanup could not remove them.
@@ -2890,7 +2934,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         throw failedLoad.reason;
       }
 
-      if (getConnectionEpoch() !== startEpoch) {
+      if (!isCurrent()) {
         // The requests stay pinned to the original connection; do not restore
         // its state into the connection that has since become active.
         await dropDemoGraphs();
@@ -2932,21 +2976,27 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (demoGraphNames.length > 0 && demoGraphNamesRef.current === demoGraphNames) await dropDemoGraphs();
       throw error;
     }
-  }, [graphName, indicator, toast, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, handleSetGraphName, setHistoryQuery]);
+  }, [graphName, indicator, toast, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, handleSetGraphName, setHistoryQuery, waitForTutorialConnection, isTutorialConnectionCurrent]);
 
   const handleCleanupDemoGraphs = useCallback(async () => {
     const startEpoch = getConnectionEpoch();
-    const cid = getActiveConnectionIdGlobal();
-    const scope = getConnectionPrefix();
-    let demoGraphNames: string[] = [];
+    const connection = tutorialConnectionRef.current;
+    tutorialConnectionRef.current = null;
 
-    try {
-      const ownerId = await getTutorialDemoOwnerId();
-      demoGraphNames = readTutorialDemoOwnership(scope, ownerId).names;
-      const remaining = await cleanupAndPersistTutorialGraphs(scope, cid, ownerId, demoGraphNames);
-      demoGraphNamesRef.current = remaining;
-    } catch (error) {
-      console.error("Failed to cleanup demo graphs", error);
+    // Delete against the pair the graphs were created in. While storage points
+    // at another connection the record cannot be verified, so it is left in
+    // place for the next tutorial in that scope to reclaim.
+    if (connection && getConnectionPrefix() === connection.scope) {
+      try {
+        const ownerId = await getTutorialDemoOwnerId();
+        const demoGraphNames = readTutorialDemoOwnership(connection.scope, ownerId).names;
+        const remaining = await cleanupAndPersistTutorialGraphs(connection.scope, connection.cid, ownerId, demoGraphNames);
+        demoGraphNamesRef.current = remaining;
+      } catch (error) {
+        console.error("Failed to cleanup demo graphs", error);
+      }
+    } else if (connection) {
+      console.error("Tutorial graph cleanup skipped: storage no longer matches the tutorial's connection; retaining its ownership record");
     }
 
     if (getConnectionEpoch() !== startEpoch) return;
