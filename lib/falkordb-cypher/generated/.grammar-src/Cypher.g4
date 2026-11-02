@@ -260,6 +260,16 @@ oC_ProjectionItem
                   | oC_Expression
                   ;
 
+oC_MapProjection
+             :  '{' SP? ( oC_MapProjectionElement ( SP? ',' SP? oC_MapProjectionElement )* )? SP? '}' ;
+
+oC_MapProjectionElement
+                    :  '.' SP? '*'
+                        | '.' SP? oC_PropertyKeyName
+                        | oC_PropertyKeyName SP? ':' SP? oC_Expression
+                        | oC_Variable
+                        ;
+
 oC_Order
      :  ORDER SP BY SP oC_SortItem ( ',' SP? oC_SortItem )* ;
 
@@ -463,7 +473,7 @@ oC_Atom
         | oC_ParenthesizedExpression
         | oC_FunctionInvocation
         | oC_ExistentialSubquery
-        | oC_Variable
+        | oC_Variable ( SP? oC_MapProjection )?
         ;
 
 COUNT : ( 'C' | 'c' ) ( 'O' | 'o' ) ( 'U' | 'u' ) ( 'N' | 'n' ) ( 'T' | 't' ) ;
@@ -759,6 +769,9 @@ oC_SymbolicName
                 | SHORTESTPATH
                 | ALLSHORTESTPATHS
                 | REDUCE
+                | EXISTS
+                | CALL
+                | YIELD
                 | DROP
                 | REMOVE
                 | INDEX

@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { SYNTAX_ERROR_HINT } from "../cypherErrors.ts";
 import { grammarErrorsToDiagnostics, prettifyGrammarMessage } from "./grammarDiagnostics.ts";
+import { lint } from "./linter.ts";
 
 describe("prettifyGrammarMessage", () => {
   it("normalizes mismatched/extraneous input into Unexpected", () => {
@@ -51,4 +52,30 @@ describe("grammarErrorsToDiagnostics", () => {
 
     assert.deepEqual([diagnostics[0].startColumn, diagnostics[0].endColumn], [11, 14]);
   });
+});
+
+describe("Cypher grammar compatibility (#2208)", () => {
+  it("still reports syntax errors for invalid queries", () => {
+    assert.notDeepEqual(lint("MATCH (n RETURN n"), []);
+  });
+
+  const validQueries = [
+    "MATCH (n) WHERE exists(n.name) RETURN n",
+    "MATCH (n) RETURN n {.name}",
+    "MATCH (n) RETURN n {.*}",
+    "MATCH (n) RETURN n {.name} AS person",
+    "MATCH (n) RETURN collect(n {.name})",
+    "MATCH (n) RETURN collect(n {.name}) AS people",
+    "MATCH (n:Call) RETURN n",
+    "MATCH (n) RETURN n.call",
+    "MATCH (n:Yield) RETURN n.yield",
+    "MATCH ()-[r:YIELD]->() RETURN r",
+    "CREATE VECTOR INDEX FOR ()-[e:Call]->() ON (e.embedding) OPTIONS {dimension:3, similarityFunction:'euclidean'}",
+  ];
+
+  for (const query of validQueries) {
+    it(`accepts ${query}`, () => {
+      assert.deepEqual(lint(query), []);
+    });
+  }
 });
