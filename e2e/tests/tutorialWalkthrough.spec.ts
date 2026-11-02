@@ -31,50 +31,79 @@ test.describe("Tutorial", () => {
 
     test.afterEach(async () => {
         let ownedTutorialGraphs: string[] = [];
-        if (browser.getContext()) {
-            const page = await browser.getPage();
-            ownedTutorialGraphs = await page.evaluate(() => {
-                const key = Object.keys(localStorage).find(name => name.endsWith("tutorialDemoGraphOwnership"));
-                if (!key) return [];
+        let teardownError: unknown;
+        try {
+            if (browser.getContext()) {
+                const page = await browser.getPage();
+                ownedTutorialGraphs = await page.evaluate(() => {
+                    const ownerId = sessionStorage.getItem("tutorialDemoOwnerId");
+                    if (!ownerId || !/^[a-zA-Z0-9-]+$/.test(ownerId)) return [];
 
-                const stored = localStorage.getItem(key);
-                if (!stored) return [];
+                    const suffix = `tutorialDemoGraphOwnership:${ownerId}`;
+                    const key = Object.keys(localStorage).find(name => name.endsWith(suffix));
+                    if (!key) return [];
 
-                const ownership: unknown = JSON.parse(stored);
-                if (
-                    typeof ownership !== "object" ||
-                    ownership === null ||
-                    !("names" in ownership) ||
-                    !Array.isArray(ownership.names)
-                ) {
-                    throw new Error("Tutorial graph ownership is invalid; refusing broad test cleanup");
-                }
+                    const stored = localStorage.getItem(key);
+                    if (!stored) return [];
 
-                const names = ownership.names.filter((name): name is string =>
-                    typeof name === "string" && /^tutorial-social-(?:demo|test)-[a-zA-Z0-9-]+$/.test(name));
-                if (names.length !== ownership.names.length) {
-                    throw new Error("Tutorial graph ownership is invalid; refusing broad test cleanup");
-                }
+                    const ownership: unknown = JSON.parse(stored);
+                    if (
+                        typeof ownership !== "object" ||
+                        ownership === null ||
+                        !("scope" in ownership) ||
+                        typeof ownership.scope !== "string" ||
+                        !ownership.scope ||
+                        key !== `${ownership.scope}${suffix}` ||
+                        !("ownerId" in ownership) ||
+                        ownership.ownerId !== ownerId ||
+                        !("names" in ownership) ||
+                        !Array.isArray(ownership.names)
+                    ) {
+                        throw new Error("Tutorial graph ownership is invalid; refusing broad test cleanup");
+                    }
 
-                return [...new Set(names)];
-            });
+                    const names = ownership.names.filter((name): name is string =>
+                        typeof name === "string" && /^tutorial-social-(?:demo|test)-[a-zA-Z0-9-]+$/.test(name));
+                    if (names.length !== ownership.names.length) {
+                        throw new Error("Tutorial graph ownership is invalid; refusing broad test cleanup");
+                    }
+
+                    return [...new Set(names)];
+                });
+            }
+        } catch (error) {
+            teardownError = error;
         }
 
-        // Close first: a live graph page polls graph info, and that poll
-        // re-creates a graph deleted out from under it.
-        await browser.closeBrowser();
+        // Close before cleanup: a live graph page polls graph info and can
+        // recreate a graph deleted out from under it. Always close, even if the
+        // ownership record is malformed.
+        try {
+            await browser.closeBrowser();
+        } catch (error) {
+            teardownError ??= error;
+        }
 
         for (const graph of ownedTutorialGraphs) {
-            const { message } = await apiCall.removeGraph(graph, "admin");
-            if (!message.includes("deleted") && !message.includes("empty key")) {
-                throw new Error(`Failed to remove owned tutorial graph ${graph}: ${message}`);
+            try {
+                const { message } = await apiCall.removeGraph(graph, "admin");
+                if (!message.includes("deleted") && !message.includes("empty key")) {
+                    throw new Error(`Failed to remove owned tutorial graph ${graph}: ${message}`);
+                }
+            } catch (error) {
+                teardownError ??= error;
             }
         }
 
-        const { message } = await apiCall.removeGraph(userGraph, "admin");
-        if (!message.includes("deleted") && !message.includes("empty key")) {
-            throw new Error(`Failed to remove ${userGraph}: ${message}`);
+        try {
+            const { message } = await apiCall.removeGraph(userGraph, "admin");
+            if (!message.includes("deleted") && !message.includes("empty key")) {
+                throw new Error(`Failed to remove ${userGraph}: ${message}`);
+            }
+        } catch (error) {
+            teardownError ??= error;
         }
+        if (teardownError) throw teardownError;
     });
 
     test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
@@ -83,12 +112,32 @@ test.describe("Tutorial", () => {
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
 
-        let knownGraphs = new Set((await apiCall.getGraphs()).opts);
         const countPeople = async () => {
-            const graphs = (await apiCall.getGraphs()).opts;
-            const demoGraph = graphs.find(name => name.startsWith("tutorial-social-demo-") && !knownGraphs.has(name));
-            if (!demoGraph) throw new Error("A newly loaded tutorial demo graph was not listed");
-            knownGraphs = new Set(graphs);
+            const page = await browser.getPage();
+            const demoGraph = await page.evaluate(() => {
+                const ownerId = sessionStorage.getItem("tutorialDemoOwnerId");
+                if (!ownerId) throw new Error("Tutorial graph owner ID was not recorded");
+
+                const suffix = `tutorialDemoGraphOwnership:${ownerId}`;
+                const key = Object.keys(localStorage).find(name => name.endsWith(suffix));
+                const stored = key ? localStorage.getItem(key) : null;
+                if (!stored) throw new Error("Tutorial graph ownership was not recorded");
+
+                const ownership: unknown = JSON.parse(stored);
+                if (
+                    typeof ownership !== "object" ||
+                    ownership === null ||
+                    !("names" in ownership) ||
+                    !Array.isArray(ownership.names)
+                ) {
+                    throw new Error("Tutorial graph ownership is invalid");
+                }
+
+                const name = ownership.names.find((graph: unknown) =>
+                    typeof graph === "string" && graph.startsWith("tutorial-social-demo-"));
+                if (typeof name !== "string") throw new Error("Tutorial demo graph was not recorded");
+                return name;
+            });
             const result = await apiCall.runQuery(
                 demoGraph,
                 "MATCH (n:Person) RETURN count(n) AS cnt"

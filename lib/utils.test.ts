@@ -60,6 +60,23 @@ describe("getQueryWithLimit", () => {
       getQueryWithLimit(procedureQuery, 300),
       [`${procedureQuery} LIMIT 300`, 300],
     );
+
+    const compactSubqueryQuery = "CALL{ MATCH (n) RETURN n } RETURN n UNION MATCH (m) RETURN m";
+    assert.deepEqual(
+      getQueryWithLimit(compactSubqueryQuery, 300),
+      [`${compactSubqueryQuery} LIMIT 300`, 300],
+    );
+
+    const escapedProcedureQuery = "CALL `db`.`labels`() YIELD label RETURN label UNION MATCH (n) RETURN n";
+    assert.deepEqual(
+      getQueryWithLimit(escapedProcedureQuery, 300),
+      [`${escapedProcedureQuery} LIMIT 300`, 300],
+    );
+  });
+
+  it("does not treat backslashes as escapes inside backtick identifiers", () => {
+    const query = "MATCH (n:`path\\`) RETURN n";
+    assert.deepEqual(getQueryWithLimit(query, 50), [`${query} LIMIT 50`, 50]);
   });
 });
 

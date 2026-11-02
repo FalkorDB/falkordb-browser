@@ -80,21 +80,41 @@ const defaultQueryHistory: HistoryQuery = {
 };
 
 const DEMO_GRAPH_PREFIX = "tutorial-social-";
-const TUTORIAL_DEMO_OWNERSHIP_KEY = "tutorialDemoGraphOwnership";
+const TUTORIAL_DEMO_OWNER_ID_SESSION_KEY = "tutorialDemoOwnerId";
+const TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX = "tutorialDemoGraphOwnership:";
+const TUTORIAL_DEMO_OWNERSHIP_LEASE_MS = 5 * 60 * 1000;
 
-type TutorialDemoOwnership = { scope: string; names: string[] };
+type TutorialDemoOwnership = { scope: string; ownerId: string; names: string[]; updatedAt: number };
 
 function isTutorialDemoGraphName(name: unknown): name is string {
   return typeof name === "string" && /^tutorial-social-(?:demo|test)-[a-zA-Z0-9-]+$/.test(name);
 }
 
-function readTutorialDemoOwnership(scope: string): TutorialDemoOwnership {
+function isTutorialDemoOwnerId(ownerId: string): boolean {
+  return /^[a-zA-Z0-9-]+$/.test(ownerId);
+}
+
+function getTutorialDemoOwnerId(): string {
+  const existing = window.sessionStorage.getItem(TUTORIAL_DEMO_OWNER_ID_SESSION_KEY);
+  if (existing && isTutorialDemoOwnerId(existing)) return existing;
+
+  const ownerId = makeTutorialDemoGraphSuffix();
+  window.sessionStorage.setItem(TUTORIAL_DEMO_OWNER_ID_SESSION_KEY, ownerId);
+  return ownerId;
+}
+
+function tutorialDemoOwnershipKey(ownerId: string): string {
+  if (!isTutorialDemoOwnerId(ownerId)) throw new Error("Tutorial graph owner ID is invalid");
+  return `${TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX}${ownerId}`;
+}
+
+function readTutorialDemoOwnership(scope: string, ownerId: string): TutorialDemoOwnership {
   if (!scope || getConnectionPrefix() !== scope) {
     throw new Error("Tutorial graph ownership cannot be read outside its connection scope");
   }
 
-  const stored = getConnectionItem(TUTORIAL_DEMO_OWNERSHIP_KEY);
-  if (!stored) return { scope, names: [] };
+  const stored = getConnectionItem(tutorialDemoOwnershipKey(ownerId));
+  if (!stored) return { scope, ownerId, names: [], updatedAt: Date.now() };
 
   const parsed: unknown = JSON.parse(stored);
   if (
@@ -102,26 +122,94 @@ function readTutorialDemoOwnership(scope: string): TutorialDemoOwnership {
     parsed === null ||
     !("scope" in parsed) ||
     parsed.scope !== scope ||
+    !("ownerId" in parsed) ||
+    parsed.ownerId !== ownerId ||
     !("names" in parsed) ||
     !Array.isArray(parsed.names) ||
-    !parsed.names.every(isTutorialDemoGraphName)
+    !parsed.names.every(isTutorialDemoGraphName) ||
+    !("updatedAt" in parsed) ||
+    typeof parsed.updatedAt !== "number" ||
+    !Number.isFinite(parsed.updatedAt)
   ) {
     throw new Error("Stored tutorial graph ownership is invalid; refusing to delete unverified graphs");
   }
 
-  return { scope, names: [...new Set(parsed.names)] };
+  return { scope, ownerId, names: [...new Set(parsed.names)], updatedAt: parsed.updatedAt };
 }
 
-function writeTutorialDemoOwnership(scope: string, names: string[]): void {
-  if (!scope || getConnectionPrefix() !== scope || !names.every(isTutorialDemoGraphName)) {
+function writeTutorialDemoOwnership(
+  scope: string,
+  ownerId: string,
+  names: string[],
+  updatedAt = Date.now(),
+): void {
+  if (
+    !scope ||
+    getConnectionPrefix() !== scope ||
+    !isTutorialDemoOwnerId(ownerId) ||
+    !names.every(isTutorialDemoGraphName) ||
+    !Number.isFinite(updatedAt)
+  ) {
     throw new Error("Tutorial graph ownership cannot be written outside its verified scope");
   }
 
   if (names.length === 0) {
-    removeConnectionItem(TUTORIAL_DEMO_OWNERSHIP_KEY);
+    removeConnectionItem(tutorialDemoOwnershipKey(ownerId));
   } else {
-    setConnectionItem(TUTORIAL_DEMO_OWNERSHIP_KEY, JSON.stringify({ scope, names: [...new Set(names)] }));
+    setConnectionItem(tutorialDemoOwnershipKey(ownerId), JSON.stringify({
+      scope,
+      ownerId,
+      names: [...new Set(names)],
+      updatedAt,
+    }));
   }
+}
+
+function getExpiredTutorialDemoOwnerships(scope: string, currentOwnerId: string): TutorialDemoOwnership[] {
+  if (!scope || getConnectionPrefix() !== scope) {
+    throw new Error("Tutorial graph ownership cannot be scanned outside its connection scope");
+  }
+
+  const keyPrefix = `${scope}${TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX}`;
+  const expired: TutorialDemoOwnership[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (!key?.startsWith(keyPrefix)) continue;
+
+    const ownerId = key.slice(keyPrefix.length);
+    if (!isTutorialDemoOwnerId(ownerId) || ownerId === currentOwnerId) continue;
+
+    const stored = window.localStorage.getItem(key);
+    if (!stored) continue;
+    const parsed: unknown = JSON.parse(stored);
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !("scope" in parsed) ||
+      parsed.scope !== scope ||
+      !("ownerId" in parsed) ||
+      parsed.ownerId !== ownerId ||
+      !("names" in parsed) ||
+      !Array.isArray(parsed.names) ||
+      !parsed.names.every(isTutorialDemoGraphName) ||
+      !("updatedAt" in parsed) ||
+      typeof parsed.updatedAt !== "number" ||
+      !Number.isFinite(parsed.updatedAt)
+    ) {
+      throw new Error("Stored tutorial graph ownership is invalid; refusing to delete unverified graphs");
+    }
+
+    if (Date.now() - parsed.updatedAt > TUTORIAL_DEMO_OWNERSHIP_LEASE_MS) {
+      expired.push({
+        scope,
+        ownerId,
+        names: [...new Set(parsed.names)],
+        updatedAt: parsed.updatedAt,
+      });
+    }
+  }
+
+  return expired;
 }
 
 function makeTutorialDemoGraphSuffix(): string {
@@ -2592,17 +2680,34 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const cleanupAndPersistTutorialGraphs = useCallback(async (
     scope: string,
     cid: string | null,
+    ownerId: string,
     names: string[],
+    renewLease = true,
   ): Promise<string[]> => {
     const attempted = [...new Set(names)];
-    const remaining = await deleteTutorialGraphs(attempted, cid);
-    const ownership = readTutorialDemoOwnership(scope);
+    let remaining: string[];
+    try {
+      remaining = await deleteTutorialGraphs(attempted, cid);
+    } catch (error) {
+      if (getConnectionPrefix() !== scope) {
+        console.error("Tutorial graph cleanup failed after switching connections; retaining its ownership record", error);
+        return attempted;
+      }
+      throw error;
+    }
+    // The requests are pinned to the original connection. If the user switched
+    // connections while they were in flight, leave that scope's record intact
+    // for reconciliation when they return to it.
+    if (getConnectionPrefix() !== scope) return remaining;
+
+    const ownership = readTutorialDemoOwnership(scope, ownerId);
     const attemptedSet = new Set(attempted);
-    writeTutorialDemoOwnership(scope, [
-      ...ownership.names.filter(name => !attemptedSet.has(name)),
-      ...remaining,
-    ]);
-    demoGraphNamesRef.current = remaining;
+    writeTutorialDemoOwnership(
+      scope,
+      ownerId,
+      [...ownership.names.filter(name => !attemptedSet.has(name)), ...remaining],
+      renewLease ? Date.now() : ownership.updatedAt,
+    );
     return remaining;
   }, [deleteTutorialGraphs]);
 
@@ -2610,6 +2715,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
     const scope = getConnectionPrefix();
+    const ownerId = getTutorialDemoOwnerId();
     let demoGraphNames: string[] = [];
 
     // Read once: the failure path has to put this back, and the state setter
@@ -2619,7 +2725,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Pinned to `cid` and exact recorded names: cleanup never infers ownership
     // from a graph-name prefix.
     const dropDemoGraphs = async () => {
-      await cleanupAndPersistTutorialGraphs(scope, cid, demoGraphNames);
+      const remaining = await cleanupAndPersistTutorialGraphs(scope, cid, ownerId, demoGraphNames);
+      demoGraphNamesRef.current = remaining;
     };
 
     // Undoes the address bar and the snapshot this attempt took, so whoever
@@ -2632,23 +2739,59 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     };
 
     try {
-      let ownership = readTutorialDemoOwnership(scope);
+      let ownership = readTutorialDemoOwnership(scope, ownerId);
       let currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
+      if (getConnectionEpoch() !== startEpoch) {
+        restorePreTutorialState();
+        return { status: "cancelled" };
+      }
       if (!currentGraphs) throw new Error("Could not verify available graph names for the tutorial");
 
-      if (ownership.names.length > 0) {
-        await cleanupAndPersistTutorialGraphs(scope, cid, ownership.names);
-        ownership = readTutorialDemoOwnership(scope);
+      const expiredOwnerships = getExpiredTutorialDemoOwnerships(scope, ownerId);
+      for (const expiredOwnership of expiredOwnerships) {
+        await cleanupAndPersistTutorialGraphs(
+          scope,
+          cid,
+          expiredOwnership.ownerId,
+          expiredOwnership.names,
+          false,
+        );
+        if (getConnectionEpoch() !== startEpoch) {
+          restorePreTutorialState();
+          return { status: "cancelled" };
+        }
+      }
+      if (expiredOwnerships.length > 0) {
         currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
+        if (getConnectionEpoch() !== startEpoch) {
+          restorePreTutorialState();
+          return { status: "cancelled" };
+        }
+        if (!currentGraphs) throw new Error("Could not refresh graph names after abandoned tutorial cleanup");
+      }
+
+      if (ownership.names.length > 0) {
+        const remaining = await cleanupAndPersistTutorialGraphs(scope, cid, ownerId, ownership.names);
+        demoGraphNamesRef.current = remaining;
+        if (getConnectionEpoch() !== startEpoch) {
+          restorePreTutorialState();
+          return { status: "cancelled" };
+        }
+        ownership = readTutorialDemoOwnership(scope, ownerId);
+        currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
+        if (getConnectionEpoch() !== startEpoch) {
+          restorePreTutorialState();
+          return { status: "cancelled" };
+        }
         if (!currentGraphs) throw new Error("Could not refresh graph names after tutorial cleanup");
       }
 
-      ownership = readTutorialDemoOwnership(scope);
+      ownership = readTutorialDemoOwnership(scope, ownerId);
       do {
         const suffix = makeTutorialDemoGraphSuffix();
         demoGraphNames = [`${DEMO_GRAPH_PREFIX}demo-${suffix}`, `${DEMO_GRAPH_PREFIX}test-${suffix}`];
       } while (demoGraphNames.some(name => currentGraphs.opts.includes(name) || ownership.names.includes(name)));
-      writeTutorialDemoOwnership(scope, [...ownership.names, ...demoGraphNames]);
+      writeTutorialDemoOwnership(scope, ownerId, demoGraphNames);
       demoGraphNamesRef.current = demoGraphNames;
 
       // Snapshot the fresh verified list, excluding only exact graphs recorded
@@ -2769,11 +2912,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
     const scope = getConnectionPrefix();
+    const ownerId = getTutorialDemoOwnerId();
     let demoGraphNames: string[] = [];
 
     try {
-      demoGraphNames = readTutorialDemoOwnership(scope).names;
-      await cleanupAndPersistTutorialGraphs(scope, cid, demoGraphNames);
+      demoGraphNames = readTutorialDemoOwnership(scope, ownerId).names;
+      const remaining = await cleanupAndPersistTutorialGraphs(scope, cid, ownerId, demoGraphNames);
+      demoGraphNamesRef.current = remaining;
     } catch (error) {
       console.error("Failed to cleanup demo graphs", error);
     }
@@ -2820,6 +2965,28 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     }
     setUrlParamsBeforeTutorial("");
   }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, handleSetGraphName, setHistoryQuery]);
+
+  useEffect(() => {
+    if (!tutorialOpen) return;
+
+    const heartbeat = () => {
+      const scope = getConnectionPrefix();
+      if (!scope) return;
+
+      try {
+        const ownerId = getTutorialDemoOwnerId();
+        const ownership = readTutorialDemoOwnership(scope, ownerId);
+        if (ownership.names.length > 0) {
+          writeTutorialDemoOwnership(scope, ownerId, ownership.names);
+        }
+      } catch (error) {
+        console.error("Failed to refresh tutorial graph ownership lease", error);
+      }
+    };
+
+    const intervalId = window.setInterval(heartbeat, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, [tutorialOpen]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>

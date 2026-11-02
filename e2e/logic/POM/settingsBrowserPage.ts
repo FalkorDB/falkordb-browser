@@ -351,7 +351,13 @@ export default class SettingsBrowserPage extends BasePage {
     return (await keyText.textContent()) ?? "";
   }
 
-  async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<void> {
+  async getChatApiKeyVisibilityLabel(apiKey: string): Promise<string> {
+    return (await this.getChatApiKeyCard(apiKey)
+      .getByTestId("toggleChatApiKeyVisibilityButton")
+      .textContent())?.trim() ?? "";
+  }
+
+  async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<string | null> {
     const card = this.getChatApiKeyCard(currentApiKey);
     await interactWhenVisible(
       card.getByTestId("editChatApiKeyButton"),
@@ -360,6 +366,7 @@ export default class SettingsBrowserPage extends BasePage {
     );
 
     const editInput = this.page.getByTestId("chatApiKeyEditInput");
+    const inputType = await editInput.getAttribute("type");
     await interactWhenVisible(
       editInput,
       async (el) => {
@@ -375,6 +382,7 @@ export default class SettingsBrowserPage extends BasePage {
       "Save Edited Chat API Key Button"
     );
     await this.getChatApiKeyCard(nextApiKey).waitFor({ state: "visible", timeout: 5000 });
+    return inputType;
   }
 
   async deleteChatApiKey(apiKey: string): Promise<void> {

@@ -236,14 +236,21 @@ test.describe('@browser Browser Settings tests', () => {
         expect(maskedKeyText).toContain(apiKey.slice(0, 6));
         expect(maskedKeyText).toContain(apiKey.slice(-4));
 
-        await settingsBrowserPage.showChatApiKey(apiKey);
-        expect(await settingsBrowserPage.getVisibleChatApiKeyText(apiKey)).toBe(apiKey);
+        expect(await settingsBrowserPage.editChatApiKey(apiKey, editedApiKey)).toBe("text");
+        expect(await settingsBrowserPage.getChatApiKeyVisibilityLabel(editedApiKey)).toBe("Show");
+        const editedMaskedKeyText = await settingsBrowserPage.getMaskedChatApiKeyText(editedApiKey);
+        expect(editedMaskedKeyText).toContain(editedApiKey.slice(0, 6));
+        expect(editedMaskedKeyText).toContain(editedApiKey.slice(-4));
 
-        await settingsBrowserPage.editChatApiKey(apiKey, editedApiKey);
+        await settingsBrowserPage.showChatApiKey(editedApiKey);
         expect(await settingsBrowserPage.getVisibleChatApiKeyText(editedApiKey)).toBe(editedApiKey);
+        const secondEditedApiKey = `sk-e2e-edited-again-${getRandomString("key")}`;
+        expect(await settingsBrowserPage.editChatApiKey(editedApiKey, secondEditedApiKey)).toBe("text");
+        expect(await settingsBrowserPage.getChatApiKeyVisibilityLabel(secondEditedApiKey)).toBe("Hide");
+        expect(await settingsBrowserPage.getVisibleChatApiKeyText(secondEditedApiKey)).toBe(secondEditedApiKey);
 
-        await settingsBrowserPage.deleteChatApiKey(editedApiKey);
-        expect(await settingsBrowserPage.isChatApiKeyPresent(editedApiKey)).toBe(false);
+        await settingsBrowserPage.deleteChatApiKey(secondEditedApiKey);
+        expect(await settingsBrowserPage.isChatApiKeyPresent(secondEditedApiKey)).toBe(false);
     });
 
     test('@readwrite Verify local LLM controls and load tooltip display correctly', async () => {

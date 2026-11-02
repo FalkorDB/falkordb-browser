@@ -106,6 +106,7 @@ export default function BrowserSettings() {
     const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
     const [editingKeyValue, setEditingKeyValue] = useState("");
     const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
+    const editingKeyVisibilityRef = useRef<{ id: string; wasVisible: boolean } | null>(null);
     const [activeSelectedChatApiKeyId, setActiveSelectedChatApiKeyId] = useState("");
     const [modelLoadNonce, setModelLoadNonce] = useState(0);
     const [loadingChatApiKeyId, setLoadingChatApiKeyId] = useState("");
@@ -608,9 +609,30 @@ export default function BrowserSettings() {
         setModelLoadNonce(nonce => nonce + 1);
     };
 
+    const restoreEditingKeyVisibility = (id: string) => {
+        const previousVisibility = editingKeyVisibilityRef.current;
+        if (!previousVisibility || previousVisibility.id !== id) return;
+
+        setVisibleKeyIds(prev => {
+            const next = new Set(prev);
+            if (previousVisibility.wasVisible) {
+                next.add(id);
+            } else {
+                next.delete(id);
+            }
+            return next;
+        });
+        editingKeyVisibilityRef.current = null;
+    };
+
     const handleEditKey = (id: string) => {
         const keyToEdit = chatApiKeys.find(item => item.id === id);
         if (!keyToEdit) return;
+
+        if (editingKeyVisibilityRef.current) {
+            restoreEditingKeyVisibility(editingKeyVisibilityRef.current.id);
+        }
+        editingKeyVisibilityRef.current = { id, wasVisible: visibleKeyIds.has(id) };
         setEditingKeyId(id);
         setEditingKeyValue(keyToEdit.key);
         setVisibleKeyIds(prev => new Set(prev).add(id));
@@ -632,12 +654,14 @@ export default function BrowserSettings() {
             : item);
         const saved = await persistChatApiKeys(nextKeys, id);
         if (saved) {
+            restoreEditingKeyVisibility(id);
             setEditingKeyId(null);
             setEditingKeyValue("");
         }
     };
 
     const handleCancelEditKey = () => {
+        if (editingKeyId) restoreEditingKeyVisibility(editingKeyId);
         setEditingKeyId(null);
         setEditingKeyValue("");
     };
@@ -654,6 +678,7 @@ export default function BrowserSettings() {
             localStorage.setItem("model", "");
         }
         if (editingKeyId === id) {
+            editingKeyVisibilityRef.current = null;
             setEditingKeyId(null);
             setEditingKeyValue("");
         }
