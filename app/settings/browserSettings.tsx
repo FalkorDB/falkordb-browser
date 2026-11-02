@@ -35,6 +35,18 @@ const LOCAL_LLM_LABELS: Record<LocalLlmProvider, string> = {
     lmstudio: "LM Studio",
 };
 
+type EditingKeyVisibility = { id: string; wasVisible: boolean };
+
+function withRestoredKeyVisibility(prev: Set<string>, { id, wasVisible }: EditingKeyVisibility): Set<string> {
+    const next = new Set(prev);
+    if (wasVisible) {
+        next.add(id);
+    } else {
+        next.delete(id);
+    }
+    return next;
+}
+
 export default function BrowserSettings() {
     const {
         newSettings: {
@@ -106,7 +118,7 @@ export default function BrowserSettings() {
     const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
     const [editingKeyValue, setEditingKeyValue] = useState("");
     const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
-    const editingKeyVisibilityRef = useRef<{ id: string; wasVisible: boolean } | null>(null);
+    const editingKeyVisibilityRef = useRef<EditingKeyVisibility | null>(null);
     const [activeSelectedChatApiKeyId, setActiveSelectedChatApiKeyId] = useState("");
     const [modelLoadNonce, setModelLoadNonce] = useState(0);
     const [loadingChatApiKeyId, setLoadingChatApiKeyId] = useState("");
@@ -299,6 +311,11 @@ export default function BrowserSettings() {
         setNewLimit(limit);
         setNewSecretKey(secretKey);
         setKeyInput("");
+        const abandonedEdit = editingKeyVisibilityRef.current;
+        if (abandonedEdit) {
+            editingKeyVisibilityRef.current = null;
+            setVisibleKeyIds(prev => withRestoredKeyVisibility(prev, abandonedEdit));
+        }
         setEditingKeyId(null);
         setEditingKeyValue("");
         setNewRefreshInterval(refreshInterval);
@@ -584,6 +601,7 @@ export default function BrowserSettings() {
 
     const handleSelectKey = (id: string) => {
         if (isLoadingModels && id === loadingChatApiKeyId) return;
+        if (editingKeyId) handleCancelEditKey();
         modelFetchRequestIdRef.current += 1;
         modelFetchAbortRef.current?.abort();
         setActiveSelectedChatApiKeyId(id);
@@ -613,15 +631,7 @@ export default function BrowserSettings() {
         const previousVisibility = editingKeyVisibilityRef.current;
         if (!previousVisibility || previousVisibility.id !== id) return;
 
-        setVisibleKeyIds(prev => {
-            const next = new Set(prev);
-            if (previousVisibility.wasVisible) {
-                next.add(id);
-            } else {
-                next.delete(id);
-            }
-            return next;
-        });
+        setVisibleKeyIds(prev => withRestoredKeyVisibility(prev, previousVisibility));
         editingKeyVisibilityRef.current = null;
     };
 
@@ -654,6 +664,7 @@ export default function BrowserSettings() {
             : item);
         const saved = await persistChatApiKeys(nextKeys, id);
         if (saved) {
+            if (editingKeyVisibilityRef.current?.id !== id) return;
             restoreEditingKeyVisibility(id);
             setEditingKeyId(null);
             setEditingKeyValue("");

@@ -82,9 +82,9 @@ const defaultQueryHistory: HistoryQuery = {
 const DEMO_GRAPH_PREFIX = "tutorial-social-";
 const TUTORIAL_DEMO_OWNER_ID_SESSION_KEY = "tutorialDemoOwnerId";
 const TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX = "tutorialDemoGraphOwnership:";
-const TUTORIAL_DEMO_OWNERSHIP_LEASE_MS = 5 * 60 * 1000;
+const TUTORIAL_DEMO_OWNER_LOCK_PREFIX = "falkordb-browser:tutorialDemoOwner:";
 
-type TutorialDemoOwnership = { scope: string; ownerId: string; names: string[]; updatedAt: number };
+type TutorialDemoOwnership = { scope: string; ownerId: string; names: string[] };
 
 function isTutorialDemoGraphName(name: unknown): name is string {
   return typeof name === "string" && /^tutorial-social-(?:demo|test)-[a-zA-Z0-9-]+$/.test(name);
@@ -94,13 +94,72 @@ function isTutorialDemoOwnerId(ownerId: string): boolean {
   return /^[a-zA-Z0-9-]+$/.test(ownerId);
 }
 
-function getTutorialDemoOwnerId(): string {
+function canLockTutorialDemoOwners(): boolean {
+  return typeof navigator !== "undefined" && typeof navigator.locks?.request === "function";
+}
+
+function tutorialDemoOwnerLockName(ownerId: string): string {
+  return `${TUTORIAL_DEMO_OWNER_LOCK_PREFIX}${ownerId}`;
+}
+
+// Claims the owner's Web Lock for the rest of this page's life without waiting.
+function claimTutorialDemoOwnerLock(ownerId: string): Promise<boolean> {
+  return new Promise<boolean>((resolve, reject) => {
+    navigator.locks.request(tutorialDemoOwnerLockName(ownerId), { ifAvailable: true }, (lock) => {
+      resolve(lock !== null);
+      return lock ? new Promise<void>(() => { }) : undefined;
+    }).catch(reject);
+  });
+}
+
+// Runs `task` while holding the owner's Web Lock. Resolves to false without
+// running it when another page holds the lock.
+async function withTutorialDemoOwnerLock(ownerId: string, task: () => Promise<void>): Promise<boolean> {
+  return navigator.locks.request(tutorialDemoOwnerLockName(ownerId), { ifAvailable: true }, async (lock) => {
+    if (!lock) return false;
+    await task();
+    return true;
+  });
+}
+
+let tutorialDemoOwnerIdPromise: Promise<string> | null = null;
+
+// Each page owns a distinct ID. sessionStorage keeps it across reloads, but
+// duplicated or opener-created tabs inherit a copy of sessionStorage, so the
+// inherited ID is reused only when this page can claim it exclusively.
+async function resolveTutorialDemoOwnerId(): Promise<string> {
   const existing = window.sessionStorage.getItem(TUTORIAL_DEMO_OWNER_ID_SESSION_KEY);
-  if (existing && isTutorialDemoOwnerId(existing)) return existing;
+  const validExisting = existing && isTutorialDemoOwnerId(existing) ? existing : null;
+
+  if (canLockTutorialDemoOwners()) {
+    if (validExisting && await claimTutorialDemoOwnerLock(validExisting)) return validExisting;
+    for (;;) {
+      const ownerId = makeTutorialDemoGraphSuffix();
+      if (await claimTutorialDemoOwnerLock(ownerId)) {
+        window.sessionStorage.setItem(TUTORIAL_DEMO_OWNER_ID_SESSION_KEY, ownerId);
+        return ownerId;
+      }
+    }
+  }
+
+  // Without Web Locks, only a reload is known to be the same tab.
+  const navigation = window.performance?.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined;
+  if (validExisting && navigation?.type === "reload") return validExisting;
 
   const ownerId = makeTutorialDemoGraphSuffix();
   window.sessionStorage.setItem(TUTORIAL_DEMO_OWNER_ID_SESSION_KEY, ownerId);
   return ownerId;
+}
+
+function getTutorialDemoOwnerId(): Promise<string> {
+  if (!tutorialDemoOwnerIdPromise) {
+    const pending = resolveTutorialDemoOwnerId();
+    tutorialDemoOwnerIdPromise = pending;
+    pending.catch(() => {
+      if (tutorialDemoOwnerIdPromise === pending) tutorialDemoOwnerIdPromise = null;
+    });
+  }
+  return tutorialDemoOwnerIdPromise;
 }
 
 function tutorialDemoOwnershipKey(ownerId: string): string {
@@ -108,14 +167,7 @@ function tutorialDemoOwnershipKey(ownerId: string): string {
   return `${TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX}${ownerId}`;
 }
 
-function readTutorialDemoOwnership(scope: string, ownerId: string): TutorialDemoOwnership {
-  if (!scope || getConnectionPrefix() !== scope) {
-    throw new Error("Tutorial graph ownership cannot be read outside its connection scope");
-  }
-
-  const stored = getConnectionItem(tutorialDemoOwnershipKey(ownerId));
-  if (!stored) return { scope, ownerId, names: [], updatedAt: Date.now() };
-
+function parseTutorialDemoOwnership(stored: string, scope: string, ownerId: string): TutorialDemoOwnership {
   const parsed: unknown = JSON.parse(stored);
   if (
     typeof parsed !== "object" ||
@@ -126,29 +178,30 @@ function readTutorialDemoOwnership(scope: string, ownerId: string): TutorialDemo
     parsed.ownerId !== ownerId ||
     !("names" in parsed) ||
     !Array.isArray(parsed.names) ||
-    !parsed.names.every(isTutorialDemoGraphName) ||
-    !("updatedAt" in parsed) ||
-    typeof parsed.updatedAt !== "number" ||
-    !Number.isFinite(parsed.updatedAt)
+    !parsed.names.every(isTutorialDemoGraphName)
   ) {
     throw new Error("Stored tutorial graph ownership is invalid; refusing to delete unverified graphs");
   }
 
-  return { scope, ownerId, names: [...new Set(parsed.names)], updatedAt: parsed.updatedAt };
+  return { scope, ownerId, names: [...new Set(parsed.names)] };
 }
 
-function writeTutorialDemoOwnership(
-  scope: string,
-  ownerId: string,
-  names: string[],
-  updatedAt = Date.now(),
-): void {
+function readTutorialDemoOwnership(scope: string, ownerId: string): TutorialDemoOwnership {
+  if (!scope || getConnectionPrefix() !== scope) {
+    throw new Error("Tutorial graph ownership cannot be read outside its connection scope");
+  }
+
+  const stored = getConnectionItem(tutorialDemoOwnershipKey(ownerId));
+  if (!stored) return { scope, ownerId, names: [] };
+  return parseTutorialDemoOwnership(stored, scope, ownerId);
+}
+
+function writeTutorialDemoOwnership(scope: string, ownerId: string, names: string[]): void {
   if (
     !scope ||
     getConnectionPrefix() !== scope ||
     !isTutorialDemoOwnerId(ownerId) ||
-    !names.every(isTutorialDemoGraphName) ||
-    !Number.isFinite(updatedAt)
+    !names.every(isTutorialDemoGraphName)
   ) {
     throw new Error("Tutorial graph ownership cannot be written outside its verified scope");
   }
@@ -160,56 +213,26 @@ function writeTutorialDemoOwnership(
       scope,
       ownerId,
       names: [...new Set(names)],
-      updatedAt,
     }));
   }
 }
 
-function getExpiredTutorialDemoOwnerships(scope: string, currentOwnerId: string): TutorialDemoOwnership[] {
+function getOtherTutorialDemoOwnerIds(scope: string, currentOwnerId: string): string[] {
   if (!scope || getConnectionPrefix() !== scope) {
     throw new Error("Tutorial graph ownership cannot be scanned outside its connection scope");
   }
 
   const keyPrefix = `${scope}${TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX}`;
-  const expired: TutorialDemoOwnership[] = [];
+  const ownerIds: string[] = [];
   for (let index = 0; index < window.localStorage.length; index += 1) {
     const key = window.localStorage.key(index);
     if (!key?.startsWith(keyPrefix)) continue;
 
     const ownerId = key.slice(keyPrefix.length);
-    if (!isTutorialDemoOwnerId(ownerId) || ownerId === currentOwnerId) continue;
-
-    const stored = window.localStorage.getItem(key);
-    if (!stored) continue;
-    const parsed: unknown = JSON.parse(stored);
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      !("scope" in parsed) ||
-      parsed.scope !== scope ||
-      !("ownerId" in parsed) ||
-      parsed.ownerId !== ownerId ||
-      !("names" in parsed) ||
-      !Array.isArray(parsed.names) ||
-      !parsed.names.every(isTutorialDemoGraphName) ||
-      !("updatedAt" in parsed) ||
-      typeof parsed.updatedAt !== "number" ||
-      !Number.isFinite(parsed.updatedAt)
-    ) {
-      throw new Error("Stored tutorial graph ownership is invalid; refusing to delete unverified graphs");
-    }
-
-    if (Date.now() - parsed.updatedAt > TUTORIAL_DEMO_OWNERSHIP_LEASE_MS) {
-      expired.push({
-        scope,
-        ownerId,
-        names: [...new Set(parsed.names)],
-        updatedAt: parsed.updatedAt,
-      });
-    }
+    if (isTutorialDemoOwnerId(ownerId) && ownerId !== currentOwnerId) ownerIds.push(ownerId);
   }
 
-  return expired;
+  return ownerIds;
 }
 
 function makeTutorialDemoGraphSuffix(): string {
@@ -2682,7 +2705,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     cid: string | null,
     ownerId: string,
     names: string[],
-    renewLease = true,
   ): Promise<string[]> => {
     const attempted = [...new Set(names)];
     let remaining: string[];
@@ -2706,7 +2728,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       scope,
       ownerId,
       [...ownership.names.filter(name => !attemptedSet.has(name)), ...remaining],
-      renewLease ? Date.now() : ownership.updatedAt,
     );
     return remaining;
   }, [deleteTutorialGraphs]);
@@ -2715,7 +2736,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
     const scope = getConnectionPrefix();
-    const ownerId = getTutorialDemoOwnerId();
+    let ownerId = "";
     let demoGraphNames: string[] = [];
 
     // Read once: the failure path has to put this back, and the state setter
@@ -2739,6 +2760,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     };
 
     try {
+      ownerId = await getTutorialDemoOwnerId();
       let ownership = readTutorialDemoOwnership(scope, ownerId);
       let currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
       if (getConnectionEpoch() !== startEpoch) {
@@ -2747,21 +2769,24 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       }
       if (!currentGraphs) throw new Error("Could not verify available graph names for the tutorial");
 
-      const expiredOwnerships = getExpiredTutorialDemoOwnerships(scope, ownerId);
-      for (const expiredOwnership of expiredOwnerships) {
-        await cleanupAndPersistTutorialGraphs(
-          scope,
-          cid,
-          expiredOwnership.ownerId,
-          expiredOwnership.names,
-          false,
-        );
-        if (getConnectionEpoch() !== startEpoch) {
-          restorePreTutorialState();
-          return { status: "cancelled" };
+      // Reclaim graphs only from owners whose page no longer holds its lock.
+      // Holding that lock through the deletes keeps the owner from coming back
+      // mid-cleanup. Without Web Locks no other owner can be proven gone.
+      let reclaimedOwnerships = 0;
+      if (canLockTutorialDemoOwners()) {
+        for (const otherOwnerId of getOtherTutorialDemoOwnerIds(scope, ownerId)) {
+          const acquired = await withTutorialDemoOwnerLock(otherOwnerId, async () => {
+            const otherOwnership = readTutorialDemoOwnership(scope, otherOwnerId);
+            await cleanupAndPersistTutorialGraphs(scope, cid, otherOwnerId, otherOwnership.names);
+          });
+          if (acquired) reclaimedOwnerships += 1;
+          if (getConnectionEpoch() !== startEpoch) {
+            restorePreTutorialState();
+            return { status: "cancelled" };
+          }
         }
       }
-      if (expiredOwnerships.length > 0) {
+      if (reclaimedOwnerships > 0) {
         currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
         if (getConnectionEpoch() !== startEpoch) {
           restorePreTutorialState();
@@ -2791,7 +2816,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const suffix = makeTutorialDemoGraphSuffix();
         demoGraphNames = [`${DEMO_GRAPH_PREFIX}demo-${suffix}`, `${DEMO_GRAPH_PREFIX}test-${suffix}`];
       } while (demoGraphNames.some(name => currentGraphs.opts.includes(name) || ownership.names.includes(name)));
-      writeTutorialDemoOwnership(scope, ownerId, demoGraphNames);
+      // Keep any earlier graphs whose cleanup failed so they are retried later.
+      writeTutorialDemoOwnership(scope, ownerId, [...ownership.names, ...demoGraphNames]);
       demoGraphNamesRef.current = demoGraphNames;
 
       // Snapshot the fresh verified list, excluding only exact graphs recorded
@@ -2912,10 +2938,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
     const scope = getConnectionPrefix();
-    const ownerId = getTutorialDemoOwnerId();
     let demoGraphNames: string[] = [];
 
     try {
+      const ownerId = await getTutorialDemoOwnerId();
       demoGraphNames = readTutorialDemoOwnership(scope, ownerId).names;
       const remaining = await cleanupAndPersistTutorialGraphs(scope, cid, ownerId, demoGraphNames);
       demoGraphNamesRef.current = remaining;
@@ -2965,28 +2991,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     }
     setUrlParamsBeforeTutorial("");
   }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, handleSetGraphName, setHistoryQuery]);
-
-  useEffect(() => {
-    if (!tutorialOpen) return;
-
-    const heartbeat = () => {
-      const scope = getConnectionPrefix();
-      if (!scope) return;
-
-      try {
-        const ownerId = getTutorialDemoOwnerId();
-        const ownership = readTutorialDemoOwnership(scope, ownerId);
-        if (ownership.names.length > 0) {
-          writeTutorialDemoOwnership(scope, ownerId, ownership.names);
-        }
-      } catch (error) {
-        console.error("Failed to refresh tutorial graph ownership lease", error);
-      }
-    };
-
-    const intervalId = window.setInterval(heartbeat, 30_000);
-    return () => window.clearInterval(intervalId);
-  }, [tutorialOpen]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>
