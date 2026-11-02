@@ -1,9 +1,52 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
+import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
+
+describe("getQueryWithLimit keyword detection (#2203)", () => {
+  it("does not append LIMIT to a write query whose string contains RETURN", () => {
+    const query = "CREATE (:Book {title:'The Return of the King'})";
+    assert.deepEqual(getQueryWithLimit(query, 300), [query, 0]);
+
+    const doubleQuoted = 'CREATE (:Book {title:"return policy"})';
+    assert.deepEqual(getQueryWithLimit(doubleQuoted, 300), [doubleQuoted, 0]);
+  });
+
+  it("ignores RETURN inside comments and backtick identifiers", () => {
+    const comment = "CREATE (n:Book) // RETURN n";
+    assert.deepEqual(getQueryWithLimit(comment, 300), [comment, 0]);
+
+    const identifier = "CREATE (:`RETURN` {name:'x'})";
+    assert.deepEqual(getQueryWithLimit(identifier, 300), [identifier, 0]);
+  });
+
+  it("still limits a real RETURN even when a string mentions RETURN or LIMIT", () => {
+    const returnString = "RETURN 'The Return of the King'";
+    assert.deepEqual(getQueryWithLimit(returnString, 300), [`${returnString} LIMIT 300`, 300]);
+
+    const limitString = "MATCH (n) WHERE n.note = 'no LIMIT 5 here' RETURN n";
+    assert.deepEqual(getQueryWithLimit(limitString, 300), [`${limitString} LIMIT 300`, 300]);
+  });
+
+  it("inserts LIMIT before a trailing comment", () => {
+    assert.deepEqual(
+      getQueryWithLimit("MATCH (n) RETURN n // all nodes", 300),
+      ["MATCH (n) RETURN n LIMIT 300 // all nodes", 300],
+    );
+  });
+
+  it("does not treat backslashes as escapes inside backtick identifiers", () => {
+    const query = "MATCH (n:`path\\`) RETURN n";
+    assert.deepEqual(getQueryWithLimit(query, 50), [`${query} LIMIT 50`, 50]);
+  });
+
+  it("keeps an existing LIMIT and reports it", () => {
+    const query = "MATCH (n) RETURN n LIMIT 10";
+    assert.deepEqual(getQueryWithLimit(query, 300), [query, 10]);
+  });
+});
 
 afterEach(() => {
   setActiveConnectionIdGlobal(null);

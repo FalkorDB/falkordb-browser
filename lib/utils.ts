@@ -1526,13 +1526,85 @@ function hasCallBlockWithReturnNoLimit(query: string): boolean {
   return false;
 }
 
+// Strings, comments and backtick identifiers are replaced with spaces in
+// `code` (newlines kept) so keyword checks only see actual Cypher tokens.
+function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
+  const code = query.split("");
+  let lastCodeEnd = 0;
+  let i = 0;
+
+  const maskRange = (target: string[], start: number, end: number) => {
+    for (let index = start; index < end; index += 1) {
+      if (target[index] !== "\n" && target[index] !== "\r") target[index] = " ";
+    }
+  };
+
+  while (i < query.length) {
+    const char = query[i];
+    const next = query[i + 1];
+
+    if (char === "/" && next === "/") {
+      const start = i;
+      i += 2;
+      while (i < query.length && query[i] !== "\n" && query[i] !== "\r") i += 1;
+      maskRange(code, start, i);
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      const start = i;
+      i += 2;
+      while (i < query.length && !(query[i] === "*" && query[i + 1] === "/")) i += 1;
+      i = Math.min(query.length, i + 2);
+      maskRange(code, start, i);
+      continue;
+    }
+
+    if (char === "'" || char === '"' || char === "`") {
+      const quote = char;
+      const start = i;
+      i += 1;
+      while (i < query.length) {
+        if (quote !== "`" && query[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        if (query[i] === quote) {
+          if (query[i + 1] === quote) {
+            i += 2;
+            continue;
+          }
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      i = Math.min(query.length, i);
+      maskRange(code, start, i);
+      lastCodeEnd = i;
+      continue;
+    }
+
+    if (!/\s/.test(char)) lastCodeEnd = i + 1;
+    i += 1;
+  }
+
+  return { code: code.join(""), lastCodeEnd };
+}
+
+function insertLimit(query: string, analysis: { code: string; lastCodeEnd: number }, limit: number): string {
+  const insertAt = analysis.lastCodeEnd;
+  return `${query.slice(0, insertAt)} LIMIT ${limit}${query.slice(insertAt)}`;
+}
+
 export function getQueryWithLimit(
   query: string,
   limit: number
 ): [string, number] {
+  const analysis = analyzeCypher(query);
   let existingLimit = 0;
 
-  const finalReturnMatch = query.match(
+  const finalReturnMatch = analysis.code.match(
     /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is
   );
   if (finalReturnMatch) {
@@ -1551,8 +1623,8 @@ export function getQueryWithLimit(
     }
   }
 
-  if (query.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
-    return [`${query} LIMIT ${limit}`, limit];
+  if (analysis.code.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
+    return [insertLimit(query, analysis, limit), limit];
   }
 
   return [query, existingLimit];
