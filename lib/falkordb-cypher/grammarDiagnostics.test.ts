@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { SYNTAX_ERROR_HINT } from "../cypherErrors.ts";
 import { grammarErrorsToDiagnostics, prettifyGrammarMessage } from "./grammarDiagnostics.ts";
+import { lint } from "./linter.ts";
 
 describe("prettifyGrammarMessage", () => {
   it("normalizes mismatched/extraneous input into Unexpected", () => {
@@ -50,5 +51,23 @@ describe("grammarErrorsToDiagnostics", () => {
     ]);
 
     assert.deepEqual([diagnostics[0].startColumn, diagnostics[0].endColumn], [11, 14]);
+  });
+});
+
+describe("Cypher grammar compatibility", () => {
+  it("accepts valid functions, map projections, and keyword identifiers", () => {
+    const queries = [
+      "MATCH (n) WHERE exists(n.name) RETURN n",
+      "MATCH (n) RETURN n {.name}",
+      "MATCH (n) RETURN n {.*}",
+      "MATCH (n:Call) RETURN n",
+      "MATCH ()-[r:YIELD]->() RETURN r",
+      "MATCH (n) RETURN n.call",
+      "CREATE VECTOR INDEX FOR ()-[e:Call]->() ON (e.embedding) OPTIONS {dimension:3, similarityFunction:'euclidean'}",
+    ];
+
+    for (const query of queries) {
+      assert.deepEqual(lint(query), [], query);
+    }
   });
 });

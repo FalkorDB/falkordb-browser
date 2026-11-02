@@ -79,9 +79,9 @@ const defaultQueryHistory: HistoryQuery = {
   counter: 0
 };
 
-const DEMO_GRAPH_NAMES = ["social-demo", "social-demo-test"];
+const DEMO_GRAPH_PREFIX = "tutorial-social-";
 
-// Swallows the "graph does not exist" error the demo pre-clean expects to get.
+// Setup errors are surfaced once by the tutorial loader.
 const silentToast = (() => { }) as ToastFn;
 
 const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
@@ -319,6 +319,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [graphName, setGraphName] = useState<string>("");
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
+  const [timeoutLoaded, setTimeoutLoaded] = useState(false);
   const [limit, setLimit] = useState(0);
   const [lastLimit, setLastLimit] = useState(0);
   const [newLimit, setNewLimit] = useState(0);
@@ -362,6 +363,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
+  const demoGraphNamesRef = useRef<string[]>([]);
 
   // The tour points at desktop-only chrome, so narrowing past the breakpoint
   // while it is open has to close it rather than leave it over the mobile layout.
@@ -1655,7 +1657,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     prefixReady,
     // Rebuilding a tab queries its graph, and querying a graph that has since
     // been dropped would make FalkorDB re-create it — wait for the list.
-    canRestore: graphNamesLoaded,
+    canRestore: graphNamesLoaded && timeoutLoaded,
     connectionKey: activeConnectionId,
     // The tutorial gets a strip of its own; the user's tabs come back with it.
     tutorialOpen,
@@ -2031,6 +2033,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         timeoutVal = fallback;
       }
       setTimeout(timeoutVal);
+      setTimeoutLoaded(true);
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);
       setLastLimit(l);
@@ -2508,6 +2511,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const handleLoadDemoGraphs = useCallback(async (): Promise<DemoLoadOutcome> => {
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
+    let demoGraphNames: string[] = [];
+    demoGraphNamesRef.current = [];
 
     // Read once: the failure path has to put this back, and the state setter
     // below is not readable synchronously.
@@ -2516,8 +2521,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Pinned to `cid`: after a connection switch neither the retry nor the
     // cleanup looks at the connection these graphs were created on.
     const dropDemoGraphs = async () => {
-      await Promise.all(DEMO_GRAPH_NAMES.map(async name => {
-        const res = await securedFetch(`/api/graph/${name}`, {
+      await Promise.all(demoGraphNames.map(async name => {
+        const res = await securedFetch(`/api/graph/${prepareArg(name)}`, {
           method: "DELETE",
         }, silentToast, setIndicator, cid);
 
@@ -2538,10 +2543,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     };
 
     try {
-      // Store current user graphs and URL params. A previous tutorial session that
-      // ended without cleanup leaves its demo graphs in the list; they are about to
-      // be dropped, so they must not come back when the list is restored.
-      setUserGraphsBeforeTutorial(graphNames?.filter(name => !DEMO_GRAPH_NAMES.includes(name)));
+      const currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
+      if (!currentGraphs) throw new Error("Could not verify available graph names for the tutorial");
+
+      do {
+        const suffix = window.crypto.randomUUID();
+        demoGraphNames = [`${DEMO_GRAPH_PREFIX}demo-${suffix}`, `${DEMO_GRAPH_PREFIX}test-${suffix}`];
+      } while (demoGraphNames.some(name => currentGraphs.opts.includes(name)));
+      demoGraphNamesRef.current = demoGraphNames;
+
+      // Store the current user graphs and URL params before the tour takes over.
+      setUserGraphsBeforeTutorial(graphNames);
       setUserGraphBeforeTutorial(graphName);
       setUrlParamsBeforeTutorial(urlParams);
 
@@ -2554,16 +2566,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLayout('force');
       setDirection('');
 
-      // CREATE only appends, and the tutorial re-opens by itself on every load
-      // until it is dismissed, so a demo graph left behind by a refresh or a closed
-      // tab used to gain another full copy of the dataset (#2087). Purging in the
-      // same query keeps the reset atomic: two tabs racing each other still end up
-      // with exactly one copy, and there is no delete response to interpret.
-      const purge = "MATCH (n) DETACH DELETE n WITH count(n) AS purged";
-
       // Create social demo graph
       const socialQuery = `
-        ${purge}
         CREATE 
           (alice:Person {name: 'Alice', age: 30, role: 'CEO'}),
           (bob:Person {name: 'Bob', age: 25, role: 'VP Engineering'}),
@@ -2591,7 +2595,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       // Create social-test demo graph
       const socialTestQuery = `
-      ${purge}
       CREATE 
       (eve:Person {name: 'Eve', age: 32}),
       (frank:Person {name: 'Frank', age: 29}),
@@ -2601,11 +2604,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // allSettled, not all: a rejection from one load would leave the other
       // still streaming, and in FalkorDB any query re-creates its graph — so a
       // rollback delete issued while that create is in flight gets undone by it.
-      // Both queries are hardcoded, so the SSE layer's parse/connection detail is
-      // for the console, not the user — silence it and report once, below.
+      // The demo queries are internal setup, so silence the SSE parse detail and
+      // report the failure once below.
       const loads = await Promise.allSettled([
-        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid }),
-        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid })
+        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[0])}?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid }),
+        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[1])}?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid })
       ]);
 
       const failedLoad = loads.find((load): load is PromiseRejectedResult => load.status === "rejected");
@@ -2614,6 +2617,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         // One graph can be loaded while the other failed, so drop both rather
         // than walk the tutorial into half a dataset.
         await dropDemoGraphs();
+        demoGraphNamesRef.current = [];
         throw failedLoad.reason;
       }
 
@@ -2621,11 +2625,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         // Nothing downstream will find these: the retry and the cleanup both
         // run against the connection that has since become active.
         await dropDemoGraphs();
+        demoGraphNamesRef.current = [];
 
         // The retry re-reads window.location.search, which is stripped by now.
         restorePreTutorialState();
 
-        return "cancelled";
+        return { status: "cancelled" };
       }
 
       // A refresh that started before the tutorial opened is exempt from the
@@ -2633,13 +2638,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       supersedeGraphRefreshes();
 
       // Update graph list to only show demo graphs
-      setGraphNames([...DEMO_GRAPH_NAMES]);
+      setGraphNames(demoGraphNames);
       handleSetGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       setGraph(Graph.empty());
       setData({ nodes: [], links: [] });
 
-      return "loaded";
+      return { status: "loaded", graphName: demoGraphNames[0] };
     } catch (error) {
 
       console.error("Failed to load demo graphs", error);
@@ -2656,23 +2661,30 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       // The tutorial takes a resolved promise as a loaded dataset and walks the
       // user into steps that query it, so a failure has to reach it.
+      if (demoGraphNames.length > 0 && demoGraphNamesRef.current === demoGraphNames) await dropDemoGraphs();
+      demoGraphNamesRef.current = [];
       throw error;
     }
-  }, [graphName, graphNames, toast, supersedeGraphRefreshes]);
+  }, [graphName, graphNames, indicator, toast, supersedeGraphRefreshes]);
 
   const handleCleanupDemoGraphs = useCallback(async () => {
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
+    const demoGraphNames = demoGraphNamesRef.current;
 
     try {
-      await Promise.all(DEMO_GRAPH_NAMES.map(name => securedFetch(`/api/graph/${name}`, {
+      const responses = await Promise.all(demoGraphNames.map(name => securedFetch(`/api/graph/${prepareArg(name)}`, {
         method: "DELETE",
       }, toast, setIndicator, cid)));
+      responses.forEach((response, index) => {
+        if (!response.ok) console.error(`Failed to cleanup tutorial graph ${demoGraphNames[index]}: HTTP ${response.status}`);
+      });
     } catch (error) {
 
       console.error("Failed to cleanup demo graphs", error);
     }
 
+    if (demoGraphNamesRef.current === demoGraphNames) demoGraphNamesRef.current = [];
     if (getConnectionEpoch() !== startEpoch) return;
 
     // Clear current graph to avoid showing deleted demo graph. Build the empty

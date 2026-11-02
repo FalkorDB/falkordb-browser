@@ -1,126 +1,128 @@
 // Generated from Cypher.g4 by ANTLR 4.13.1
 
-import { ErrorNode, ParseTreeListener, ParserRuleContext, TerminalNode } from "antlr4ng";
+import type { ErrorNode, ParseTreeListener, ParserRuleContext, TerminalNode } from "antlr4ng";
 
 
-import { OC_CypherContext } from "./CypherParser.js";
-import { OC_StatementContext } from "./CypherParser.js";
-import { OC_QueryContext } from "./CypherParser.js";
-import { OC_FalkorCommandContext } from "./CypherParser.js";
-import { OC_CreateIndexContext } from "./CypherParser.js";
-import { OC_DropIndexContext } from "./CypherParser.js";
-import { OC_IndexQualifierContext } from "./CypherParser.js";
-import { OC_IndexEntityContext } from "./CypherParser.js";
-import { OC_IndexPropertiesContext } from "./CypherParser.js";
-import { OC_CreateConstraintContext } from "./CypherParser.js";
-import { OC_DropConstraintContext } from "./CypherParser.js";
-import { OC_ConstraintPredicateContext } from "./CypherParser.js";
-import { OC_RegularQueryContext } from "./CypherParser.js";
-import { OC_UnionContext } from "./CypherParser.js";
-import { OC_SingleQueryContext } from "./CypherParser.js";
-import { OC_SinglePartQueryContext } from "./CypherParser.js";
-import { OC_MultiPartQueryContext } from "./CypherParser.js";
-import { OC_UpdatingClauseContext } from "./CypherParser.js";
-import { OC_ReadingClauseContext } from "./CypherParser.js";
-import { OC_LoadCsvContext } from "./CypherParser.js";
-import { OC_ForeachContext } from "./CypherParser.js";
-import { OC_CallSubqueryContext } from "./CypherParser.js";
-import { OC_MatchContext } from "./CypherParser.js";
-import { OC_UnwindContext } from "./CypherParser.js";
-import { OC_MergeContext } from "./CypherParser.js";
-import { OC_MergeActionContext } from "./CypherParser.js";
-import { OC_CreateContext } from "./CypherParser.js";
-import { OC_SetContext } from "./CypherParser.js";
-import { OC_SetItemContext } from "./CypherParser.js";
-import { OC_DeleteContext } from "./CypherParser.js";
-import { OC_RemoveContext } from "./CypherParser.js";
-import { OC_RemoveItemContext } from "./CypherParser.js";
-import { OC_InQueryCallContext } from "./CypherParser.js";
-import { OC_StandaloneCallContext } from "./CypherParser.js";
-import { OC_YieldItemsContext } from "./CypherParser.js";
-import { OC_YieldItemContext } from "./CypherParser.js";
-import { OC_WithContext } from "./CypherParser.js";
-import { OC_ReturnContext } from "./CypherParser.js";
-import { OC_ProjectionBodyContext } from "./CypherParser.js";
-import { OC_ProjectionItemsContext } from "./CypherParser.js";
-import { OC_ProjectionItemContext } from "./CypherParser.js";
-import { OC_OrderContext } from "./CypherParser.js";
-import { OC_SkipContext } from "./CypherParser.js";
-import { OC_LimitContext } from "./CypherParser.js";
-import { OC_SortItemContext } from "./CypherParser.js";
-import { OC_WhereContext } from "./CypherParser.js";
-import { OC_PatternContext } from "./CypherParser.js";
-import { OC_PatternPartContext } from "./CypherParser.js";
-import { OC_AnonymousPatternPartContext } from "./CypherParser.js";
-import { OC_ShortestPathPatternContext } from "./CypherParser.js";
-import { OC_PatternElementContext } from "./CypherParser.js";
-import { OC_RelationshipsPatternContext } from "./CypherParser.js";
-import { OC_NodePatternContext } from "./CypherParser.js";
-import { OC_PatternElementChainContext } from "./CypherParser.js";
-import { OC_RelationshipPatternContext } from "./CypherParser.js";
-import { OC_RelationshipDetailContext } from "./CypherParser.js";
-import { OC_PropertiesContext } from "./CypherParser.js";
-import { OC_RelationshipTypesContext } from "./CypherParser.js";
-import { OC_NodeLabelsContext } from "./CypherParser.js";
-import { OC_NodeLabelContext } from "./CypherParser.js";
-import { OC_RangeLiteralContext } from "./CypherParser.js";
-import { OC_LabelNameContext } from "./CypherParser.js";
-import { OC_RelTypeNameContext } from "./CypherParser.js";
-import { OC_PropertyExpressionContext } from "./CypherParser.js";
-import { OC_ExpressionContext } from "./CypherParser.js";
-import { OC_OrExpressionContext } from "./CypherParser.js";
-import { OC_XorExpressionContext } from "./CypherParser.js";
-import { OC_AndExpressionContext } from "./CypherParser.js";
-import { OC_NotExpressionContext } from "./CypherParser.js";
-import { OC_ComparisonExpressionContext } from "./CypherParser.js";
-import { OC_PartialComparisonExpressionContext } from "./CypherParser.js";
-import { OC_StringListNullPredicateExpressionContext } from "./CypherParser.js";
-import { OC_StringPredicateExpressionContext } from "./CypherParser.js";
-import { OC_ListPredicateExpressionContext } from "./CypherParser.js";
-import { OC_NullPredicateExpressionContext } from "./CypherParser.js";
-import { OC_AddOrSubtractExpressionContext } from "./CypherParser.js";
-import { OC_MultiplyDivideModuloExpressionContext } from "./CypherParser.js";
-import { OC_PowerOfExpressionContext } from "./CypherParser.js";
-import { OC_UnaryAddOrSubtractExpressionContext } from "./CypherParser.js";
-import { OC_NonArithmeticOperatorExpressionContext } from "./CypherParser.js";
-import { OC_ListOperatorExpressionContext } from "./CypherParser.js";
-import { OC_PropertyLookupContext } from "./CypherParser.js";
-import { OC_AtomContext } from "./CypherParser.js";
-import { OC_CaseExpressionContext } from "./CypherParser.js";
-import { OC_CaseAlternativeContext } from "./CypherParser.js";
-import { OC_ListComprehensionContext } from "./CypherParser.js";
-import { OC_PatternComprehensionContext } from "./CypherParser.js";
-import { OC_QuantifierContext } from "./CypherParser.js";
-import { OC_FilterExpressionContext } from "./CypherParser.js";
-import { OC_PatternPredicateContext } from "./CypherParser.js";
-import { OC_ParenthesizedExpressionContext } from "./CypherParser.js";
-import { OC_IdInCollContext } from "./CypherParser.js";
-import { OC_ReduceExpressionContext } from "./CypherParser.js";
-import { OC_FunctionInvocationContext } from "./CypherParser.js";
-import { OC_FunctionNameContext } from "./CypherParser.js";
-import { OC_ExistentialSubqueryContext } from "./CypherParser.js";
-import { OC_ExplicitProcedureInvocationContext } from "./CypherParser.js";
-import { OC_ImplicitProcedureInvocationContext } from "./CypherParser.js";
-import { OC_ProcedureResultFieldContext } from "./CypherParser.js";
-import { OC_ProcedureNameContext } from "./CypherParser.js";
-import { OC_NamespaceContext } from "./CypherParser.js";
-import { OC_VariableContext } from "./CypherParser.js";
-import { OC_LiteralContext } from "./CypherParser.js";
-import { OC_BooleanLiteralContext } from "./CypherParser.js";
-import { OC_NumberLiteralContext } from "./CypherParser.js";
-import { OC_IntegerLiteralContext } from "./CypherParser.js";
-import { OC_DoubleLiteralContext } from "./CypherParser.js";
-import { OC_ListLiteralContext } from "./CypherParser.js";
-import { OC_MapLiteralContext } from "./CypherParser.js";
-import { OC_PropertyKeyNameContext } from "./CypherParser.js";
-import { OC_ParameterContext } from "./CypherParser.js";
-import { OC_SchemaNameContext } from "./CypherParser.js";
-import { OC_ReservedWordContext } from "./CypherParser.js";
-import { OC_SymbolicNameContext } from "./CypherParser.js";
-import { OC_ParameterHeaderContext } from "./CypherParser.js";
-import { OC_LeftArrowHeadContext } from "./CypherParser.js";
-import { OC_RightArrowHeadContext } from "./CypherParser.js";
-import { OC_DashContext } from "./CypherParser.js";
+import { OC_CypherContext } from "./CypherParser.ts";
+import { OC_StatementContext } from "./CypherParser.ts";
+import { OC_QueryContext } from "./CypherParser.ts";
+import { OC_FalkorCommandContext } from "./CypherParser.ts";
+import { OC_CreateIndexContext } from "./CypherParser.ts";
+import { OC_DropIndexContext } from "./CypherParser.ts";
+import { OC_IndexQualifierContext } from "./CypherParser.ts";
+import { OC_IndexEntityContext } from "./CypherParser.ts";
+import { OC_IndexPropertiesContext } from "./CypherParser.ts";
+import { OC_CreateConstraintContext } from "./CypherParser.ts";
+import { OC_DropConstraintContext } from "./CypherParser.ts";
+import { OC_ConstraintPredicateContext } from "./CypherParser.ts";
+import { OC_RegularQueryContext } from "./CypherParser.ts";
+import { OC_UnionContext } from "./CypherParser.ts";
+import { OC_SingleQueryContext } from "./CypherParser.ts";
+import { OC_SinglePartQueryContext } from "./CypherParser.ts";
+import { OC_MultiPartQueryContext } from "./CypherParser.ts";
+import { OC_UpdatingClauseContext } from "./CypherParser.ts";
+import { OC_ReadingClauseContext } from "./CypherParser.ts";
+import { OC_LoadCsvContext } from "./CypherParser.ts";
+import { OC_ForeachContext } from "./CypherParser.ts";
+import { OC_CallSubqueryContext } from "./CypherParser.ts";
+import { OC_MatchContext } from "./CypherParser.ts";
+import { OC_UnwindContext } from "./CypherParser.ts";
+import { OC_MergeContext } from "./CypherParser.ts";
+import { OC_MergeActionContext } from "./CypherParser.ts";
+import { OC_CreateContext } from "./CypherParser.ts";
+import { OC_SetContext } from "./CypherParser.ts";
+import { OC_SetItemContext } from "./CypherParser.ts";
+import { OC_DeleteContext } from "./CypherParser.ts";
+import { OC_RemoveContext } from "./CypherParser.ts";
+import { OC_RemoveItemContext } from "./CypherParser.ts";
+import { OC_InQueryCallContext } from "./CypherParser.ts";
+import { OC_StandaloneCallContext } from "./CypherParser.ts";
+import { OC_YieldItemsContext } from "./CypherParser.ts";
+import { OC_YieldItemContext } from "./CypherParser.ts";
+import { OC_WithContext } from "./CypherParser.ts";
+import { OC_ReturnContext } from "./CypherParser.ts";
+import { OC_ProjectionBodyContext } from "./CypherParser.ts";
+import { OC_ProjectionItemsContext } from "./CypherParser.ts";
+import { OC_ProjectionItemContext } from "./CypherParser.ts";
+import { OC_MapProjectionContext } from "./CypherParser.ts";
+import { OC_MapProjectionElementContext } from "./CypherParser.ts";
+import { OC_OrderContext } from "./CypherParser.ts";
+import { OC_SkipContext } from "./CypherParser.ts";
+import { OC_LimitContext } from "./CypherParser.ts";
+import { OC_SortItemContext } from "./CypherParser.ts";
+import { OC_WhereContext } from "./CypherParser.ts";
+import { OC_PatternContext } from "./CypherParser.ts";
+import { OC_PatternPartContext } from "./CypherParser.ts";
+import { OC_AnonymousPatternPartContext } from "./CypherParser.ts";
+import { OC_ShortestPathPatternContext } from "./CypherParser.ts";
+import { OC_PatternElementContext } from "./CypherParser.ts";
+import { OC_RelationshipsPatternContext } from "./CypherParser.ts";
+import { OC_NodePatternContext } from "./CypherParser.ts";
+import { OC_PatternElementChainContext } from "./CypherParser.ts";
+import { OC_RelationshipPatternContext } from "./CypherParser.ts";
+import { OC_RelationshipDetailContext } from "./CypherParser.ts";
+import { OC_PropertiesContext } from "./CypherParser.ts";
+import { OC_RelationshipTypesContext } from "./CypherParser.ts";
+import { OC_NodeLabelsContext } from "./CypherParser.ts";
+import { OC_NodeLabelContext } from "./CypherParser.ts";
+import { OC_RangeLiteralContext } from "./CypherParser.ts";
+import { OC_LabelNameContext } from "./CypherParser.ts";
+import { OC_RelTypeNameContext } from "./CypherParser.ts";
+import { OC_PropertyExpressionContext } from "./CypherParser.ts";
+import { OC_ExpressionContext } from "./CypherParser.ts";
+import { OC_OrExpressionContext } from "./CypherParser.ts";
+import { OC_XorExpressionContext } from "./CypherParser.ts";
+import { OC_AndExpressionContext } from "./CypherParser.ts";
+import { OC_NotExpressionContext } from "./CypherParser.ts";
+import { OC_ComparisonExpressionContext } from "./CypherParser.ts";
+import { OC_PartialComparisonExpressionContext } from "./CypherParser.ts";
+import { OC_StringListNullPredicateExpressionContext } from "./CypherParser.ts";
+import { OC_StringPredicateExpressionContext } from "./CypherParser.ts";
+import { OC_ListPredicateExpressionContext } from "./CypherParser.ts";
+import { OC_NullPredicateExpressionContext } from "./CypherParser.ts";
+import { OC_AddOrSubtractExpressionContext } from "./CypherParser.ts";
+import { OC_MultiplyDivideModuloExpressionContext } from "./CypherParser.ts";
+import { OC_PowerOfExpressionContext } from "./CypherParser.ts";
+import { OC_UnaryAddOrSubtractExpressionContext } from "./CypherParser.ts";
+import { OC_NonArithmeticOperatorExpressionContext } from "./CypherParser.ts";
+import { OC_ListOperatorExpressionContext } from "./CypherParser.ts";
+import { OC_PropertyLookupContext } from "./CypherParser.ts";
+import { OC_AtomContext } from "./CypherParser.ts";
+import { OC_CaseExpressionContext } from "./CypherParser.ts";
+import { OC_CaseAlternativeContext } from "./CypherParser.ts";
+import { OC_ListComprehensionContext } from "./CypherParser.ts";
+import { OC_PatternComprehensionContext } from "./CypherParser.ts";
+import { OC_QuantifierContext } from "./CypherParser.ts";
+import { OC_FilterExpressionContext } from "./CypherParser.ts";
+import { OC_PatternPredicateContext } from "./CypherParser.ts";
+import { OC_ParenthesizedExpressionContext } from "./CypherParser.ts";
+import { OC_IdInCollContext } from "./CypherParser.ts";
+import { OC_ReduceExpressionContext } from "./CypherParser.ts";
+import { OC_FunctionInvocationContext } from "./CypherParser.ts";
+import { OC_FunctionNameContext } from "./CypherParser.ts";
+import { OC_ExistentialSubqueryContext } from "./CypherParser.ts";
+import { OC_ExplicitProcedureInvocationContext } from "./CypherParser.ts";
+import { OC_ImplicitProcedureInvocationContext } from "./CypherParser.ts";
+import { OC_ProcedureResultFieldContext } from "./CypherParser.ts";
+import { OC_ProcedureNameContext } from "./CypherParser.ts";
+import { OC_NamespaceContext } from "./CypherParser.ts";
+import { OC_VariableContext } from "./CypherParser.ts";
+import { OC_LiteralContext } from "./CypherParser.ts";
+import { OC_BooleanLiteralContext } from "./CypherParser.ts";
+import { OC_NumberLiteralContext } from "./CypherParser.ts";
+import { OC_IntegerLiteralContext } from "./CypherParser.ts";
+import { OC_DoubleLiteralContext } from "./CypherParser.ts";
+import { OC_ListLiteralContext } from "./CypherParser.ts";
+import { OC_MapLiteralContext } from "./CypherParser.ts";
+import { OC_PropertyKeyNameContext } from "./CypherParser.ts";
+import { OC_ParameterContext } from "./CypherParser.ts";
+import { OC_SchemaNameContext } from "./CypherParser.ts";
+import { OC_ReservedWordContext } from "./CypherParser.ts";
+import { OC_SymbolicNameContext } from "./CypherParser.ts";
+import { OC_ParameterHeaderContext } from "./CypherParser.ts";
+import { OC_LeftArrowHeadContext } from "./CypherParser.ts";
+import { OC_RightArrowHeadContext } from "./CypherParser.ts";
+import { OC_DashContext } from "./CypherParser.ts";
 
 
 /**
@@ -538,6 +540,26 @@ export class CypherListener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitOC_ProjectionItem?: (ctx: OC_ProjectionItemContext) => void;
+    /**
+     * Enter a parse tree produced by `CypherParser.oC_MapProjection`.
+     * @param ctx the parse tree
+     */
+    enterOC_MapProjection?: (ctx: OC_MapProjectionContext) => void;
+    /**
+     * Exit a parse tree produced by `CypherParser.oC_MapProjection`.
+     * @param ctx the parse tree
+     */
+    exitOC_MapProjection?: (ctx: OC_MapProjectionContext) => void;
+    /**
+     * Enter a parse tree produced by `CypherParser.oC_MapProjectionElement`.
+     * @param ctx the parse tree
+     */
+    enterOC_MapProjectionElement?: (ctx: OC_MapProjectionElementContext) => void;
+    /**
+     * Exit a parse tree produced by `CypherParser.oC_MapProjectionElement`.
+     * @param ctx the parse tree
+     */
+    exitOC_MapProjectionElement?: (ctx: OC_MapProjectionElementContext) => void;
     /**
      * Enter a parse tree produced by `CypherParser.oC_Order`.
      * @param ctx the parse tree

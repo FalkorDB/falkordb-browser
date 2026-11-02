@@ -1,9 +1,47 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
+import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, prepareArg, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
+
+describe("Cypher URL arguments", () => {
+  it("encodes path arguments without trimming meaningful whitespace", () => {
+    assert.equal(prepareArg("trail "), "trail%20");
+    assert.equal(prepareArg("a#b/c%"), "a%23b%2Fc%25");
+  });
+});
+
+describe("getQueryWithLimit", () => {
+  it("ignores keywords in string literals and comments", () => {
+    const createQuery = "CREATE (:Book {title:'The Return of the King'})";
+    assert.deepEqual(getQueryWithLimit(createQuery, 300), [createQuery, 0]);
+
+    const unionString = "MATCH (n) WHERE n.name = 'European UNION' RETURN n";
+    assert.deepEqual(getQueryWithLimit(unionString, 300), [`${unionString} LIMIT 300`, 300]);
+
+    const returnString = "RETURN 'The Return of the King'";
+    assert.deepEqual(getQueryWithLimit(returnString, 300), [`${returnString} LIMIT 300`, 300]);
+
+    const trailingComment = "MATCH (n) RETURN n // UNION";
+    assert.deepEqual(getQueryWithLimit(trailingComment, 300), ["MATCH (n) RETURN n LIMIT 300 // UNION", 300]);
+  });
+
+  it("places auto LIMIT before a trailing semicolon", () => {
+    assert.deepEqual(
+      getQueryWithLimit("MATCH (n) RETURN n;", 300),
+      ["MATCH (n) RETURN n LIMIT 300;", 300],
+    );
+  });
+
+  it("wraps actual UNION queries without retaining a trailing semicolon", () => {
+    const query = "MATCH (n) RETURN n UNION MATCH (m) RETURN m;";
+    assert.deepEqual(
+      getQueryWithLimit(query, 300),
+      ["CALL { MATCH (n) RETURN n UNION MATCH (m) RETURN m\n} RETURN * LIMIT 300", 300],
+    );
+  });
+});
 
 afterEach(() => {
   setActiveConnectionIdGlobal(null);

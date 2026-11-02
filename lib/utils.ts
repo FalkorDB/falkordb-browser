@@ -866,7 +866,7 @@ export async function securedFetch(
 }
 
 export function prepareArg(arg: string) {
-  return encodeURIComponent(arg.trim());
+  return encodeURIComponent(arg);
 }
 
 /**
@@ -1526,13 +1526,90 @@ function hasCallBlockWithReturnNoLimit(query: string): boolean {
   return false;
 }
 
+function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
+  const code = query.split("");
+  let lastCodeEnd = 0;
+  let i = 0;
+
+  const maskRange = (start: number, end: number) => {
+    for (let index = start; index < end; index += 1) {
+      if (code[index] !== "\n" && code[index] !== "\r") code[index] = " ";
+    }
+  };
+
+  while (i < query.length) {
+    const char = query[i];
+    const next = query[i + 1];
+
+    if (char === "/" && next === "/") {
+      const start = i;
+      i += 2;
+      while (i < query.length && query[i] !== "\n" && query[i] !== "\r") i += 1;
+      maskRange(start, i);
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      const start = i;
+      i += 2;
+      while (i < query.length && !(query[i] === "*" && query[i + 1] === "/")) i += 1;
+      i = Math.min(query.length, i + 2);
+      maskRange(start, i);
+      continue;
+    }
+
+    if (char === "'" || char === '"' || char === "`") {
+      const quote = char;
+      const start = i;
+      i += 1;
+      while (i < query.length) {
+        if (query[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        if (query[i] === quote) {
+          if (query[i + 1] === quote) {
+            i += 2;
+            continue;
+          }
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      i = Math.min(query.length, i);
+      maskRange(start, i);
+      lastCodeEnd = i;
+      continue;
+    }
+
+    if (!/\s/.test(char)) lastCodeEnd = i + 1;
+    i += 1;
+  }
+
+  return { code: code.join(""), lastCodeEnd };
+}
+
+function insertLimit(query: string, analysis: { code: string; lastCodeEnd: number }, limit: number): string {
+  let insertAt = analysis.lastCodeEnd;
+  if (analysis.code[insertAt - 1] === ";") insertAt -= 1;
+  return `${query.slice(0, insertAt)} LIMIT ${limit}${query.slice(insertAt)}`;
+}
+
+function withoutTrailingSemicolon(query: string, analysis: { code: string; lastCodeEnd: number }): string {
+  const semicolonAt = analysis.lastCodeEnd - 1;
+  if (analysis.code[semicolonAt] !== ";") return query;
+  return `${query.slice(0, semicolonAt)}${query.slice(semicolonAt + 1)}`;
+}
+
 export function getQueryWithLimit(
   query: string,
   limit: number
 ): [string, number] {
+  const analysis = analyzeCypher(query);
   let existingLimit = 0;
 
-  const finalReturnMatch = query.match(
+  const finalReturnMatch = analysis.code.match(
     /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is
   );
   if (finalReturnMatch) {
@@ -1541,18 +1618,19 @@ export function getQueryWithLimit(
 
   if (limit === 0) return [query, existingLimit];
 
-  if (query.includes("UNION")) {
-    if (!query.includes("CALL")) {
-      return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
+  if (/\bUNION\b/i.test(analysis.code)) {
+    if (!/\bCALL\b/i.test(analysis.code)) {
+      const body = withoutTrailingSemicolon(query, analysis);
+      return [`CALL { ${body}\n} RETURN * LIMIT ${limit}`, limit];
     }
 
-    if (hasCallBlockWithReturnNoLimit(query)) {
-      return [`${query} LIMIT ${limit}`, limit];
+    if (hasCallBlockWithReturnNoLimit(analysis.code)) {
+      return [insertLimit(query, analysis, limit), limit];
     }
   }
 
-  if (query.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
-    return [`${query} LIMIT ${limit}`, limit];
+  if (analysis.code.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
+    return [insertLimit(query, analysis, limit), limit];
   }
 
   return [query, existingLimit];

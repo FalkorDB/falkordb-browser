@@ -16,15 +16,13 @@ import { delay, getRandomString } from "../infra/utils";
  */
 
 test.describe("Tutorial", () => {
-    // Every test here drives the tutorial, which loads and drops the same fixed
-    // `social-demo` graphs. `fullyParallel` would otherwise run them against one
-    // server at once, so they all live in this one file and run in order.
+    // Keep the walkthroughs sequential within each project; each tour creates
+    // unique demo graphs so separate browser projects do not share graph names.
     test.describe.configure({ mode: "default" });
 
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
     const userGraph = getRandomString("tutorialTest");
-    const DEMO_GRAPHS = ["social-demo", "social-demo-test"];
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
@@ -36,20 +34,10 @@ test.describe("Tutorial", () => {
         // re-creates a graph deleted out from under it.
         await browser.closeBrowser();
 
-        // Every test here opens the tutorial, which creates the demo graphs,
-        // but only the one that reaches Finish drops them again. Without the
-        // admin role the delete goes out unauthenticated, and the 401 it comes
-        // back with reads exactly like the graph having never been created.
-        await Promise.all(
-            [userGraph, ...DEMO_GRAPHS].map(async name => {
-                const { message } = await apiCall.removeGraph(name, "admin");
-                // A graph this test never created, or already dropped, is the
-                // one failure this teardown may ignore.
-                if (!message.includes("deleted") && !message.includes("empty key")) {
-                    throw new Error(`Failed to remove ${name}: ${message}`);
-                }
-            })
-        );
+        const { message } = await apiCall.removeGraph(userGraph, "admin");
+        if (!message.includes("deleted") && !message.includes("empty key")) {
+            throw new Error(`Failed to remove ${userGraph}: ${message}`);
+        }
     });
 
     test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
@@ -58,9 +46,14 @@ test.describe("Tutorial", () => {
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
 
+        let knownGraphs = new Set((await apiCall.getGraphs()).opts);
         const countPeople = async () => {
+            const graphs = (await apiCall.getGraphs()).opts;
+            const demoGraph = graphs.find(name => name.startsWith("tutorial-social-demo-") && !knownGraphs.has(name));
+            if (!demoGraph) throw new Error("A newly loaded tutorial demo graph was not listed");
+            knownGraphs = new Set(graphs);
             const result = await apiCall.runQuery(
-                "social-demo",
+                demoGraph,
                 "MATCH (n:Person) RETURN count(n) AS cnt"
             );
             const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
@@ -80,7 +73,7 @@ test.describe("Tutorial", () => {
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
         } finally {
-            await tutorial.changeLocalStorage("false");
+            await tutorial.skip();
         }
     });
 
@@ -161,9 +154,15 @@ test.describe("Tutorial", () => {
         await tutorial.waitForStep("Close Manage Graphs Window");
         await tutorial.clickTutorialTarget('[data-testid="closeManage"]');
 
-        // Step 6: "Select a Demo Graph" — advanceOn: "click" on selectGraphsocial-demoButton
+        // Step 6: "Select a Demo Graph" — advanceOn: "click" on the generated demo graph option
         await tutorial.waitForStep("Select a Demo Graph");
-        await tutorial.clickTutorialTarget('[data-testid="selectGraphsocial-demoButton"]');
+        const page = await browser.getPage();
+        const demoOptionId = await page.locator('[data-testid^="selectGraphtutorial-social-demo-"]').first().getAttribute("data-testid");
+        if (!demoOptionId) throw new Error("Tutorial demo graph option was not found");
+        const demoGraph = demoOptionId.replace(/^selectGraph/, "").replace(/Button$/, "");
+        const demoSuffix = demoGraph.slice("tutorial-social-demo-".length);
+        const activeDemoGraphs = [demoGraph, `tutorial-social-test-${demoSuffix}`];
+        await tutorial.clickTutorialTarget('[data-testid^="selectGraphtutorial-social-demo-"]');
 
         // Step 7: "Graph Info Panel" — no advanceOn, has Next button
         await tutorial.waitForStep("Graph Info Panel");
@@ -415,10 +414,11 @@ test.describe("Tutorial", () => {
         // Wait for cleanup to complete (demo graphs deleted, user graphs restored)
         await tutorial.waitForTimeout(3000);
 
-        // 4. Verify demo graphs are gone
+        // 4. Verify this tutorial's demo graphs are gone
         const graphsAfter = await tutorial.getGraphList();
-        expect(graphsAfter).not.toContain("social-demo");
-        expect(graphsAfter).not.toContain("social-demo-test");
+        for (const demoGraph of activeDemoGraphs) {
+            expect(graphsAfter).not.toContain(demoGraph);
+        }
 
         // 5. Verify the user's original graph is still present
         expect(graphsAfter).toContain(userGraph);
@@ -427,7 +427,6 @@ test.describe("Tutorial", () => {
         expect(await tutorial.getStripTabCount()).toBe(userTabs);
 
         // 6. Verify the tutorial flag is set to "false" (completed)
-        const page = await browser.getPage();
         const tutorialFlag = await page.evaluate(() =>
             localStorage.getItem("tutorial")
         );

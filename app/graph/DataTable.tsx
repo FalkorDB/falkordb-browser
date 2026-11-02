@@ -287,7 +287,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
         }
         try {
             if (actionType === "set") setIsSetLoading(true);
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${isReadOnly ? '?readOnly=true' : ''}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${prepareArg(key)}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "POST",
                 body: JSON.stringify({
                     value: val,
@@ -405,7 +405,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
         try {
             setIsRemoveLoading(true);
             const { id } = object;
-            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${isReadOnly ? '?readOnly=true' : ''}`, {
+            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${prepareArg(key)}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
             }, toast, setIndicator, cid)).ok;

@@ -257,8 +257,18 @@ oC_ProjectionItems
 
 oC_ProjectionItem
               :  ( oC_Expression SP AS SP oC_Variable )
-                  | oC_Expression
+                  | oC_Expression ( SP? oC_MapProjection )?
                   ;
+
+oC_MapProjection
+             :  '{' SP? ( oC_MapProjectionElement ( SP? ',' SP? oC_MapProjectionElement )* )? SP? '}' ;
+
+oC_MapProjectionElement
+                    :  '.' SP? '*'
+                        | '.' SP? oC_PropertyKeyName
+                        | oC_PropertyKeyName SP? ':' SP? oC_Expression
+                        | oC_Variable
+                        ;
 
 oC_Order
      :  ORDER SP BY SP oC_SortItem ( ',' SP? oC_SortItem )* ;
@@ -759,6 +769,9 @@ oC_SymbolicName
                 | SHORTESTPATH
                 | ALLSHORTESTPATHS
                 | REDUCE
+                | EXISTS
+                | CALL
+                | YIELD
                 | DROP
                 | REMOVE
                 | INDEX

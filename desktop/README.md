@@ -53,5 +53,15 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
 - **Code signing:** builds are unsigned (`CSC_IDENTITY_AUTO_DISCOVERY=false` in
   CI). To sign, set electron-builder's `CSC_LINK`/`CSC_KEY_PASSWORD`, plus
   Apple notarization credentials for macOS.
+- **macOS Gatekeeper:** until releases are signed and notarized, macOS may block
+  the app after download. Only if you trust the official FalkorDB Browser
+  release, you can remove its quarantine flag after moving it to Applications:
+
+  ```sh
+  xattr -dr com.apple.quarantine "/Applications/FalkorDB Browser.app"
+  ```
+
+  This bypasses Gatekeeper's quarantine check for that app. Do not use it for
+  an app from an untrusted source.
 - **App icon:** electron-builder's default icon is used. Add `build/icon.png`
   (512×512 or larger) and set `directories.buildResources: build`.

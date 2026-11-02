@@ -6,7 +6,7 @@
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection, NodeShape } from "@falkordb/canvas";
-import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import useLongPress from "@/lib/useLongPress";
 import { Graph } from "../api/graph/model";
@@ -206,7 +206,7 @@ export default function ForceGraph({
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
 
-        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}${isReadOnly ? '?readOnly=true' : ''}`, {
+        const result = await securedFetch(`/api/graph/${prepareArg(graph.Id)}/${node.id}${isReadOnly ? '?readOnly=true' : ''}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'

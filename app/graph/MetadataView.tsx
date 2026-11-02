@@ -41,7 +41,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
         setIsLoading(true);
         try {
             const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
-            const result = await securedFetch(`/api/graph/${query.graphName}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
+            const result = await securedFetch(`/api/graph/${prepareArg(query.graphName)}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
                 method: "GET",
             }, toast, setIndicator, cid);
 
