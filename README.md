@@ -62,9 +62,10 @@ applies; a texture/renderbuffer limit means either reported limit:
 
 | GPU capability | Maximum nodes | Maximum relationships |
 |---|---:|---:|
+| WebGL2 unavailable (could not start) | 0 | 0 |
 | Recognized software renderer, or texture/renderbuffer limit at most 4,096 | 500 | 1,000 |
 | Texture/renderbuffer limit at most 8,192 | 1,000 | 2,500 |
-| Capability check failed or a texture/renderbuffer limit unavailable | 2,000 | 5,000 |
+| WebGL2 probe result is `unknown`, or a texture/renderbuffer limit is unavailable | 2,000 | 5,000 |
 | Both texture/renderbuffer limits above 8,192 | 4,000 | 10,000 |
 
 If WebGL2 cannot start, any non-empty graph warns before attempting 3D.
@@ -349,5 +350,4 @@ set `LOAD_CSV_FILE_URI=false`.
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
 

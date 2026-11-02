@@ -634,8 +634,7 @@ export default function Page() {
     }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
 
     const handleDeleteElement = useCallback(async () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
+        if (!canvasRef.current) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
 
@@ -685,7 +684,8 @@ export default function Page() {
         graph.removeElements(deletedElements);
 
         setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
-        if (!await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), () => getConnectionEpoch() === startEpoch && canvasRef.current === canvas)) return;
+        const canvas = canvasRef.current;
+        if (canvas && !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), () => getConnectionEpoch() === startEpoch && canvasRef.current === canvas)) return;
         fetchCount(graphName);
         setSelectedElements([]);
 

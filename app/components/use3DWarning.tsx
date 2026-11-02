@@ -72,6 +72,7 @@ export default function use3DWarning(dimension: CanvasDimension, setDimension: (
 
     const prepareData = useCallback(async (size: GraphSize) => {
         const allowed = check3D(size);
+        if (dimensionRef.current === "2d") return await ensure2D();
         const fallback = fallbackRef.current;
         if (fallback) return await fallback;
         if (fallbackFailedRef.current) return await ensure2D();

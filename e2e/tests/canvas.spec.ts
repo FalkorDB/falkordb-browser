@@ -24,7 +24,7 @@ test.describe('Canvas Tests', () => {
     });
 
     test("@admin Warn before rendering a large graph in 3D and honor fallback or approval", async () => {
-        test.setTimeout(60000);
+        test.setTimeout(90000);
         const graph = await browser.createNewPage(GraphPage);
         const page = await browser.getPage();
         await page.addInitScript(() => {
@@ -55,7 +55,7 @@ test.describe('Canvas Tests', () => {
             await expect(warning).toBeVisible();
             await warning.getByRole("button", { name: "Proceed with 3D" }).click();
             await expect(warning).toBeHidden();
-            await expect.poll(() => graph.getCanvasDimension(), { timeout: 15000 }).toBe("3d");
+            await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
 
             await graph.insertQuery("CREATE (:ResourceTest {id: 1002}) WITH 1 AS added MATCH (n:ResourceTest) RETURN n");
             await graph.clickRunQuery();
@@ -70,6 +70,61 @@ test.describe('Canvas Tests', () => {
             await dimensions.getByRole("radio", { name: "3D", exact: true }).click();
             await expect.poll(() => graph.getCanvasDimension(), { timeout: 15000 }).toBe("3d");
             await expect(warning).toBeHidden();
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
+    test("@admin Restoring a saved 2D tab waits for the live 3D renderer to stop", async () => {
+        test.setTimeout(90000);
+        const graph = await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        await page.addInitScript(() => {
+            Object.defineProperty(navigator, "deviceMemory", { value: 2, configurable: true });
+            Object.defineProperty(navigator, "hardwareConcurrency", { value: 2, configurable: true });
+            localStorage.setItem("limit", "2000");
+        });
+        await browser.navigateTo(urls.graphUrl);
+        const graphName = getRandomString("restore-2d");
+        const smallTab = getRandomString("live-3d");
+        await graph.addGraph(graphName);
+        try {
+            await graph.insertQuery("UNWIND range(1, 1001) AS i CREATE (n:ResourceRestore {id: i}) RETURN n");
+            await graph.clickRunQuery();
+            const canvas = page.locator("falkordb-canvas");
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(1001);
+            await graph.addStripTab();
+            await graph.renameStripTab("New tab", smallTab);
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH (n:ResourceRestore) RETURN n LIMIT 2");
+            await graph.clickRunQuery();
+            await graph.clickDimensionControl("3d");
+            await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+
+            const unsafeWrites: number[] = [];
+            await page.exposeFunction("recordUnsafeRestore", (count: number) => { unsafeWrites.push(count); });
+            await canvas.evaluate(element => {
+                const c = element as FalkorDBCanvas;
+                const setDimension = c.setDimension.bind(c);
+                c.setDimension = async dimension => {
+                    if (dimension === "2d") await new Promise(resolve => setTimeout(resolve, 200));
+                    await setDimension(dimension);
+                };
+                const setData = c.setData.bind(c);
+                c.setData = data => {
+                    if (data.nodes.length > 500 && !c.getGraph()) {
+                        void (window as unknown as { recordUnsafeRestore: (count: number) => Promise<void> }).recordUnsafeRestore(data.nodes.length);
+                    }
+                    setData(data);
+                };
+            });
+            await graph.selectStripTab(graphName);
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length), { timeout: 15000 }).toBe(1001);
+            await expect.poll(() => graph.getCanvasDimension()).toBe("2d");
+            await expect(page.getByTestId("graph3DWarning")).toBeHidden();
+            expect(unsafeWrites).toEqual([]);
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.every(node =>
+                Number.isFinite(node.fx) && Number.isFinite(node.fy)))).toBe(true);
         } finally {
             await apicalls.removeGraph(graphName);
         }

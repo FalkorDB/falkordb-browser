@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { FalkorDBCanvas } from "@falkordb/canvas";
 import { getRandomString } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
@@ -19,6 +20,44 @@ test.describe("Graph operation race conditions", () => {
 
   test.afterEach(async () => {
     await browser.closeBrowser();
+  });
+
+  test("@admin a deletion updates the replacement canvas after a responsive remount", async () => {
+    test.setTimeout(90000);
+    const graphName = getRandomString("delete-remount");
+    let releaseDelete: () => void = () => {};
+    const heldDelete = new Promise<void>(resolve => { releaseDelete = resolve; });
+    const reachedDelete = Promise.withResolvers<void>();
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await graph.addGraph(graphName);
+      await graph.insertQuery("CREATE (a:DeleteRace {name:'delete-me'}), (b:DeleteRace {name:'keep-me'}) RETURN a,b");
+      await graph.clickRunQuery();
+      await graph.searchElementInCanvas("delete-me");
+      const canvas = page.locator("falkordb-canvas");
+      const original = await canvas.elementHandle();
+      await page.route(`**/api/graph/${graphName}/*`, async route => {
+        if (route.request().method() === "DELETE") {
+          reachedDelete.resolve();
+          await heldDelete;
+        }
+        await route.continue();
+      });
+      await graph.clickDeleteElement();
+      await graph.clickDeleteElementConfirm();
+      await reachedDelete.promise;
+      await page.setViewportSize({ width: 900, height: 1000 });
+      await expect.poll(() => canvas.evaluate((element, old) => element !== old, original)).toBe(true);
+      await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(2);
+      releaseDelete();
+      await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length), { timeout: 15000 }).toBe(1);
+      await expect(page.getByTestId("toast")).toContainText("deleted");
+    } finally {
+      releaseDelete();
+      await apiCall.removeGraph(graphName);
+    }
   });
 
   test(`@admin a query held in-flight is discarded after switching graph (no stale apply)`, async () => {
