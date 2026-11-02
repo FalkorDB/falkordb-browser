@@ -113,10 +113,35 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: npm version "${TAG#v}" --no-git-tag-version --allow-same-version
 
+      - name: Verify macOS signing credentials
+        if: runner.os == 'macOS' && github.event_name == 'release'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$MACOS_CERTIFICATE_P12" ] ||
+             [ -z "$MACOS_CERTIFICATE_PASSWORD" ] ||
+             [ -z "$APPLE_ID" ] ||
+             [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ||
+             [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::error::Configure all documented macOS signing and notarization secrets before publishing a desktop release."
+            exit 1
+          fi
+
       # Native modules in the standalone server are traced for the OS that
       # builds them, which is why each platform builds its own installer.
       - name: Build installers
         working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ runner.os == 'macOS' && github.event_name == 'release' }}
+          CSC_LINK: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.MACOS_CERTIFICATE_P12 || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.MACOS_CERTIFICATE_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.APPLE_TEAM_ID || '' }}
         run: npm run dist
 
       - name: Upload installers

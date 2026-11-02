@@ -50,9 +50,23 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
 
 ## Not done yet
 
-- **Code signing:** builds are unsigned (`CSC_IDENTITY_AUTO_DISCOVERY=false` in
-  CI). To sign, set electron-builder's `CSC_LINK`/`CSC_KEY_PASSWORD`, plus
-  Apple notarization credentials for macOS.
+- **Code signing:** CI signs and notarizes macOS release builds when the
+  repository Actions secrets below are configured. Release builds fail before
+  packaging if any are missing, rather than silently publishing an unsigned
+  app. Pull-request, push, and local builds remain unsigned.
+
+  Configure these repository Actions secrets:
+
+  - `MACOS_CERTIFICATE_P12`: base64-encoded Developer ID Application
+    certificate (`.p12`) including its private key.
+  - `MACOS_CERTIFICATE_PASSWORD`: password used when exporting the `.p12`.
+  - `APPLE_ID`: Apple ID used for notarization.
+  - `APPLE_APP_SPECIFIC_PASSWORD`: app-specific password for that Apple ID.
+  - `APPLE_TEAM_ID`: Apple Developer team ID.
+
+  The workflow passes the certificate as electron-builder's `CSC_LINK` and
+  `CSC_KEY_PASSWORD`, and the Apple credentials as `APPLE_ID`,
+  `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
 - **macOS Gatekeeper:** until releases are signed and notarized, macOS may block
   the app after download. Only if you trust the official FalkorDB Browser
   release, you can remove its quarantine flag after moving it to Applications:
