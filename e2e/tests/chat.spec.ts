@@ -324,7 +324,7 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test(`@readwrite Verify play button inserts query into editor, then edit and execute modified query`, async () => {
+  test(`@readwrite Verify insert button inserts query into editor, then edit and execute modified query`, async () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
@@ -357,8 +357,7 @@ test.describe("Chat Feature Tests", () => {
       }
       expect(hasCypherQuery).toBe(true);
       
-      // Click the play/run button to execute the query (this puts the query in the editor)
-      await chat.clickChatRunQueryButton();
+      await chat.clickChatInsertQueryButton();
       
       // Wait for the query to be inserted into the editor
       await chat.waitForTimeout(1000);
@@ -626,11 +625,11 @@ test.describe("Chat Feature Tests", () => {
       const displayedQuery = await chat.getLastAssistantMessageContent("CypherQuery");
       expect(displayedQuery?.trim().startsWith("CYPHER sourceCode='TLV'")).toBe(true);
 
-      // Running it from the chat must execute successfully against FalkorDB.
-      await chat.clickChatRunQueryButton();
+      await chat.clickChatInsertQueryButton();
 
       await expect.poll(() => chat.getEditorInput(), { timeout: 10000 })
         .toMatch(/^CYPHER sourceCode='TLV'/);
+      await chat.clickRunQuery();
       await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
       expect(await chat.getNotificationErrorToast()).toBe(false);
     } finally {

@@ -5,22 +5,24 @@ import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Share2, Loader2, Search, X, Sparkles } from "lucide-react";
 import { Chat as ChatPanel, ChatAvatar, ChatFooter, ChatHeader, ChatInput, ChatInputField, ChatMessage, ChatMessages, ChatSendButton, ChatTitle } from "@falkordb/ui";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Button from "../components/ui/Button";
-import { GraphContext, GraphTabsContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
+import { GraphContext, GraphTabsContext, HistoryQueryContext, IndicatorContext, BrowserSettingsContext, ConnectionContext, UDFContext } from "../components/provider";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
-import useQueryPreflight from "../components/useQueryPreflight";
+import { withQuery } from "@/lib/editorEchoes";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
 import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConfidenceStyle, normalizeConfidence } from "./confidence";
 import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
 import { stripCypherFenceTag } from "./cypherDisplay";
+import SuggestedQuery from "../components/SuggestedQuery";
 
 const mdInstance = new MarkdownIt({
     html: false,
@@ -73,12 +75,10 @@ export default function Chat({ onClose }: Props) {
     const { resolvedTheme } = useTheme();
     const { currentTheme } = getTheme(resolvedTheme);
     const { setIndicator } = useContext(IndicatorContext);
-    const { runQuery, graphName } = useContext(GraphContext);
-    // A generated query is arbitrary text the user never typed, so it gets the same
-    // pre-flight gate as the editor before it can reach the server.
-    const checkPreflight = useQueryPreflight();
+    const { graphName } = useContext(GraphContext);
+    const { setHistoryQuery } = useContext(HistoryQueryContext);
     const { activeTabId } = useContext(GraphTabsContext);
-    const { isQueryLoading } = useContext(QueryLoadingContext);
+    const { activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
@@ -104,6 +104,26 @@ export default function Chat({ onClose }: Props) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
+    const draftKey = `${historyKey}-draft`;
+    const draftScope = `${getConnectionPrefix()}${draftKey}`;
+    const loadedDraftScopeRef = useRef<string | null>(null);
+
+    useLayoutEffect(() => {
+        if (!getConnectionPrefix() || activeConnectionId !== prefixConnectionId) {
+            loadedDraftScopeRef.current = null;
+            setNewMessage("");
+            return;
+        }
+        setNewMessage(getConnectionItem(draftKey) ?? "");
+        loadedDraftScopeRef.current = draftScope;
+    }, [draftKey, draftScope, activeConnectionId, prefixConnectionId]);
+
+    const updateDraft = (value: string) => {
+        setNewMessage(value);
+        if (loadedDraftScopeRef.current === draftScope && getConnectionPrefix() && activeConnectionId === prefixConnectionId) {
+            setConnectionItem(draftKey, value);
+        }
+    };
     // Requests in flight, keyed by the conversation they were sent from. A single
     // boolean leaks across tabs: switching mid-request would block the conversation
     // you switched to, and the old request settling would clear its spinner.
@@ -111,10 +131,6 @@ export default function Chat({ onClose }: Props) {
     const isLoading = loadingKeys.includes(historyKey);
     const startLoading = useCallback((key: string) => setLoadingKeys(prev => prev.includes(key) ? prev : [...prev, key]), []);
     const stopLoading = useCallback((key: string) => setLoadingKeys(prev => prev.filter(k => k !== key)), []);
-    const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
-    const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
-    const textRefs = useRef<Map<number, HTMLElement>>(new Map());
-    const observerRef = useRef<ResizeObserver | null>(null);
     // Derived from messages — automatically in sync with trimmed message history
     const totalTokens = useMemo(
         () => messages.reduce((sum, m) => sum + (m.tokenUsage ?? 0), 0),
@@ -127,50 +143,8 @@ export default function Chat({ onClose }: Props) {
         return null;
     }, [messages]);
 
-    const queryCollapseRef = useRef(queryCollapse);
-    queryCollapseRef.current = queryCollapse;
-
     useEffect(() => {
         setMounted(true);
-    }, []);
-
-    // Create a single ResizeObserver that recomputes collapse eligibility on resize
-    useEffect(() => {
-        observerRef.current = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                const el = entry.target as HTMLElement;
-                textRefs.current.forEach((ref, i) => {
-                    if (ref !== el) return;
-                    const shouldCollapse = el.scrollHeight > 64;
-                    // Only upgrade to eligible, never downgrade — collapsed items have small height
-                    if (!shouldCollapse) return;
-                    setCollapseEligible(prev => {
-                        if (prev[i]) return prev;
-                        return { ...prev, [i]: true };
-                    });
-                });
-            }
-        });
-
-        return () => observerRef.current?.disconnect();
-    }, []);
-
-    const setTextRef = useCallback((i: number) => (r: HTMLElement | null) => {
-        if (r) {
-            textRefs.current.set(i, r);
-            // Measure on mount — only set eligible if content is tall enough
-            if (r.scrollHeight > 64) {
-                setCollapseEligible(prev => {
-                    if (prev[i]) return prev;
-                    return { ...prev, [i]: true };
-                });
-            }
-            observerRef.current?.observe(r);
-        } else {
-            const prev = textRefs.current.get(i);
-            if (prev) observerRef.current?.unobserve(prev);
-            textRefs.current.delete(i);
-        }
     }, []);
 
     // Load messages and cypher only preference for current graph on mount
@@ -226,6 +200,13 @@ export default function Chat({ onClose }: Props) {
         // and only this conversation's loading state may be settled by it.
         const submittedKey = historyKey;
         const isStale = () => historyKeyRef.current !== submittedKey;
+        const showRequestError = (content: string) => {
+            if (isStale()) return;
+            if (loadedDraftScopeRef.current === draftScope && getConnectionItem(draftKey) === "") {
+                updateDraft(newMessage);
+            }
+            handleSetMessages({ role: "assistant", content, type: "Error" });
+        };
 
         if (isLoading) {
             toast({
@@ -245,12 +226,7 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
-        const ToastActionButton = <ToastButton label="Go to Settings" showUndo={false} onClick={() => {
-            onClose();
-            setTimeout(() => {
-                route.push("/settings");
-            }, 500);
-        }}>
+        const ToastActionButton = <ToastButton label="Go to Settings" showUndo={false} onClick={() => route.push("/settings")}>
             Go to Settings
         </ToastButton>;
 
@@ -286,7 +262,7 @@ export default function Chat({ onClose }: Props) {
         const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
 
         handleSetMessages(newMessages);
-        setNewMessage("");
+        updateDraft("");
 
         try {
             const chatHeaders = new Headers({ "Content-Type": "application/json" });
@@ -341,26 +317,14 @@ export default function Chat({ onClose }: Props) {
             try {
                 data = await response.json();
             } catch {
-                if (!isStale()) {
-                    handleSetMessages({
-                        role: "assistant",
-                        content: "Failed to parse server response",
-                        type: "Error"
-                    });
-                }
+                showRequestError("Failed to parse server response");
                 stopLoading(submittedKey);
                 return;
             }
 
             if (!response.ok) {
                 if (response.status >= 500) setIndicator("offline");
-                if (!isStale()) {
-                    handleSetMessages({
-                        role: "assistant",
-                        content: data.error || "An error occurred",
-                        type: "Error"
-                    });
-                }
+                showRequestError(data.error || "An error occurred");
                 stopLoading(submittedKey);
                 return;
             }
@@ -377,7 +341,6 @@ export default function Chat({ onClose }: Props) {
                 const cypherContent = typeof data.cypherQuery === "string"
                     ? stripCypherFenceTag(data.cypherQuery)
                     : data.cypherQuery;
-                setQueryCollapse(prev => ({ ...prev, [newMessages.length]: false }));
                 handleSetMessages({
                     role: "assistant",
                     content: cypherContent,
@@ -411,13 +374,7 @@ export default function Chat({ onClose }: Props) {
 
         } catch (error) {
             const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
-            if (!isStale()) {
-                handleSetMessages({
-                    role: "assistant",
-                    content: `${friendly.title}: ${friendly.description}`,
-                    type: "Error"
-                });
-            }
+            showRequestError(`${friendly.title}: ${friendly.description}`);
             stopLoading(submittedKey);
         }
     };
@@ -443,66 +400,13 @@ export default function Chat({ onClose }: Props) {
                     </div>
                 );
             case "CypherQuery":
-                const i = messages.findIndex(m => m === message);
-
                 return (
-                    <div className="flex gap-2 items-start">
-                        {
-                            collapseEligible[i] &&
-                            <Button
-                                onClick={() => {
-                                    setQueryCollapse(prev => ({ ...prev, [i]: !prev[i] }));
-                                }}
-                                className="p-1 min-w-8 min-h-8"
-                            >
-                                {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
-                            </Button>
-                        }
-                        <div ref={setTextRef(i)} className="overflow-hidden SofiaSans">
-                            {
-                                queryCollapse[i] ? (
-                                    <ShadTooltip>
-                                        <ShadTooltipTrigger asChild>
-                                            <p className="text-sm truncate">{message.content}</p>
-                                        </ShadTooltipTrigger>
-                                        <ShadTooltipContent>
-                                            {message.content}
-                                        </ShadTooltipContent>
-                                    </ShadTooltip>
-                                ) : (
-                                    <pre className="text-sm text-wrap whitespace-pre-wrap break-all">
-                                        {message.content}
-                                    </pre>
-                                )
-                            }
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <Button
-                                data-testid="chatRunQueryButton"
-                                title="Run Query"
-                                onClick={() => {
-                                    if (checkPreflight(message.content)) return;
-                                    runQuery(message.content);
-                                }}
-                                isLoading={isQueryLoading}
-                            >
-                                <Play size={20} />
-                            </Button>
-                            <Button
-                                data-testid="chatCopyQueryButton"
-                                title="Copy Query"
-                                onClick={() => {
-                                    navigator.clipboard.writeText(message.content);
-                                    toast({
-                                        title: "Copied to clipboard",
-                                        description: "The query has been copied to your clipboard",
-                                    });
-                                }}
-                            >
-                                <Copy size={20} />
-                            </Button>
-                        </div>
-                    </div>
+                    <SuggestedQuery
+                        query={message.content}
+                        onInsert={query => setHistoryQuery(prev => withQuery(prev, query))}
+                        collapsible
+                        testIds={{ query: "chatSuggestedQuery", copy: "chatCopyQueryButton", insert: "chatInsertQueryButton" }}
+                    />
                 );
             // case "CypherResult":
             //     return (
@@ -515,6 +419,11 @@ export default function Chat({ onClose }: Props) {
                 return (
                     <div className="flex flex-col gap-1">
                         <MarkdownMessage content={message.content} />
+                        {message.type === "Error" && (
+                            <Link href="/settings" className="text-sm underline">
+                                Go to Settings
+                            </Link>
+                        )}
                         {message.type === "Result" && (() => {
                             const confidence = normalizeConfidence(message.confidence);
                             if (confidence == null) return null;
@@ -707,7 +616,7 @@ export default function Chat({ onClose }: Props) {
                             placeholder="What would you like to know?"
                             aria-describedby="chat-prerequisites"
                             value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
+                            onChange={(e) => updateDraft(e.target.value)}
                         />
                     </div>
                     <ChatSendButton

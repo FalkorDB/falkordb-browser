@@ -1,34 +1,19 @@
 "use client";
 
-import { useContext, useEffect, useRef, useState } from "react";
-import { Check, Copy, Sparkles, X } from "lucide-react";
+import { useContext, useEffect, useState } from "react";
+import { Sparkles, X } from "lucide-react";
+import Link from "next/link";
 import { AiFixContext } from "./provider";
 import DialogComponent from "./DialogComponent";
 import Button from "./ui/Button";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
+import SuggestedQuery from "./SuggestedQuery";
 
 export default function AiFixDialogs() {
     const { result, pendingConsentProvider, confirmConsent, cancelConsent, dismissResult, insertCorrectedQuery } = useContext(AiFixContext);
     const [dontAskAgain, setDontAskAgain] = useState(false);
-    const [copied, setCopied] = useState(false);
-    const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { size: panelSize, onResize: onPanelResize } = useResizableSize("ai-fix-panel-size", 480, 400, 300, 250);
-
-    const handleCopy = async (text: string) => {
-        const writer = navigator.clipboard?.writeText?.bind(navigator.clipboard);
-        if (!writer) return;
-        try {
-            await writer(text);
-            setCopied(true);
-            // Cancel any in-flight reset timer (e.g. rapid double-click) before
-            // scheduling a new one so the icon never flips back prematurely.
-            if (copyTimeoutRef.current !== null) clearTimeout(copyTimeoutRef.current);
-            copyTimeoutRef.current = setTimeout(() => { setCopied(false); copyTimeoutRef.current = null; }, 2000);
-        } catch {
-            setCopied(false);
-        }
-    };
 
     useEffect(() => {
         if (pendingConsentProvider === null) setDontAskAgain(false);
@@ -88,6 +73,7 @@ export default function AiFixDialogs() {
                         minHeight={250}
                         onResizeEnd={(w, h) => onPanelResize(w, h)}
                         direction="top-right"
+                        className="max-w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-1.5rem)]"
                         data-testid="aiFixResultPanel"
                     >
                         <div className="flex flex-col h-full rounded-lg border border-border bg-background shadow-xl overflow-hidden">
@@ -113,6 +99,9 @@ export default function AiFixDialogs() {
                                 {result.status === "error" && (
                                     <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
                                         <p className="text-sm text-destructive" data-testid="aiFixError">{result.error}</p>
+                                        <Link href="/settings" onClick={dismissResult} className="mt-3 inline-block text-sm underline">
+                                            Go to Settings
+                                        </Link>
                                     </div>
                                 )}
 
@@ -129,34 +118,12 @@ export default function AiFixDialogs() {
                                         )}
 
                                         {result.correctedQuery ? (
-                                            <div className="flex flex-col gap-2">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corrected query</span>
-                                                    <button
-                                                        type="button"
-                                                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                                        onClick={() => void handleCopy(result.correctedQuery as string)}
-                                                        data-testid="aiFixCopy"
-                                                    >
-                                                        {copied ? <Check size={13} /> : <Copy size={13} />}
-                                                        {copied ? "Copied!" : "Copy"}
-                                                    </button>
-                                                </div>
-                                                <pre
-                                                    className="rounded-lg bg-zinc-950 text-emerald-300 text-sm font-mono p-4 overflow-auto whitespace-pre-wrap leading-relaxed"
-                                                    data-testid="aiFixQuery"
-                                                >
-                                                    {result.correctedQuery}
-                                                </pre>
-                                                <Button
-                                                    variant="Primary"
-                                                    className="w-full mt-1"
-                                                    data-testid="aiFixInsert"
-                                                    onClick={() => insertCorrectedQuery(result.correctedQuery as string)}
-                                                >
-                                                    Insert into editor
-                                                </Button>
-                                            </div>
+                                            <SuggestedQuery
+                                                query={result.correctedQuery}
+                                                title="Corrected query"
+                                                onInsert={insertCorrectedQuery}
+                                                testIds={{ query: "aiFixQuery", copy: "aiFixCopy", insert: "aiFixInsert" }}
+                                            />
                                         ) : (
                                             <p className="text-sm text-muted-foreground">The AI couldn&apos;t produce a corrected query.</p>
                                         )}

@@ -282,6 +282,22 @@ with the storage and URI handled for you. Whether `file://` can resolve depends 
 deployment and nothing the browser can see settles it, so it is assumed to work unless you
 set `LOAD_CSV_FILE_URI=false`.
 
+### AI query optimization and drafts
+
+The editor's **Optimize** action uses the model and API key selected in Settings.
+It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without executing
+the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
+
+Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
+**Insert into editor** actions. Neither action runs the query. The card adapts to
+mobile screens, and long Chat queries can be collapsed.
+
+Missing AI configuration and provider errors offer **Go to Settings**. Returning
+to the graph preserves the editor query and unsent Chat input. Chat drafts are
+scoped to the connection, tab, and graph, and survive closing and reopening Chat.
+Failed Chat requests restore the submitted input unless a new draft was entered.
+Optimize failures close the dialog and show only a toast with the Settings action.
+
 ### Testing
 
 * **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
@@ -309,7 +325,6 @@ set `LOAD_CSV_FILE_URI=false`.
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
 
 
 

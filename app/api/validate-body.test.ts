@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { updateGraphElementAttribute, login, addConnection, authCredentials } from "./validate-body.ts";
+import { updateGraphElementAttribute, login, addConnection, authCredentials, optimizeRequest } from "./validate-body.ts";
 import { CALENDAR_DATE_ERROR } from "../../lib/graphValues.ts";
 
 const parse = (body: unknown) => updateGraphElementAttribute.safeParse(body);
@@ -22,6 +22,30 @@ describe("updateGraphElementAttribute", () => {
     ];
 
     accepted.forEach((body) => assert.equal(parse(body).success, true, JSON.stringify(body)));
+  });
+
+  describe("optimizeRequest", () => {
+    const validRequest = {
+      query: "MATCH (n) RETURN n",
+      graphName: "people",
+      model: "gpt-4o-mini",
+    };
+
+    it("accepts a query and graph with the selected model", () => {
+      const result = optimizeRequest.safeParse(validRequest);
+      assert.equal(result.success, true);
+      if (result.success) {
+        assert.equal(result.data.modelSource, "api-key");
+        assert.equal(result.data.localProvider, "ollama");
+        assert.equal(result.data.key, "");
+      }
+    });
+
+    it("rejects missing required fields and oversized queries", () => {
+      assert.equal(optimizeRequest.safeParse({ ...validRequest, graphName: "" }).success, false);
+      assert.equal(optimizeRequest.safeParse({ ...validRequest, query: " " }).success, false);
+      assert.equal(optimizeRequest.safeParse({ ...validRequest, query: "x".repeat(8193) }).success, false);
+    });
   });
 
   it("turns a value the named type cannot be built from away", () => {
