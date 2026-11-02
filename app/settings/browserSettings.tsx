@@ -674,6 +674,9 @@ export default function BrowserSettings() {
                 label: item.label || `${providerName} key`,
             }
             : item);
+        // Each save attempt takes its own generation, so a newer submission of
+        // the same edit supersedes an older one that is still encrypting.
+        editGenerationRef.current += 1;
         const generation = editGenerationRef.current;
         const isCurrentEdit = () => editGenerationRef.current === generation && editingKeyVisibilityRef.current?.id === id;
         const saved = await persistChatApiKeys(nextKeys, id, isCurrentEdit);
