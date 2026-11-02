@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Data } from "@falkordb/canvas";
-import { get3DBudget, needs3DWarning, register3DCheck, setCanvasGraphData } from "./graph3DResources.ts";
+import { get3DBudget, needs3DWarning, register3DCheck, setCanvasGraphData, writeCanvasData } from "./graph3DResources.ts";
 
 test("3D budgets use conservative defaults when resource hints are missing or invalid", () => {
     for (const resources of [{}, { deviceMemory: NaN, hardwareConcurrency: 0 }, { deviceMemory: Infinity }, { hardwareConcurrency: 32 }]) {
@@ -59,7 +59,7 @@ test("approval covers the chosen size but growing either dimension warns again",
     assert.equal(needs3DWarning({ nodes: 2500, links: 6001 }, {}, approved), true);
 });
 
-test("incremental writes check the incoming size before passing it to the renderer", () => {
+test("incremental writes gate the incoming size before passing it to the renderer", async () => {
     const calls: string[] = [];
     const data: Data = { nodes: [{ id: 1, labels: [], data: {}, color: "#fff", visible: true }], links: [] };
     const canvas = { setGraphData: (incoming: typeof data) => {
@@ -71,20 +71,75 @@ test("incremental writes check the incoming size before passing it to the render
         calls.push("check");
         return false;
     });
-    setCanvasGraphData(canvas, data);
-    assert.deepEqual(calls, ["check", "write"]);
+    assert.equal(await setCanvasGraphData(canvas, data), false);
+    assert.deepEqual(calls, ["check"]);
     cleanup();
-    setCanvasGraphData(canvas, data);
-    assert.deepEqual(calls, ["check", "write", "write"]);
+    assert.equal(await setCanvasGraphData(canvas, data), true);
+    assert.deepEqual(calls, ["check", "write"]);
 });
 
-test("cleanup of an older registration does not remove a replacement check", () => {
+test("cleanup of an older registration does not remove a replacement check", async () => {
     const canvas = { setGraphData: () => {} };
     const cleanup = register3DCheck(canvas, () => { throw new Error("stale check"); });
     let checked = false;
     const cleanupLatest = register3DCheck(canvas, () => { checked = true; return true; });
     cleanup();
-    setCanvasGraphData(canvas, { nodes: [], links: [] });
+    await setCanvasGraphData(canvas, { nodes: [], links: [] });
     assert.equal(checked, true);
     cleanupLatest();
+});
+
+test("query, restore and mutation writes await a delayed safe-renderer check", async () => {
+    for (const kind of ["query", "restore", "mutation"]) {
+        const calls: string[] = [];
+        const canvas = { setGraphData: () => { calls.push("mutation"); } };
+        const ready = Promise.withResolvers<boolean>();
+        register3DCheck(canvas, () => ready.promise);
+        const data = { nodes: [], links: [] };
+        const pending = kind === "mutation"
+            ? setCanvasGraphData(canvas, data)
+            : writeCanvasData(canvas, data, () => { calls.push(kind); });
+        assert.deepEqual(calls, []);
+        ready.resolve(true);
+        assert.equal(await pending, true);
+        assert.deepEqual(calls, [kind]);
+    }
+});
+
+test("a failed renderer fallback blocks data writes", async () => {
+    let written = false;
+    const canvas = { setGraphData: () => { written = true; } };
+    register3DCheck(canvas, async () => false);
+    assert.equal(await setCanvasGraphData(canvas, { nodes: [], links: [] }), false);
+    assert.equal(written, false);
+});
+
+test("only the latest write survives a delayed fallback", async () => {
+    const calls: string[] = [];
+    const canvas = { setGraphData: () => {} };
+    const ready = Promise.withResolvers<boolean>();
+    register3DCheck(canvas, () => ready.promise);
+    const data = { nodes: [], links: [] };
+    const first = writeCanvasData(canvas, data, () => { calls.push("old"); });
+    const latest = writeCanvasData(canvas, data, () => { calls.push("latest"); });
+    ready.resolve(true);
+    assert.equal(await first, false);
+    assert.equal(await latest, true);
+    assert.deepEqual(calls, ["latest"]);
+});
+
+test("cleanup and caller cancellation discard delayed writes", async () => {
+    for (const cancel of ["cleanup", "caller"]) {
+        let written = false;
+        let current = true;
+        const canvas = { setGraphData: () => { written = true; } };
+        const ready = Promise.withResolvers<boolean>();
+        const cleanup = register3DCheck(canvas, () => ready.promise);
+        const pending = setCanvasGraphData(canvas, { nodes: [], links: [] }, () => current);
+        if (cancel === "cleanup") cleanup();
+        else current = false;
+        ready.resolve(true);
+        assert.equal(await pending, false);
+        assert.equal(written, false);
+    }
 });

@@ -51,15 +51,31 @@ export function needs3DWarning(size: GraphSize, resources: DeviceResources, appr
 }
 
 type DataCanvas = Pick<FalkorDBCanvas, "setGraphData">;
-const checks = new WeakMap<DataCanvas, (size: GraphSize) => boolean>();
+type DataCheck = (size: GraphSize) => boolean | Promise<boolean>;
+const checks = new WeakMap<DataCanvas, DataCheck>();
+const writes = new WeakMap<DataCanvas, object>();
 
-export function register3DCheck(canvas: DataCanvas, check: (size: GraphSize) => boolean): () => void {
+export function register3DCheck(canvas: DataCanvas, check: DataCheck): () => void {
     checks.set(canvas, check);
-    return () => { if (checks.get(canvas) === check) checks.delete(canvas); };
+    return () => {
+        if (checks.get(canvas) !== check) return;
+        checks.delete(canvas);
+        writes.delete(canvas);
+    };
 }
 
-/** Mutations must use the same pre-render check as query results and restores. */
-export function setCanvasGraphData(canvas: DataCanvas, data: Data): void {
-    checks.get(canvas)?.({ nodes: data.nodes.length, links: data.links.length });
-    canvas.setGraphData(data);
+/** Wait for a safe renderer and discard superseded or unmounted data writes. */
+export async function writeCanvasData(canvas: DataCanvas, data: Data, write: () => void, isCurrent = () => true): Promise<boolean> {
+    const token = {};
+    writes.set(canvas, token);
+    const check = checks.get(canvas);
+    if (check && !await check({ nodes: data.nodes.length, links: data.links.length })) return false;
+    if (writes.get(canvas) !== token || checks.get(canvas) !== check || !isCurrent()) return false;
+    write();
+    return true;
+}
+
+/** Mutations use the same awaited pre-render guard as queries and restores. */
+export function setCanvasGraphData(canvas: DataCanvas, data: Data, isCurrent?: () => boolean): Promise<boolean> {
+    return writeCanvasData(canvas, data, () => canvas.setGraphData(data), isCurrent);
 }

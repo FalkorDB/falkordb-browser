@@ -57,14 +57,15 @@ hints are coarse, may be unavailable, and do not expose free GPU memory. Choosin
 
 On the first 3D request, a temporary WebGL2 context checks GPU capabilities once
 per page load and is immediately released. No benchmark or frame-time monitoring
-runs. GPU checks can only lower the CPU/RAM budgets:
+runs. GPU checks can only lower the CPU/RAM budgets. The first matching row
+applies; a texture/renderbuffer limit means either reported limit:
 
 | GPU capability | Maximum nodes | Maximum relationships |
 |---|---:|---:|
 | Recognized software renderer, or texture/renderbuffer limit at most 4,096 | 500 | 1,000 |
-| Either graphics limit at most 8,192 | 1,000 | 2,500 |
-| Capability check failed or either limit unavailable | 2,000 | 5,000 |
-| Both graphics limits above 8,192 | 4,000 | 10,000 |
+| Texture/renderbuffer limit at most 8,192 | 1,000 | 2,500 |
+| Capability check failed or a texture/renderbuffer limit unavailable | 2,000 | 5,000 |
+| Both texture/renderbuffer limits above 8,192 | 4,000 | 10,000 |
 
 If WebGL2 cannot start, any non-empty graph warns before attempting 3D.
 **Proceed with 3D** still permits an attempt; initialization failures return to
@@ -348,6 +349,5 @@ set `LOAD_CSV_FILE_URI=false`.
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
 
 

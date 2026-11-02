@@ -9,7 +9,7 @@ import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDi
 import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import useLongPress from "@/lib/useLongPress";
-import { setCanvasGraphData } from "@/lib/graph3DResources";
+import { setCanvasGraphData, writeCanvasData } from "@/lib/graph3DResources";
 import { createGraphAppearanceLookup } from "@/lib/graphAppearance";
 import use3DWarning from "./use3DWarning";
 import { Graph } from "../api/graph/model";
@@ -78,7 +78,9 @@ export default function ForceGraph({
     const { theme } = useTheme();
     const { toast } = useToast();
     const { background, foreground } = getTheme(theme);
-    const { check3D, approval, warning } = use3DWarning(ctxDimension, setCtxDimension, canvasRef);
+    const { check3D, prepareData, getRequestedDimension, approval, warning } = use3DWarning(ctxDimension, setCtxDimension, canvasRef);
+    const dataPendingRef = useRef(false);
+    const [dataRevision, setDataRevision] = useState(0);
 
     // A click only selects once the double-click window has passed, so a
     // double-click expands without selecting first. `select` lets a click on a
@@ -241,13 +243,14 @@ export default function ForceGraph({
                         }))
                 };
 
-                setCanvasGraphData(canvas, newData);
+                if (!await setCanvasGraphData(canvas, newData, () => getConnectionEpoch() === startEpoch && isCurrent() && canvasRef.current === canvas)) return;
             }
         }
     }, [canvasRef, canvasLoaded, graph, toast, setIndicator]);
 
-    const deleteNeighbors = useCallback((nodes: Node[]) => {
+    const deleteNeighbors = useCallback(async (nodes: Node[]) => {
         if (nodes.length === 0) return;
+        const startEpoch = getConnectionEpoch();
 
         const canvas = canvasRef.current;
 
@@ -273,11 +276,12 @@ export default function ForceGraph({
             links: graph.Elements.links
         };
 
-        deleteNeighbors(expandedNodes);
+        await deleteNeighbors(expandedNodes);
+        if (getConnectionEpoch() !== startEpoch || canvasRef.current !== canvas) return;
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)));
 
-        setCanvasGraphData(canvas, convertToCanvasData(graph.Elements, nodeShape));
+        if (!await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements, nodeShape), () => getConnectionEpoch() === startEpoch && canvasRef.current === canvas)) return;
     }, [canvasRef, canvasLoaded, graph, setRelationships, nodeShape]);
 
     // When focus mode is on, pan the canvas to the centroid of the selected elements.
@@ -405,16 +409,16 @@ export default function ForceGraph({
                 // mutates in place and awaits along the way, so a collapse
                 // that landed mid-merge may have swept before the neighbours
                 // arrived — sweep again for it.
-                if (!fullNode.expand) deleteNeighbors([fullNode]);
+                if (!fullNode.expand) await deleteNeighbors([fullNode]);
                 return;
             }
 
             // Guard: if the node was collapsed while fetching, undo the expansion.
             if (!fullNode.expand) {
-                deleteNeighbors([fullNode]);
+                await deleteNeighbors([fullNode]);
             }
         } else {
-            deleteNeighbors([fullNode]);
+            await deleteNeighbors([fullNode]);
         }
     }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand, handleSelect, clearPendingClick, flushPendingClick, multiSelect, consumeClick]);
 
@@ -555,32 +559,45 @@ export default function ForceGraph({
 
         if (!canvas || !canvasLoaded) return;
 
-        let nodeCount: number;
+        let cancelled = false;
+        let correctionTimer: ReturnType<typeof setTimeout> | undefined;
+        dataPendingRef.current = true;
+        const write = (incoming: Data, apply: () => void) => {
+            void writeCanvasData(canvas, incoming, apply, () => !cancelled && canvasRef.current === canvas).then(applied => {
+                if (cancelled) return;
+                dataPendingRef.current = false;
+                if (applied) setDataRevision(value => value + 1);
+            }).catch((error: unknown) => {
+                if (cancelled) return;
+                dataPendingRef.current = false;
+                console.error("Could not update the graph view", error);
+                toast({ title: "Could not update the graph view", description: "Try running the query again.", variant: "destructive" });
+            });
+        };
+        const cleanup = () => {
+            cancelled = true;
+            clearTimeout(correctionTimer);
+        };
         if (graphData) {
-            check3D({ nodes: graphData.data.nodes.length, links: graphData.data.links.length });
-            // Restore a saved canvas layout. Store the current data snapshot so
-            // the cleanup re-run can verify data hasn't changed before skipping.
-            pendingRestoreDataRef.current = data;
-            applyCanvasLayout(canvas, graphData);
-            setGraphData(undefined);
+            write(graphData.data, () => {
+                // Remember the data snapshot so consuming the restore does not
+                // immediately overwrite it with an unchanged query result.
+                pendingRestoreDataRef.current = data;
+                applyCanvasLayout(canvas, graphData);
+                setGraphData(undefined);
 
-            // setData (inside applyCanvasLayout) schedules its own zoomToFit,
-            // which would land after the mount effect restored the viewport and
-            // undo it. Re-apply once that timer has run. The handle lives in a
-            // ref rather than this effect's cleanup because setGraphData(undefined)
-            // re-runs the effect immediately, which would cancel the timer.
-            if (viewport) {
-                canvas.setViewport(viewport);
-                clearTimeout(viewportRestoreTimerRef.current);
-                viewportRestoreTimerRef.current = setTimeout(() => {
-                    // The canvas captured at effect time, not canvasRef.current:
-                    // a late callback must never touch whatever canvas is
-                    // mounted now.
+                // Re-apply after setData's scheduled zoomToFit. Consuming the
+                // restore re-runs this effect, so its cleanup must not cancel it.
+                if (viewport) {
                     canvas.setViewport(viewport);
-                }, CANVAS_AUTO_ZOOM_DELAY);
-            }
+                    clearTimeout(viewportRestoreTimerRef.current);
+                    viewportRestoreTimerRef.current = setTimeout(() => {
+                        canvas.setViewport(viewport);
+                    }, CANVAS_AUTO_ZOOM_DELAY);
+                }
+            });
 
-            return undefined;
+            return cleanup;
         }
 
         // Skip only when this re-run was triggered by setGraphData(undefined)
@@ -589,6 +606,7 @@ export default function ForceGraph({
         // in that case fall through so the canvas gets the fresh data.
         if (pendingRestoreDataRef.current !== null && pendingRestoreDataRef.current === data) {
             pendingRestoreDataRef.current = null;
+            dataPendingRef.current = false;
             return undefined;
         }
         pendingRestoreDataRef.current = null;
@@ -599,47 +617,41 @@ export default function ForceGraph({
         clearTimeout(viewportRestoreTimerRef.current);
         viewportRestoreTimerRef.current = undefined;
         const canvasData = convertToCanvasData(data, nodeShape);
-        nodeCount = canvasData.nodes.length;
-        check3D({ nodes: nodeCount, links: canvasData.links.length });
-        canvas.setData(canvasData);
+        const nodeCount = canvasData.nodes.length;
+        write(canvasData, () => {
+            canvas.setData(canvasData);
 
-        // With the npm @falkordb/canvas package the canvas's zoomToFit fires asynchronously
-        // via a requestAnimationFrame, so the min-zoom enforcement inside the canvas runs
-        // before the new zoom is committed. For very sparse graphs (1–3 nodes) the force
-        // simulation can push nodes far apart, producing a near-zero zoom that makes them
-        // invisible. We use a 400 ms delay (longer than the canvas's internal ~50 ms delay)
-        // so the canvas has finished its own zoomToFit before we check and correct.
-        //
-        // Stale-timer safety: React calls each effect's cleanup before the next run, so
-        // `clearTimeout(handle)` below always cancels the previous timer before a new one
-        // is scheduled. This means the correction only fires if the data has been stable
-        // for 400 ms, and rapid successive updates never accumulate stale callbacks.
-        if (nodeCount > 0 && nodeCount <= 3) {
-            const handle = setTimeout(() => {
-                const c = canvasRef.current;
-                if (!c) return;
-                const vp = c.getViewport();
-                if (vp && vp.zoom < 1.0) {
-                    c.zoom(1.0);
-                }
-            }, 400);
-            return () => clearTimeout(handle);
-        }
+            // Sparse graphs can zoom out too far during the canvas's scheduled
+            // fit. Correct after it lands; cleanup cancels stale corrections.
+            if (nodeCount > 0 && nodeCount <= 3) {
+                correctionTimer = setTimeout(() => {
+                    const c = canvasRef.current;
+                    if (!c) return;
+                    const vp = c.getViewport();
+                    if (vp && vp.zoom < 1.0) {
+                        c.zoom(1.0);
+                    }
+                }, 400);
+            }
+        });
 
-        return undefined;
-    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape, check3D]);
+        return cleanup;
+    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape, prepareData, toast]);
 
     // Run after data/restore effects: the live counts must be checked, including
     // a consumed restore whose data prop may still describe an earlier result.
     useEffect(() => {
         const canvas = canvasRef.current;
-        if (!canvas || !canvasLoaded) return undefined;
-
-        const currentData = canvas.getGraphData();
-        if (!check3D({ nodes: currentData.nodes.length, links: currentData.links.length })) return undefined;
+        if (!canvas || !canvasLoaded || dataPendingRef.current) return undefined;
 
         let superseded = false;
-        canvas.setDimension(ctxDimension).catch((error: unknown) => {
+        const reconcile = async () => {
+            const currentData = canvas.getGraphData();
+            const size = { nodes: currentData.nodes.length, links: currentData.links.length };
+            if (!await prepareData(size) || superseded || getRequestedDimension() !== ctxDimension || !check3D(size)) return;
+            await canvas.setDimension(ctxDimension);
+        };
+        void reconcile().catch((error: unknown) => {
             if (superseded) return;
             console.error("Could not open the 3D view", error);
             toast({
@@ -651,7 +663,7 @@ export default function ForceGraph({
         });
 
         return () => { superseded = true; };
-    }, [canvasRef, canvasLoaded, ctxDimension, setCtxDimension, toast, check3D, approval, data, graphData]);
+    }, [canvasRef, canvasLoaded, ctxDimension, setCtxDimension, toast, check3D, prepareData, getRequestedDimension, approval, data, graphData, dataRevision]);
 
     return (
         <div

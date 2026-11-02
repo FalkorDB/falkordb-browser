@@ -627,13 +627,15 @@ export default function Page() {
             setSelectedElements([]);
         }
 
-        if (canvasRef.current) setCanvasGraphData(canvasRef.current, convertToCanvasData(graph.Elements));
+        const canvas = canvasRef.current;
+        if (canvas && !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), () => getConnectionEpoch() === startEpoch && canvasRef.current === canvas)) return false;
 
         return result.ok;
     }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
 
     const handleDeleteElement = useCallback(async () => {
-        if (!canvasRef.current) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
 
@@ -683,7 +685,7 @@ export default function Page() {
         graph.removeElements(deletedElements);
 
         setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
-        setCanvasGraphData(canvasRef.current, convertToCanvasData(graph.Elements));
+        if (!await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), () => getConnectionEpoch() === startEpoch && canvasRef.current === canvas)) return;
         fetchCount(graphName);
         setSelectedElements([]);
 

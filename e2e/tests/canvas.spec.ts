@@ -23,37 +23,53 @@ test.describe('Canvas Tests', () => {
         await browser.closeBrowser();
     });
 
-    test("@admin Warn before rendering a large graph in 3D and allow falling back", async () => {
+    test("@admin Warn before rendering a large graph in 3D and honor fallback or approval", async () => {
+        test.setTimeout(60000);
         const graph = await browser.createNewPage(GraphPage);
         const page = await browser.getPage();
         await page.addInitScript(() => {
             Object.defineProperty(navigator, "deviceMemory", { value: 2, configurable: true });
             Object.defineProperty(navigator, "hardwareConcurrency", { value: 2, configurable: true });
-            localStorage.setItem("limit", "1000");
+            localStorage.setItem("limit", "2000");
         });
         await browser.navigateTo(urls.graphUrl);
         const graphName = getRandomString("3d-warning");
         await graph.addGraph(graphName);
         try {
             const canvas = page.getByTestId("graphCanvasWrapper").locator("falkordb-canvas");
-            await graph.insertQuery("UNWIND range(1, 501) AS i CREATE (n:ResourceTest {id: i}) RETURN n");
+            await graph.insertQuery("UNWIND range(1, 1001) AS i CREATE (n:ResourceTest {id: i}) RETURN n");
             await graph.clickRunQuery();
-            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(501);
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(1001);
             const dimensions = page.getByTestId("dimensionControl");
             const warning = page.getByTestId("graph3DWarning");
 
             await dimensions.getByRole("radio", { name: "3D", exact: true }).click();
             await expect(warning).toBeVisible();
-            await expect(warning).toContainText("501 nodes");
-            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getDimension())).toBe("2d");
+            await expect(warning).toContainText("1,001 nodes");
+            await expect.poll(() => graph.getCanvasDimension()).toBe("2d");
             await warning.getByRole("button", { name: "Use 2D (recommended)" }).click();
             await expect(warning).toBeHidden();
             await expect(dimensions.getByRole("radio", { name: "2D", exact: true })).toHaveAttribute("aria-checked", "true");
 
             await dimensions.getByRole("radio", { name: "3D", exact: true }).click();
             await expect(warning).toBeVisible();
-            await expect(warning.getByRole("button", { name: "Proceed with 3D" })).toBeVisible();
+            await warning.getByRole("button", { name: "Proceed with 3D" }).click();
+            await expect(warning).toBeHidden();
+            await expect.poll(() => graph.getCanvasDimension(), { timeout: 15000 }).toBe("3d");
+
+            await graph.insertQuery("CREATE (:ResourceTest {id: 1002}) WITH 1 AS added MATCH (n:ResourceTest) RETURN n");
+            await graph.clickRunQuery();
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(1002);
+            await expect(warning).toBeVisible();
+            await expect.poll(() => graph.getCanvasDimension()).toBe("2d");
             await warning.getByRole("button", { name: "Use 2D (recommended)" }).click();
+
+            await graph.insertQuery("MATCH (n:ResourceTest) RETURN n LIMIT 3");
+            await graph.clickRunQuery();
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(3);
+            await dimensions.getByRole("radio", { name: "3D", exact: true }).click();
+            await expect.poll(() => graph.getCanvasDimension(), { timeout: 15000 }).toBe("3d");
+            await expect(warning).toBeHidden();
         } finally {
             await apicalls.removeGraph(graphName);
         }

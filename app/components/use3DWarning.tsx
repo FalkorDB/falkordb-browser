@@ -14,17 +14,38 @@ export default function use3DWarning(dimension: CanvasDimension, setDimension: (
     const approvedRef = useRef<GraphSize | undefined>(undefined);
     const [approval, setApproval] = useState(0);
     const [pending, setPending] = useState<GraphSize & { gpu: GPUCapabilities }>();
+    const pendingRef = useRef(false);
+    const fallbackRef = useRef<Promise<boolean> | undefined>(undefined);
+    const fallbackFailedRef = useRef(false);
+
+    const ensure2D = useCallback(() => {
+        if (fallbackRef.current) return fallbackRef.current;
+        const canvas = canvasRef.current;
+        if (!canvas) return Promise.resolve(false);
+        const fallback = canvas.setDimension("2d").then(() => true, (error: unknown) => {
+            console.error("Could not switch to the 2D view", error);
+            toast({ title: "Could not switch to the 2D view", description: "Reduce the query result size before continuing.", variant: "destructive" });
+            return false;
+        });
+        fallbackRef.current = fallback;
+        void fallback.then(succeeded => {
+            if (fallbackRef.current !== fallback) return;
+            fallbackFailedRef.current = !succeeded;
+            fallbackRef.current = undefined;
+        });
+        return fallback;
+    }, [canvasRef, toast]);
 
     useLayoutEffect(() => {
         dimensionRef.current = dimension;
         if (dimension === "2d") {
             approvedRef.current = undefined;
+            pendingRef.current = false;
             setPending(undefined);
         }
     }, [dimension]);
 
-    // Called before both dimension changes and data writes. setDimension('2d')
-    // tears down 3D synchronously, before a large result reaches the renderer.
+    // The boolean gates entry to 3D; prepareData also awaits the safe fallback.
     const check3D = useCallback((size: GraphSize) => {
         if (dimensionRef.current !== "3d") return true;
         const gpu = getGPUCapabilities();
@@ -34,26 +55,40 @@ export default function use3DWarning(dimension: CanvasDimension, setDimension: (
             gpu,
         };
         if (!needs3DWarning(size, resources, approvedRef.current)) {
+            if (pendingRef.current) {
+                dimensionRef.current = "2d";
+                approvedRef.current = undefined;
+                pendingRef.current = false;
+                setDimension("2d");
+            }
             setPending(undefined);
             return true;
         }
-        void canvasRef.current?.setDimension("2d").catch((error: unknown) => {
-            console.error("Could not switch to the 2D view", error);
-            toast({ title: "Could not switch to the 2D view", description: "Reduce the query result size before continuing.", variant: "destructive" });
-        });
+        void ensure2D();
+        pendingRef.current = true;
         setPending({ ...size, gpu });
         return false;
-    }, [canvasRef, toast]);
+    }, [ensure2D, setDimension]);
+
+    const prepareData = useCallback(async (size: GraphSize) => {
+        const allowed = check3D(size);
+        const fallback = fallbackRef.current;
+        if (fallback) return await fallback;
+        if (fallbackFailedRef.current) return await ensure2D();
+        return allowed;
+    }, [check3D, ensure2D]);
+    const getRequestedDimension = useCallback(() => dimensionRef.current, []);
 
     useLayoutEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return undefined;
-        return register3DCheck(canvas, check3D);
-    }, [canvasRef, check3D]);
+        return register3DCheck(canvas, prepareData);
+    }, [canvasRef, prepareData]);
 
     const fallBackTo2D = () => {
         dimensionRef.current = "2d";
         approvedRef.current = undefined;
+        pendingRef.current = false;
         setPending(undefined);
         setDimension("2d");
     };
@@ -77,6 +112,7 @@ export default function use3DWarning(dimension: CanvasDimension, setDimension: (
                         // Keep Radix's automatic close from also taking the cancel path.
                         event.preventDefault();
                         approvedRef.current = pending;
+                        pendingRef.current = false;
                         setPending(undefined);
                         setApproval(value => value + 1);
                     }}>Proceed with 3D</AlertDialogAction>
@@ -85,5 +121,5 @@ export default function use3DWarning(dimension: CanvasDimension, setDimension: (
         </AlertDialog>
     );
 
-    return { check3D, approval, warning };
+    return { check3D, prepareData, getRequestedDimension, approval, warning };
 }
