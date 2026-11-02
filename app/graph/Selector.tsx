@@ -93,6 +93,10 @@ export default function Selector({
             <p>{isMobile ? "Select Multiple Entities (Press And Hold)" : "Select Multiple Entities (Click + Shift or Ctrl)"}</p>
             <p>Select 2 Nodes to Create Edge</p>
             <p>Expand And Collapse Neighbors ({isMobile ? "Double Tap" : "Double Click"})</p>
+            <p>Rotate In 3D ({isMobile ? "Drag With One Finger" : "Left Drag"})</p>
+            <p>Pan In 3D ({isMobile ? "Drag With Two Fingers" : "Right Drag"})</p>
+            <p>Zoom In 3D ({isMobile ? "Pinch" : "Scroll"})</p>
+            <p>Start 3D Camera Gestures On Empty Space; Drag A Node To Move It</p>
         </div>
     );
 

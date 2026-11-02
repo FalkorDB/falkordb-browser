@@ -60,6 +60,63 @@ test.describe("Graph operation race conditions", () => {
     }
   });
 
+  for (const switchOwner of ["graph", "tab"] as const) {
+    test(`@admin a pending deletion cannot overwrite a different ${switchOwner}`, async () => {
+      test.setTimeout(90000);
+      const graphA = getRandomString("delete-owner-a");
+      const graphB = getRandomString("delete-owner-b");
+      const tabName = getRandomString("delete-owner-tab");
+      let releaseDelete: () => void = () => {};
+      const heldDelete = new Promise<void>(resolve => { releaseDelete = resolve; });
+      const reachedDelete = Promise.withResolvers<void>();
+      try {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await browser.setPageToFullScreen();
+        await graph.addGraph(graphA);
+        await graph.insertQuery("CREATE (a:DeleteOwner {name:'delete-me'}), (b:DeleteOwner {name:'keep-me'}), (c:DeleteOwner {name:'third'}) RETURN a,b");
+        await graph.clickRunQuery();
+        await graph.searchElementInCanvas("delete-me");
+        await page.route(`**/api/graph/${graphA}/*`, async route => {
+          if (route.request().method() === "DELETE") {
+            reachedDelete.resolve();
+            await heldDelete;
+          }
+          await route.continue();
+        });
+        await graph.clickDeleteElement();
+        await graph.clickDeleteElementConfirm();
+        await reachedDelete.promise;
+        await graph.clickDeleteElementCancel();
+
+        if (switchOwner === "tab") {
+          await graph.addStripTab();
+          await graph.renameStripTab("New tab", tabName);
+          await graph.selectGraphByName(graphA);
+          await graph.insertQuery("MATCH (n:DeleteOwner) RETURN n");
+        } else {
+          await graph.addGraph(graphB);
+          await graph.insertQuery("CREATE (a:OtherOwner {name:'a'}), (b:OtherOwner {name:'b'}), (c:OtherOwner {name:'c'}) RETURN a,b,c");
+        }
+        await graph.clickRunQuery();
+        const canvas = page.locator("falkordb-canvas");
+        await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(3);
+        const before = await canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.map(node => node.data));
+        const deleted = page.waitForResponse(response => response.request().method() === "DELETE"
+          && response.url().includes(`/api/graph/${graphA}/`));
+        releaseDelete();
+        expect((await deleted).ok()).toBe(true);
+        await page.waitForTimeout(500);
+        expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.map(node => node.data))).toEqual(before);
+        await expect(page.getByTestId("toast").filter({ hasText: "deleted" })).toHaveCount(0);
+      } finally {
+        releaseDelete();
+        await apiCall.removeGraph(graphA);
+        if (switchOwner === "graph") await apiCall.removeGraph(graphB);
+      }
+    });
+  }
+
   test(`@admin a query held in-flight is discarded after switching graph (no stale apply)`, async () => {
     const graphA = getRandomString("raceA");
     const graphB = getRandomString("raceB");

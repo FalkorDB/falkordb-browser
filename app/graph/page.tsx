@@ -1,6 +1,6 @@
 'use client';
 
-import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cn, convertToCanvasData, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, parsePanelSizePercent, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
@@ -107,6 +107,10 @@ export default function Page() {
         chatOpen,
         setChatOpen,
     } = useContext(GraphContext);
+    const graphOwnerRef = useRef({ graph, graphName, activeTabId });
+    useLayoutEffect(() => {
+        graphOwnerRef.current = { graph, graphName, activeTabId };
+    }, [graph, graphName, activeTabId]);
     const {
         settings: {
             querySettings: { runDefaultQuery, defaultQuery },
@@ -637,6 +641,10 @@ export default function Page() {
         if (!canvasRef.current) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
+        const isCurrentOwner = () => getConnectionEpoch() === startEpoch
+            && graphOwnerRef.current.graph === graph
+            && graphOwnerRef.current.graphName === graphName
+            && graphOwnerRef.current.activeTabId === activeTabId;
 
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
             const type = !('source' in element);
@@ -646,7 +654,7 @@ export default function Page() {
                 body: JSON.stringify({ type })
             }, toast, setIndicator, cid);
 
-            if (!result.ok) return undefined;
+            if (!result.ok || !isCurrentOwner()) return undefined;
 
             if (type) {
                 (element as Node).labels.forEach((label) => {
@@ -679,13 +687,14 @@ export default function Page() {
             return element;
         }))).filter(e => !!e);
 
-        if (getConnectionEpoch() !== startEpoch) return;
+        if (!isCurrentOwner()) return;
 
         graph.removeElements(deletedElements);
 
         setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
         const canvas = canvasRef.current;
-        if (canvas && !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), () => getConnectionEpoch() === startEpoch && canvasRef.current === canvas)) return;
+        if (canvas && !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), () => isCurrentOwner() && canvasRef.current === canvas)) return;
+        if (!isCurrentOwner()) return;
         fetchCount(graphName);
         setSelectedElements([]);
 
@@ -697,7 +706,7 @@ export default function Page() {
             description: `${deletedElements.length > 1 ? "Elements" : "Element"} deleted
             ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.`,
         });
-    }, [selectedElements, graph, graphName, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+    }, [selectedElements, graph, graphName, activeTabId, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined;

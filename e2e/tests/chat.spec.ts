@@ -626,6 +626,15 @@ test.describe("Chat Feature Tests", () => {
       const displayedQuery = await chat.getLastAssistantMessageContent("CypherQuery");
       expect(displayedQuery?.trim().startsWith("CYPHER sourceCode='TLV'")).toBe(true);
 
+      const queryMessage = page.getByTestId("chatAssistantMessage-CypherQuery").last();
+      const queryText = queryMessage.locator("pre");
+      await expect(queryText).toHaveText(cypherQuery);
+      await expect(queryText).toHaveCSS("font-size", "12px");
+      await expect(queryMessage.getByRole("button")).toHaveCount(2);
+      await expect(queryMessage.getByTestId("chatRunQueryButton")).toBeVisible();
+      await expect(queryMessage.getByTestId("chatCopyQueryButton")).toBeVisible();
+      expect(await queryText.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+
       // Running it from the chat must execute successfully against FalkorDB.
       await chat.clickChatRunQueryButton();
 

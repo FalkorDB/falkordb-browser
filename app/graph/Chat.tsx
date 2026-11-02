@@ -111,10 +111,6 @@ export default function Chat({ onClose }: Props) {
     const isLoading = loadingKeys.includes(historyKey);
     const startLoading = useCallback((key: string) => setLoadingKeys(prev => prev.includes(key) ? prev : [...prev, key]), []);
     const stopLoading = useCallback((key: string) => setLoadingKeys(prev => prev.filter(k => k !== key)), []);
-    const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
-    const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
-    const textRefs = useRef<Map<number, HTMLElement>>(new Map());
-    const observerRef = useRef<ResizeObserver | null>(null);
     // Derived from messages — automatically in sync with trimmed message history
     const totalTokens = useMemo(
         () => messages.reduce((sum, m) => sum + (m.tokenUsage ?? 0), 0),
@@ -127,50 +123,8 @@ export default function Chat({ onClose }: Props) {
         return null;
     }, [messages]);
 
-    const queryCollapseRef = useRef(queryCollapse);
-    queryCollapseRef.current = queryCollapse;
-
     useEffect(() => {
         setMounted(true);
-    }, []);
-
-    // Create a single ResizeObserver that recomputes collapse eligibility on resize
-    useEffect(() => {
-        observerRef.current = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                const el = entry.target as HTMLElement;
-                textRefs.current.forEach((ref, i) => {
-                    if (ref !== el) return;
-                    const shouldCollapse = el.scrollHeight > 64;
-                    // Only upgrade to eligible, never downgrade — collapsed items have small height
-                    if (!shouldCollapse) return;
-                    setCollapseEligible(prev => {
-                        if (prev[i]) return prev;
-                        return { ...prev, [i]: true };
-                    });
-                });
-            }
-        });
-
-        return () => observerRef.current?.disconnect();
-    }, []);
-
-    const setTextRef = useCallback((i: number) => (r: HTMLElement | null) => {
-        if (r) {
-            textRefs.current.set(i, r);
-            // Measure on mount — only set eligible if content is tall enough
-            if (r.scrollHeight > 64) {
-                setCollapseEligible(prev => {
-                    if (prev[i]) return prev;
-                    return { ...prev, [i]: true };
-                });
-            }
-            observerRef.current?.observe(r);
-        } else {
-            const prev = textRefs.current.get(i);
-            if (prev) observerRef.current?.unobserve(prev);
-            textRefs.current.delete(i);
-        }
     }, []);
 
     // Load messages and cypher only preference for current graph on mount
@@ -377,7 +331,6 @@ export default function Chat({ onClose }: Props) {
                 const cypherContent = typeof data.cypherQuery === "string"
                     ? stripCypherFenceTag(data.cypherQuery)
                     : data.cypherQuery;
-                setQueryCollapse(prev => ({ ...prev, [newMessages.length]: false }));
                 handleSetMessages({
                     role: "assistant",
                     content: cypherContent,
@@ -443,54 +396,28 @@ export default function Chat({ onClose }: Props) {
                     </div>
                 );
             case "CypherQuery":
-                const i = messages.findIndex(m => m === message);
-
                 return (
-                    <div className="flex gap-2 items-start">
-                        {
-                            collapseEligible[i] &&
-                            <Button
-                                onClick={() => {
-                                    setQueryCollapse(prev => ({ ...prev, [i]: !prev[i] }));
-                                }}
-                                className="p-1 min-w-8 min-h-8"
-                            >
-                                {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
-                            </Button>
-                        }
-                        <div ref={setTextRef(i)} className="overflow-hidden SofiaSans">
-                            {
-                                queryCollapse[i] ? (
-                                    <ShadTooltip>
-                                        <ShadTooltipTrigger asChild>
-                                            <p className="text-sm truncate">{message.content}</p>
-                                        </ShadTooltipTrigger>
-                                        <ShadTooltipContent>
-                                            {message.content}
-                                        </ShadTooltipContent>
-                                    </ShadTooltip>
-                                ) : (
-                                    <pre className="text-sm text-wrap whitespace-pre-wrap break-all">
-                                        {message.content}
-                                    </pre>
-                                )
-                            }
-                        </div>
-                        <div className="flex flex-col gap-2">
+                    <div className="flex min-w-0 flex-col gap-1">
+                        <pre className="min-w-0 whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
+                            {message.content}
+                        </pre>
+                        <div className="flex items-center gap-1">
                             <Button
                                 data-testid="chatRunQueryButton"
                                 title="Run Query"
+                                className="p-1"
                                 onClick={() => {
                                     if (checkPreflight(message.content)) return;
                                     runQuery(message.content);
                                 }}
                                 isLoading={isQueryLoading}
                             >
-                                <Play size={20} />
+                                <Play size={16} />
                             </Button>
                             <Button
                                 data-testid="chatCopyQueryButton"
                                 title="Copy Query"
+                                className="p-1"
                                 onClick={() => {
                                     navigator.clipboard.writeText(message.content);
                                     toast({
@@ -499,7 +426,7 @@ export default function Chat({ onClose }: Props) {
                                     });
                                 }}
                             >
-                                <Copy size={20} />
+                                <Copy size={16} />
                             </Button>
                         </div>
                     </div>
