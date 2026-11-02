@@ -1526,6 +1526,23 @@ function hasCallBlockWithReturnNoLimit(query: string): boolean {
   return false;
 }
 
+// `code` has strings, comments and backtick identifiers masked, so a CALL
+// keyword is only found outside them. The procedure name after it is matched
+// against the original query so backtick-escaped names are still recognised.
+function hasCallClause(query: string, code: string): boolean {
+  const identifier = String.raw`(?:\w+|` + "`(?:``|[^`])*`" + String.raw`)`;
+  const callTarget = new RegExp(
+    String.raw`^\s*(?:\{|${identifier}(?:\s*\.\s*${identifier})*\s*\()`,
+  );
+  const callKeyword = /(?:^|[^\w.:])CALL\b/gi;
+  let match = callKeyword.exec(code);
+  while (match) {
+    if (callTarget.test(query.slice(match.index + match[0].length))) return true;
+    match = callKeyword.exec(code);
+  }
+  return false;
+}
+
 // Strings, comments and backtick identifiers are replaced with spaces in
 // `code` (newlines kept) so keyword checks only see actual Cypher tokens.
 function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
@@ -1593,8 +1610,15 @@ function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
 }
 
 function insertLimit(query: string, analysis: { code: string; lastCodeEnd: number }, limit: number): string {
-  const insertAt = analysis.lastCodeEnd;
+  let insertAt = analysis.lastCodeEnd;
+  if (analysis.code[insertAt - 1] === ";") insertAt -= 1;
   return `${query.slice(0, insertAt)} LIMIT ${limit}${query.slice(insertAt)}`;
+}
+
+function withoutTrailingSemicolon(query: string, analysis: { code: string; lastCodeEnd: number }): string {
+  const semicolonAt = analysis.lastCodeEnd - 1;
+  if (analysis.code[semicolonAt] !== ";") return query;
+  return `${query.slice(0, semicolonAt)}${query.slice(semicolonAt + 1)}`;
 }
 
 export function getQueryWithLimit(
@@ -1613,13 +1637,14 @@ export function getQueryWithLimit(
 
   if (limit === 0) return [query, existingLimit];
 
-  if (query.includes("UNION")) {
-    if (!query.includes("CALL")) {
-      return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
+  if (/\bUNION\b/i.test(analysis.code)) {
+    if (!hasCallClause(query, analysis.code)) {
+      const body = withoutTrailingSemicolon(query, analysis);
+      return [`CALL { ${body}\n} RETURN * LIMIT ${limit}`, limit];
     }
 
-    if (hasCallBlockWithReturnNoLimit(query)) {
-      return [`${query} LIMIT ${limit}`, limit];
+    if (hasCallBlockWithReturnNoLimit(analysis.code)) {
+      return [insertLimit(query, analysis, limit), limit];
     }
   }
 
