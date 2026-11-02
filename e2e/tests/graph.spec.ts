@@ -35,6 +35,29 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@admin Querying a graph whose name ends with a space targets that graph, not a trimmed one`, async () => {
+    const trimmedName = getRandomString("trail");
+    const graphName = `${trimmedName} `;
+    const encodedName = encodeURIComponent(graphName);
+    await apiCall.addGraph(encodedName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery("CREATE (:Trail {name: 'x'})");
+      await graph.clickRunQuery(false);
+      await expect.poll(async () => {
+        const response = await apiCall.runQuery(encodedName, "MATCH (n:Trail) RETURN count(n) AS c");
+        return Number(response.data[0].c);
+      }, { timeout: 15000 }).toBe(1);
+      const { opts } = await apiCall.getGraphs();
+      expect(opts).toContain(graphName);
+      expect(opts).not.toContain(trimmedName);
+    } finally {
+      await apiCall.removeGraph(encodedName);
+      if ((await apiCall.getGraphs()).opts.includes(trimmedName)) await apiCall.removeGraph(trimmedName);
+    }
+  });
+
   test(`@admin Validate that the Manage Graphs toolbar and the Delete dialog stay on one row`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
