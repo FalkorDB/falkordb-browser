@@ -80,6 +80,57 @@ const defaultQueryHistory: HistoryQuery = {
 };
 
 const DEMO_GRAPH_PREFIX = "tutorial-social-";
+const TUTORIAL_DEMO_OWNERSHIP_KEY = "tutorialDemoGraphOwnership";
+
+type TutorialDemoOwnership = { scope: string; names: string[] };
+
+function isTutorialDemoGraphName(name: unknown): name is string {
+  return typeof name === "string" && /^tutorial-social-(?:demo|test)-[a-zA-Z0-9-]+$/.test(name);
+}
+
+function readTutorialDemoOwnership(scope: string): TutorialDemoOwnership {
+  if (!scope || getConnectionPrefix() !== scope) {
+    throw new Error("Tutorial graph ownership cannot be read outside its connection scope");
+  }
+
+  const stored = getConnectionItem(TUTORIAL_DEMO_OWNERSHIP_KEY);
+  if (!stored) return { scope, names: [] };
+
+  const parsed: unknown = JSON.parse(stored);
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    !("scope" in parsed) ||
+    parsed.scope !== scope ||
+    !("names" in parsed) ||
+    !Array.isArray(parsed.names) ||
+    !parsed.names.every(isTutorialDemoGraphName)
+  ) {
+    throw new Error("Stored tutorial graph ownership is invalid; refusing to delete unverified graphs");
+  }
+
+  return { scope, names: [...new Set(parsed.names)] };
+}
+
+function writeTutorialDemoOwnership(scope: string, names: string[]): void {
+  if (!scope || getConnectionPrefix() !== scope || !names.every(isTutorialDemoGraphName)) {
+    throw new Error("Tutorial graph ownership cannot be written outside its verified scope");
+  }
+
+  if (names.length === 0) {
+    removeConnectionItem(TUTORIAL_DEMO_OWNERSHIP_KEY);
+  } else {
+    setConnectionItem(TUTORIAL_DEMO_OWNERSHIP_KEY, JSON.stringify({ scope, names: [...new Set(names)] }));
+  }
+}
+
+function makeTutorialDemoGraphSuffix(): string {
+  if (typeof window !== "undefined" && typeof window.crypto?.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 // Setup errors are surfaced once by the tutorial loader.
 const silentToast = (() => { }) as ToastFn;
@@ -2508,29 +2559,67 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setTutorialOpen(false);
   };
 
+  const deleteTutorialGraphs = useCallback(async (names: string[], cid: string | null): Promise<string[]> => {
+    let graphList = await fetchOptions(silentToast, setIndicator, indicator, cid);
+    if (!graphList) throw new Error("Could not verify graph names before tutorial cleanup");
+
+    const remaining: string[] = [];
+    for (const name of [...new Set(names)]) {
+      if (!graphList.opts.includes(name)) continue;
+
+      try {
+        const response = await securedFetch(`/api/graph/${prepareArg(name)}`, {
+          method: "DELETE",
+        }, silentToast, setIndicator, cid);
+
+        if (response.ok) continue;
+
+        const refreshed = await fetchOptions(silentToast, setIndicator, indicator, cid);
+        if (!refreshed) throw new Error("Could not verify graph names after a failed tutorial cleanup");
+        graphList = refreshed;
+        if (!graphList.opts.includes(name)) continue;
+        console.error(`Failed to cleanup tutorial graph ${name}: HTTP ${response.status}`);
+      } catch (error) {
+        console.error(`Failed to cleanup tutorial graph ${name}`, error);
+      }
+
+      remaining.push(name);
+    }
+
+    return remaining;
+  }, [indicator]);
+
+  const cleanupAndPersistTutorialGraphs = useCallback(async (
+    scope: string,
+    cid: string | null,
+    names: string[],
+  ): Promise<string[]> => {
+    const attempted = [...new Set(names)];
+    const remaining = await deleteTutorialGraphs(attempted, cid);
+    const ownership = readTutorialDemoOwnership(scope);
+    const attemptedSet = new Set(attempted);
+    writeTutorialDemoOwnership(scope, [
+      ...ownership.names.filter(name => !attemptedSet.has(name)),
+      ...remaining,
+    ]);
+    demoGraphNamesRef.current = remaining;
+    return remaining;
+  }, [deleteTutorialGraphs]);
+
   const handleLoadDemoGraphs = useCallback(async (): Promise<DemoLoadOutcome> => {
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
+    const scope = getConnectionPrefix();
     let demoGraphNames: string[] = [];
-    demoGraphNamesRef.current = [];
 
     // Read once: the failure path has to put this back, and the state setter
     // below is not readable synchronously.
     const urlParams = window.location.search;
 
-    // Pinned to `cid`: after a connection switch neither the retry nor the
-    // cleanup looks at the connection these graphs were created on.
+    // Pinned to `cid` and exact recorded names: cleanup never infers ownership
+    // from a graph-name prefix.
     const dropDemoGraphs = async () => {
-      await Promise.all(demoGraphNames.map(async name => {
-        const res = await securedFetch(`/api/graph/${prepareArg(name)}`, {
-          method: "DELETE",
-        }, silentToast, setIndicator, cid);
-
-        // The route answers 400 for every failure including "no such graph",
-        // and securedFetch has already drained the body that would tell them
-        // apart — so 400 is the one status this rollback cannot act on.
-        if (!res.ok && res.status !== 400) console.error(`Failed to drop ${name} while rolling back the demo load: HTTP ${res.status}`);
-      }));
+      await cleanupAndPersistTutorialGraphs(scope, cid, demoGraphNames);
     };
 
     // Undoes the address bar and the snapshot this attempt took, so whoever
@@ -2543,18 +2632,30 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     };
 
     try {
-      const currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
+      let ownership = readTutorialDemoOwnership(scope);
+      let currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
       if (!currentGraphs) throw new Error("Could not verify available graph names for the tutorial");
 
+      if (ownership.names.length > 0) {
+        await cleanupAndPersistTutorialGraphs(scope, cid, ownership.names);
+        ownership = readTutorialDemoOwnership(scope);
+        currentGraphs = await fetchOptions(toast, setIndicator, indicator, cid);
+        if (!currentGraphs) throw new Error("Could not refresh graph names after tutorial cleanup");
+      }
+
+      ownership = readTutorialDemoOwnership(scope);
       do {
-        const suffix = window.crypto.randomUUID();
+        const suffix = makeTutorialDemoGraphSuffix();
         demoGraphNames = [`${DEMO_GRAPH_PREFIX}demo-${suffix}`, `${DEMO_GRAPH_PREFIX}test-${suffix}`];
-      } while (demoGraphNames.some(name => currentGraphs.opts.includes(name)));
+      } while (demoGraphNames.some(name => currentGraphs.opts.includes(name) || ownership.names.includes(name)));
+      writeTutorialDemoOwnership(scope, [...ownership.names, ...demoGraphNames]);
       demoGraphNamesRef.current = demoGraphNames;
 
-      // Store the current user graphs and URL params before the tour takes over.
-      setUserGraphsBeforeTutorial(graphNames);
-      setUserGraphBeforeTutorial(graphName);
+      // Snapshot the fresh verified list, excluding only exact graphs recorded
+      // as tutorial-owned when a prior cleanup could not remove them.
+      const userGraphs = currentGraphs.opts.filter(name => !ownership.names.includes(name));
+      setUserGraphsBeforeTutorial(userGraphs);
+      setUserGraphBeforeTutorial(userGraphs.includes(graphName) ? graphName : "");
       setUrlParamsBeforeTutorial(urlParams);
 
       // Clear the visible URL params for the tutorial, but push a new history
@@ -2617,15 +2718,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         // One graph can be loaded while the other failed, so drop both rather
         // than walk the tutorial into half a dataset.
         await dropDemoGraphs();
-        demoGraphNamesRef.current = [];
         throw failedLoad.reason;
       }
 
       if (getConnectionEpoch() !== startEpoch) {
-        // Nothing downstream will find these: the retry and the cleanup both
-        // run against the connection that has since become active.
+        // The requests stay pinned to the original connection; do not restore
+        // its state into the connection that has since become active.
         await dropDemoGraphs();
-        demoGraphNamesRef.current = [];
 
         // The retry re-reads window.location.search, which is stripped by now.
         restorePreTutorialState();
@@ -2662,29 +2761,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // The tutorial takes a resolved promise as a loaded dataset and walks the
       // user into steps that query it, so a failure has to reach it.
       if (demoGraphNames.length > 0 && demoGraphNamesRef.current === demoGraphNames) await dropDemoGraphs();
-      demoGraphNamesRef.current = [];
       throw error;
     }
-  }, [graphName, graphNames, indicator, toast, supersedeGraphRefreshes]);
+  }, [graphName, indicator, toast, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, handleSetGraphName, setHistoryQuery]);
 
   const handleCleanupDemoGraphs = useCallback(async () => {
     const startEpoch = getConnectionEpoch();
     const cid = getActiveConnectionIdGlobal();
-    const demoGraphNames = demoGraphNamesRef.current;
+    const scope = getConnectionPrefix();
+    let demoGraphNames: string[] = [];
 
     try {
-      const responses = await Promise.all(demoGraphNames.map(name => securedFetch(`/api/graph/${prepareArg(name)}`, {
-        method: "DELETE",
-      }, toast, setIndicator, cid)));
-      responses.forEach((response, index) => {
-        if (!response.ok) console.error(`Failed to cleanup tutorial graph ${demoGraphNames[index]}: HTTP ${response.status}`);
-      });
+      demoGraphNames = readTutorialDemoOwnership(scope).names;
+      await cleanupAndPersistTutorialGraphs(scope, cid, demoGraphNames);
     } catch (error) {
-
       console.error("Failed to cleanup demo graphs", error);
     }
 
-    if (demoGraphNamesRef.current === demoGraphNames) demoGraphNamesRef.current = [];
     if (getConnectionEpoch() !== startEpoch) return;
 
     // Clear current graph to avoid showing deleted demo graph. Build the empty
@@ -2726,7 +2819,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       window.history.replaceState(null, "", `${window.location.pathname}${urlParamsBeforeTutorial}`);
     }
     setUrlParamsBeforeTutorial("");
-  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial, supersedeGraphRefreshes]);
+  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, handleSetGraphName, setHistoryQuery]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>

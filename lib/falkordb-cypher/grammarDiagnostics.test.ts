@@ -56,13 +56,18 @@ describe("grammarErrorsToDiagnostics", () => {
 
 describe("Cypher grammar compatibility", () => {
   it("accepts valid functions, map projections, and keyword identifiers", () => {
+    assert.notDeepEqual(lint("MATCH (n RETURN n"), [], "invalid query must report syntax errors");
+
     const queries = [
       "MATCH (n) WHERE exists(n.name) RETURN n",
       "MATCH (n) RETURN n {.name}",
       "MATCH (n) RETURN n {.*}",
+      "MATCH (n) RETURN n {.name} AS person",
+      "MATCH (n) RETURN collect(n {.name})",
+      "MATCH (n) RETURN collect(n {.name}) AS people",
       "MATCH (n:Call) RETURN n",
-      "MATCH ()-[r:YIELD]->() RETURN r",
       "MATCH (n) RETURN n.call",
+      "MATCH ()-[r:YIELD]->() RETURN r",
       "CREATE VECTOR INDEX FOR ()-[e:Call]->() ON (e.embedding) OPTIONS {dimension:3, similarityFunction:'euclidean'}",
     ];
 

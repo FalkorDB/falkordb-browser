@@ -257,7 +257,7 @@ oC_ProjectionItems
 
 oC_ProjectionItem
               :  ( oC_Expression SP AS SP oC_Variable )
-                  | oC_Expression ( SP? oC_MapProjection )?
+                  | oC_Expression
                   ;
 
 oC_MapProjection
@@ -473,7 +473,7 @@ oC_Atom
         | oC_ParenthesizedExpression
         | oC_FunctionInvocation
         | oC_ExistentialSubquery
-        | oC_Variable
+        | oC_Variable ( SP? oC_MapProjection )?
         ;
 
 COUNT : ( 'C' | 'c' ) ( 'O' | 'o' ) ( 'U' | 'u' ) ( 'N' | 'n' ) ( 'T' | 't' ) ;

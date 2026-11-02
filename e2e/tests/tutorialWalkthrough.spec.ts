@@ -30,9 +30,46 @@ test.describe("Tutorial", () => {
     });
 
     test.afterEach(async () => {
+        let ownedTutorialGraphs: string[] = [];
+        if (browser.getContext()) {
+            const page = await browser.getPage();
+            ownedTutorialGraphs = await page.evaluate(() => {
+                const key = Object.keys(localStorage).find(name => name.endsWith("tutorialDemoGraphOwnership"));
+                if (!key) return [];
+
+                const stored = localStorage.getItem(key);
+                if (!stored) return [];
+
+                const ownership: unknown = JSON.parse(stored);
+                if (
+                    typeof ownership !== "object" ||
+                    ownership === null ||
+                    !("names" in ownership) ||
+                    !Array.isArray(ownership.names)
+                ) {
+                    throw new Error("Tutorial graph ownership is invalid; refusing broad test cleanup");
+                }
+
+                const names = ownership.names.filter((name): name is string =>
+                    typeof name === "string" && /^tutorial-social-(?:demo|test)-[a-zA-Z0-9-]+$/.test(name));
+                if (names.length !== ownership.names.length) {
+                    throw new Error("Tutorial graph ownership is invalid; refusing broad test cleanup");
+                }
+
+                return [...new Set(names)];
+            });
+        }
+
         // Close first: a live graph page polls graph info, and that poll
         // re-creates a graph deleted out from under it.
         await browser.closeBrowser();
+
+        for (const graph of ownedTutorialGraphs) {
+            const { message } = await apiCall.removeGraph(graph, "admin");
+            if (!message.includes("deleted") && !message.includes("empty key")) {
+                throw new Error(`Failed to remove owned tutorial graph ${graph}: ${message}`);
+            }
+        }
 
         const { message } = await apiCall.removeGraph(userGraph, "admin");
         if (!message.includes("deleted") && !message.includes("empty key")) {

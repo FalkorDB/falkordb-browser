@@ -1526,6 +1526,10 @@ function hasCallBlockWithReturnNoLimit(query: string): boolean {
   return false;
 }
 
+function hasCallClause(query: string): boolean {
+  return /(?:^|[^\w.:])CALL\s+(?:\{|(?:[\w`]+(?:\s*\.\s*[\w`]+)*)\s*\()/i.test(query);
+}
+
 function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
   const code = query.split("");
   let lastCodeEnd = 0;
@@ -1619,7 +1623,7 @@ export function getQueryWithLimit(
   if (limit === 0) return [query, existingLimit];
 
   if (/\bUNION\b/i.test(analysis.code)) {
-    if (!/\bCALL\b/i.test(analysis.code)) {
+    if (!hasCallClause(analysis.code)) {
       const body = withoutTrailingSemicolon(query, analysis);
       return [`CALL { ${body}\n} RETURN * LIMIT ${limit}`, limit];
     }

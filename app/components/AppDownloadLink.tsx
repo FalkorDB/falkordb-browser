@@ -48,9 +48,9 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
         );
     }
 
-    const handleDownload = (label: string) => {
+    const handleDownload = (platform: string) => {
         onSelect?.();
-        if (label.toLowerCase().includes("macos")) {
+        if (platform === "mac") {
             toast({
                 title: "macOS app is not signed yet",
                 description: "Gatekeeper may block this download. For the official release only, see the desktop README for the manual launch workaround.",
@@ -65,7 +65,7 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
             target="_blank"
             rel="noreferrer"
             data-testid="appDownload"
-            onClick={() => handleDownload(download.label)}
+            onClick={() => handleDownload(download.platform)}
         >
             <Download size={iconSize} />
             <span>{download.label}</span>
@@ -81,7 +81,7 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
         <>
             {primary}
             {item(
-                <a className={className} href={alternate.href} target="_blank" rel="noreferrer" data-testid="appDownloadAlternate" onClick={() => handleDownload(alternate.label)}>
+                <a className={className} href={alternate.href} target="_blank" rel="noreferrer" data-testid="appDownloadAlternate" onClick={() => handleDownload(download.platform)}>
                     <Download size={iconSize} />
                     <span>{alternate.label}</span>
                     <ArrowUpRight size={15} className="ml-auto" />

@@ -41,6 +41,26 @@ describe("getQueryWithLimit", () => {
       ["CALL { MATCH (n) RETURN n UNION MATCH (m) RETURN m\n} RETURN * LIMIT 300", 300],
     );
   });
+
+  it("does not mistake CALL identifiers for subqueries when wrapping UNION", () => {
+    const query = "MATCH (n:Call) RETURN n UNION MATCH (n:Call) RETURN n";
+    assert.deepEqual(
+      getQueryWithLimit(query, 300),
+      [`CALL { ${query}\n} RETURN * LIMIT 300`, 300],
+    );
+
+    const propertyQuery = "MATCH (n) RETURN n.call UNION MATCH (m) RETURN m.call";
+    assert.deepEqual(
+      getQueryWithLimit(propertyQuery, 300),
+      [`CALL { ${propertyQuery}\n} RETURN * LIMIT 300`, 300],
+    );
+
+    const procedureQuery = "CALL db.labels() YIELD label RETURN label UNION MATCH (n) RETURN n";
+    assert.deepEqual(
+      getQueryWithLimit(procedureQuery, 300),
+      [`${procedureQuery} LIMIT 300`, 300],
+    );
+  });
 });
 
 afterEach(() => {

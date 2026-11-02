@@ -136,7 +136,7 @@ const tutorialSteps: TutorialStep[] = [
         title: "Select a Demo Graph",
         description: "Click on the tutorial's social demo graph to select and load it. It contains sample social network data with users, posts, and relationships that you can explore.",
         placementAxis: "x",
-        targetSelector: '[data-testid^="selectGraphtutorial-social-demo-"]',
+        targetSelector: '[data-testid^="selectGraphtutorial-social-demo-"][data-testid$="Button"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
         hidePrev: true

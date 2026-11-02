@@ -53,7 +53,8 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
 - **Code signing:** CI signs and notarizes macOS release builds when the
   repository Actions secrets below are configured. Release builds fail before
   packaging if any are missing, rather than silently publishing an unsigned
-  app. Pull-request, push, and local builds remain unsigned.
+  macOS app. Windows and Linux installers remain unsigned. Pull-request, push,
+  and local builds for every platform also remain unsigned.
 
   Configure these repository Actions secrets:
 
