@@ -7,14 +7,14 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { withQuery } from "@/lib/editorEchoes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Monaco } from "@monaco-editor/react";
-import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo, useCallback } from "react";
+import { SetStateAction, Dispatch, useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from "react";
 import * as monaco from "monaco-editor";
 import { History, Info, Maximize2, Minimize2, MoreHorizontal, Play, Sparkles, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import useIsMobile from "@/lib/useIsMobile";
-import { cn, getActiveConnectionIdGlobal, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS, FALLBACK_PROCEDURE_NAMES, udfFunctionNames } from "@/lib/cypherLang";
 import { codeActionEditsForMarkers, analyzeSchemaWarnings, type EditorDiagnostic } from "@/lib/cypherDiagnostics";
 import { extractVariableCandidates } from "@/lib/cypherSuggestions";
@@ -26,7 +26,7 @@ import { isQueryOptimization } from "@/lib/aiOptimize";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
-import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, DiagnosticsContext, AiFixContext, type ChatModelSource, type LocalLlmProvider } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, GraphTabsContext, DiagnosticsContext, AiFixContext, type ChatModelSource, type LocalLlmProvider } from "./provider";
 import useQueryPreflight from "./useQueryPreflight";
 import { Graph } from "../api/graph/model";
 import ToastButton from "./ToastButton";
@@ -195,7 +195,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         },
     } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
+    const { activeTabId } = useContext(GraphTabsContext);
     const { diagnostics, setDiagnostics } = useContext(DiagnosticsContext);
     const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
     const checkPreflight = useQueryPreflight();
@@ -208,6 +209,21 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const [pendingOptimization, setPendingOptimization] = useState<PendingOptimizationRequest | null>(null);
     const [optimizationResult, setOptimizationResult] = useState<AiOptimizeResultState>({ status: "idle" });
     const [dontAskAgain, setDontAskAgain] = useState(false);
+    const optimizationContext = JSON.stringify([activeTabId, graphName, activeConnectionId]);
+    const optimizationOwnerRef = useRef<object>({});
+    const optimizationAbortRef = useRef<AbortController | null>(null);
+    useLayoutEffect(() => {
+        optimizationOwnerRef.current = {};
+        setPendingOptimization(null);
+        setOptimizationResult({ status: "idle" });
+        setOptimizationOpen(false);
+        setDontAskAgain(false);
+        return () => {
+            optimizationOwnerRef.current = {};
+            optimizationAbortRef.current?.abort();
+            optimizationAbortRef.current = null;
+        };
+    }, [optimizationContext]);
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
     const dialogEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -271,6 +287,15 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     }, [router, toast]);
 
     const startOptimization = useCallback(async (pending: PendingOptimizationRequest) => {
+        optimizationAbortRef.current?.abort();
+        const controller = new AbortController();
+        optimizationAbortRef.current = controller;
+        const owner = optimizationOwnerRef.current;
+        const epoch = getConnectionEpoch();
+        const isCurrent = () => !controller.signal.aborted
+            && optimizationOwnerRef.current === owner
+            && getConnectionEpoch() === epoch
+            && getActiveConnectionIdGlobal() === pending.connectionId;
         setPendingOptimization(null);
         setOptimizationResult({ status: "loading" });
         setOptimizationOpen(true);
@@ -281,6 +306,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             const response = await fetch("/api/chat/optimize", {
                 method: "POST",
                 headers,
+                signal: controller.signal,
                 body: JSON.stringify({
                     query: pending.query,
                     graphName: pending.graphName,
@@ -291,6 +317,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     localEndpoint: pending.localEndpoint,
                 }),
             });
+            if (!isCurrent()) return;
 
             if (response.status === 401 && response.headers.get("X-Session-Invalid") === "1") {
                 const { signOut } = await import("next-auth/react");
@@ -302,6 +329,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             }
 
             const data: unknown = await response.json().catch(() => null);
+            if (!isCurrent()) return;
             if (!response.ok) {
                 const message = typeof data === "object" && data !== null && "error" in data && typeof data.error === "string"
                     ? data.error
@@ -315,11 +343,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 return;
             }
 
-            setOptimizationResult({ status: "done", query: pending.query, result: data });
+            setOptimizationResult({ status: "done", query: pending.query, context: optimizationContext, epoch, result: data });
         } catch {
-            showOptimizationError("Couldn't reach the optimizer. Please try again.");
+            if (isCurrent()) showOptimizationError("Couldn't reach the optimizer. Please try again.");
+        } finally {
+            if (optimizationAbortRef.current === controller) optimizationAbortRef.current = null;
         }
-    }, [resolvedChatKey, setIndicator, showOptimizationError]);
+    }, [resolvedChatKey, setIndicator, showOptimizationError, optimizationContext]);
 
     const handleOptimize = useCallback(() => {
         const query = historyQuery.query.trim();
@@ -430,18 +460,26 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const handleOptimizationOpenChange = (open: boolean) => {
         setOptimizationOpen(open);
         if (!open) {
+            optimizationAbortRef.current?.abort();
+            optimizationAbortRef.current = null;
+            setOptimizationResult({ status: "idle" });
             setPendingOptimization(null);
             setDontAskAgain(false);
         }
     };
 
     const cancelOptimization = () => {
-        setPendingOptimization(null);
-        setDontAskAgain(false);
-        setOptimizationOpen(false);
+        handleOptimizationOpenChange(false);
     };
 
     const useOptimizedQuery = (query: string) => {
+        if (optimizationResult.status !== "done"
+            || optimizationResult.context !== optimizationContext
+            || optimizationResult.epoch !== getConnectionEpoch()
+            || optimizationResult.query !== historyQuery.query.trim()) {
+            toast({ title: "Optimization is out of date", description: "Optimize the current query again before inserting a suggestion.", variant: "destructive" });
+            return;
+        }
         setHistoryQuery(prev => withQuery(prev, query));
         setOptimizationOpen(false);
         setOptimizationResult({ status: "idle" });
@@ -1738,6 +1776,9 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 dontAskAgain={dontAskAgain}
                 result={optimizationResult}
                 currentQuery={historyQuery.query}
+                contextMatches={optimizationResult.status === "done"
+                    && optimizationResult.context === optimizationContext
+                    && optimizationResult.epoch === getConnectionEpoch()}
                 onOpenChange={handleOptimizationOpenChange}
                 onDontAskAgainChange={setDontAskAgain}
                 onConfirm={confirmOptimization}

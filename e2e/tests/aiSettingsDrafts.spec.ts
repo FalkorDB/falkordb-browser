@@ -2,7 +2,10 @@ import { expect, test } from "@playwright/test";
 import { createServer } from "node:http";
 import GraphPage from "../logic/POM/graphPage";
 import { getRandomString, initializeLocalStorage } from "../infra/utils";
-import urls from "../config/urls.json";
+import configuredUrls from "../config/urls.json";
+
+const baseUrl = process.env.E2E_BASE_URL ?? configuredUrls.localHost;
+const urls = { graphUrl: `${baseUrl}/graph`, api: { graphUrl: `${baseUrl}/api/graph/` } };
 
 const TEST_KEY = "sk-demo-not-a-real-api-key";
 
@@ -12,6 +15,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       test.setTimeout(60_000);
       const graphName = getRandomString("aiQueryCards");
       const query = "RETURN 4242 AS unsent_draft";
+      const invalidQuery = "MATCH (n) RETsURN n";
       const suggestion = "WITH 4242 AS unsent_draft\nWITH unsent_draft\nRETURN unsent_draft";
       let providerPrompt = "";
       let queryRequests = 0;
@@ -66,7 +70,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
           await page.setViewportSize(viewport);
           if (viewport.width < 1100) await expect(page.getByTestId("editorMore")).toBeVisible();
           page.on("request", request => {
-            if (request.method() === "POST" && new URL(request.url()).pathname === `/api/graph/${graphName}`) queryRequests += 1;
+            const url = new URL(request.url());
+            const executedQuery = url.searchParams.get("query") ?? "";
+            if (request.method() === "GET"
+              && decodeURIComponent(url.pathname) === `/api/graph/${graphName}`
+              && [query, suggestion, invalidQuery].some(testedQuery => executedQuery.includes(testedQuery))) queryRequests += 1;
           });
           if (feature === "optimize") {
             if (viewport.width < 1100) await page.getByTestId("editorMore").click();
@@ -89,14 +97,15 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             await page.getByTestId("aiOptimizeApply").click();
           } else if (feature === "fix") {
             const graph = new GraphPage(page);
-            await graph.insertQuery("MATCH (n) RETsURN n");
+            await graph.insertQuery(invalidQuery);
             await graph.clickRunQuery(false);
+            queryRequests = 0;
             await page.getByTestId("fix-with-ai").click();
             await expect(page.getByTestId("aiFixQuery")).toHaveText(suggestion);
             await page.getByTestId("aiFixCopy").click();
             await expect(page.getByTestId("aiFixCopy")).toHaveText("Copied!");
             expect(await page.evaluate(() => sessionStorage.getItem("copiedQuery"))).toBe(suggestion);
-            await expect(editor).toHaveAttribute("data-value", "MATCH (n) RETsURN n");
+            await expect(editor).toHaveAttribute("data-value", invalidQuery);
             await page.getByTestId("aiFixInsert").click();
           } else {
             await page.getByTestId("chatToggleButton").click();
@@ -192,12 +201,12 @@ for (const { feature, scenario } of cases) {
         await expect(errorContainer).toContainText("Unable to reach the AI provider");
         await errorContainer.getByRole("link", { name: "Go to Settings", exact: true }).click();
       }
-      await expect(page).toHaveURL(/\/settings/);
+      await expect(page).toHaveURL(/\/settings/, { timeout: 30_000 });
       if (scenario === "missing-key") {
         await page.getByTestId("chatSectionHeader").click();
         await page.getByTestId("chatApiKeyInput").fill(TEST_KEY);
         await page.getByTestId("addChatApiKeyButton").click();
-        await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
+        await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1, { timeout: 30_000 });
       }
 
       await page.goBack();

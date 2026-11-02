@@ -5,7 +5,8 @@ export { MAX_CHAT_BODY_BYTES, OVER_LIMIT };
 
 // Enforce a byte cap while streaming so chunked bodies cannot bypass Content-Length checks.
 export async function readChatBodyWithLimit(
-  request: Request,
+  request: Pick<Request, "body">,
+  maxBytes = MAX_CHAT_BODY_BYTES,
 ): Promise<string | typeof OVER_LIMIT> {
   const reader = request.body?.getReader();
   if (!reader) return "";
@@ -19,7 +20,7 @@ export async function readChatBodyWithLimit(
       if (done) break;
       if (value) {
         received += value.byteLength;
-        if (received > MAX_CHAT_BODY_BYTES) {
+        if (received > maxBytes) {
           await reader.cancel();
           return OVER_LIMIT;
         }

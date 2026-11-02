@@ -5,11 +5,12 @@ import { getClient } from "../../auth/[...nextauth]/options";
 import { optimizeRequest, validateBody } from "../../validate-body";
 import { getCorsHeaders, corsPreflight } from "../../utils";
 import { MAX_CHAT_BODY_BYTES, OVER_LIMIT, readChatBodyWithLimit } from "../requestBody";
+import { getOptimizationContext } from "./context";
 
 export const OPTIONS = corsPreflight;
 
 const REQUEST_TIMEOUT_MS = 30_000;
-const MAX_INDEX_ROWS = 256;
+const MAX_PROVIDER_BODY_BYTES = 256 * 1024;
 
 export async function POST(request: NextRequest) {
   let session;
@@ -51,23 +52,14 @@ export async function POST(request: NextRequest) {
   }
 
   let plan: readonly string[];
-  let indexes: unknown;
+  let indexes: { available: boolean; entries: unknown[]; truncated: boolean; warning?: string };
   try {
     const graph = session.client.selectGraph(graphName);
-    const [explainResult, indexResult] = await Promise.all([
-      graph.explain(query),
-      graph.roQuery("CALL db.indexes() YIELD label, types, entitytype RETURN label, types, entitytype"),
-    ]);
-    plan = explainResult.steps;
-    const rows = Array.isArray(indexResult.data) ? indexResult.data : [];
-    indexes = {
-      entries: rows.slice(0, MAX_INDEX_ROWS),
-      truncated: rows.length > MAX_INDEX_ROWS,
-    };
+    ({ plan, indexes } = await getOptimizationContext(graph, query));
   } catch (error) {
-    console.error("Cypher optimizer plan/index lookup failed");
+    console.error("Cypher optimizer plan lookup failed");
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not read the query plan and graph indexes." },
+      { error: error instanceof Error ? error.message : "Could not read the query plan." },
       { status: 400, headers: getCorsHeaders(request) },
     );
   }
@@ -95,7 +87,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error }, { status: response.status === 401 ? 401 : 422, headers: getCorsHeaders(request) });
     }
 
-    const data = await response.json();
+    const rawResponse = await readChatBodyWithLimit(response, MAX_PROVIDER_BODY_BYTES);
+    if (rawResponse === OVER_LIMIT) {
+      return NextResponse.json({ error: "The AI provider response was too large. Please try again." }, { status: 422, headers: getCorsHeaders(request) });
+    }
+    let data;
+    try {
+      data = JSON.parse(rawResponse);
+    } catch {
+      return NextResponse.json({ error: "The AI provider returned invalid JSON. Please try again." }, { status: 422, headers: getCorsHeaders(request) });
+    }
     const reply: unknown = data?.choices?.[0]?.message?.content;
     if (typeof reply !== "string" || !reply.trim()) {
       return NextResponse.json({ error: "The AI provider returned an empty response." }, { status: 422, headers: getCorsHeaders(request) });
@@ -106,7 +107,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "The AI provider returned an invalid optimization response. Please try again." }, { status: 422, headers: getCorsHeaders(request) });
     }
 
-    return NextResponse.json({ ...result, executionPlan: plan }, { headers: getCorsHeaders(request) });
+    return NextResponse.json({
+      ...result,
+      executionPlan: plan,
+      ...(indexes.available ? {} : { indexWarning: "Index metadata was unavailable; recommendations may be incomplete." }),
+    }, { headers: getCorsHeaders(request) });
   } catch (error) {
     const name = (error as Error)?.name;
     const message = name === "TimeoutError"

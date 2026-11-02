@@ -42,9 +42,18 @@ describe("updateGraphElementAttribute", () => {
     });
 
     it("rejects missing required fields and oversized queries", () => {
+      for (const field of ["graphName", "query", "model"] as const) {
+        const request: Partial<typeof validRequest> = { ...validRequest };
+        delete request[field];
+        assert.equal(optimizeRequest.safeParse(request).success, false, field);
+      }
       assert.equal(optimizeRequest.safeParse({ ...validRequest, graphName: "" }).success, false);
       assert.equal(optimizeRequest.safeParse({ ...validRequest, query: " " }).success, false);
       assert.equal(optimizeRequest.safeParse({ ...validRequest, query: "x".repeat(8193) }).success, false);
+    });
+    it("preserves whitespace in graph identifiers", () => {
+      const result = optimizeRequest.parse({ ...validRequest, graphName: " people " });
+      assert.equal(result.graphName, " people ");
     });
   });
 

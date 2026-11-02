@@ -9,7 +9,7 @@ import SuggestedQuery from "./SuggestedQuery";
 export type AiOptimizeResultState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "done"; query: string; result: QueryOptimizationAnalysis };
+  | { status: "done"; query: string; context: string; epoch: number; result: QueryOptimizationAnalysis };
 
 export type AiOptimizeConsent = {
   query: string;
@@ -23,6 +23,7 @@ interface Props {
   dontAskAgain: boolean;
   result: AiOptimizeResultState;
   currentQuery: string;
+  contextMatches: boolean;
   onOpenChange: (open: boolean) => void;
   onDontAskAgainChange: (checked: boolean) => void;
   onConfirm: () => void;
@@ -36,6 +37,7 @@ export default function AiOptimizeDialog({
   dontAskAgain,
   result,
   currentQuery,
+  contextMatches,
   onOpenChange,
   onDontAskAgainChange,
   onConfirm,
@@ -43,6 +45,7 @@ export default function AiOptimizeDialog({
   onUseQuery,
 }: Props) {
   const canApply = result.status === "done"
+    && contextMatches
     && currentQuery.trim() === result.query.trim()
     && Boolean(result.result.optimizedQuery);
 
@@ -95,6 +98,7 @@ export default function AiOptimizeDialog({
           {result.status === "done" && (
             <>
               <section className="min-w-0 rounded-lg border border-border bg-muted/20 p-4 mobile:p-3">
+                {result.result.indexWarning && <p className="mb-3 text-sm text-muted-foreground" role="status">{result.result.indexWarning}</p>}
                 <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Sparkles size={16} className="shrink-0 text-primary" />Analysis</h2>
                 <p className="break-words text-sm leading-relaxed whitespace-pre-wrap" data-testid="aiOptimizeExplanation">
                   {result.result.explanation}
@@ -131,7 +135,7 @@ export default function AiOptimizeDialog({
                   query={result.result.optimizedQuery}
                   onInsert={onUseQuery}
                   insertDisabled={!canApply}
-                  insertDisabledReason={!canApply ? "The editor changed after this analysis. Run Optimize again before applying the suggestion." : undefined}
+                  insertDisabledReason={!canApply ? "The query, graph, tab, or connection changed after this analysis. Run Optimize again before applying the suggestion." : undefined}
                   testIds={{ query: "aiOptimizeQuery", copy: "aiOptimizeCopy", insert: "aiOptimizeApply" }}
                 />
               ) : (

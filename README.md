@@ -284,9 +284,11 @@ set `LOAD_CSV_FILE_URI=false`.
 
 ### AI query optimization and drafts
 
-The editor's **Optimize** action uses the model and API key selected in Settings.
+The editor's **Optimize** action uses the model and provider configuration selected
+in Settings, with an API key only for hosted providers.
 It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without executing
 the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
+If index metadata is unavailable, analysis continues with an explicit warning.
 
 Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 **Insert into editor** actions. Neither action runs the query. The card adapts to
@@ -295,7 +297,8 @@ mobile screens, and long Chat queries can be collapsed.
 Missing AI configuration and provider errors offer **Go to Settings**. Returning
 to the graph preserves the editor query and unsent Chat input. Chat drafts are
 scoped to the connection, tab, and graph, and survive closing and reopening Chat.
-Failed Chat requests restore the submitted input unless a new draft was entered.
+Submitted Chat input remains saved until the request succeeds; newer edits or an
+intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
 
 ### Testing
@@ -325,7 +328,5 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
-
 
 

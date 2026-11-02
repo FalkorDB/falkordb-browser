@@ -23,6 +23,7 @@ import { getConfidenceStyle, normalizeConfidence } from "./confidence";
 import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
 import { stripCypherFenceTag } from "./cypherDisplay";
 import SuggestedQuery from "../components/SuggestedQuery";
+import { chatDraftKey, isUnchangedChatDraft, isChatConfigurationError } from "./chatDraft";
 
 const mdInstance = new MarkdownIt({
     html: false,
@@ -104,9 +105,10 @@ export default function Chat({ onClose }: Props) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
-    const draftKey = `${historyKey}-draft`;
+    const draftKey = tabScopedKey(activeTabId, chatDraftKey(graphName));
     const draftScope = `${getConnectionPrefix()}${draftKey}`;
     const loadedDraftScopeRef = useRef<string | null>(null);
+    const draftRevisionsRef = useRef(new Map<string, number>());
 
     useLayoutEffect(() => {
         if (!getConnectionPrefix() || activeConnectionId !== prefixConnectionId) {
@@ -120,6 +122,7 @@ export default function Chat({ onClose }: Props) {
 
     const updateDraft = (value: string) => {
         setNewMessage(value);
+        draftRevisionsRef.current.set(draftScope, (draftRevisionsRef.current.get(draftScope) ?? 0) + 1);
         if (loadedDraftScopeRef.current === draftScope && getConnectionPrefix() && activeConnectionId === prefixConnectionId) {
             setConnectionItem(draftKey, value);
         }
@@ -199,12 +202,13 @@ export default function Chat({ onClose }: Props) {
         // so it must not be appended (it would also be persisted under the new key),
         // and only this conversation's loading state may be settled by it.
         const submittedKey = historyKey;
-        const isStale = () => historyKeyRef.current !== submittedKey;
+        const submittedScope = draftScope;
+        const submittedDraft = { text: newMessage, revision: draftRevisionsRef.current.get(submittedScope) ?? 0 };
+        const isStale = () => historyKeyRef.current !== submittedKey || loadedDraftScopeRef.current !== submittedScope;
+        const draftUnchanged = () => isUnchangedChatDraft(submittedDraft, localStorage.getItem(submittedScope), draftRevisionsRef.current.get(submittedScope) ?? 0);
         const showRequestError = (content: string) => {
             if (isStale()) return;
-            if (loadedDraftScopeRef.current === draftScope && getConnectionItem(draftKey) === "") {
-                updateDraft(newMessage);
-            }
+            if (draftUnchanged()) setNewMessage(submittedDraft.text);
             handleSetMessages({ role: "assistant", content, type: "Error" });
         };
 
@@ -262,7 +266,8 @@ export default function Chat({ onClose }: Props) {
         const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
 
         handleSetMessages(newMessages);
-        updateDraft("");
+        // Keep the persisted submission until success so switches, unmounts and sign-out cannot lose it.
+        setNewMessage("");
 
         try {
             const chatHeaders = new Headers({ "Content-Type": "application/json" });
@@ -331,6 +336,10 @@ export default function Chat({ onClose }: Props) {
 
             setIndicator("online");
 
+            if (draftUnchanged()) {
+                localStorage.setItem(submittedScope, "");
+                if (!isStale()) setNewMessage("");
+            }
             if (isStale()) {
                 stopLoading(submittedKey);
                 return;
@@ -419,7 +428,7 @@ export default function Chat({ onClose }: Props) {
                 return (
                     <div className="flex flex-col gap-1">
                         <MarkdownMessage content={message.content} />
-                        {message.type === "Error" && (
+                        {message.type === "Error" && isChatConfigurationError(message.content) && (
                             <Link href="/settings" className="text-sm underline">
                                 Go to Settings
                             </Link>

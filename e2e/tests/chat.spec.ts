@@ -56,15 +56,18 @@ test.describe("Chat Feature Tests", () => {
   });
 
   test(`@readwrite Verify chat button is disabled when no graph is selected`, async () => {
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    await browser.createNewPage(ChatComponent);
+    const page = await browser.getPage();
+    await page.addInitScript(() => {
+      for (const key of Object.keys(localStorage)) {
+        if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
+      }
+    });
+    await page.goto(urls.graphUrl);
     await browser.setPageToFullScreen();
     
-    // Wait for the chat toggle button to render before checking state
-    await chat.waitForChatToggleButton();
-    const isChatButtonVisible = await chat.isChatToggleButtonVisible();
-    expect(isChatButtonVisible).toBe(true);
-    const isChatButtonDisabled = await chat.isChatToggleButtonDisabled();
-    expect(isChatButtonDisabled).toBe(true);
+    await expect(page.getByTestId("chatToggleButton")).toBeVisible();
+    await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
   });
 
   test(`@readwrite Verify chat button is displayed when a graph is selected`, async () => {

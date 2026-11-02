@@ -36,6 +36,7 @@ export default function SuggestedQuery({
     useEffect(() => {
         setCopied(false);
         setCollapsed(false);
+        setCanCollapse(false);
         return () => {
             if (copyResetRef.current) clearTimeout(copyResetRef.current);
         };
@@ -43,15 +44,15 @@ export default function SuggestedQuery({
 
     useEffect(() => {
         const element = queryRef.current;
-        if (!collapsible || !element) return undefined;
+        if (!collapsible || collapsed || !element) return undefined;
         const measure = () => {
-            if (element.scrollHeight > 64) setCanCollapse(true);
+            setCanCollapse(element.scrollHeight > 64);
         };
         measure();
         const observer = new ResizeObserver(measure);
         observer.observe(element);
         return () => observer.disconnect();
-    }, [collapsible, query]);
+    }, [collapsible, collapsed, query]);
 
     const handleCopy = async () => {
         if (!await copyText(navigator.clipboard?.writeText?.bind(navigator.clipboard), query)) {
