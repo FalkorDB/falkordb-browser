@@ -297,6 +297,35 @@ test.describe("@admin App download", () => {
         await expect(app.alternateLink).toHaveAttribute("role", "menuitem");
     });
 
+    // Until release builds are signed and notarized, Gatekeeper can block the
+    // macOS app (#2210); the link tells the user where the workaround is.
+    test("macOS: downloading from the help menu explains what to do if Gatekeeper blocks the app", async ({ browser }) => {
+        context = await openVisitor(browser, { ua: UA.mac, cpu: "none" });
+        const [page, app] = await openPage(context, urls.graphUrl);
+        await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
+        await app.dismiss(true);
+
+        await page.getByRole("button", { name: "Help" }).click();
+        const fetched = fetchedInNewTab(context, `${RELEASES}/FalkorDB-Browser-mac-arm64.dmg`);
+        await app.link.click();
+        await fetched;
+        await expect(page.getByText("If macOS blocks the app", { exact: true })).toBeVisible();
+    });
+
+    test("Windows: downloading from the help menu shows no macOS warning", async ({ browser }) => {
+        context = await openVisitor(browser, { ua: UA.windows });
+        const [page, app] = await openPage(context, urls.graphUrl);
+        await expect(app.prompt).toBeVisible({ timeout: OPENS_WITHIN });
+        await app.dismiss(true);
+
+        await page.getByRole("button", { name: "Help" }).click();
+        const fetched = fetchedInNewTab(context, `${RELEASES}/FalkorDB-Browser-win-x64.exe`);
+        await app.link.click();
+        await fetched;
+        await app.waitForTimeout(1000);
+        await expect(page.getByText("If macOS blocks the app", { exact: true })).toHaveCount(0);
+    });
+
     test("Android with no app link configured: no popup and no menu item", async ({ browser }) => {
         context = await openVisitor(browser, { ua: UA.android, viewport: PHONE });
         const [page, app] = await openPage(context, urls.graphUrl);

@@ -50,8 +50,35 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
 
 ## Not done yet
 
-- **Code signing:** builds are unsigned (`CSC_IDENTITY_AUTO_DISCOVERY=false` in
-  CI). To sign, set electron-builder's `CSC_LINK`/`CSC_KEY_PASSWORD`, plus
-  Apple notarization credentials for macOS.
+- **Code signing:** CI signs and notarizes macOS release builds when the
+  repository Actions secrets below are configured. Release builds fail before
+  packaging if any are missing, and fail after packaging if the app is not
+  signed, accepted by Gatekeeper and stapled, rather than silently publishing
+  an unsigned macOS app. Installers from the platforms that passed their checks
+  are still attached to the release. Windows and Linux installers remain unsigned.
+  Pull-request, push, and local builds for every platform also remain unsigned.
+
+  Configure these repository Actions secrets:
+
+  - `MACOS_CERTIFICATE_P12`: base64-encoded Developer ID Application
+    certificate (`.p12`) including its private key.
+  - `MACOS_CERTIFICATE_PASSWORD`: password used when exporting the `.p12`.
+  - `APPLE_ID`: Apple ID used for notarization.
+  - `APPLE_APP_SPECIFIC_PASSWORD`: app-specific password for that Apple ID.
+  - `APPLE_TEAM_ID`: Apple Developer team ID.
+
+  The workflow passes the certificate as electron-builder's `CSC_LINK` and
+  `CSC_KEY_PASSWORD`, and the Apple credentials as `APPLE_ID`,
+  `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
+- **macOS Gatekeeper:** until releases are signed and notarized, macOS may block
+  the app after download. Only if you trust the official FalkorDB Browser
+  release, you can remove its quarantine flag after moving it to Applications:
+
+  ```sh
+  xattr -dr com.apple.quarantine "/Applications/FalkorDB Browser.app"
+  ```
+
+  This bypasses Gatekeeper's quarantine check for that app. Do not use it for
+  an app from an untrusted source.
 - **App icon:** electron-builder's default icon is used. Add `build/icon.png`
   (512×512 or larger) and set `directories.buildResources: build`.

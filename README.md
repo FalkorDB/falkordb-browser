@@ -40,6 +40,12 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 
 Access the Browser: (https://browser.falkordb.com)
 
+### Desktop app
+
+Desktop installers are attached to successful GitHub releases. Until macOS release
+builds are signed and notarized, Gatekeeper may block them. For the workaround
+and its security caveat, see the [desktop app notes](./desktop/README.md#not-done-yet).
+
 ### Quick start
 
 #### Run the graph database and browser from one docker container
@@ -309,8 +315,3 @@ set `LOAD_CSV_FILE_URI=false`.
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
-
-
-
-
