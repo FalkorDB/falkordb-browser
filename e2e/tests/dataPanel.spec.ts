@@ -225,8 +225,11 @@ test.describe("Data panel Tests", () => {
       await graph.clickRunQuery();
       await graph.searchElementInCanvas("Alice");
       await graph.setAttribute(key, "70", "integer");
-      const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-      expect(response.data[0].n.properties).toEqual({ name: "Alice", [key]: 70, a: 2, c: 3, e: 4, g: 5 });
+      // The UI save is async, so poll until it lands before checking the other keys.
+      await expect.poll(async () => {
+        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
+        return response.data[0].n.properties;
+      }, { timeout: 10000 }).toEqual({ name: "Alice", [key]: 70, a: 2, c: 3, e: 4, g: 5 });
       await apicalls.removeGraph(graphName);
     });
 
@@ -244,8 +247,11 @@ test.describe("Data panel Tests", () => {
       await graph.clickRunQuery();
       await graph.searchElementInCanvas("Alice");
       await graph.removeAttribute(key);
-      const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-      expect(response.data[0].n.properties).toEqual({ name: "Alice", a: 2, c: 3, e: 4, g: 5 });
+      // The UI save is async, so poll until it lands before checking the other keys.
+      await expect.poll(async () => {
+        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
+        return response.data[0].n.properties;
+      }, { timeout: 10000 }).toEqual({ name: "Alice", a: 2, c: 3, e: 4, g: 5 });
       await apicalls.removeGraph(graphName);
     });
   }
