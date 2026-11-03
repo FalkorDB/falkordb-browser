@@ -1,11 +1,9 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextResponse, NextRequest } from "next/server";
 import { duplicateGraph, validateBody } from "../../../validate-body";
-import { getCorsHeaders } from "../../../utils";
+import { getCorsHeaders, corsPreflight } from "../../../utils";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * Copies data from the source specified by the JSON body property `sourceName` into the destination `graph` provided by route params.
@@ -42,9 +40,10 @@ export async function PATCH(
       }
 
       const { sourceName } = validation.data;
-      const result = await client.selectGraph(sourceName).copy(graphId);
+      const copy = await client.selectGraph(sourceName).copy(graphId);
 
-      return NextResponse.json({ result }, { headers: getCorsHeaders(request) });
+      // The name of the graph the copy created, which the UI then selects
+      return NextResponse.json({ result: copy.name }, { headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(

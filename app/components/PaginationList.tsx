@@ -1,4 +1,5 @@
 import { cn, Query } from "@/lib/utils";
+import { getExecutionTime } from "@/lib/queryStats";
 import { getCypherErrorHint } from "@/lib/cypherErrors";
 import { suggestForError } from "@/lib/cypherSuggestions";
 import { Fragment, KeyboardEvent, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -35,8 +36,6 @@ const getLastRun = (timestamp: number) => {
     return date.toLocaleString([], { hour12: false });
 };
 
-const getExecutionTime = (metadata: string[]) => metadata.find(value => value.startsWith("Query internal execution time:"))?.split(":")[1].replace(" milliseconds", "ms");
-
 const getItemClassName = (selected: boolean, hover: boolean, prefix: "text" | "bg" = "text") => {
     if (selected) return `${prefix}-primary border-primary`;
     if (hover) return `${prefix}-foreground border-foreground`;
@@ -63,7 +62,7 @@ const getStatusIcon = (status: Query["status"]) => {
 };
 
 const getQueryElement = (item: Query) => {
-    const executionTime = getExecutionTime(item.metadata);
+    const executionTime = getExecutionTime(item);
 
     // Build array of items to display
     const elements: ElementItem[] = [];
@@ -322,7 +321,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                         const content = (
                             <>
                                 {
-                                    !isString && (item.status || item.elementsCount || item.timestamp || item.graphName || getExecutionTime(item.metadata)) &&
+                                    !isString && (item.status || item.elementsCount || item.timestamp || item.graphName || getExecutionTime(item)) &&
                                     <div className="w-full flex justify-between text-xs">
                                         {getQueryElement(item)}
                                         {!isString && onToggleFav && (

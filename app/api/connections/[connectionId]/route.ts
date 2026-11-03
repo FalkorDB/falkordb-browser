@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSessionFromRequest, removeSessionConnection } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
+import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin, corsPreflight } from "@/app/api/utils";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * DELETE /api/connections/[connectionId]

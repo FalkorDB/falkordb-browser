@@ -706,7 +706,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             const data = await result.json() as {
                 message?: string;
                 error?: { message?: string; status?: number };
-                result?: { data?: Data; metadata?: unknown[] };
+                result?: { data?: Data };
             };
 
             // The import streams a keep-alive heartbeat then a single JSON object;
@@ -731,7 +731,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                 return;
             }
 
-            if (data.result?.data && Array.isArray(data.result.metadata)) {
+            if (Array.isArray(data.result?.data)) {
                 let graphInfo: GraphInfo | undefined;
                 try {
                     const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
@@ -770,7 +770,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
                 const nextGraph = await Graph.create(
                     graphName,
-                    { data: data.result.data, metadata: data.result.metadata },
+                    { data: data.result.data },
                     showPropertyKeyPrefix,
                     graph.CurrentLimit,
                     graphInfo

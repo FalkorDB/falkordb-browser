@@ -5,22 +5,25 @@ import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Share2, Loader2, Search, X, Sparkles, Copy, FileCode2 } from "lucide-react";
 import { Chat as ChatPanel, ChatAvatar, ChatFooter, ChatHeader, ChatInput, ChatInputField, ChatMessage, ChatMessages, ChatSendButton, ChatTitle } from "@falkordb/ui";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Button from "../components/ui/Button";
-import { GraphContext, GraphTabsContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
+import { GraphContext, GraphTabsContext, HistoryQueryContext, IndicatorContext, BrowserSettingsContext, ConnectionContext, UDFContext } from "../components/provider";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
-import useQueryPreflight from "../components/useQueryPreflight";
+import { withQuery } from "@/lib/editorEchoes";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
 import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConfidenceStyle, normalizeConfidence } from "./confidence";
 import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
 import { stripCypherFenceTag } from "./cypherDisplay";
+import { copyText } from "@/lib/clipboard";
+import { chatDraftKey, isUnchangedChatDraft, isChatConfigurationError } from "./chatDraft";
 
 const mdInstance = new MarkdownIt({
     html: false,
@@ -73,12 +76,10 @@ export default function Chat({ onClose }: Props) {
     const { resolvedTheme } = useTheme();
     const { currentTheme } = getTheme(resolvedTheme);
     const { setIndicator } = useContext(IndicatorContext);
-    const { runQuery, graphName } = useContext(GraphContext);
-    // A generated query is arbitrary text the user never typed, so it gets the same
-    // pre-flight gate as the editor before it can reach the server.
-    const checkPreflight = useQueryPreflight();
+    const { graphName } = useContext(GraphContext);
+    const { setHistoryQuery } = useContext(HistoryQueryContext);
     const { activeTabId } = useContext(GraphTabsContext);
-    const { isQueryLoading } = useContext(QueryLoadingContext);
+    const { activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
@@ -104,6 +105,28 @@ export default function Chat({ onClose }: Props) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
+    const draftKey = tabScopedKey(activeTabId, chatDraftKey(graphName));
+    const draftScope = `${getConnectionPrefix()}${draftKey}`;
+    const loadedDraftScopeRef = useRef<string | null>(null);
+    const draftRevisionsRef = useRef(new Map<string, number>());
+
+    useLayoutEffect(() => {
+        if (!getConnectionPrefix() || activeConnectionId !== prefixConnectionId) {
+            loadedDraftScopeRef.current = null;
+            setNewMessage("");
+            return;
+        }
+        setNewMessage(getConnectionItem(draftKey) ?? "");
+        loadedDraftScopeRef.current = draftScope;
+    }, [draftKey, draftScope, activeConnectionId, prefixConnectionId]);
+
+    const updateDraft = (value: string) => {
+        setNewMessage(value);
+        draftRevisionsRef.current.set(draftScope, (draftRevisionsRef.current.get(draftScope) ?? 0) + 1);
+        if (loadedDraftScopeRef.current === draftScope && getConnectionPrefix() && activeConnectionId === prefixConnectionId) {
+            setConnectionItem(draftKey, value);
+        }
+    };
     // Requests in flight, keyed by the conversation they were sent from. A single
     // boolean leaks across tabs: switching mid-request would block the conversation
     // you switched to, and the old request settling would clear its spinner.
@@ -179,7 +202,15 @@ export default function Chat({ onClose }: Props) {
         // so it must not be appended (it would also be persisted under the new key),
         // and only this conversation's loading state may be settled by it.
         const submittedKey = historyKey;
-        const isStale = () => historyKeyRef.current !== submittedKey;
+        const submittedScope = draftScope;
+        const submittedDraft = { text: newMessage, revision: draftRevisionsRef.current.get(submittedScope) ?? 0 };
+        const isStale = () => historyKeyRef.current !== submittedKey || loadedDraftScopeRef.current !== submittedScope;
+        const draftUnchanged = () => isUnchangedChatDraft(submittedDraft, localStorage.getItem(submittedScope), draftRevisionsRef.current.get(submittedScope) ?? 0);
+        const showRequestError = (content: string) => {
+            if (isStale()) return;
+            if (draftUnchanged()) setNewMessage(submittedDraft.text);
+            handleSetMessages({ role: "assistant", content, type: "Error" });
+        };
 
         if (isLoading) {
             toast({
@@ -199,12 +230,7 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
-        const ToastActionButton = <ToastButton label="Go to Settings" showUndo={false} onClick={() => {
-            onClose();
-            setTimeout(() => {
-                route.push("/settings");
-            }, 500);
-        }}>
+        const ToastActionButton = <ToastButton label="Go to Settings" showUndo={false} onClick={() => route.push("/settings")}>
             Go to Settings
         </ToastButton>;
 
@@ -240,6 +266,7 @@ export default function Chat({ onClose }: Props) {
         const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
 
         handleSetMessages(newMessages);
+        // Keep the persisted submission until success so switches, unmounts and sign-out cannot lose it.
         setNewMessage("");
 
         try {
@@ -295,32 +322,24 @@ export default function Chat({ onClose }: Props) {
             try {
                 data = await response.json();
             } catch {
-                if (!isStale()) {
-                    handleSetMessages({
-                        role: "assistant",
-                        content: "Failed to parse server response",
-                        type: "Error"
-                    });
-                }
+                showRequestError("Failed to parse server response");
                 stopLoading(submittedKey);
                 return;
             }
 
             if (!response.ok) {
                 if (response.status >= 500) setIndicator("offline");
-                if (!isStale()) {
-                    handleSetMessages({
-                        role: "assistant",
-                        content: data.error || "An error occurred",
-                        type: "Error"
-                    });
-                }
+                showRequestError(data.error || "An error occurred");
                 stopLoading(submittedKey);
                 return;
             }
 
             setIndicator("online");
 
+            if (draftUnchanged()) {
+                localStorage.setItem(submittedScope, "");
+                if (!isStale()) setNewMessage("");
+            }
             if (isStale()) {
                 stopLoading(submittedKey);
                 return;
@@ -364,13 +383,7 @@ export default function Chat({ onClose }: Props) {
 
         } catch (error) {
             const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
-            if (!isStale()) {
-                handleSetMessages({
-                    role: "assistant",
-                    content: `${friendly.title}: ${friendly.description}`,
-                    type: "Error"
-                });
-            }
+            showRequestError(`${friendly.title}: ${friendly.description}`);
             stopLoading(submittedKey);
         }
     };
@@ -398,28 +411,31 @@ export default function Chat({ onClose }: Props) {
             case "CypherQuery":
                 return (
                     <div className="flex min-w-0 flex-col gap-1">
-                        <pre className="min-w-0 whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
+                        <pre data-testid="chatSuggestedQuery" className="min-w-0 whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
                             {message.content}
                         </pre>
                         <div className="flex items-center gap-1">
                             <Button
-                                data-testid="chatRunQueryButton"
-                                title="Run Query"
+                                data-testid="chatInsertQueryButton"
+                                title="Insert into editor"
                                 className="p-1"
-                                onClick={() => {
-                                    if (checkPreflight(message.content)) return;
-                                    runQuery(message.content);
-                                }}
-                                isLoading={isQueryLoading}
+                                onClick={() => setHistoryQuery(prev => withQuery(prev, message.content))}
                             >
-                                <Play size={16} />
+                                <FileCode2 size={16} />
                             </Button>
                             <Button
                                 data-testid="chatCopyQueryButton"
                                 title="Copy Query"
                                 className="p-1"
-                                onClick={() => {
-                                    navigator.clipboard.writeText(message.content);
+                                onClick={async () => {
+                                    if (!await copyText(navigator.clipboard?.writeText?.bind(navigator.clipboard), message.content)) {
+                                        toast({
+                                            title: "Couldn't copy query",
+                                            description: "Clipboard access is unavailable. Select and copy the query manually.",
+                                            variant: "destructive",
+                                        });
+                                        return;
+                                    }
                                     toast({
                                         title: "Copied to clipboard",
                                         description: "The query has been copied to your clipboard",
@@ -442,6 +458,11 @@ export default function Chat({ onClose }: Props) {
                 return (
                     <div className="flex flex-col gap-1">
                         <MarkdownMessage content={message.content} />
+                        {message.type === "Error" && isChatConfigurationError(message.content) && (
+                            <Link href="/settings" className="text-sm underline">
+                                Go to Settings
+                            </Link>
+                        )}
                         {message.type === "Result" && (() => {
                             const confidence = normalizeConfidence(message.confidence);
                             if (confidence == null) return null;
@@ -634,7 +655,7 @@ export default function Chat({ onClose }: Props) {
                             placeholder="What would you like to know?"
                             aria-describedby="chat-prerequisites"
                             value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
+                            onChange={(e) => updateDraft(e.target.value)}
                         />
                     </div>
                     <ChatSendButton

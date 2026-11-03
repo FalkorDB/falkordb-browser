@@ -56,15 +56,18 @@ test.describe("Chat Feature Tests", () => {
   });
 
   test(`@readwrite Verify chat button is disabled when no graph is selected`, async () => {
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    await browser.createNewPage(ChatComponent);
+    const page = await browser.getPage();
+    await page.addInitScript(() => {
+      for (const key of Object.keys(localStorage)) {
+        if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
+      }
+    });
+    await page.goto(urls.graphUrl);
     await browser.setPageToFullScreen();
     
-    // Wait for the chat toggle button to render before checking state
-    await chat.waitForChatToggleButton();
-    const isChatButtonVisible = await chat.isChatToggleButtonVisible();
-    expect(isChatButtonVisible).toBe(true);
-    const isChatButtonDisabled = await chat.isChatToggleButtonDisabled();
-    expect(isChatButtonDisabled).toBe(true);
+    await expect(page.getByTestId("chatToggleButton")).toBeVisible();
+    await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
   });
 
   test(`@readwrite Verify chat button is displayed when a graph is selected`, async () => {
@@ -324,7 +327,7 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test(`@readwrite Verify play button inserts query into editor, then edit and execute modified query`, async () => {
+  test(`@readwrite Verify insert button inserts query into editor, then edit and execute modified query`, async () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
@@ -357,8 +360,7 @@ test.describe("Chat Feature Tests", () => {
       }
       expect(hasCypherQuery).toBe(true);
       
-      // Click the play/run button to execute the query (this puts the query in the editor)
-      await chat.clickChatRunQueryButton();
+      await chat.clickChatInsertQueryButton();
       
       // Wait for the query to be inserted into the editor
       await chat.waitForTimeout(1000);
@@ -631,15 +633,20 @@ test.describe("Chat Feature Tests", () => {
       await expect(queryText).toHaveText(cypherQuery);
       await expect(queryText).toHaveCSS("font-size", "12px");
       await expect(queryMessage.getByRole("button")).toHaveCount(2);
-      await expect(queryMessage.getByTestId("chatRunQueryButton")).toBeVisible();
+      await expect(queryMessage.getByTestId("chatInsertQueryButton")).toBeVisible();
       await expect(queryMessage.getByTestId("chatCopyQueryButton")).toBeVisible();
       expect(await queryText.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 
-      // Running it from the chat must execute successfully against FalkorDB.
-      await chat.clickChatRunQueryButton();
+      let queryRequests = 0;
+      page.on("request", request => {
+        if (request.method() === "POST" && new URL(request.url()).pathname === "/api/graph") queryRequests++;
+      });
+      await chat.clickChatInsertQueryButton();
 
       await expect.poll(() => chat.getEditorInput(), { timeout: 10000 })
         .toMatch(/^CYPHER sourceCode='TLV'/);
+      expect(queryRequests).toBe(0);
+      await chat.clickRunQuery();
       await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
       expect(await chat.getNotificationErrorToast()).toBe(false);
     } finally {

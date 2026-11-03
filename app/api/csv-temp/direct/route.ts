@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders, resolveReadOnly } from "../../utils";
+import { getCorsHeaders, resolveReadOnly, corsPreflight } from "../../utils";
 import { getClient } from "../../auth/[...nextauth]/options";
 import {
     getCsvStorageProvider,
@@ -38,9 +38,7 @@ function sanitizeDirectUploadRequest(body: unknown): CsvDirectUploadRequest | nu
     };
 }
 
-export async function OPTIONS(request: Request) {
-    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 export async function POST(request: NextRequest) {
     if (!CSV_UPLOAD_ENABLED) {

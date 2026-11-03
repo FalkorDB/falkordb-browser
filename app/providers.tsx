@@ -2,16 +2,18 @@
 
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dispatch, SetStateAction, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout, ToastFn } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey, ServerDecryptError } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, buildConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import switchSessionConnection from "@/lib/connection-switch";
 import { usePathname, useRouter } from "next/navigation";
+import { settleQueryUpdate, withQuery } from "@/lib/editorEchoes";
 import { syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
 import { detectProviderFromApiKey, getProviderDisplayName, detectProviderFromModel } from "@/lib/ai-provider-utils";
+import { LOCAL_PROVIDER_DEFAULT_ENDPOINTS, normalizeLocalProvider } from "@/lib/local-llm-utils";
 import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
@@ -19,6 +21,7 @@ import { isAiFixSupported } from "@/lib/aiFix";
 import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
+import type { QueryStatistics } from "falkordb";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
@@ -62,9 +65,9 @@ type GraphSession = {
 const defaultQueryHistory: HistoryQuery = {
   queries: [],
   query: "",
+  revision: 0,
   currentQuery: {
     text: "",
-    metadata: [],
     explain: [],
     profile: [],
     graphName: "",
@@ -90,21 +93,14 @@ const NO_OFFLOADED_GRAPHS: string[] = [];
 // The graph list waits on the stub probe, so this bounds how long a hung
 // GRAPH.STUBS can hold the selector empty.
 const STUBS_PROBE_TIMEOUT = 10000;
-const DEFAULT_LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
-  ollama: "http://localhost:11434",
-  lmstudio: "http://localhost:1234/v1",
-};
 
 const normalizeChatModelSource = (value: string | null | undefined): ChatModelSource =>
   value === "local" ? "local" : "api-key";
 
-const normalizeLocalLlmProvider = (value: string | null | undefined): LocalLlmProvider =>
-  value === "lmstudio" ? "lmstudio" : "ollama";
-
 const normalizeLocalLlmEndpoint = (
   provider: LocalLlmProvider,
   endpoint: string | null | undefined
-) => endpoint?.trim() || DEFAULT_LOCAL_LLM_ENDPOINTS[provider];
+) => endpoint?.trim() || LOCAL_PROVIDER_DEFAULT_ENDPOINTS[provider];
 
 const createChatApiKey = (key: string): ChatApiKey => {
   const provider = detectProviderFromApiKey(key);
@@ -238,7 +234,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   );
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
-  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
+  const [historyQuery, setHistoryQueryState] = useState<HistoryQuery>(defaultQueryHistory);
+  // Every write goes through settleQueryUpdate, so the editors learn of any outside replacement.
+  const setHistoryQuery = useCallback<Dispatch<SetStateAction<HistoryQuery>>>((update) => {
+    setHistoryQueryState(prev => settleQueryUpdate(prev, typeof update === "function" ? update(prev) : update));
+  }, []);
   const [selectedParam, setSelectedParam] = useState<string>("");
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [graphNames, setGraphNames] = useState<string[] | undefined>(undefined);
@@ -341,10 +341,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [selectedChatApiKeyId, setSelectedChatApiKeyId] = useState("");
   const [chatModelSource, setChatModelSource] = useState<ChatModelSource>("api-key");
   const [localLlmProvider, setLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
-  const [localLlmEndpoint, setLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
+  const [localLlmEndpoint, setLocalLlmEndpoint] = useState(LOCAL_PROVIDER_DEFAULT_ENDPOINTS.ollama);
   const [newChatModelSource, setNewChatModelSource] = useState<ChatModelSource>("api-key");
   const [newLocalLlmProvider, setNewLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
-  const [newLocalLlmEndpoint, setNewLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
+  const [newLocalLlmEndpoint, setNewLocalLlmEndpoint] = useState(LOCAL_PROVIDER_DEFAULT_ENDPOINTS.ollama);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
@@ -408,7 +408,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const prevActiveConnectionIdRef = useRef<string | null>(null);
   const connectionSwitchFetchedRef = useRef(false);
 
-  // ── Graph-operation ownership guards (see idea-6 plan) ──────────────────────
+  // ── Graph-operation ownership guards (see docs/design/idea-6-connection-epoch-pinning-plan.md) ──────────────────────
   // contextGen: "what connection + graph the UI represents" — bumped on a
   // connection-switch begin, a connection reset, and a graph-name change.
   const contextGenRef = useRef(0);
@@ -574,7 +574,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("perSourceModels", JSON.stringify(next));
       // chatModelSource and localLlmProvider are non-secret enum values
       localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource === "local" ? "local" : "api-key");
-      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider === "lmstudio" ? "lmstudio" : "ollama");
+      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, normalizeLocalProvider(newLocalLlmProvider));
       localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
       localStorage.setItem("model", sanitizeModelName(newModel));
       // Reset has changes
@@ -725,7 +725,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     cancelConsent: () => setPendingConsent(null),
     dismissResult: () => setAiFixResult({ status: "idle" }),
     insertCorrectedQuery: (q: string) => {
-      setHistoryQuery(prev => ({ ...prev, query: q }));
+      setHistoryQuery(prev => withQuery(prev, q));
       setAiFixResult({ status: "idle" });
     },
   }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
@@ -1191,7 +1191,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       elementsCount: 0,
       explain: [],
       graphName: n,
-      metadata: [],
       profile: [],
       status: "Failed",
       text: q,
@@ -1216,7 +1215,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
         query: q,
         connectionId: cid,
-      }) as { data: Data; metadata: string[] };
+      }) as { data: Data; stats: QueryStatistics };
 
       if (!result) throw new Error("Failed to execute query");
       if (!isCurrent()) return;
@@ -1264,7 +1263,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         elementsCount: g.getElements().length,
         explain: explainJson.result,
         graphName: n,
-        metadata: result.metadata,
+        stats: result.stats,
         status: "Success",
       };
 
@@ -2067,7 +2066,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
       const loadedChatModelSource = normalizeChatModelSource(localStorage.getItem(CHAT_MODEL_SOURCE_STORAGE_KEY));
-      const loadedLocalLlmProvider = normalizeLocalLlmProvider(localStorage.getItem(LOCAL_LLM_PROVIDER_STORAGE_KEY));
+      const loadedLocalLlmProvider = normalizeLocalProvider(localStorage.getItem(LOCAL_LLM_PROVIDER_STORAGE_KEY));
       const rawEndpoint = localStorage.getItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY);
       const loadedLocalLlmEndpoint = normalizeLocalLlmEndpoint(
         loadedLocalLlmProvider,
@@ -2334,14 +2333,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const udfData = await result.json();
         setSelectedUdf(prev => prev ?? udfData.result[0]);
       }
-    })();
+    })().catch((error) => console.error("Failed to load UDFs:", error));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, activeConnectionId]);
 
+  // A poll may publish unless a newer poll already published or the connection changed.
+  const statusStartedRef = useRef(0);
+  const statusPublishedRef = useRef(0);
   const checkStatus = useCallback(() => {
+    const seq = (statusStartedRef.current += 1);
+    const epoch = getConnectionEpoch();
+    const setIndicatorIfCurrent = (value: "online" | "offline") => {
+      if (seq < statusPublishedRef.current || getConnectionEpoch() !== epoch) return;
+      statusPublishedRef.current = seq;
+      setIndicator(value);
+    };
+
     securedFetch("/api/status", {
       method: "GET",
-    }, toast, setIndicator);
+    }, toast, setIndicatorIfCurrent).catch(() => setIndicatorIfCurrent("offline"));
   }, [toast]);
 
   useEffect(() => {
