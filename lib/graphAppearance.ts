@@ -28,16 +28,19 @@ export function getGraphAppearance(selection: (Node | Link)[], hover: Node | Lin
 }
 
 /** Expansion mutates the model outside React, sometimes pushing into the same array. */
-export function createGraphAppearanceLookup(selection: (Node | Link)[], hover: Node | Link | undefined, readLinks: () => Link[]) {
+export function createGraphAppearanceLookup(selection: (Node | Link)[], hover: Node | Link | undefined, readLinks: () => Link[], readVersion: () => number = () => 0) {
     let previousLinks: Link[] | undefined;
     let previousLength = -1;
+    let previousVersion = -1;
     let cached: ReturnType<typeof getGraphAppearance> | undefined;
     return () => {
         const links = readLinks();
-        if (!cached || links !== previousLinks || links.length !== previousLength) {
+        const version = readVersion();
+        if (!cached || links !== previousLinks || links.length !== previousLength || version !== previousVersion) {
             cached = getGraphAppearance(selection, hover, links);
             previousLinks = links;
             previousLength = links.length;
+            previousVersion = version;
         }
         return cached;
     };

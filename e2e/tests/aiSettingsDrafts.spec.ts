@@ -113,6 +113,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             await page.getByTestId("chatSendButton").click();
             await expect(page.getByTestId("chatSuggestedQuery")).toHaveText(suggestion);
             await expect(page.getByRole("group", { name: "Suggested query", exact: true })).toHaveText(suggestion);
+            await expect(page.getByTestId("chatSuggestedQuery")).toHaveCSS("word-break", "normal");
+            await expect(page.getByTestId("chatSuggestedQuery")).toHaveCSS("overflow-wrap", "break-word");
             expect(await page.getByTestId("chatSuggestedQuery").evaluate(element =>
               parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(12);
             expect(await page.getByTestId("chatSuggestedQuery").evaluate(element =>

@@ -37,6 +37,12 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 
 ### Large graphs in 3D
 
+Expansion, collapse and mutation repaints are tied to the graph, query result,
+tab and connection that started them. A completed server mutation still updates
+its owning graph model when that view is no longer active; only its canvas
+repaint and active-view controls are skipped. Returning to a saved tab reconciles
+its stored positions with the updated model.
+
 Before entering 3D, loading results in 3D, restoring a graph, or adding elements,
 the browser checks the graph size against advisory device-adjusted budgets:
 

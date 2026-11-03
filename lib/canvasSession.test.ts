@@ -61,3 +61,17 @@ test("a safe-renderer wait cannot commit after a connection switch starts", asyn
     assert.equal(written, false);
     setActiveConnectionIdGlobal(null);
 });
+
+test("an already stale mutation cannot cancel a pending restore or start its resource check", async () => {
+    const canvas = { setGraphData() {} };
+    const ready = Promise.withResolvers<boolean>();
+    let checks = 0;
+    register3DCheck(canvas, () => { checks += 1; return ready.promise; });
+    let restored = false;
+    const restore = writeCanvasData(canvas, { nodes: [], links: [] }, () => { restored = true; });
+    assert.equal(await writeCanvasData(canvas, { nodes: [], links: [] }, () => assert.fail("stale mutation applied"), () => false), false);
+    assert.equal(checks, 1);
+    ready.resolve(true);
+    assert.equal(await restore, true);
+    assert.equal(restored, true);
+});

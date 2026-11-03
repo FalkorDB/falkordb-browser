@@ -62,3 +62,16 @@ test("same-sized topology replacement invalidates the cache", () => {
     assert.equal(lookup().activeNodeIds.has(5), true);
     assert.equal(lookup().activeNodeIds.has(2), false);
 });
+
+test("a topology revision invalidates equal-length in-place replacements", () => {
+    const topology = [...links];
+    let version = 0;
+    const lookup = createGraphAppearanceLookup([{ id: 1 }], undefined, () => topology, () => version);
+    const first = lookup();
+    topology.splice(0, 1);
+    topology.push({ id: 4, source: 1, target: 5 });
+    version += 1;
+    assert.notEqual(lookup(), first);
+    assert.equal(lookup().activeNodeIds.has(2), false);
+    assert.equal(lookup().activeNodeIds.has(5), true);
+});

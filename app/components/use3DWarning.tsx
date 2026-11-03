@@ -55,6 +55,7 @@ export default function use3DWarning(dimension: CanvasDimension, setDimension: (
             gpu,
         };
         if (!needs3DWarning(size, resources, approvedRef.current)) {
+            fallbackFailedRef.current = false;
             if (pendingRef.current) {
                 dimensionRef.current = "2d";
                 approvedRef.current = undefined;
@@ -98,11 +99,12 @@ export default function use3DWarning(dimension: CanvasDimension, setDimension: (
         <AlertDialog open={pending !== undefined} onOpenChange={(open) => { if (!open) fallBackTo2D(); }}>
             <AlertDialogContent data-testid="graph3DWarning">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Large graph in 3D</AlertDialogTitle>
+                    <AlertDialogTitle>{pending?.gpu.webgl2 === "unavailable" ? "3D may be unavailable" : "Large graph in 3D"}</AlertDialogTitle>
                     <AlertDialogDescription>
                         This graph has {pending?.nodes.toLocaleString()} nodes and {pending?.links.toLocaleString()} relationships.
-                        Based on the device information available, 3D may freeze or crash this browser tab.
-                        {pending?.gpu.webgl2 === "unavailable" && " WebGL2 could not be started, so 3D may not be available."}
+                        {pending?.gpu.webgl2 === "unavailable"
+                            ? " WebGL2 could not be started. This browser may not support 3D, even for small graphs."
+                            : " Based on the device information available, 3D may freeze or crash this browser tab."}
                         {pending?.gpu.softwareRendering && " Software rendering was detected, which uses the CPU instead of hardware GPU acceleration."}
                         {" "}Available GPU memory cannot be reliably checked. The graph is shown in 2D until you choose.
                     </AlertDialogDescription>

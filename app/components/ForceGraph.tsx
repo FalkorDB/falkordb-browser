@@ -176,11 +176,19 @@ export default function ForceGraph({
     useEffect(() => {
         if (!viewport || !canvasRef.current || !canvasLoaded) return undefined;
 
-        canvasRef.current.setViewport(viewport);
+        const canvas = canvasRef.current;
+        const session = { ...sessionRef.current, epoch: getConnectionEpoch() };
+        const apply = () => {
+            if (canvasRef.current === canvas
+                && sessionRef.current.graph === session.graph && sessionRef.current.data === session.data
+                && sessionRef.current.tabId === session.tabId && getConnectionEpoch() === session.epoch
+                && ownsCanvasSession(canvas, { ...session, restore: sessionRef.current.restore })) canvas.setViewport(viewport);
+        };
+        apply();
         // A viewport that arrives alongside fresh results (a tab rebuilt from its
         // stored metadata) races the canvas's own deferred zoomToFit, which would
         // otherwise win. Re-apply once that has had its turn.
-        const handle = setTimeout(() => canvasRef.current?.setViewport(viewport), CANVAS_AUTO_ZOOM_DELAY);
+        const handle = setTimeout(apply, CANVAS_AUTO_ZOOM_DELAY);
 
         return () => clearTimeout(handle);
     }, [canvasRef, viewport, canvasLoaded]);
@@ -218,6 +226,12 @@ export default function ForceGraph({
         if (!canvas || !canvasLoaded) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
+        const session = { graph, data, tabId: activeTabId, epoch: startEpoch };
+        const isCurrentOwner = () => getConnectionEpoch() === startEpoch && isCurrent()
+            && sessionRef.current.graph === graph && sessionRef.current.data === data
+            && sessionRef.current.tabId === activeTabId && canvasRef.current === canvas
+            && ownsCanvasSession(canvas, { ...session, restore: sessionRef.current.restore });
+        if (!isCurrentOwner()) return;
 
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}${isReadOnly ? '?readOnly=true' : ''}`, {
             method: 'GET',
@@ -226,13 +240,13 @@ export default function ForceGraph({
             }
         }, toast, setIndicator, cid);
 
-        if (getConnectionEpoch() !== startEpoch || !isCurrent()) return;
+        if (!isCurrentOwner()) return;
         if (result.ok) {
             const json = await result.json();
-            if (getConnectionEpoch() !== startEpoch || !isCurrent()) return;
+            if (!isCurrentOwner()) return;
 
             const elements = await graph.extend(json.result, true, true);
-            if (getConnectionEpoch() !== startEpoch || !isCurrent()) return;
+            if (!isCurrentOwner()) return;
 
             if (elements.length === 0) {
                 toast({
@@ -250,10 +264,10 @@ export default function ForceGraph({
                         }))
                 };
 
-                if (!await setCanvasGraphData(canvas, newData, () => getConnectionEpoch() === startEpoch && isCurrent() && canvasRef.current === canvas)) return;
+                await setCanvasGraphData(canvas, newData, isCurrentOwner);
             }
         }
-    }, [canvasRef, canvasLoaded, graph, toast, setIndicator]);
+    }, [canvasRef, canvasLoaded, graph, data, activeTabId, isReadOnly, toast, setIndicator]);
 
     const deleteNeighbors = useCallback(async (nodes: Node[]) => {
         if (nodes.length === 0) return;
@@ -262,6 +276,12 @@ export default function ForceGraph({
         const canvas = canvasRef.current;
 
         if (!canvas || !canvasLoaded) return;
+        const session = { graph, data, tabId: activeTabId, epoch: startEpoch };
+        const isCurrentOwner = () => getConnectionEpoch() === startEpoch
+            && sessionRef.current.graph === graph && sessionRef.current.data === data
+            && sessionRef.current.tabId === activeTabId && canvasRef.current === canvas
+            && ownsCanvasSession(canvas, { ...session, restore: sessionRef.current.restore });
+        if (!isCurrentOwner()) return;
 
         const expandedNodes: Node[] = [];
         const nodeIdsToRemove = new Set<number>();
@@ -284,12 +304,12 @@ export default function ForceGraph({
         };
 
         await deleteNeighbors(expandedNodes);
-        if (getConnectionEpoch() !== startEpoch || canvasRef.current !== canvas) return;
+        if (!isCurrentOwner()) return;
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)));
 
-        if (!await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements, nodeShape), () => getConnectionEpoch() === startEpoch && canvasRef.current === canvas)) return;
-    }, [canvasRef, canvasLoaded, graph, setRelationships, nodeShape]);
+        await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements, nodeShape), isCurrentOwner);
+    }, [canvasRef, canvasLoaded, graph, data, activeTabId, setRelationships, nodeShape]);
 
     // When focus mode is on, pan the canvas to the centroid of the selected elements.
     const centerOnSelection = useCallback((selection: (Node | Link)[]) => {
@@ -479,7 +499,7 @@ export default function ForceGraph({
         setSelectedElements([]);
     }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, consumeClick]);
 
-    const appearance = useMemo(() => createGraphAppearanceLookup(selectedElements, hoverElement, () => graph.Elements.links),
+    const appearance = useMemo(() => createGraphAppearanceLookup(selectedElements, hoverElement, () => graph.Elements.links, () => graph.TopologyVersion),
         [selectedElements, hoverElement, graph]);
 
     const checkIsNodeSelected = useCallback((node: GraphNode) => appearance().selectedNodeIds.has(node.id), [appearance]);
@@ -595,11 +615,12 @@ export default function ForceGraph({
             clearTimeout(correctionTimer);
         };
         if (graphData) {
-            write(graphData.data, () => {
+            const restoredData = convertToCanvasData(graph.Elements, nodeShape);
+            write(restoredData, () => {
                 // Remember the data snapshot so consuming the restore does not
                 // immediately overwrite it with an unchanged query result.
                 pendingRestoreDataRef.current = data;
-                applyCanvasLayout(canvas, graphData);
+                applyCanvasLayout(canvas, { ...graphData, data: restoredData });
                 setGraphData(undefined);
 
                 // Re-apply after setData's scheduled zoomToFit. Consuming the
@@ -653,7 +674,7 @@ export default function ForceGraph({
         });
 
         return cleanup;
-    }, [canvasRef, graph, activeTabId, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape, prepareData, toast]);
+    }, [canvasRef, graph, activeTabId, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape, toast]);
 
     // Run after data/restore effects: the live counts must be checked, including
     // a consumed restore whose data prop may still describe an earlier result.

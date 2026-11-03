@@ -66,6 +66,7 @@ export function register3DCheck(canvas: DataCanvas, check: DataCheck): () => voi
 
 /** Wait for a safe renderer and discard superseded or unmounted data writes. */
 export async function writeCanvasData(canvas: DataCanvas, data: Data, write: () => void, isCurrent = () => true): Promise<boolean> {
+    if (!isCurrent()) return false;
     const token = {};
     writes.set(canvas, token);
     const check = checks.get(canvas);
