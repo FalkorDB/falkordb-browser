@@ -111,9 +111,12 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             await page.getByTestId("chatToggleButton").click();
             await page.getByTestId("chatInput").fill("Suggest a query");
             await page.getByTestId("chatSendButton").click();
-            await page.getByRole("button", { name: "Collapse query", exact: true }).click();
-            await expect(page.getByRole("button", { name: "Expand query", exact: true })).toHaveAttribute("aria-expanded", "false");
-            await page.getByRole("button", { name: "Expand query", exact: true }).click();
+            await expect(page.getByTestId("chatSuggestedQuery")).toHaveText(suggestion);
+            expect(await page.getByTestId("chatSuggestedQuery").evaluate(element =>
+              parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(12);
+            expect(await page.getByTestId("chatSuggestedQuery").evaluate(element =>
+              element.scrollWidth <= element.clientWidth)).toBe(true);
+            await expect(page.getByRole("button", { name: /^(Collapse|Expand) query$/ })).toHaveCount(0);
             await page.getByTestId("chatCopyQueryButton").click();
             expect(await page.evaluate(() => sessionStorage.getItem("copiedQuery"))).toBe(suggestion);
             await expect(editor).toHaveAttribute("data-value", query);

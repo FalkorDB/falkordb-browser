@@ -639,7 +639,8 @@ test.describe("Chat Feature Tests", () => {
 
       let queryRequests = 0;
       page.on("request", request => {
-        if (request.method() === "POST" && new URL(request.url()).pathname === "/api/graph") queryRequests++;
+        const url = new URL(request.url());
+        if (url.pathname === `/api/graph/${graphName}` && url.searchParams.has("query")) queryRequests++;
       });
       await chat.clickChatInsertQueryButton();
 
@@ -647,6 +648,7 @@ test.describe("Chat Feature Tests", () => {
         .toMatch(/^CYPHER sourceCode='TLV'/);
       expect(queryRequests).toBe(0);
       await chat.clickRunQuery();
+      expect(queryRequests).toBeGreaterThan(0);
       await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
       expect(await chat.getNotificationErrorToast()).toBe(false);
     } finally {

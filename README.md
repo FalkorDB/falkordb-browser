@@ -333,7 +333,7 @@ If index metadata is unavailable, analysis continues with an explicit warning.
 
 Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 **Insert into editor** actions. Neither action runs the query. The card adapts to
-mobile screens, and long Chat queries can be collapsed.
+mobile screens. Chat uses compact, fully wrapped queries without collapse controls.
 
 Missing AI configuration and provider errors offer **Go to Settings**. Returning
 to the graph preserves the editor query and unsent Chat input. Chat drafts are
