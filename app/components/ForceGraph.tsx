@@ -572,7 +572,7 @@ export default function ForceGraph({
         const isCurrent = () => !cancelled && canvasRef.current === canvas
             && getConnectionEpoch() === epoch
             && sessionRef.current.graph === graph && sessionRef.current.data === data
-            && sessionRef.current.tabId === activeTabId;
+            && sessionRef.current.tabId === activeTabId && sessionRef.current.restore === graphData;
         let correctionTimer: ReturnType<typeof setTimeout> | undefined;
         dataPendingRef.current = true;
         const write = (incoming: Data, apply: () => void) => {

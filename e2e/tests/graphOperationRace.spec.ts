@@ -38,8 +38,8 @@ test.describe("Graph operation race conditions", () => {
       await route.fulfill({ json: { connections: [...payload.connections, { ...original, id: "pending-test-switch" }] } });
     });
     await browser.navigateTo(urls.graphUrl);
-    await graph.addGraph(graphName);
     try {
+      await graph.addGraph(graphName);
       await graph.insertQuery("CREATE (a:PendingConnection {id: 1}), (b:PendingConnection {id: 2}) RETURN a,b");
       await graph.clickRunQuery();
       await graph.clickDimensionControl("3d");

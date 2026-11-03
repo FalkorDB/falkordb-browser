@@ -676,7 +676,7 @@ test.describe("Chat Feature Tests", () => {
         .toMatch(/^CYPHER sourceCode='TLV'/);
       expect(queryRequests).toBe(0);
       await chat.clickRunQuery();
-      expect(queryRequests).toBeGreaterThan(0);
+      await expect.poll(() => queryRequests).toBeGreaterThan(0);
       await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
       expect(await chat.getNotificationErrorToast()).toBe(false);
     } finally {
