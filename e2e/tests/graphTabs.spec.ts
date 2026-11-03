@@ -143,18 +143,35 @@ test.describe("@admin Graph tabs", () => {
 
         await graph.selectGraphByName(graphOne);
         await graph.insertQuery("MATCH (n) RETURN n");
+        const firstRun = page.waitForResponse((response) => new URL(response.url()).searchParams.get("query")?.startsWith("MATCH (n) RETURN n") ?? false);
         await graph.clickRunQuery();
+        await firstRun;
         await graph.waitForPageIdle();
+
+        // With no saved timeout the app loads it from /api/graph/config. Clear the
+        // value the E2E harness seeds and slow that request down, so the tab
+        // restore would win the race if it did not wait for the timeout.
+        await page.addInitScript(() => localStorage.removeItem("timeout"));
+        await page.route("**/api/graph/config", async (route) => {
+            await new Promise((resolve) => { setTimeout(resolve, 3000); });
+            await route.continue();
+        });
+
+        // Listen only once the reloaded document exists, so no request from the
+        // run above can be counted; the delayed config keeps the restore later.
+        const reloadedDocument = page.waitForEvent("domcontentloaded");
+        const refresh = graph.refreshPage();
+        await reloadedDocument;
 
         const restoredQueries: URL[] = [];
         page.on("request", (request) => {
             const url = new URL(request.url());
-            if (/^\/api\/graph\/[^/]+$/.test(url.pathname) && url.searchParams.has("query")) {
+            if (/^\/api\/graph\/[^/]+$/.test(url.pathname) && url.searchParams.get("query")?.startsWith("MATCH (n) RETURN n")) {
                 restoredQueries.push(url);
             }
         });
 
-        await graph.refreshPage();
+        await refresh;
         await graph.waitForPageIdle();
 
         await expect.poll(() => restoredQueries.length, { timeout: 15000 }).toBeGreaterThan(0);
