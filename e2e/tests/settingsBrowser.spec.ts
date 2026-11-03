@@ -222,6 +222,104 @@ test.describe('@browser Browser Settings tests', () => {
         expect(tooltipText).toContain("xAI");
     });
 
+    for (const wasVisible of [false, true]) {
+        test(`@readwrite discarding settings restores a ${wasVisible ? "shown" : "hidden"} key and closes its edit`, async () => {
+            const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+            const page = await browser.getPage();
+            const apiKey = `sk-e2e-discard-${getRandomString("key")}`;
+            await settings.expandChatSection();
+            await settings.selectApiKeyModelSource();
+            await settings.waitForChatApiKeyInputEnabled();
+            await settings.addChatApiKey(apiKey);
+            if (wasVisible) await settings.showChatApiKey(apiKey);
+
+            await page.getByTestId("queryExecutionSectionHeader").click();
+            const limit = page.locator("#limitInput");
+            const savedLimit = await limit.inputValue();
+            await limit.fill(savedLimit === "123" ? "124" : "123");
+            await expect(page.getByTestId("cancelSettingsButton")).toBeVisible();
+            await settings.startChatApiKeyEdit(apiKey, `${apiKey}-discarded`);
+            await page.getByTestId("cancelSettingsButton").click();
+
+            await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);
+            expect(await settings.getChatApiKeyVisibilityLabel(apiKey)).toBe(wasVisible ? "Hide" : "Show");
+            await expect(limit).toHaveValue(savedLimit);
+            await settings.deleteChatApiKey(apiKey);
+        });
+    }
+
+    for (const abandon of ["discard", "unmount"] as const) {
+        test(`@readwrite a pending API key save cannot overwrite a newer edit after ${abandon}`, async () => {
+            const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+            const page = await browser.getPage();
+            const apiKey = `sk-e2e-pending-${getRandomString("key")}`;
+            const staleKey = `${apiKey}-stale`;
+            const newerKey = `${apiKey}-newer`;
+            await settings.expandChatSection();
+            await settings.selectApiKeyModelSource();
+            await settings.waitForChatApiKeyInputEnabled();
+            await settings.addChatApiKey(apiKey);
+
+            let releaseEncryption!: () => void;
+            const encryptionGate = new Promise<void>((resolve) => { releaseEncryption = resolve; });
+            let encryptionStarted!: () => void;
+            const started = new Promise<void>((resolve) => { encryptionStarted = resolve; });
+            let delayed = false;
+            await page.route("**/api/encrypt", async (route) => {
+                if (delayed || route.request().postDataJSON().action !== "encrypt") {
+                    await route.continue();
+                    return;
+                }
+                delayed = true;
+                const response = await route.fetch();
+                encryptionStarted();
+                await encryptionGate;
+                await route.fulfill({ response });
+            });
+
+            try {
+                if (abandon === "discard") {
+                    await page.getByTestId("queryExecutionSectionHeader").click();
+                    const limit = page.locator("#limitInput");
+                    await limit.fill((await limit.inputValue()) === "123" ? "124" : "123");
+                    await expect(page.getByTestId("cancelSettingsButton")).toBeVisible();
+                }
+                await settings.startChatApiKeyEdit(apiKey, staleKey);
+                await page.getByTestId("saveEditedChatApiKeyButton").click();
+                await started;
+                if (abandon === "discard") {
+                    await page.getByTestId("cancelSettingsButton").click();
+                } else {
+                    await page.getByTestId("settingsTabTokens").click();
+                    await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);
+                    await page.getByTestId("settingsTabBrowser").click();
+                    await settings.expandChatSection();
+                }
+                await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);
+                await settings.editChatApiKey(apiKey, newerKey);
+
+                const staleResponse = page.waitForResponse((response) =>
+                    response.url().endsWith("/api/encrypt")
+                    && response.request().postData()?.includes(staleKey) === true);
+                releaseEncryption();
+                await (await staleResponse).finished();
+                // Allow the resumed save to reach its commit guard before asserting.
+                await page.waitForTimeout(500);
+                await expect(page.getByTestId("chatApiKeyValue").filter({
+                    hasText: `sk-e2e••••••••${newerKey.slice(-4)}`,
+                })).toBeVisible();
+                expect(await settings.getChatApiKeyVisibilityLabel(newerKey)).toBe("Show");
+                await page.reload({ waitUntil: "networkidle" });
+                await settings.expandChatSection();
+                expect(await settings.getMaskedChatApiKeyText(newerKey)).toContain(newerKey.slice(-4));
+                await settings.deleteChatApiKey(newerKey);
+            } finally {
+                releaseEncryption();
+                await page.unrouteAll({ behavior: "wait" });
+            }
+        });
+    }
+
     test('@readwrite Verify API key can be added viewed edited and deleted', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         const apiKey = `sk-e2e-${getRandomString("key")}`;

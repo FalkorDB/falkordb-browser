@@ -372,7 +372,7 @@ export default class SettingsBrowserPage extends BasePage {
       .textContent())?.trim() ?? "";
   }
 
-  async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<string | null> {
+  async startChatApiKeyEdit(currentApiKey: string, nextApiKey: string): Promise<string | null> {
     const card = this.getChatApiKeyCard(currentApiKey);
     await interactWhenVisible(
       card.getByTestId("editChatApiKeyButton"),
@@ -390,7 +390,11 @@ export default class SettingsBrowserPage extends BasePage {
       },
       "Chat API Key Edit Input"
     );
+    return inputType;
+  }
 
+  async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<string | null> {
+    const inputType = await this.startChatApiKeyEdit(currentApiKey, nextApiKey);
     await interactWhenVisible(
       this.page.getByTestId("saveEditedChatApiKeyButton"),
       (el) => el.click(),

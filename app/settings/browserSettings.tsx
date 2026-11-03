@@ -122,6 +122,27 @@ export default function BrowserSettings() {
     // Bumped whenever a key edit starts or ends, so a save that finishes after
     // its edit was cancelled or replaced can be recognised before it commits.
     const editGenerationRef = useRef(0);
+    useEffect(() => () => {
+        editGenerationRef.current += 1;
+        editingKeyVisibilityRef.current = null;
+    }, []);
+
+    const handleCancelEditKey = useCallback(() => {
+        editGenerationRef.current += 1;
+        const previousVisibility = editingKeyVisibilityRef.current;
+        editingKeyVisibilityRef.current = null;
+        if (previousVisibility) {
+            setVisibleKeyIds(prev => withRestoredKeyVisibility(prev, previousVisibility));
+        }
+        setEditingKeyId(null);
+        setEditingKeyValue("");
+    }, []);
+
+    const handleDiscardSettings = useCallback(() => {
+        handleCancelEditKey();
+        resetSettings();
+    }, [handleCancelEditKey, resetSettings]);
+
     const [activeSelectedChatApiKeyId, setActiveSelectedChatApiKeyId] = useState("");
     const [modelLoadNonce, setModelLoadNonce] = useState(0);
     const [loadingChatApiKeyId, setLoadingChatApiKeyId] = useState("");
@@ -387,14 +408,14 @@ export default function BrowserSettings() {
                     handleSubmit();
                     router.back();
                 }, () => {
-                    resetSettings();
+                    handleDiscardSettings();
                     router.back();
                 });
             } else {
                 router.back();
             }
         }
-    }, [hasChanges, toast, handleSubmit, router, resetSettings]);
+    }, [hasChanges, toast, handleSubmit, router, handleDiscardSettings]);
 
     useEffect(() => {
         window.addEventListener("keydown", navigateBack);
@@ -686,13 +707,6 @@ export default function BrowserSettings() {
             setEditingKeyId(null);
             setEditingKeyValue("");
         }
-    };
-
-    const handleCancelEditKey = () => {
-        editGenerationRef.current += 1;
-        if (editingKeyId) restoreEditingKeyVisibility(editingKeyId);
-        setEditingKeyId(null);
-        setEditingKeyValue("");
     };
 
     const handleDeleteKey = async (id: string) => {
@@ -1771,7 +1785,7 @@ export default function BrowserSettings() {
                             data-testid="cancelSettingsButton"
                             id="cancelQuerySettingsBtn"
                             variant="Secondary"
-                            onClick={resetSettings}
+                            onClick={handleDiscardSettings}
                         >
                             <p>Cancel Changes</p>
                         </Button>
