@@ -63,9 +63,13 @@ test.describe("Chat Feature Tests", () => {
         if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
       }
     });
+    // A single real graph is auto-selected, so isolate the empty-list case
+    // from graphs created or removed by other workers.
+    await page.route("**/api/graph", route => route.fulfill({ json: { opts: [] } }));
     await page.goto(urls.graphUrl);
     await browser.setPageToFullScreen();
     
+    await expect(page.getByTestId("selectGraph")).toHaveText("Select Graph");
     await expect(page.getByTestId("chatToggleButton")).toBeVisible();
     await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
   });
