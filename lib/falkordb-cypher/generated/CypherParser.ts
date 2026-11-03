@@ -273,39 +273,39 @@ export class CypherParser extends antlr.Parser {
 
     public static readonly literalNames = [
         null, "';'", "'='", "':'", "'('", "','", "')'", "'|'", "'{'", "'}'",
-        "'+='", "'*'", "'['", "']'", "'..'", "'<>'", "'<'", "'>'", "'<='", 
-        "'>='", "'+'", "'-'", "'/'", "'%'", "'^'", "'.'", "'$'", "'\\u27E8'", 
-        "'\\u3008'", "'\\uFE64'", "'\\uFF1C'", "'\\u27E9'", "'\\u3009'", 
-        "'\\uFE65'", "'\\uFF1E'", "'\\u00AD'", "'\\u2010'", "'\\u2011'", 
-        "'\\u2012'", "'\\u2013'", "'\\u2014'", "'\\u2015'", "'\\u2212'", 
-        "'\\uFE58'", "'\\uFE63'", "'\\uFF0D'", null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, null, 
+        "'+='", "'*'", "'['", "']'", "'..'", "'<>'", "'<'", "'>'", "'<='",
+        "'>='", "'+'", "'-'", "'/'", "'%'", "'^'", "'.'", "'$'", "'\\u27E8'",
+        "'\\u3008'", "'\\uFE64'", "'\\uFF1C'", "'\\u27E9'", "'\\u3009'",
+        "'\\uFE65'", "'\\uFF1E'", "'\\u00AD'", "'\\u2010'", "'\\u2011'",
+        "'\\u2012'", "'\\u2013'", "'\\u2014'", "'\\u2015'", "'\\u2212'",
+        "'\\uFE58'", "'\\uFE63'", "'\\uFF0D'", null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null,
         null, "'0'"
     ];
 
     public static readonly symbolicNames = [
-        null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, "INDEX", "ASSERT", "FULLTEXT", "VECTOR", "OPTIONS", 
-        "UNION", "ALL", "LOAD", "CSV", "HEADERS", "FROM", "FIELDTERMINATOR", 
-        "FOREACH", "OPTIONAL", "MATCH", "UNWIND", "AS", "MERGE", "ON", "CREATE", 
-        "SET", "DETACH", "DELETE", "REMOVE", "CALL", "YIELD", "WITH", "RETURN", 
-        "DISTINCT", "ORDER", "BY", "L_SKIP", "LIMIT", "ASCENDING", "ASC", 
-        "DESCENDING", "DESC", "WHERE", "SHORTESTPATH", "ALLSHORTESTPATHS", 
-        "OR", "XOR", "AND", "NOT", "STARTS", "ENDS", "CONTAINS", "IN", "IS", 
-        "NULL", "COUNT", "CASE", "ELSE", "END", "WHEN", "THEN", "ANY", "NONE", 
-        "SINGLE", "REDUCE", "EXISTS", "TRUE", "FALSE", "HexInteger", "DecimalInteger", 
-        "OctalInteger", "HexLetter", "HexDigit", "Digit", "NonZeroDigit", 
-        "NonZeroOctDigit", "OctDigit", "ZeroDigit", "ExponentDecimalReal", 
-        "RegularDecimalReal", "StringLiteral", "EscapedChar", "CONSTRAINT", 
-        "DO", "FOR", "REQUIRE", "UNIQUE", "MANDATORY", "SCALAR", "OF", "ADD", 
+        null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null,
+        null, null, "INDEX", "ASSERT", "FULLTEXT", "VECTOR", "OPTIONS",
+        "UNION", "ALL", "LOAD", "CSV", "HEADERS", "FROM", "FIELDTERMINATOR",
+        "FOREACH", "OPTIONAL", "MATCH", "UNWIND", "AS", "MERGE", "ON", "CREATE",
+        "SET", "DETACH", "DELETE", "REMOVE", "CALL", "YIELD", "WITH", "RETURN",
+        "DISTINCT", "ORDER", "BY", "L_SKIP", "LIMIT", "ASCENDING", "ASC",
+        "DESCENDING", "DESC", "WHERE", "SHORTESTPATH", "ALLSHORTESTPATHS",
+        "OR", "XOR", "AND", "NOT", "STARTS", "ENDS", "CONTAINS", "IN", "IS",
+        "NULL", "COUNT", "CASE", "ELSE", "END", "WHEN", "THEN", "ANY", "NONE",
+        "SINGLE", "REDUCE", "EXISTS", "TRUE", "FALSE", "HexInteger", "DecimalInteger",
+        "OctalInteger", "HexLetter", "HexDigit", "Digit", "NonZeroDigit",
+        "NonZeroOctDigit", "OctDigit", "ZeroDigit", "ExponentDecimalReal",
+        "RegularDecimalReal", "StringLiteral", "EscapedChar", "CONSTRAINT",
+        "DO", "FOR", "REQUIRE", "UNIQUE", "MANDATORY", "SCALAR", "OF", "ADD",
         "DROP", "FILTER", "EXTRACT", "CYPHER", "UnescapedSymbolicName",
         "IdentifierStart", "IdentifierPart", "EscapedSymbolicName", "SP",
         "WHITESPACE", "Comment"
@@ -333,15 +333,15 @@ export class CypherParser extends antlr.Parser {
         "oC_StringPredicateExpression", "oC_ListPredicateExpression", "oC_NullPredicateExpression",
         "oC_AddOrSubtractExpression", "oC_MultiplyDivideModuloExpression",
         "oC_PowerOfExpression", "oC_UnaryAddOrSubtractExpression", "oC_NonArithmeticOperatorExpression",
-        "oC_ListOperatorExpression", "oC_PropertyLookup", "oC_Atom", "oC_CaseExpression", 
-        "oC_CaseAlternative", "oC_ListComprehension", "oC_PatternComprehension", 
-        "oC_Quantifier", "oC_FilterExpression", "oC_PatternPredicate", "oC_ParenthesizedExpression", 
-        "oC_IdInColl", "oC_ReduceExpression", "oC_FunctionInvocation", "oC_FunctionName", 
-        "oC_ExistentialSubquery", "oC_ExplicitProcedureInvocation", "oC_ImplicitProcedureInvocation", 
-        "oC_ProcedureResultField", "oC_ProcedureName", "oC_Namespace", "oC_Variable", 
-        "oC_Literal", "oC_BooleanLiteral", "oC_NumberLiteral", "oC_IntegerLiteral", 
-        "oC_DoubleLiteral", "oC_ListLiteral", "oC_MapLiteral", "oC_PropertyKeyName", 
-        "oC_Parameter", "oC_SchemaName", "oC_ReservedWord", "oC_SymbolicName", 
+        "oC_ListOperatorExpression", "oC_PropertyLookup", "oC_Atom", "oC_CaseExpression",
+        "oC_CaseAlternative", "oC_ListComprehension", "oC_PatternComprehension",
+        "oC_Quantifier", "oC_FilterExpression", "oC_PatternPredicate", "oC_ParenthesizedExpression",
+        "oC_IdInColl", "oC_ReduceExpression", "oC_FunctionInvocation", "oC_FunctionName",
+        "oC_ExistentialSubquery", "oC_ExplicitProcedureInvocation", "oC_ImplicitProcedureInvocation",
+        "oC_ProcedureResultField", "oC_ProcedureName", "oC_Namespace", "oC_Variable",
+        "oC_Literal", "oC_BooleanLiteral", "oC_NumberLiteral", "oC_IntegerLiteral",
+        "oC_DoubleLiteral", "oC_ListLiteral", "oC_MapLiteral", "oC_PropertyKeyName",
+        "oC_Parameter", "oC_SchemaName", "oC_ReservedWord", "oC_SymbolicName",
         "oC_LeftArrowHead", "oC_RightArrowHead", "oC_Dash",
     ];
 
@@ -9411,11 +9411,11 @@ export class OC_CypherContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public CYPHER(): antlr.TerminalNode[];
     public CYPHER(i: number): antlr.TerminalNode | null;
@@ -9580,11 +9580,11 @@ export class OC_CreateIndexContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_IndexQualifier(): OC_IndexQualifierContext | null {
         return this.getRuleContext(0, OC_IndexQualifierContext);
@@ -9639,11 +9639,11 @@ export class OC_DropIndexContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_IndexQualifier(): OC_IndexQualifierContext | null {
         return this.getRuleContext(0, OC_IndexQualifierContext);
@@ -9750,11 +9750,11 @@ export class OC_IndexPropertiesContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_IndexProperties;
@@ -9782,11 +9782,11 @@ export class OC_CreateConstraintContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public CONSTRAINT(): antlr.TerminalNode {
         return this.getToken(CypherParser.CONSTRAINT, 0)!;
@@ -9838,11 +9838,11 @@ export class OC_DropConstraintContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public CONSTRAINT(): antlr.TerminalNode {
         return this.getToken(CypherParser.CONSTRAINT, 0)!;
@@ -9894,11 +9894,11 @@ export class OC_ConstraintPredicateContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public UNIQUE(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.UNIQUE, 0);
@@ -9944,11 +9944,11 @@ export class OC_RegularQueryContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_RegularQuery;
@@ -9976,11 +9976,11 @@ export class OC_UnionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public ALL(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.ALL, 0);
@@ -10049,11 +10049,11 @@ export class OC_SinglePartQueryContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_UpdatingClause(): OC_UpdatingClauseContext[];
     public oC_UpdatingClause(i: number): OC_UpdatingClauseContext | null;
@@ -10117,11 +10117,11 @@ export class OC_MultiPartQueryContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_MultiPartQuery;
@@ -10225,11 +10225,11 @@ export class OC_LoadCsvContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public CSV(): antlr.TerminalNode {
         return this.getToken(CypherParser.CSV, 0)!;
@@ -10287,11 +10287,11 @@ export class OC_ForeachContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public IN(): antlr.TerminalNode {
         return this.getToken(CypherParser.IN, 0)!;
@@ -10337,11 +10337,11 @@ export class OC_CallSubqueryContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_CallSubquery;
@@ -10375,11 +10375,11 @@ export class OC_MatchContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_Where(): OC_WhereContext | null {
         return this.getRuleContext(0, OC_WhereContext);
@@ -10413,11 +10413,11 @@ export class OC_UnwindContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public AS(): antlr.TerminalNode {
         return this.getToken(CypherParser.AS, 0)!;
@@ -10454,11 +10454,11 @@ export class OC_MergeContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_MergeAction(): OC_MergeActionContext[];
     public oC_MergeAction(i: number): OC_MergeActionContext | null;
@@ -10495,11 +10495,11 @@ export class OC_MergeActionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public MATCH(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.MATCH, 0);
@@ -10574,11 +10574,11 @@ export class OC_SetContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_Set;
@@ -10609,11 +10609,11 @@ export class OC_SetItemContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_Variable(): OC_VariableContext | null {
         return this.getRuleContext(0, OC_VariableContext);
@@ -10659,11 +10659,11 @@ export class OC_DeleteContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_Delete;
@@ -10691,11 +10691,11 @@ export class OC_RemoveContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_RemoveItem(): OC_RemoveItemContext[];
     public oC_RemoveItem(i: number): OC_RemoveItemContext | null;
@@ -10761,11 +10761,11 @@ export class OC_InQueryCallContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_ExplicitProcedureInvocation(): OC_ExplicitProcedureInvocationContext {
         return this.getRuleContext(0, OC_ExplicitProcedureInvocationContext)!;
@@ -10802,11 +10802,11 @@ export class OC_StandaloneCallContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_ExplicitProcedureInvocation(): OC_ExplicitProcedureInvocationContext | null {
         return this.getRuleContext(0, OC_ExplicitProcedureInvocationContext);
@@ -10855,11 +10855,11 @@ export class OC_YieldItemsContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_YieldItems;
@@ -10890,11 +10890,11 @@ export class OC_YieldItemContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public AS(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.AS, 0);
@@ -10980,11 +10980,11 @@ export class OC_ProjectionBodyContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_ProjectionItems(): OC_ProjectionItemsContext {
         return this.getRuleContext(0, OC_ProjectionItemsContext)!;
@@ -11033,11 +11033,11 @@ export class OC_ProjectionItemsContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_ProjectionItems;
@@ -11065,11 +11065,11 @@ export class OC_ProjectionItemContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public AS(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.AS, 0);
@@ -11103,11 +11103,11 @@ export class OC_OrderContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public BY(): antlr.TerminalNode {
         return this.getToken(CypherParser.BY, 0)!;
@@ -11278,11 +11278,11 @@ export class OC_PatternContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_Pattern;
@@ -11313,11 +11313,11 @@ export class OC_PatternPartContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_PatternPart;
@@ -11377,11 +11377,11 @@ export class OC_ShortestPathPatternContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_ShortestPathPattern;
@@ -11418,11 +11418,11 @@ export class OC_PatternElementContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_PatternElement(): OC_PatternElementContext | null {
         return this.getRuleContext(0, OC_PatternElementContext);
@@ -11462,11 +11462,11 @@ export class OC_RelationshipsPatternContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_RelationshipsPattern;
@@ -11491,11 +11491,11 @@ export class OC_NodePatternContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_Variable(): OC_VariableContext | null {
         return this.getRuleContext(0, OC_VariableContext);
@@ -11573,11 +11573,11 @@ export class OC_RelationshipPatternContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_RelationshipDetail(): OC_RelationshipDetailContext | null {
         return this.getRuleContext(0, OC_RelationshipDetailContext);
@@ -11605,11 +11605,11 @@ export class OC_RelationshipDetailContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_Variable(): OC_VariableContext | null {
         return this.getRuleContext(0, OC_VariableContext);
@@ -11681,11 +11681,11 @@ export class OC_RelationshipTypesContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_RelationshipTypes;
@@ -11719,11 +11719,11 @@ export class OC_NodeLabelsContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_NodeLabels;
@@ -11774,11 +11774,11 @@ export class OC_RangeLiteralContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_IntegerLiteral(): OC_IntegerLiteralContext[];
     public oC_IntegerLiteral(i: number): OC_IntegerLiteralContext | null;
@@ -11870,11 +11870,11 @@ export class OC_PropertyExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_PropertyExpression;
@@ -11931,20 +11931,20 @@ export class OC_OrExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public OR(): antlr.TerminalNode[];
     public OR(i: number): antlr.TerminalNode | null;
     public OR(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.OR);
-    	} else {
-    		return this.getToken(CypherParser.OR, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.OR);
+        } else {
+            return this.getToken(CypherParser.OR, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_OrExpression;
@@ -11978,20 +11978,20 @@ export class OC_XorExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public XOR(): antlr.TerminalNode[];
     public XOR(i: number): antlr.TerminalNode | null;
     public XOR(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.XOR);
-    	} else {
-    		return this.getToken(CypherParser.XOR, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.XOR);
+        } else {
+            return this.getToken(CypherParser.XOR, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_XorExpression;
@@ -12025,20 +12025,20 @@ export class OC_AndExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public AND(): antlr.TerminalNode[];
     public AND(i: number): antlr.TerminalNode | null;
     public AND(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.AND);
-    	} else {
-    		return this.getToken(CypherParser.AND, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.AND);
+        } else {
+            return this.getToken(CypherParser.AND, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_AndExpression;
@@ -12066,20 +12066,20 @@ export class OC_NotExpressionContext extends antlr.ParserRuleContext {
     public NOT(): antlr.TerminalNode[];
     public NOT(i: number): antlr.TerminalNode | null;
     public NOT(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.NOT);
-    	} else {
-    		return this.getToken(CypherParser.NOT, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.NOT);
+        } else {
+            return this.getToken(CypherParser.NOT, i);
+        }
     }
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_NotExpression;
@@ -12116,11 +12116,11 @@ export class OC_ComparisonExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_ComparisonExpression;
@@ -12224,11 +12224,11 @@ export class OC_StringPredicateExpressionContext extends antlr.ParserRuleContext
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public STARTS(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.STARTS, 0);
@@ -12265,11 +12265,11 @@ export class OC_ListPredicateExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public IN(): antlr.TerminalNode {
         return this.getToken(CypherParser.IN, 0)!;
@@ -12300,11 +12300,11 @@ export class OC_NullPredicateExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public IS(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.IS, 0);
@@ -12347,11 +12347,11 @@ export class OC_AddOrSubtractExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_AddOrSubtractExpression;
@@ -12385,11 +12385,11 @@ export class OC_MultiplyDivideModuloExpressionContext extends antlr.ParserRuleCo
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_MultiplyDivideModuloExpression;
@@ -12423,11 +12423,11 @@ export class OC_PowerOfExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_PowerOfExpression;
@@ -12502,11 +12502,11 @@ export class OC_NonArithmeticOperatorExpressionContext extends antlr.ParserRuleC
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_NonArithmeticOperatorExpression;
@@ -12598,11 +12598,11 @@ export class OC_AtomContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_ListComprehension(): OC_ListComprehensionContext | null {
         return this.getRuleContext(0, OC_ListComprehensionContext);
@@ -12672,11 +12672,11 @@ export class OC_CaseExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public CASE(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.CASE, 0);
@@ -12728,11 +12728,11 @@ export class OC_CaseAlternativeContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_CaseAlternative;
@@ -12760,11 +12760,11 @@ export class OC_ListComprehensionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_Expression(): OC_ExpressionContext | null {
         return this.getRuleContext(0, OC_ExpressionContext);
@@ -12798,11 +12798,11 @@ export class OC_PatternComprehensionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_Variable(): OC_VariableContext | null {
         return this.getRuleContext(0, OC_VariableContext);
@@ -12839,11 +12839,11 @@ export class OC_QuantifierContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public ANY(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.ANY, 0);
@@ -12932,11 +12932,11 @@ export class OC_ParenthesizedExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_ParenthesizedExpression;
@@ -12964,11 +12964,11 @@ export class OC_IdInCollContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public IN(): antlr.TerminalNode {
         return this.getToken(CypherParser.IN, 0)!;
@@ -13017,11 +13017,11 @@ export class OC_ReduceExpressionContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public override get ruleIndex(): number {
         return CypherParser.RULE_oC_ReduceExpression;
@@ -13049,11 +13049,11 @@ export class OC_FunctionInvocationContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public DISTINCT(): antlr.TerminalNode | null {
         return this.getToken(CypherParser.DISTINCT, 0);
@@ -13122,11 +13122,11 @@ export class OC_ExistentialSubqueryContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_Pattern(): OC_PatternContext | null {
         return this.getRuleContext(0, OC_PatternContext);
@@ -13169,11 +13169,11 @@ export class OC_ExplicitProcedureInvocationContext extends antlr.ParserRuleConte
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_Expression(): OC_ExpressionContext[];
     public oC_Expression(i: number): OC_ExpressionContext | null;
@@ -13476,11 +13476,11 @@ export class OC_ListLiteralContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_Expression(): OC_ExpressionContext[];
     public oC_Expression(i: number): OC_ExpressionContext | null;
@@ -13514,11 +13514,11 @@ export class OC_MapLiteralContext extends antlr.ParserRuleContext {
     public SP(): antlr.TerminalNode[];
     public SP(i: number): antlr.TerminalNode | null;
     public SP(i?: number): antlr.TerminalNode | null | antlr.TerminalNode[] {
-    	if (i === undefined) {
-    		return this.getTokens(CypherParser.SP);
-    	} else {
-    		return this.getToken(CypherParser.SP, i);
-    	}
+        if (i === undefined) {
+            return this.getTokens(CypherParser.SP);
+        } else {
+            return this.getToken(CypherParser.SP, i);
+        }
     }
     public oC_PropertyKeyName(): OC_PropertyKeyNameContext[];
     public oC_PropertyKeyName(i: number): OC_PropertyKeyNameContext | null;
