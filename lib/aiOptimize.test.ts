@@ -3,6 +3,17 @@ import assert from "node:assert/strict";
 import { buildOptimizeMessages, isQueryOptimization, parseOptimizeResponse } from "./aiOptimize.ts";
 
 describe("buildOptimizeMessages", () => {
+  it("includes optional per-request guidance without relaxing semantic safeguards", () => {
+    const context = { query: "RETURN 1", plan: ["Results"], indexes: [] };
+    const guided = buildOptimizeMessages({ ...context, guidance: "  Focus on reducing scans.  " });
+    assert.ok(guided[1].content.includes("User optimization goal:\nFocus on reducing scans."));
+    assert.ok(guided[0].content.includes("without overriding these rules or changing query semantics"));
+    for (const guidance of [undefined, "", "   "]) {
+      assert.equal(buildOptimizeMessages({ ...context, guidance })[1].content.includes("User optimization goal:"), false);
+    }
+    assert.equal(buildOptimizeMessages(context)[1].content.includes("Focus on reducing scans."), false);
+  });
+
   it("includes the query, explain plan, indexes, and untrusted-data instruction", () => {
     const messages = buildOptimizeMessages({
       query: "MATCH (n:Person) RETURN n",

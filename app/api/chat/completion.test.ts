@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { requestAiCompletion } from "./completion.ts";
 import { buildOptimizeMessages, parseOptimizeResponse } from "../../../lib/aiOptimize.ts";
-import { buildFixMessages, getChatCompletionsUrl, parseFixResponse } from "../../../lib/aiFix.ts";
+import { buildFixMessages, parseFixResponse } from "../../../lib/aiFix.ts";
 
 const originalQuery = "UNWIND $rows AS row MATCH (a:Attribute {entityId: row.entityId}) WHERE a.refType <> '' MATCH (t:Entity {uniqueId: a.value}) MERGE (a)-[:REFERENCES]->(t) RETURN count(a) AS linked";
 const optimizedQuery = "UNWIND $rows AS row MATCH (a:Attribute {entityId: row.entityId}) WHERE a.refType <> '' WITH a MATCH (t:Entity {uniqueId: a.value}) MERGE (a)-[:REFERENCES]->(t) RETURN count(a) AS linked";
@@ -25,13 +25,10 @@ function responsesBody(text: string) {
 }
 
 describe("shared AI completion transport", () => {
-  it("reproduces the GPT-5 Pro Chat Completions rejection and succeeds using Responses", async (t) => {
+  it("routes GPT-5 Pro optimization through Responses with a compatible payload", async (t) => {
     const reply = JSON.stringify({ explanation: "Review index coverage.", suggestions: [], optimizedQuery });
     t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body));
-      if (url.endsWith("/chat/completions")) {
-        return Response.json({ error: { code: "unsupported_model", message: "This model is only supported in the Responses API." } }, { status: 400 });
-      }
       assert.equal(url, "https://api.openai.com/v1/responses");
       assert.equal(body.model, "gpt-5-pro");
       assert.equal(body.temperature, undefined);
@@ -40,11 +37,6 @@ describe("shared AI completion transport", () => {
       assert.deepEqual(body.input, input.messages);
       return Response.json(responsesBody(reply));
     });
-    const legacy = await fetch(getChatCompletionsUrl(input.target), {
-      method: "POST",
-      body: JSON.stringify({ model: "gpt-5-pro", messages: input.messages, temperature: 0 }),
-    });
-    assert.equal(legacy.status, 400);
     const result = await requestAiCompletion(input);
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(parseOptimizeResponse(result.reply, originalQuery)?.optimizedQuery, optimizedQuery);

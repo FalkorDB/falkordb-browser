@@ -120,6 +120,7 @@ test(`@admin optimize cancels on ${dismissal} and allows a fresh request`, async
     const originalTab = await page.locator('[data-testid^="graphTabSelect-"]').first().getAttribute("data-testid");
     if (!originalTab) throw new Error("Missing originating tab");
     await page.getByTestId("editorOptimize").click();
+    await page.getByTestId("aiOptimizeConsentConfirm").click();
     const request = await pending.promise;
     const aborted = page.waitForEvent("requestfailed", {
       predicate: failed => failed.url().endsWith("/api/chat/optimize"),
@@ -144,6 +145,8 @@ test(`@admin optimize cancels on ${dismissal} and allows a fresh request`, async
       explanation: "Fresh result", suggestions: [], optimizedQuery: "RETURN 3", executionPlan: ["Results"],
     } }));
     await page.getByTestId("editorOptimize").click();
+    await expect(page.getByTestId("aiOptimizeGuidance")).toHaveValue("");
+    await page.getByTestId("aiOptimizeConsentConfirm").click();
     expect((await freshRequestPromise).postDataJSON().graphName).toBe(graphName);
     await expect(page.getByTestId("aiOptimizeQuery")).toHaveText("RETURN 3");
   } finally {

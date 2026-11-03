@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: validation.error }, { status: 400, headers: getCorsHeaders(request) });
   }
 
-  const { query, graphName, key, model, modelSource, localProvider, localEndpoint } = validation.data;
+  const { query, guidance, graphName, key, model, modelSource, localProvider, localEndpoint } = validation.data;
   const resolved = resolveFixTarget({ modelSource, model, key, localProvider, localEndpoint });
   if (!resolved.ok) {
     return NextResponse.json({ error: resolved.error }, { status: 400, headers: getCorsHeaders(request) });
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       target: resolved.target,
       authHeader: resolved.authHeader,
       model,
-      messages: buildOptimizeMessages({ query, plan, indexes }),
+      messages: buildOptimizeMessages({ query, plan, indexes, guidance }),
       signal: request.signal,
     });
     if (!completion.ok) {
