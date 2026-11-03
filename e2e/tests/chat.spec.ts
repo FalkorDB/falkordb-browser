@@ -91,6 +91,30 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test("@readwrite A single available graph is auto-selected and enables chat", async () => {
+    const graphName = getRandomString("chat-auto-select");
+    await apiCall.addGraph(graphName);
+    try {
+      await browser.createNewPage(ChatComponent);
+      const page = await browser.getPage();
+      await page.addInitScript(() => {
+        for (const key of Object.keys(localStorage)) {
+          if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
+        }
+      });
+      await page.route("**/api/graph", route => route.fulfill({ json: { opts: [graphName] } }));
+      await page.goto(urls.graphUrl);
+      await browser.setPageToFullScreen();
+
+      await expect(page.getByTestId("selectGraph")).toHaveText(graphName);
+      await expect(page.getByTestId("chatToggleButton")).toBeEnabled();
+      await page.getByTestId("chatToggleButton").click();
+      await expect(page.getByTestId("chatPanel")).toBeVisible();
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
+  });
+
   test(`@readwrite Verify attempting to send a question without API key shows error`, async () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);

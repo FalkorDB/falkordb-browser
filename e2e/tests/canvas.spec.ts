@@ -906,6 +906,74 @@ test.describe('Canvas Tests', () => {
     // wait on top of starting the browser and running its query. Graphs are
     // removed even when an assertion fails, so none are left in the database.
 
+    test("@admin Large 3D graphs use the packaged worker and export clean data after pinning", async () => {
+        test.setTimeout(120000);
+        const graphName = getRandomString("canvas-worker");
+        const graph = await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        await page.addInitScript(() => {
+            Object.defineProperty(navigator, "deviceMemory", { value: 2, configurable: true });
+            Object.defineProperty(navigator, "hardwareConcurrency", { value: 2, configurable: true });
+            localStorage.setItem("limit", "2000");
+            const NativeWorker = window.Worker;
+            sessionStorage.setItem("layoutPackets", "0");
+            window.Worker = class extends NativeWorker {
+                constructor(...args: ConstructorParameters<typeof Worker>) {
+                    super(...args);
+                    this.addEventListener("message", event => {
+                        if (event.data?.type !== "positions") return;
+                        const count = Number(sessionStorage.getItem("layoutPackets"));
+                        sessionStorage.setItem("layoutPackets", String(count + 1));
+                    });
+                }
+            };
+        });
+        await browser.navigateTo(urls.graphUrl);
+        await graph.addGraph(graphName);
+        try {
+            await graph.insertQuery("UNWIND range(1, 1001) AS i CREATE (n:WorkerRegression {id: i}) RETURN n");
+            await graph.clickRunQuery();
+            const canvas = page.getByTestId("graphCanvasWrapper").locator("falkordb-canvas");
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(1001);
+            await graph.clickDimensionControl("3d");
+            const warning = page.getByTestId("graph3DWarning");
+            await expect(warning).toBeVisible();
+            await warning.getByRole("button", { name: "Proceed with 3D" }).click();
+            await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+            const packets = () => page.evaluate(() => Number(sessionStorage.getItem("layoutPackets")));
+            await expect.poll(packets, { timeout: 30000 }).toBeGreaterThan(0);
+
+            const pinned = await canvas.evaluate(element => {
+                const c = element as FalkorDBCanvas;
+                c.setAnimation(true);
+                c.setPinOnDragEnd(true);
+                const nodes = c.getGraphData().nodes;
+                return {
+                    count: nodes.length,
+                    finiteAndPinned: nodes.every(node => {
+                        const n = node as typeof node & { z?: number; fz?: number };
+                        return [n.x, n.y, n.z, n.fx, n.fy, n.fz].every(Number.isFinite)
+                            && n.x === n.fx && n.y === n.fy && n.z === n.fz;
+                    }),
+                    cleanExport: c.getData().nodes.every(node =>
+                        !["x", "y", "z", "vx", "vy", "vz", "fx", "fy", "fz"].some(key => key in node)),
+                };
+            });
+            expect(pinned).toEqual({ count: 1001, finiteAndPinned: true, cleanExport: true });
+            const previousPackets = await packets();
+            await canvas.evaluate(element => (element as FalkorDBCanvas).setPinOnDragEnd(false));
+            await expect.poll(packets, { timeout: 30000 }).toBeGreaterThan(previousPackets);
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.every(node =>
+                !["fx", "fy", "fz"].some(key => node[key as keyof typeof node] !== undefined)))).toBe(true);
+
+            await graph.clickDimensionControl("2d");
+            await expect.poll(() => graph.getCanvasDimension(), { timeout: 15000 }).toBe("2d");
+            await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getData().nodes.length)).toBe(1001);
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
     test(`@admin The canvas switches to 3D and back to 2D`, async () => {
         test.setTimeout(90000);
         const graphName = getRandomString('canvas');
