@@ -2,7 +2,7 @@
 
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
-import { Dispatch, SetStateAction, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dispatch, SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout, ToastFn } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey, ServerDecryptError } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
@@ -22,6 +22,7 @@ import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { QueryStatistics } from "falkordb";
+import { ownsCanvasSession } from "@/lib/canvasSession";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
@@ -1449,6 +1450,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // into the tab — seeded from the tab on activation so a capture taken before
   // the view mounts does not carry the previous tab's state over.
   const schemaMetaRef = useRef<SchemaViewMeta>({});
+  const activeCanvasTabRef = useRef("");
   // The schema view's layout and direction are also mirrored in state, so the
   // address bar follows them. The rest of its metadata changes on every pan
   // and stays in the ref; bailing out on equal values keeps this quiet.
@@ -1468,7 +1470,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // zoom; capturing them is what lets a return skip the layout entirely.
     // Off /graph the canvas is unmounted and ForceGraph's own unmount handler
     // has already pushed the last snapshot into state, so fall back to that.
-    const layout = canvas ? captureCanvasLayout(canvas) : undefined;
+    const ownsCanvas = canvas && ownsCanvasSession(canvas, {
+      graph: state.graph, data: state.data, tabId: activeCanvasTabRef.current,
+      epoch: getConnectionEpoch(), restore: state.graphData,
+    });
+    const layout = ownsCanvas ? captureCanvasLayout(canvas) : undefined;
 
     return {
       ...state,
@@ -1484,7 +1490,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const canvas = canvasRef.current;
     // An empty canvas reports whatever zoom it happens to sit at, which would
     // overwrite a good viewport with a meaningless one.
-    const hasNodes = (canvas?.getGraphData().nodes.length ?? 0) > 0;
+    const hasNodes = canvas && ownsCanvasSession(canvas, {
+      graph: state.graph, data: state.data, tabId: activeCanvasTabRef.current,
+      epoch: getConnectionEpoch(), restore: state.graphData,
+    }) && canvas.getGraphData().nodes.length > 0;
     const panelView = state.view === "Schema" ? "schema" : "graph";
     if (panelRef.current) panelOpenRef.current[panelView] = !panelRef.current.isCollapsed();
 
@@ -1670,6 +1679,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     captureMeta: captureTabMeta,
     onActivate: handleActivateTab,
   });
+
+  useLayoutEffect(() => {
+    activeCanvasTabRef.current = graphTabs.activeTabId;
+  }, [graphTabs.activeTabId]);
 
   markTabRanRef.current = graphTabs.markRan;
 

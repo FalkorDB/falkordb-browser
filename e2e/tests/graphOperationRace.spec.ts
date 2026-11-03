@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 import type { FalkorDBCanvas } from "@falkordb/canvas";
+import type { SessionConnection } from "@/app/components/provider";
 import { getRandomString } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
@@ -20,6 +21,62 @@ test.describe("Graph operation race conditions", () => {
 
   test.afterEach(async () => {
     await browser.closeBrowser();
+  });
+
+  test("@admin a pending canvas write is discarded as soon as a connection switch starts", async () => {
+    test.setTimeout(90000);
+    const graphName = getRandomString("canvas-connection-owner");
+    const graph = await browser.createNewPage(GraphPage);
+    const page = await browser.getPage();
+    const switching = Promise.withResolvers<Route>();
+    let pendingSwitch: Route | undefined;
+    await page.route("**/api/connections", async route => {
+      const response = await route.fetch();
+      const payload: { connections: SessionConnection[] } = await response.json();
+      const original = payload.connections[0];
+      if (!original) throw new Error("Missing active test connection");
+      await route.fulfill({ json: { connections: [...payload.connections, { ...original, id: "pending-test-switch" }] } });
+    });
+    await browser.navigateTo(urls.graphUrl);
+    await graph.addGraph(graphName);
+    try {
+      await graph.insertQuery("CREATE (a:PendingConnection {id: 1}), (b:PendingConnection {id: 2}) RETURN a,b");
+      await graph.clickRunQuery();
+      await graph.clickDimensionControl("3d");
+      await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+      const canvas = page.getByTestId("graphCanvasWrapper").locator("falkordb-canvas");
+      await canvas.evaluate(element => {
+        const c = element as FalkorDBCanvas;
+        const setDimension = c.setDimension.bind(c);
+        let hold = true;
+        element.addEventListener("release-restore", () => { hold = false; });
+        c.setDimension = async dimension => {
+          if (dimension === "2d" && hold) {
+            element.setAttribute("data-restore-waiting", "true");
+            await new Promise<void>(resolve => element.addEventListener("release-restore", () => resolve(), { once: true }));
+          }
+          await setDimension(dimension);
+        };
+      });
+      await graph.clickDimensionControl("2d");
+      await graph.insertQuery("UNWIND range(1, 15) AS i CREATE (n:PendingConnection {id: i}) RETURN n");
+      await graph.clickRunQuery();
+      await expect(canvas).toHaveAttribute("data-restore-waiting", "true");
+      await page.route("**/api/auth/session", async route => {
+        if (route.request().method() === "POST") switching.resolve(route);
+        else await route.continue();
+      });
+      await page.getByTestId("connections-dropdown-trigger").click();
+      await page.getByTestId("connection-item-pending-test-switch").click();
+      pendingSwitch = await switching.promise;
+      await canvas.dispatchEvent("release-restore");
+      await expect.poll(() => graph.getCanvasDimension()).toBe("2d");
+      await page.waitForTimeout(200);
+      expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(2);
+    } finally {
+      await pendingSwitch?.fulfill({ status: 500, json: { message: "Intentional test rollback" } });
+      await apiCall.removeGraph(graphName);
+    }
   });
 
   test("@admin a deletion updates the replacement canvas after a responsive remount", async () => {

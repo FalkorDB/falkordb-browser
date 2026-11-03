@@ -411,7 +411,7 @@ export default function Chat({ onClose }: Props) {
             case "CypherQuery":
                 return (
                     <div className="flex min-w-0 flex-col gap-1">
-                        <pre data-testid="chatSuggestedQuery" className="min-w-0 whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
+                        <pre data-testid="chatSuggestedQuery" tabIndex={0} aria-label="Suggested query" className="max-h-48 min-w-0 overflow-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
                             {message.content}
                         </pre>
                         <div className="flex items-center gap-1">

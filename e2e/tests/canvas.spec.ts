@@ -130,6 +130,59 @@ test.describe('Canvas Tests', () => {
         }
     });
 
+    for (const interruption of ["tab", "view"] as const) {
+        test(`@admin a pending 2D restore survives switching ${interruption} before the renderer is ready`, async () => {
+            test.setTimeout(90000);
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            const page = await browser.getPage();
+            const graphName = getRandomString("pending-restore");
+            const smallTab = getRandomString("pending-small");
+            await graph.addGraph(graphName);
+            try {
+                await graph.insertQuery("UNWIND range(1, 15) AS i CREATE (n:PendingRestore {id: i}) RETURN n");
+                await graph.clickRunQuery();
+                const canvas = () => page.getByTestId("graphCanvasWrapper").locator("falkordb-canvas");
+                await expect.poll(() => canvas().evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(15);
+                await graph.addStripTab();
+                await graph.renameStripTab("New tab", smallTab);
+                await graph.selectGraphByName(graphName);
+                await graph.insertQuery("MATCH (n:PendingRestore) RETURN n LIMIT 2");
+                await graph.clickRunQuery();
+                await graph.clickDimensionControl("3d");
+                await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+                await canvas().evaluate(element => {
+                    const c = element as FalkorDBCanvas;
+                    const setDimension = c.setDimension.bind(c);
+                    let hold = true;
+                    element.addEventListener("release-restore", () => { hold = false; });
+                    c.setDimension = async dimension => {
+                        if (dimension === "2d" && hold) {
+                            element.setAttribute("data-restore-waiting", "true");
+                            await new Promise<void>(resolve => element.addEventListener("release-restore", () => resolve(), { once: true }));
+                        }
+                        await setDimension(dimension);
+                    };
+                });
+                await graph.selectStripTab(graphName);
+                await expect(canvas()).toHaveAttribute("data-restore-waiting", "true");
+                if (interruption === "tab") {
+                    await graph.selectStripTab(smallTab);
+                    await canvas().dispatchEvent("release-restore");
+                    await expect.poll(() => canvas().evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(2);
+                    await graph.selectStripTab(graphName);
+                } else {
+                    const original = await canvas().elementHandle();
+                    await graph.clickTableTab();
+                    await original!.dispatchEvent("release-restore");
+                    await page.getByRole("tab", { name: "Graph", exact: true }).click();
+                }
+                await expect.poll(() => canvas().evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length), { timeout: 15000 }).toBe(15);
+            } finally {
+                await apicalls.removeGraph(graphName);
+            }
+        });
+    }
+
     const testNodes = [1, 5, 10];
     testNodes.forEach(async (node) => {
         test(`@admin Validate search for node: ${node} in the canvas and ensure focus on correct node`, async () => {

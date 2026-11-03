@@ -11,9 +11,10 @@ import { useToast } from "@/components/ui/use-toast";
 import useLongPress from "@/lib/useLongPress";
 import { setCanvasGraphData, writeCanvasData } from "@/lib/graph3DResources";
 import { createGraphAppearanceLookup } from "@/lib/graphAppearance";
+import { commitCanvasSession, ownsCanvasSession } from "@/lib/canvasSession";
 import use3DWarning from "./use3DWarning";
 import { Graph } from "../api/graph/model";
-import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext, GraphTabsContext } from "./provider";
 
 const DOUBLE_CLICK_MS = 300;
 
@@ -73,6 +74,7 @@ export default function ForceGraph({
     const { setIndicator } = useContext(IndicatorContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { activeTabId } = useContext(GraphTabsContext);
     const { layout: ctxLayout, direction: ctxDirection, dimension: ctxDimension, setDimension: setCtxDimension, animation: ctxAnimation, pinned: ctxPinned } = useContext(ForceGraphContext);
 
     const { theme } = useTheme();
@@ -81,6 +83,10 @@ export default function ForceGraph({
     const { check3D, prepareData, getRequestedDimension, approval, warning } = use3DWarning(ctxDimension, setCtxDimension, canvasRef);
     const dataPendingRef = useRef(false);
     const [dataRevision, setDataRevision] = useState(0);
+    const sessionRef = useRef({ graph, data, tabId: activeTabId, restore: graphData });
+    useLayoutEffect(() => {
+        sessionRef.current = { graph, data, tabId: activeTabId, restore: graphData };
+    }, [graph, data, activeTabId, graphData]);
 
     // A click only selects once the double-click window has passed, so a
     // double-click expands without selecting first. `select` lets a click on a
@@ -193,6 +199,7 @@ export default function ForceGraph({
         if (!setViewport || !canvasLoaded || !canvas) return undefined;
 
         return () => {
+            if (!ownsCanvasSession(canvas, { ...sessionRef.current, epoch: getConnectionEpoch() })) return;
             const layout = captureCanvasLayout(canvas);
 
             if (layout) {
@@ -560,10 +567,19 @@ export default function ForceGraph({
         if (!canvas || !canvasLoaded) return;
 
         let cancelled = false;
+        const epoch = getConnectionEpoch();
+        const session = { graph, data, tabId: activeTabId, epoch, restore: graphData };
+        const isCurrent = () => !cancelled && canvasRef.current === canvas
+            && getConnectionEpoch() === epoch
+            && sessionRef.current.graph === graph && sessionRef.current.data === data
+            && sessionRef.current.tabId === activeTabId;
         let correctionTimer: ReturnType<typeof setTimeout> | undefined;
         dataPendingRef.current = true;
         const write = (incoming: Data, apply: () => void) => {
-            void writeCanvasData(canvas, incoming, apply, () => !cancelled && canvasRef.current === canvas).then(applied => {
+            void writeCanvasData(canvas, incoming, () => {
+                apply();
+                commitCanvasSession(canvas, session);
+            }, isCurrent).then(applied => {
                 if (cancelled) return;
                 dataPendingRef.current = false;
                 if (applied) setDataRevision(value => value + 1);
@@ -592,7 +608,7 @@ export default function ForceGraph({
                     canvas.setViewport(viewport);
                     clearTimeout(viewportRestoreTimerRef.current);
                     viewportRestoreTimerRef.current = setTimeout(() => {
-                        canvas.setViewport(viewport);
+                        if (ownsCanvasSession(canvas, { ...sessionRef.current, epoch: getConnectionEpoch() })) canvas.setViewport(viewport);
                     }, CANVAS_AUTO_ZOOM_DELAY);
                 }
             });
@@ -626,7 +642,7 @@ export default function ForceGraph({
             if (nodeCount > 0 && nodeCount <= 3) {
                 correctionTimer = setTimeout(() => {
                     const c = canvasRef.current;
-                    if (!c) return;
+                    if (!c || !isCurrent()) return;
                     const vp = c.getViewport();
                     if (vp && vp.zoom < 1.0) {
                         c.zoom(1.0);
@@ -636,7 +652,7 @@ export default function ForceGraph({
         });
 
         return cleanup;
-    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape, prepareData, toast]);
+    }, [canvasRef, graph, activeTabId, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape, prepareData, toast]);
 
     // Run after data/restore effects: the live counts must be checked, including
     // a consumed restore whose data prop may still describe an earlier result.

@@ -333,8 +333,8 @@ If index metadata is unavailable, analysis continues with an explicit warning.
 
 Fix with AI and Optimize share a suggested-query card with **Copy** and
 **Insert into editor** actions. Chat offers the same actions with compact, fully
-wrapped queries and no collapse controls. Both presentations adapt to mobile
-screens. Neither action runs the query.
+wrapped queries in a keyboard-scrollable, height-limited area with no collapse
+controls. Both presentations adapt to mobile screens. Neither action runs the query.
 
 Missing AI configuration and provider errors offer **Go to Settings**. Returning
 to the graph preserves the editor query and unsent Chat input. Chat drafts are
