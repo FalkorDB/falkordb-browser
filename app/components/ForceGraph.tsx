@@ -604,9 +604,10 @@ export default function ForceGraph({
 
                 // Re-apply after setData's scheduled zoomToFit. Consuming the
                 // restore re-runs this effect, so its cleanup must not cancel it.
+                clearTimeout(viewportRestoreTimerRef.current);
+                viewportRestoreTimerRef.current = undefined;
                 if (viewport) {
                     canvas.setViewport(viewport);
-                    clearTimeout(viewportRestoreTimerRef.current);
                     viewportRestoreTimerRef.current = setTimeout(() => {
                         if (ownsCanvasSession(canvas, { ...sessionRef.current, epoch: getConnectionEpoch() })) canvas.setViewport(viewport);
                     }, CANVAS_AUTO_ZOOM_DELAY);
