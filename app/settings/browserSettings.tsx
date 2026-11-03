@@ -122,8 +122,10 @@ export default function BrowserSettings() {
     // Bumped whenever a key edit starts or ends, so a save that finishes after
     // its edit was cancelled or replaced can be recognised before it commits.
     const editGenerationRef = useRef(0);
+    const keyMutationGenerationRef = useRef(0);
     useEffect(() => () => {
         editGenerationRef.current += 1;
+        keyMutationGenerationRef.current += 1;
         editingKeyVisibilityRef.current = null;
     }, []);
 
@@ -548,6 +550,7 @@ export default function BrowserSettings() {
         }
         const scope = getConnectionPrefix();
         const epoch = getConnectionEpoch();
+        const mutationGeneration = ++keyMutationGenerationRef.current;
 
         try {
             if (keys.length > 0) {
@@ -560,9 +563,9 @@ export default function BrowserSettings() {
                     });
                     return false;
                 }
-                // The edit this save belongs to was cancelled or replaced while
-                // encrypting; committing now would overwrite newer state.
-                if (!isCurrent()) return false;
+                // Every mutation writes the full list, so an older add/edit/delete
+                // must not commit after a newer mutation has started.
+                if (keyMutationGenerationRef.current !== mutationGeneration || !isCurrent()) return false;
                 if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
                     toast({
                         title: "Error",
@@ -990,6 +993,7 @@ export default function BrowserSettings() {
                                                                 <div
                                                                     key={apiKey.id}
                                                                     data-testid="chatApiKeyCard"
+                                                                    data-api-key-id={apiKey.id}
                                                                     className={cn(
                                                                         "group rounded-xl border bg-background/80 p-2 text-left transition-all",
                                                                         isLoadingKey ? "cursor-wait" : "cursor-pointer",

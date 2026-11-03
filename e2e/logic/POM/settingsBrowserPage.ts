@@ -1,5 +1,5 @@
 /* eslint-disable no-await-in-loop */
-import { Locator } from "@playwright/test";
+import { expect, Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import {
   interactWhenVisible,
@@ -7,6 +7,8 @@ import {
 } from "@/e2e/infra/utils";
 
 export default class SettingsBrowserPage extends BasePage {
+  private readonly chatApiKeyIds = new Map<string, string>();
+
   // Chat Section
   private get chatSectionHeader(): Locator {
     return this.page.getByTestId("chatSectionHeader");
@@ -289,19 +291,19 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   private getRevealedChatApiKeyCard(apiKey: string): Locator {
-    // Scope to the card whose chatApiKeyValue text equals the key exactly, so a
-    // key that is a substring of another key never selects the wrong card.
-    return this.chatApiKeyCards
+    return this.getChatApiKeyCard(apiKey)
       .filter({
         has: this.page
           .getByTestId("chatApiKeyValue")
           .and(this.page.getByText(apiKey, { exact: true })),
-      })
-      .first();
+      });
   }
 
   private getChatApiKeyCard(apiKey: string): Locator {
-    // Match the card whether the key is currently revealed or masked.
+    const id = this.chatApiKeyIds.get(apiKey);
+    if (id) return this.chatApiKeyCards.and(this.page.locator(`[data-api-key-id=${JSON.stringify(id)}]`));
+
+    // Unknown keys must match uniquely; never silently choose a colliding mask.
     return this.chatApiKeyCards
       .filter({
         has: this.page
@@ -311,34 +313,42 @@ export default class SettingsBrowserPage extends BasePage {
               .getByText(apiKey, { exact: true })
               .or(this.page.getByText(this.getMaskedApiKey(apiKey), { exact: true }))
           ),
-      })
-      .first();
+      });
   }
 
   private getMaskedChatApiKeyCard(apiKey: string): Locator {
-    return this.chatApiKeyCards
+    return this.getChatApiKeyCard(apiKey)
       .filter({
         has: this.page
           .getByTestId("chatApiKeyValue")
           .and(this.page.getByText(this.getMaskedApiKey(apiKey), { exact: true })),
-      })
-      .first();
+      });
   }
 
   async addChatApiKey(apiKey: string): Promise<void> {
+    const existingIds = new Set(await this.chatApiKeyCards.evaluateAll(cards =>
+      cards.map(card => card.getAttribute("data-api-key-id"))));
     await this.fillChatApiKey(apiKey);
     await interactWhenVisible(
       this.addChatApiKeyButton,
       (el) => el.click(),
       "Add Chat API Key Button"
     );
+    let newIds: string[] = [];
+    await expect.poll(async () => {
+      const ids = await this.chatApiKeyCards.evaluateAll(cards =>
+        cards.map(card => card.getAttribute("data-api-key-id")));
+      newIds = ids.filter((id): id is string => id !== null && !existingIds.has(id));
+      return newIds.length;
+    }, { timeout: 15000 }).toBe(1);
+    this.chatApiKeyIds.set(apiKey, newIds[0]);
     await this.getMaskedChatApiKeyCard(apiKey).waitFor({ state: "visible", timeout: 5000 });
   }
 
   async selectChatApiKey(apiKey: string): Promise<void> {
     const card = this.getMaskedChatApiKeyCard(apiKey);
     await interactWhenVisible(
-      card,
+      card.getByTestId("selectChatApiKeyButton"),
       (el) => el.click(),
       "Select Chat API Key Card"
     );
@@ -374,6 +384,7 @@ export default class SettingsBrowserPage extends BasePage {
 
   async startChatApiKeyEdit(currentApiKey: string, nextApiKey: string): Promise<string | null> {
     const card = this.getChatApiKeyCard(currentApiKey);
+    await expect(card.getByTestId("selectChatApiKeyButton")).toBeEnabled();
     await interactWhenVisible(
       card.getByTestId("editChatApiKeyButton"),
       (el) => el.click(),
@@ -394,13 +405,19 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<string | null> {
+    const id = await this.getChatApiKeyCard(currentApiKey).getAttribute("data-api-key-id");
+    if (!id) throw new Error("Chat API key card is missing its stable ID");
     const inputType = await this.startChatApiKeyEdit(currentApiKey, nextApiKey);
     await interactWhenVisible(
       this.page.getByTestId("saveEditedChatApiKeyButton"),
       (el) => el.click(),
       "Save Edited Chat API Key Button"
     );
-    await this.getChatApiKeyCard(nextApiKey).waitFor({ state: "visible", timeout: 5000 });
+    this.chatApiKeyIds.set(nextApiKey, id);
+    await expect.poll(async () => {
+      const text = await this.getChatApiKeyCard(nextApiKey).getByTestId("chatApiKeyValue").textContent();
+      return text === nextApiKey || text === this.getMaskedApiKey(nextApiKey);
+    }, { timeout: 10000 }).toBe(true);
     return inputType;
   }
 
