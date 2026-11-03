@@ -68,6 +68,46 @@ for (const scenario of ["edited-clear", "new-draft-success", "switch-failure", "
   });
 }
 
+test("@admin old Chat success cannot clear a resubmitted draft after reopening", async ({ page }) => {
+  const graphName = getRandomString("chatReopen");
+  const draft = "Keep this submitted draft";
+  const first = Promise.withResolvers<Route>();
+  const second = Promise.withResolvers<Route>();
+  let requests = 0;
+  await page.route("**/api/chat", route => {
+    requests += 1;
+    (requests === 1 ? first : second).resolve(route);
+  });
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  try {
+    await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+    await expect(page.getByTestId("chatToggleButton")).toBeEnabled({ timeout: 30_000 });
+    if (!await page.getByTestId("chatInput").isVisible()) await page.getByTestId("chatToggleButton").click();
+    await page.getByTestId("chatInput").fill(draft);
+    await page.getByTestId("chatSendButton").click();
+    const oldRequest = await first.promise;
+    await page.getByTestId("chatCloseButton").click();
+    await expect(page.getByTestId("chatInput")).toHaveCount(0);
+    await page.getByTestId("chatToggleButton").click();
+    await expect(page.getByTestId("chatInput")).toHaveValue(draft);
+    await page.getByTestId("chatInput").fill("An intermediate edit");
+    await page.getByTestId("chatInput").fill(draft);
+    await page.getByTestId("chatSendButton").click();
+    const newRequest = await second.promise;
+    const oldResponse = page.waitForResponse(response => response.url().endsWith("/api/chat"));
+    await oldRequest.fulfill({ json: { answer: "Old response" } });
+    await oldResponse;
+    await newRequest.fulfill({ status: 422, json: { error: "Internal server error" } });
+    await expect(page.getByTestId("chatMessagesList")).toContainText("Internal server error");
+    await expect(page.getByTestId("chatInput")).toHaveValue(draft);
+    await page.getByTestId("chatCloseButton").click();
+    await page.getByTestId("chatToggleButton").click();
+    await expect(page.getByTestId("chatInput")).toHaveValue(draft);
+  } finally {
+    expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  }
+});
+
 for (const dismissal of ["tab-switch", "close"] as const) {
 test(`@admin optimize cancels on ${dismissal} and allows a fresh request`, async ({ page }) => {
   const graphName = getRandomString("optimizeOwner");

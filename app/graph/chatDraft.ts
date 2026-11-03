@@ -9,5 +9,5 @@ export function isUnchangedChatDraft(
 }
 
 export function isChatConfigurationError(message: string): boolean {
-    return /\b(?:api[ _-]?key|model(?:\/api key)? mismatch|no model selected|model "[^"]+" not found|unsupported (?:model|provider)|provider (?:rejected|error|unavailable)|(?:reach|connect to) (?:the )?(?:ai provider|local (?:server|provider))|ollama|lm studio)\b/i.test(message);
+    return /\b(?:api[ _-]?key|model(?:\/api key)? mismatch|no model selected|model "[^"]+" not found|unsupported (?:model|provider)|provider (?:rejected|error|unavailable)|(?:reach|connect to) (?:the )?(?:ai provider|local (?:server|provider))|local llm endpoint|ollama|lm studio)\b/i.test(message);
 }

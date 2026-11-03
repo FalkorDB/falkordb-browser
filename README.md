@@ -286,6 +286,10 @@ set `LOAD_CSV_FILE_URI=false`.
 
 The editor's **Optimize** action uses the model and provider configuration selected
 in Settings, with an API key only for hosted providers.
+Optimize and Fix with AI use the Responses API for OpenAI GPT-5 and o-series
+reasoning models (including GPT-5 Pro), without unsupported temperature settings.
+These requests allow up to five minutes for reasoning; other supported models
+retain the 30-second timeout. Closing Optimize cancels the request.
 It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without executing
 the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
 If index metadata is unavailable, analysis continues with an explicit warning.
@@ -328,5 +332,4 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
 
