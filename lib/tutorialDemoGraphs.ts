@@ -3,8 +3,9 @@
 // are never matched, wiped or dropped by it.
 export const DEMO_GRAPH_PREFIX = "tutorial-social-";
 export const TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX = "tutorialDemoGraphOwnership:";
+export const TUTORIAL_DEMO_OWNER_TTL_MS = 24 * 60 * 60 * 1000;
 
-export type TutorialDemoOwnership = { scope: string; ownerId: string; names: string[] };
+export type TutorialDemoOwnership = { scope: string; ownerId: string; names: string[]; lastActiveAt?: number };
 
 export function isTutorialDemoGraphName(name: unknown): name is string {
   return typeof name === "string" && /^tutorial-social-(?:demo|test)-[a-zA-Z0-9-]+$/.test(name);
@@ -30,19 +31,28 @@ export function parseTutorialDemoOwnership(stored: string, scope: string, ownerI
     parsed.ownerId !== ownerId ||
     !("names" in parsed) ||
     !Array.isArray(parsed.names) ||
-    !parsed.names.every(isTutorialDemoGraphName)
+    !parsed.names.every(isTutorialDemoGraphName) ||
+    ("lastActiveAt" in parsed && (typeof parsed.lastActiveAt !== "number" || !Number.isFinite(parsed.lastActiveAt) || parsed.lastActiveAt < 0))
   ) {
     throw new Error("Stored tutorial graph ownership is invalid; refusing to delete unverified graphs");
   }
 
-  return { scope, ownerId, names: [...new Set(parsed.names)] };
+  return {
+    scope, ownerId, names: [...new Set(parsed.names)],
+    ...("lastActiveAt" in parsed && typeof parsed.lastActiveAt === "number" ? { lastActiveAt: parsed.lastActiveAt } : {}),
+  };
+}
+
+export function isTutorialDemoOwnershipExpired(ownership: TutorialDemoOwnership, now = Date.now()): boolean {
+  return ownership.lastActiveAt !== undefined && now - ownership.lastActiveAt >= TUTORIAL_DEMO_OWNER_TTL_MS;
 }
 
 // Returns a demo/test name pair that `isTaken` rejects for neither name.
 export function pickTutorialDemoGraphNames(makeSuffix: () => string, isTaken: (name: string) => boolean): [string, string] {
-  for (;;) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
     const suffix = makeSuffix();
     const names: [string, string] = [`${DEMO_GRAPH_PREFIX}demo-${suffix}`, `${DEMO_GRAPH_PREFIX}test-${suffix}`];
     if (!names.some(isTaken)) return names;
   }
+  throw new Error("Could not allocate unused tutorial graph names after 50 attempts");
 }

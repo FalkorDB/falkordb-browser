@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   isTutorialDemoGraphName,
+  isTutorialDemoOwnershipExpired,
+  TUTORIAL_DEMO_OWNER_TTL_MS,
   parseTutorialDemoOwnership,
   pickTutorialDemoGraphNames,
   tutorialDemoOwnershipKey,
@@ -33,6 +35,12 @@ describe("tutorial demo graph names (#2202)", () => {
     for (const name of [...USER_GRAPHS, "tutorial-social-demo-", "tutorial-social-demo-a b", "tutorial-social-demo-a/b", 42, null]) {
       assert.equal(isTutorialDemoGraphName(name), false, String(name));
     }
+  });
+
+  it("fails explicitly instead of looping forever when every candidate is taken", () => {
+    let attempts = 0;
+    assert.throws(() => pickTutorialDemoGraphNames(() => `s${attempts += 1}`, () => true), /50 attempts/);
+    assert.equal(attempts, 50);
   });
 });
 
@@ -71,5 +79,21 @@ describe("tutorial demo graph ownership (#2202)", () => {
     assert.equal(tutorialDemoOwnershipKey("owner-1"), "tutorialDemoGraphOwnership:owner-1");
     assert.throws(() => tutorialDemoOwnershipKey("owner:1"));
     assert.throws(() => tutorialDemoOwnershipKey(""));
+  });
+
+  it("preserves validated heartbeat timestamps and rejects malformed timestamps", () => {
+    const record = { scope, ownerId, names: ["tutorial-social-demo-x"], lastActiveAt: 123 };
+    assert.deepEqual(parseTutorialDemoOwnership(stored(record), scope, ownerId), record);
+    for (const lastActiveAt of [-1, "123", null]) {
+      assert.throws(() => parseTutorialDemoOwnership(stored({ ...record, lastActiveAt }), scope, ownerId));
+    }
+  });
+
+  it("expires only recorded owners with a full day without a heartbeat", () => {
+    const record = { scope, ownerId, names: ["tutorial-social-demo-x"], lastActiveAt: 100 };
+    assert.equal(isTutorialDemoOwnershipExpired(record, 100 + TUTORIAL_DEMO_OWNER_TTL_MS - 1), false);
+    assert.equal(isTutorialDemoOwnershipExpired(record, 100 + TUTORIAL_DEMO_OWNER_TTL_MS), true);
+    assert.equal(isTutorialDemoOwnershipExpired({ scope, ownerId, names: [] }, 10 * TUTORIAL_DEMO_OWNER_TTL_MS), false);
+    assert.equal(isTutorialDemoOwnershipExpired(record, 0), false);
   });
 });

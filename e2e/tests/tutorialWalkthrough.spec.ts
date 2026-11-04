@@ -112,6 +112,7 @@ test.describe("Tutorial", () => {
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
 
+        const demoNames: string[] = [];
         const countPeople = async () => {
             const page = await browser.getPage();
             const demoGraph = await page.evaluate(() => {
@@ -138,6 +139,7 @@ test.describe("Tutorial", () => {
                 if (typeof name !== "string") throw new Error("Tutorial demo graph was not recorded");
                 return name;
             });
+            demoNames.push(demoGraph);
             const result = await apiCall.runQuery(
                 demoGraph,
                 "MATCH (n:Person) RETURN count(n) AS cnt"
@@ -158,10 +160,88 @@ test.describe("Tutorial", () => {
             await tutorial.refreshPage();
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
+            expect(demoNames[1]).not.toBe(demoNames[0]);
+            expect((await apiCall.getGraphs()).opts).not.toContain(demoNames[0]);
         } finally {
             await tutorial.skip();
         }
     });
+
+    for (const [webLocks, ownRecord, failedCleanup] of [[true, false, false], [false, false, false], [true, true, false], [false, false, true]]) {
+        test(`@admin app startup reclaims recorded abandoned tutorials only (Web Locks ${webLocks}, own record ${ownRecord}, failed cleanup ${failedCleanup})`, async () => {
+            test.setTimeout(90_000);
+            const suffix = getRandomString("owner").replaceAll("_", "-");
+            const orphanOwner = `abandoned-${suffix}`;
+            const orphan = `tutorial-social-demo-${suffix}`;
+            const userNamedLikeDemo = `tutorial-social-test-user-${suffix}`;
+            const recent = `tutorial-social-test-recent-${suffix}`;
+            const recentOwner = `recent-${suffix}`;
+            for (const name of [orphan, userNamedLikeDemo, recent]) {
+                await apiCall.runQuery(name, "CREATE (:Mine {keep: true})");
+            }
+            try {
+                await browser.createNewPage(TutorialPanel);
+                const page = await browser.getPage();
+                if (webLocks) {
+                    const context = browser.getContext();
+                    if (!context) throw new Error("Tutorial test context was not created");
+                    const activeOwner = await context.newPage();
+                    await activeOwner.goto(`${urls.localHost}/api/auth/providers`);
+                    await activeOwner.evaluate(async ownerId => new Promise<void>(resolve => {
+                        void navigator.locks.request(`falkordb-browser:tutorialDemoOwner:${ownerId}`, () => {
+                            resolve();
+                            return new Promise<void>(() => {});
+                        });
+                    }), recentOwner);
+                }
+                await page.addInitScript(({ orphanOwnerId, orphanName, recentOwnerId, recentName, locks, own }) => {
+                    if (!locks) Object.defineProperty(navigator, "locks", { value: undefined, configurable: true });
+                    const scope = "localhost:6379:default:";
+                    localStorage.setItem("tutorial", "false");
+                    if (own) sessionStorage.setItem("tutorialDemoOwnerId", orphanOwnerId);
+                    localStorage.setItem(`${scope}tutorialDemoGraphOwnership:${orphanOwnerId}`, JSON.stringify({
+                        scope, ownerId: orphanOwnerId, names: [orphanName], lastActiveAt: Date.now() - 25 * 60 * 60 * 1000,
+                    }));
+                    localStorage.setItem(`${scope}tutorialDemoGraphOwnership:${recentOwnerId}`, JSON.stringify({
+                        scope, ownerId: recentOwnerId, names: [recentName], lastActiveAt: locks ? Date.now() - 25 * 60 * 60 * 1000 : Date.now(),
+                    }));
+                }, { orphanOwnerId: orphanOwner, orphanName: orphan, recentOwnerId: recentOwner, recentName: recent, locks: webLocks, own: ownRecord });
+                const cleanupUrl = `**/api/graph/${orphan}`;
+                if (failedCleanup) {
+                    await page.route(cleanupUrl, route => route.request().method() === "DELETE"
+                        ? route.fulfill({ status: 503, json: { message: "Simulated tutorial cleanup failure" } })
+                        : route.continue());
+                }
+                await page.goto(urls.graphUrl);
+                if (failedCleanup) {
+                    await expect(page.getByText("Tutorial cleanup failed", { exact: true })).toBeVisible();
+                    expect((await apiCall.getGraphs()).opts).toContain(orphan);
+                    const lastActiveAt = await page.evaluate(ownerId => {
+                        const key = Object.keys(localStorage).find(name => name.endsWith(`tutorialDemoGraphOwnership:${ownerId}`));
+                        if (!key) throw new Error("Failed cleanup lost its ownership record");
+                        const timestamp: unknown = JSON.parse(localStorage.getItem(key)!).lastActiveAt;
+                        if (typeof timestamp !== "number") throw new Error("Failed cleanup lost its ownership timestamp");
+                        return timestamp;
+                    }, orphanOwner);
+                    expect(lastActiveAt).toBeLessThan(Date.now() - 24 * 60 * 60 * 1000);
+                    await page.unroute(cleanupUrl);
+                    await page.reload();
+                }
+                await expect.poll(async () => (await apiCall.getGraphs()).opts, { timeout: 30_000 }).not.toContain(orphan);
+                const { opts } = await apiCall.getGraphs();
+                expect(opts).toContain(userNamedLikeDemo);
+                expect(opts).toContain(recent);
+                const result = await apiCall.runQuery(userNamedLikeDemo, "MATCH (n:Mine {keep: true}) RETURN count(n) AS c");
+                expect(Number(result.data[0].c)).toBe(1);
+                await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+            } finally {
+                const { opts } = await apiCall.getGraphs();
+                for (const name of [orphan, userNamedLikeDemo, recent]) {
+                    if (opts.includes(name)) await apiCall.removeGraph(name, "admin");
+                }
+            }
+        });
+    }
 
     test("@admin the tutorial leaves user graphs named social-demo and social-demo-test untouched", async ({ browserName }) => {
         // These names are fixed, so every browser project would share them.

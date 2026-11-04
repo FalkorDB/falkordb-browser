@@ -40,6 +40,17 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 
 Access the Browser: (https://browser.falkordb.com)
 
+### Tutorial samples
+
+The tutorial uses unique graph names, checks for existing names before creation,
+and records the exact names it owns per connection. Cleanup never deletes graphs
+just because their names resemble tutorial samples, including `social-demo`.
+Abandoned samples are reclaimed on app visits as well as tutorial start/close.
+With Web Locks, active tabs are protected by their ownership lock. Without Web
+Locks, active tabs renew ownership every minute and only records inactive for
+24 hours are eligible. Cleanup requires the same browser's retained ownership
+records; clearing browser storage removes that evidence.
+
 ### Quick start
 
 #### Run the graph database and browser from one docker container
@@ -309,7 +320,6 @@ set `LOAD_CSV_FILE_URI=false`.
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
 
 
 
