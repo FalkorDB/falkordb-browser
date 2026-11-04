@@ -48,6 +48,32 @@ describe("runQuery", () => {
     describe("isRequestOriginTrusted", () => {
         const envKeys = ["ALLOWED_ORIGINS", "AUTH_URL", "NEXTAUTH_URL", "TRUST_PROXY_HEADERS"] as const;
 
+        it("honors explicit origin restrictions even when Host equals Origin in auto mode", (t) => {
+            const previous = { ...process.env };
+            t.after(() => { process.env = previous; });
+            process.env.AUTH_URL = "auto";
+            process.env.ALLOWED_ORIGINS = "https://allowed.example";
+            for (const origin of ["https://unlisted.example", "https://allowed.example"]) {
+                const request = new Request(`${origin}/api/graph`, {
+                    method: "POST", headers: { host: new URL(origin).host, origin },
+                });
+                assert.equal(isRequestOriginTrusted(request), origin === "https://allowed.example");
+            }
+        });
+
+        it("does not override an untrusted or malformed Origin with Fetch Metadata", (t) => {
+            const previous = { ...process.env };
+            t.after(() => { process.env = previous; });
+            process.env.ALLOWED_ORIGINS = "";
+            process.env.AUTH_URL = "https://app.example";
+            for (const origin of ["https://attacker.example", "null", "malformed"]) {
+                assert.equal(isRequestOriginTrusted(new Request("https://app.example/api/graph", {
+                    method: "POST",
+                    headers: { host: "app.example", origin, "sec-fetch-site": "same-origin" },
+                })), false);
+            }
+        });
+
         it("requires a trusted origin for cookie-authenticated mutations", () => {
             const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
             try {

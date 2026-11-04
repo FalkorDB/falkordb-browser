@@ -186,7 +186,11 @@ export function isOriginAllowed(requestOrigin?: string | null, request?: Request
 
 export function isRequestOriginTrusted(request: Request): boolean {
     const requestOrigin = getRequestOrigin(request);
+    if (process.env.ALLOWED_ORIGINS && !isOriginAllowed(requestOrigin, request)) {
+        return false;
+    }
     const callerOrigin = getHeaderOrigin(request);
+    if (request.headers.has("origin") && !callerOrigin) return false;
     if (callerOrigin) {
         return Boolean(requestOrigin) &&
             (callerOrigin === requestOrigin || isOriginAllowed(callerOrigin, request));

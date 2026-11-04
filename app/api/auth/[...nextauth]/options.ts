@@ -117,10 +117,21 @@ export { PAT_BINDING_VERSION };
  * Returns the map key for a session-scoped multi-connection entry.
  * Only used for connections stored via addSessionConnection / the
  * initial login flow — NOT for JWT/PAT clients (which are keyed by
- * payload.sub directly).
+ * pat:<jti>).
  */
 function sessionConnectionKey(sessionId: string, connectionId: string): string {
   return `${sessionId}:${connectionId}`;
+}
+
+export async function closeCachedConnection(key: string): Promise<void> {
+  const client = connections.get(key);
+  if (!client) return;
+  connections.delete(key);
+  try {
+    await client.close();
+  } catch (error) {
+    console.warn("Failed to close temporary authentication connection:", error);
+  }
 }
 
 /**
@@ -1078,7 +1089,7 @@ const authOptions: NextAuthConfig = {
       try {
         const destination = new URL(url, baseUrl);
         if (destination.origin === new URL(baseUrl).origin) {
-          return url.startsWith("/") ? new URL(url, baseUrl).toString() : url;
+          return destination.toString();
         }
       } catch {
         // Invalid redirect destinations fall back to the application origin.

@@ -79,6 +79,14 @@ before removing an abandoned lock directory and restarting. Use FalkorDB-backed
 token storage for distributed deployments rather than sharing files across
 machines.
 
+`API_TOKEN_FALKORDB_URL` accepts `falkor://`, the legacy `falkordb://` alias,
+`redis://`, and the TLS schemes `falkors://` / `rediss://`. Only database 0 is
+supported; query strings and fragments are rejected. For a private/self-signed
+token-database certificate, mount the issuing CA PEM and set
+`NODE_EXTRA_CA_CERTS=/path/to/ca.pem` **before starting Node**. This extends trust
+for the token store and other Node TLS connections without disabling certificate
+or hostname verification.
+
 Replacing a user's role also clears existing ACL selectors, so selectors cannot
 retain permissions outside the replacement role and key patterns.
 
@@ -94,6 +102,11 @@ an explicit retryable error. File-URI imports remain validated during upload.
 Schema-discovery placement limits, timeouts, and limit-reached UI behavior are
 tracked separately in [#2228](https://github.com/FalkorDB/falkordb-browser/issues/2228);
 no schema limit or sampling change is introduced here.
+
+Aborting a graph-query request stops its SSE output, but does not cancel an
+already-running database query: the current driver has no per-query cancellation
+API. Existing query timeouts still apply; shared database connections are not
+closed to cancel an individual request.
 
 > Note: the image ships no default `AUTH_SECRET`. If you do not supply one, a
 > random secret is generated per container, which means every session is

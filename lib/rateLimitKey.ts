@@ -20,6 +20,40 @@ export function readNonNegativeInt(raw: string | undefined, fallback: number): n
 
 export const DEFAULT_TRUSTED_PROXY_HOPS = 1;
 
+const SIGN_IN_BODY_CAP = 16 * 1024;
+
+export async function isPreconfiguredSignIn(request: Request): Promise<boolean> {
+    if (request.method !== "POST" || new URL(request.url).pathname !== "/api/auth/callback/credentials") return false;
+    const length = readNonNegativeInt(request.headers.get("content-length") ?? undefined, -1);
+    if (length < 0 || length > SIGN_IN_BODY_CAP) return true;
+    const reader = request.clone().body?.getReader();
+    if (!reader) return false;
+    try {
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            size += value.byteLength;
+            if (size > SIGN_IN_BODY_CAP) {
+                void reader.cancel().catch(error => console.warn("Failed to cancel sign-in inspection:", error));
+                return true;
+            }
+            chunks.push(value);
+        }
+        const body = Buffer.concat(chunks).toString("utf8");
+        if (request.headers.get("content-type")?.includes("application/json")) {
+            return (JSON.parse(body) as { preconfigured?: unknown } | null)?.preconfigured === "true";
+        }
+        return new URLSearchParams(body).getAll("preconfigured").includes("true");
+    } catch {
+        console.warn("Could not inspect sign-in request");
+        return false;
+    } finally {
+        reader.releaseLock();
+    }
+}
+
 /**
  * The address a request is charged to, from its `X-Forwarded-For`.
  *

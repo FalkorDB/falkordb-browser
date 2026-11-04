@@ -150,6 +150,34 @@ describe("API URL normalization", () => {
 
 type MockToast = { title?: unknown; description?: unknown; variant?: unknown };
 
+it("reports an empty successful POST stream instead of silently rejecting", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", {
+    configurable: true, value: { location: { href: "http://localhost/graph" } },
+  });
+  globalThis.fetch = async () => new Response("", {
+    status: 200, headers: { "Content-Type": "text/event-stream" },
+  });
+  const toasts: MockToast[] = [];
+  const indicators: string[] = [];
+  try {
+    await assert.rejects(getSSEGraphResult(
+      "/api/graph/demo?query=RETURN%201",
+      toast => { toasts.push(toast); },
+      state => { indicators.push(state); },
+      { method: "POST" },
+    ), /Invalid server response/);
+    assert.equal(toasts.length, 1);
+    assert.ok(toasts[0].description);
+    assert.equal(indicators.at(-1), "offline");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});
+
 type MockEventSourceInstance = {
   url: string;
   listeners: Record<string, (event: MessageEvent) => void>;

@@ -1,8 +1,9 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders } from "../../../utils";
+import { getCorsHeaders, resolveReadOnly, corsPreflight } from "../../../utils";
 
-// eslint-disable-next-line import/prefer-default-export
+export const OPTIONS = corsPreflight;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
@@ -12,6 +13,12 @@ export async function POST(
 
     if (session instanceof NextResponse) {
       return session;
+    }
+    if (resolveReadOnly(request, session.user.role)) {
+      return NextResponse.json(
+        { message: "Profiling executes queries and is not available in read-only mode." },
+        { status: 403, headers: getCorsHeaders(request) }
+      );
     }
 
     if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {

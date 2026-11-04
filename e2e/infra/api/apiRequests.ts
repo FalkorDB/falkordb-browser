@@ -17,7 +17,7 @@ const getRequest = async (url: string, headers?: Record<string, string>, body?: 
 const postRequest = async (url: string, body?: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
   const requestOptions = {
     data: body,
-    headers: { Origin: new URL(url).origin, ...headers },
+    headers: { ...headers, Origin: new URL(url).origin },
   };
 
   const requestContext = availableRequest || (await request.newContext());
@@ -28,7 +28,7 @@ const postRequest = async (url: string, body?: any, availableRequest?: APIReques
 const deleteRequest = async (url: string, headers?: Record<string, string>, body?: any) => {
   const requestOptions = {
     data: body,
-    headers: { Origin: new URL(url).origin, ...headers },
+    headers: { ...headers, Origin: new URL(url).origin },
   };
 
   const requestContext = await request.newContext();
@@ -39,7 +39,7 @@ const deleteRequest = async (url: string, headers?: Record<string, string>, body
 const patchRequest = async (url: string, body?: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
   const requestOptions = {
     data: body,
-    headers: { Origin: new URL(url).origin, ...headers },
+    headers: { ...headers, Origin: new URL(url).origin },
   };
 
   const requestContext = availableRequest || (await request.newContext());

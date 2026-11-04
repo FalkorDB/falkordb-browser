@@ -1,5 +1,5 @@
-import { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorage';
-import { executePATQuery } from './falkordb-client';
+import type { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorage.ts';
+import { executePATQuery } from './falkordb-client.ts';
 
 /**
  * FalkorDB-based token storage implementation

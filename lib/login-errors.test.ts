@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { classifyLoginError, LoginError } from "./login-errors.ts";
+import { classifyLoginError, connectionResponseError, LoginError } from "./login-errors.ts";
 
 describe("login errors", () => {
   it("distinguishes missing credentials, invalid credentials, and connection failures", () => {
@@ -9,6 +9,28 @@ describe("login errors", () => {
     assert.equal(classifyLoginError(new Error("connect ECONNREFUSED 127.0.0.1:6379")), "connection_failed");
     assert.equal(classifyLoginError(new Error("TLS certificate rejected")), "connection_failed");
     assert.equal(classifyLoginError(undefined), "connection_failed");
+    assert.equal(classifyLoginError(new Error("Connection failed: NOAUTH Authentication required")), "credentials_required");
+    assert.equal(classifyLoginError(new Error("Invalid password")), "invalid_credentials");
+  });
+
+  it("only maps recognized add-connection codes to credential prompts", async (t) => {
+    t.mock.method(console, "warn", () => {});
+    for (const code of ["credentials_required", "invalid_credentials", "connection_failed"]) {
+      const error = await connectionResponseError(Response.json({ code }, { status: 400 }));
+      assert.ok(error instanceof LoginError);
+      assert.equal(error.code, code);
+    }
+    for (const response of [
+      Response.json({ message: "Maximum connections reached" }, { status: 400 }),
+      Response.json({ code: "UNKNOWN_ERROR" }, { status: 500 }),
+      new Response("<html>Proxy error</html>", { status: 502 }),
+      new Response(null, { status: 500 }),
+    ]) {
+      const error = await connectionResponseError(response);
+      assert.equal(error instanceof LoginError, false);
+      assert.match(error.message, /Failed to add connection/);
+      assert.equal(error.message.includes("JSON"), false);
+    }
   });
 
   it("only exposes predefined safe messages to the UI", () => {

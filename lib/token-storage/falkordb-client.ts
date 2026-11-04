@@ -12,7 +12,7 @@ let patFalkorDBInstance: FalkorDB | null = null;
  * Format: falkordb://[username:password@]host:port
  * Falls back to individual PAT_FALKORDB_* env vars if URL not provided
  */
-function parseFalkorDBUrl(): {
+export function parseFalkorDBUrl(): {
   host: string;
   port: number;
   username?: string;
@@ -22,30 +22,41 @@ function parseFalkorDBUrl(): {
   const url = process.env.API_TOKEN_FALKORDB_URL;
   
   if (url) {
+    let parsed: URL;
     try {
       // Parse URL (e.g., falkordb://localhost:6380 or falkordb://user:pass@localhost:6380)
-      const parsed = new URL(url);
-      if (!["falkor:", "falkors:", "redis:", "rediss:"].includes(parsed.protocol)) {
-        throw new Error("Unsupported API_TOKEN_FALKORDB_URL scheme");
-      }
-      if (!parsed.hostname) {
-        throw new Error("API_TOKEN_FALKORDB_URL must contain a database host");
-      }
-      const host = parsed.hostname;
-      const port = parsed.port ? parseInt(parsed.port, 10) : 6380;
-      const username = parsed.username ? decodeURIComponent(parsed.username) : "default";
-      const password = parsed.password ? decodeURIComponent(parsed.password) : undefined;
-      
-      return {
-        host,
-        port,
-        username,
-        password,
-        tls: parsed.protocol === "falkors:" || parsed.protocol === "rediss:",
-      };
-    } catch (err) {
-      throw new Error("Invalid API_TOKEN_FALKORDB_URL", { cause: err });
+      parsed = new URL(url);
+    } catch {
+      // URL errors contain the raw input, which can include a password.
+      throw new Error("Invalid API_TOKEN_FALKORDB_URL: check scheme, host and port");
     }
+    if (!["falkor:", "falkordb:", "falkors:", "redis:", "rediss:"].includes(parsed.protocol)) {
+      throw new Error("Unsupported API_TOKEN_FALKORDB_URL scheme");
+    }
+    if (!parsed.hostname) {
+      throw new Error("API_TOKEN_FALKORDB_URL must contain a database host");
+    }
+    if (!["", "/", "/0"].includes(parsed.pathname) || parsed.search || parsed.hash) {
+      throw new Error("API_TOKEN_FALKORDB_URL may only select database 0 and cannot contain query options or fragments");
+    }
+    const host = parsed.hostname.replace(/^\[([0-9a-f:]+)\]$/i, "$1");
+    const port = parsed.port ? parseInt(parsed.port, 10) : 6380;
+    let username: string;
+    let password: string | undefined;
+    try {
+      username = parsed.username ? decodeURIComponent(parsed.username) : "default";
+      password = parsed.password ? decodeURIComponent(parsed.password) : undefined;
+    } catch {
+      throw new Error("Invalid API_TOKEN_FALKORDB_URL credential encoding");
+    }
+
+    return {
+      host,
+      port,
+      username,
+      password,
+      tls: parsed.protocol === "falkors:" || parsed.protocol === "rediss:",
+    };
   }
   
   // Fallback to individual env vars for backward compatibility

@@ -172,7 +172,7 @@ class FileTokenStorage implements ITokenStorage {
       filtered = filtered.filter(
         t =>
           t.username === options.username &&
-          t.host === (options.host || 'localhost') &&
+          t.host.toLowerCase() === (options.host || 'localhost').toLowerCase() &&
           t.port === (options.port || 6379)
       );
     }

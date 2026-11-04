@@ -499,7 +499,8 @@ export async function getSSEGraphResult(
           finishReject(reportError(responseText, response.status));
           return;
         }
-        finishReject(new Error("Invalid server response"));
+        setIndicator("offline");
+        finishReject(reportError("Invalid server response", response.status));
       }).catch((error: unknown) => {
         if (settled) return;
         if (signal?.aborted) {

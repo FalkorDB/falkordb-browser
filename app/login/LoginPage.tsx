@@ -121,7 +121,7 @@ export default function LoginPage() {
     autoConnectAttempt.current
       .then((res) => {
         if (!active) return;
-        if (res?.error) {
+        if (!res || res.error) {
           setAutoConnectError(AUTO_CONNECT_FAILED);
           return;
         }

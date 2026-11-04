@@ -73,8 +73,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
           if (viewport.width < 1100) await expect(page.getByTestId("editorMore")).toBeVisible();
           page.on("request", request => {
             const url = new URL(request.url());
-            const executedQuery = url.searchParams.get("query") ?? "";
-            if (request.method() === "GET"
+            if (decodeURIComponent(url.pathname) !== `/api/graph/${graphName}`) return;
+            const executedQuery = request.method() === "POST" && request.postData()
+              ? (request.postDataJSON() as { query?: string } | null)?.query ?? ""
+              : url.searchParams.get("query") ?? "";
+            if (["GET", "POST"].includes(request.method())
               && decodeURIComponent(url.pathname) === `/api/graph/${graphName}`
               && [query, suggestion, invalidQuery].some(testedQuery => executedQuery.includes(testedQuery))) queryRequests += 1;
           });

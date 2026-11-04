@@ -185,7 +185,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "List JWT tokens",
-        description: "Get a list of active JWT tokens. Admins see all tokens, regular users see only their own tokens.",
+        description: "Get active JWT tokens for the authenticated database endpoint. Admins see all users at that endpoint; regular users see only their own tokens. Host matching is case-insensitive.",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
@@ -273,7 +273,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "Get token metadata",
-        description: "Get detailed metadata for a specific JWT token by its token ID. Admins can view any token, regular users can only view their own tokens.",
+        description: "Get metadata for a JWT token at the authenticated database endpoint. Admins can view any user at that endpoint; regular users can only view their own tokens.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -356,7 +356,7 @@ const swaggerSpec = {
             description: "Authentication failed - invalid or missing token"
           },
           "403": {
-            description: "Forbidden - You can only view your own tokens (unless you are an Admin)",
+            description: "Forbidden - Token must belong to your connection; non-admins must also own it",
             content: {
               "application/json": {
                 schema: {
@@ -364,7 +364,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Forbidden: You can only view your own tokens"
+                      example: "Forbidden: You can only view tokens for your connection"
                     }
                   }
                 }
@@ -395,7 +395,7 @@ const swaggerSpec = {
       delete: {
         tags: ["Authentication"],
         summary: "Revoke token by ID",
-        description: "Revoke a specific JWT token by its token ID. Once revoked, the token cannot be used for authentication. Admins can revoke any token, regular users can only revoke their own tokens.",
+        description: "Revoke a JWT token at the authenticated database endpoint. Once revoked, it cannot authenticate. Admins can revoke any user at that endpoint; regular users can only revoke their own tokens.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -451,7 +451,7 @@ const swaggerSpec = {
             description: "Authentication failed - invalid or missing token"
           },
           "403": {
-            description: "Forbidden - You can only revoke your own tokens (unless you are an Admin)",
+            description: "Forbidden - Token must belong to your connection; non-admins must also own it",
             content: {
               "application/json": {
                 schema: {
@@ -459,7 +459,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Forbidden: You can only revoke your own tokens"
+                      example: "Forbidden: You can only revoke tokens for your connection"
                     }
                   }
                 }
@@ -670,7 +670,20 @@ const swaggerSpec = {
         },
         responses: {
           "200": {
-            description: "Query returns a Server-Sent Events stream; graph checks return JSON"
+            description: "Query returns a Server-Sent Events stream; graph checks return JSON",
+            content: {
+              "text/event-stream": {
+                schema: { type: "string" },
+                example: 'event: result\ndata: {"data":[{"value":1}]}\n\n'
+              },
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["message"],
+                  properties: { message: { type: "string", example: "Graph created successfully" } }
+                }
+              }
+            }
           },
           "400": {
             description: "Bad request"
@@ -808,7 +821,7 @@ const swaggerSpec = {
       post: {
         tags: ["Graph"],
         summary: "Profile query execution",
-        description: "Get detailed profiling information for a Cypher query",
+        description: "Execute a Cypher query and return profiling information. Requires a writable user and connection; read-only mode returns 403.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
