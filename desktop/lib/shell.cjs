@@ -22,6 +22,7 @@ function writeJson(file, value) {
     const temp = `${file}.${crypto.randomBytes(12).toString("hex")}.tmp`;
     try {
         fs.writeFileSync(temp, JSON.stringify(value, null, 2), { mode: 0o600, flag: "wx" });
+        fs.chmodSync(temp, 0o600);
         fs.renameSync(temp, file);
     } finally {
         if (fs.existsSync(temp)) fs.unlinkSync(temp);

@@ -21,7 +21,7 @@ test("stops and cancels after 8 KiB even when the response ignores Range", async
             cancel() { cancelled = true; },
         }, { highWaterMark: 0 }));
     };
-    assert.equal(await validateCsvHeadFromUrl("https://storage.example/file.csv"), null);
+    assert.deepEqual(await validateCsvHeadFromUrl("https://storage.example/file.csv"), { status: "valid" });
     assert.equal(read, CSV_HEAD_INSPECT_BYTES);
     assert.equal(cancelled, true);
 });
@@ -30,7 +30,7 @@ test("does not inspect or retain bytes beyond the head in a large chunk", async 
     const chunk = new Uint8Array(1024 * 1024).fill(65);
     chunk[CSV_HEAD_INSPECT_BYTES] = 0;
     globalThis.fetch = async () => new Response(chunk);
-    assert.equal(await validateCsvHeadFromUrl("https://storage.example/file.csv"), null);
+    assert.deepEqual(await validateCsvHeadFromUrl("https://storage.example/file.csv"), { status: "valid" });
 });
 
 test("validates BOM, binary, and empty heads", async () => {
@@ -40,17 +40,19 @@ test("validates BOM, binary, and empty heads", async () => {
         [Buffer.alloc(0), "The uploaded CSV is empty."],
     ] as const) {
         globalThis.fetch = async () => new Response(body);
-        assert.equal(await validateCsvHeadFromUrl("https://storage.example/file.csv"), expected);
+        assert.deepEqual(await validateCsvHeadFromUrl("https://storage.example/file.csv"),
+            expected ? { status: "invalid", message: expected } : { status: "valid" });
     }
 });
 
-test("surfaces storage HTTP and network errors instead of treating validation as successful", async (t) => {
+test("distinguishes an unavailable browser precheck from valid content and logs delegation to FalkorDB", async (t) => {
     const warning = t.mock.method(console, "warn", () => {});
     globalThis.fetch = async () => new Response("denied", { status: 403 });
-    assert.match((await validateCsvHeadFromUrl("https://storage.example/file.csv"))!, /Could not validate/);
+    assert.deepEqual(await validateCsvHeadFromUrl("https://storage.example/file.csv"), { status: "unavailable" });
     globalThis.fetch = async () => { throw new Error("network unavailable"); };
-    assert.match((await validateCsvHeadFromUrl("https://storage.example/file.csv"))!, /Could not validate/);
+    assert.deepEqual(await validateCsvHeadFromUrl("https://storage.example/file.csv"), { status: "unavailable" });
     assert.equal(warning.mock.callCount(), 2);
+    assert.match(String(warning.mock.calls[0].arguments[0]), /FalkorDB.*authoritative/);
 });
 
 test("aborts stalled header requests after ten seconds", async (t) => {
@@ -61,12 +63,12 @@ test("aborts stalled header requests after ten seconds", async (t) => {
     });
     const pending = validateCsvHeadFromUrl("https://storage.example/file.csv");
     t.mock.timers.tick(10_000);
-    assert.match((await pending)!, /Could not validate/);
+    assert.deepEqual(await pending, { status: "unavailable" });
 });
 
 test("file imports remain supported without an HTTP precheck", async () => {
     globalThis.fetch = async () => { throw new Error("must not fetch file imports"); };
-    assert.equal(await validateCsvHeadFromUrl("file://imports/owner/file.csv"), null);
+    assert.deepEqual(await validateCsvHeadFromUrl("file://imports/owner/file.csv"), { status: "skipped" });
 });
 
 test("cancels a real HTTP response that ignores Range", async (t) => {
@@ -86,7 +88,7 @@ test("cancels a real HTTP response that ignores Range", async (t) => {
     });
     const address = server.address();
     assert.ok(address && typeof address !== "string");
-    assert.equal(await validateCsvHeadFromUrl(`http://127.0.0.1:${address.port}/file.csv`), null);
+    assert.deepEqual(await validateCsvHeadFromUrl(`http://127.0.0.1:${address.port}/file.csv`), { status: "valid" });
     assert.equal(range, "bytes=0-8191");
     await new Promise(resolve => setImmediate(resolve));
     // Socket shutdown can be delivered after the validation promise resolves.

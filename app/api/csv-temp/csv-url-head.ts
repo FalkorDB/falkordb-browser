@@ -1,8 +1,14 @@
 import { CSV_HEAD_INSPECT_BYTES, headLooksBinary, stripLeadingBom } from "./csv-head.ts";
 
-export async function validateCsvHeadFromUrl(csvUrl: string): Promise<string | null> {
+export type CsvHeadValidation =
+    | { status: "valid" }
+    | { status: "invalid"; message: string }
+    | { status: "unavailable" }
+    | { status: "skipped" };
+
+export async function validateCsvHeadFromUrl(csvUrl: string): Promise<CsvHeadValidation> {
     // Local file imports are validated during upload and read by FalkorDB, not fetch.
-    if (csvUrl.startsWith("file://")) return null;
+    if (csvUrl.startsWith("file://")) return { status: "skipped" };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
@@ -25,14 +31,14 @@ export async function validateCsvHeadFromUrl(csvUrl: string): Promise<string | n
             length += part.length;
         }
         const head = stripLeadingBom(buffer.subarray(0, length));
-        if (head.length === 0) return "The uploaded CSV is empty.";
+        if (head.length === 0) return { status: "invalid", message: "The uploaded CSV is empty." };
         if (headLooksBinary(head)) {
-            return "The uploaded file does not appear to be a valid CSV (contains binary data).";
+            return { status: "invalid", message: "The uploaded file does not appear to be a valid CSV (contains binary data)." };
         }
-        return null;
-    } catch (error) {
-        console.warn("CSV header validation failed:", error);
-        return "Could not validate the uploaded CSV. Check storage connectivity and retry.";
+        return { status: "valid" };
+    } catch {
+        console.warn("CSV header precheck unavailable; FalkorDB will perform the authoritative fetch.");
+        return { status: "unavailable" };
     } finally {
         try {
             await reader?.cancel();

@@ -45,6 +45,23 @@ test("loadSecrets generates two 32-byte hex secrets once and keeps them", () => 
     }
 });
 
+test("loadSecrets keeps readable, stable secrets under a restrictive umask", (t) => {
+    if (process.platform === "win32") return t.skip("POSIX file modes");
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    const previousUmask = process.umask(0o477);
+    try {
+        const first = loadSecrets(dir);
+        assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+        assert.deepEqual(loadSecrets(dir), first);
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+    } finally {
+        process.umask(previousUmask);
+        if (fs.existsSync(file)) fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
 test("loadSecrets makes a replaced secrets file owner-only, whatever its old mode", (t) => {
     if (process.platform === "win32") return t.skip("POSIX file modes");
     const dir = tempDir();

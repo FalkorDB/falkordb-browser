@@ -72,10 +72,11 @@ last connection requires a fresh login; old sessions without a connection ID
 must also sign in again instead of reconnecting from cookie fields.
 
 File-backed token storage uses atomic replacements and an exclusive
-`api_tokens.json.lock` directory (next to the configured token file) to serialize
+`<token-file>.lock` directory (the full configured token path with `.lock`
+appended; by default `.data/api_tokens.json.lock`) to serialize
 writers. A writer waits up to 10 seconds for the lock, then fails explicitly.
 Locks are never automatically stolen. After a process crash, stop **all** writers
-before removing an abandoned lock directory and restarting. Use FalkorDB-backed
+before removing that token file's abandoned lock directory and restarting. Use FalkorDB-backed
 token storage for distributed deployments rather than sharing files across
 machines.
 
@@ -95,9 +96,14 @@ than guessing ownership, including hostnames beginning with `chat-` or another
 legacy prefix. Desktop secret regeneration atomically replaces the secrets file
 inside an owner-only directory.
 
-HTTP CSV header validation reads at most 8 KiB and cancels the response, even if
-storage ignores Range. A 10-second validation timeout or a storage error produces
-an explicit retryable error. File-URI imports remain validated during upload.
+HTTP CSV header validation inspects and retains at most 8 KiB, then cancels the
+response. A stream chunk and the underlying network transfer may exceed 8 KiB
+when storage ignores Range. The optional precheck has a 10-second deadline.
+If Next.js cannot fetch the URL, it logs an unavailable precheck and lets
+FalkorDB perform the authoritative fetch: the URL may target a network reachable
+only by the database. A successfully inspected empty/binary header still rejects
+the import; database fetch/query failures remain explicit import errors.
+File-URI imports remain validated during upload.
 
 Schema-discovery placement limits, timeouts, and limit-reached UI behavior are
 tracked separately in [#2228](https://github.com/FalkorDB/falkordb-browser/issues/2228);

@@ -130,10 +130,12 @@ export async function POST(
             throw configError;
         }
 
-        const csvHeadError = await validateCsvHeadFromUrl(csvUrl);
-        if (csvHeadError) {
+        // The URL targets FalkorDB's network, which may be unreachable from Next.js.
+        // Unavailable prechecks are logged; LOAD CSV remains authoritative.
+        const csvHead = await validateCsvHeadFromUrl(csvUrl);
+        if (csvHead.status === "invalid") {
             return NextResponse.json(
-                { message: csvHeadError },
+                { message: csvHead.message },
                 { status: 422, headers: getCorsHeaders(request) }
             );
         }
