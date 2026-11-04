@@ -55,6 +55,8 @@ test.describe('Metadata Tests', () => {
             const segments = new URL(response.url()).pathname.split('/');
             expect(segments).toHaveLength(5);
             expect(decodeURIComponent(segments[3])).toBe(graphName);
+            await expect(page.getByTestId("profileTree")).toBeVisible();
+            await expect(page.getByTestId("profileTree")).not.toBeEmpty();
         } finally {
             await apiCalls.removeGraph(encodedName);
         }

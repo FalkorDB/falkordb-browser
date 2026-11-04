@@ -39,4 +39,11 @@ describe("graph API URLs (#2207)", () => {
     }
     assert.equal(getNodeUrl("g/1", 3, true), "/api/graph/g%2F1/3?readOnly=true");
   });
+
+  it("encodes string node IDs without allowing them to change the read-only flag", () => {
+    const url = new URL(getNodeUrl("g", "a/b?readOnly=false", true), "http://localhost/");
+    assert.equal(url.pathname.split("/").length, 5);
+    assert.equal(decodeURIComponent(url.pathname.split("/")[4]), "a/b?readOnly=false");
+    assert.equal(url.searchParams.get("readOnly"), "true");
+  });
 });

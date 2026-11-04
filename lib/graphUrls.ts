@@ -5,5 +5,5 @@ export function getProfileUrl(graphName: string, query: string, readOnly = false
 }
 
 export function getNodeUrl(graphName: string, nodeId: number | string, readOnly = false): string {
-  return `/api/graph/${encodeURIComponent(graphName)}/${nodeId}${readOnly ? "?readOnly=true" : ""}`;
+  return `/api/graph/${encodeURIComponent(graphName)}/${encodeURIComponent(String(nodeId))}${readOnly ? "?readOnly=true" : ""}`;
 }

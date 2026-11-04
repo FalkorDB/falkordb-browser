@@ -84,7 +84,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
             </div>
             {
                 profile.length > 0 &&
-                <div className="h-1 grow w-full overflow-auto">
+                <div className="h-1 grow w-full overflow-auto" data-testid="profileTree">
                     <JSONTree
                         data={createNestedObject(profile)}
                         shouldExpandNodeInitially={() => true}
