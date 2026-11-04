@@ -1680,21 +1680,17 @@ function insertLimit(query: string, analysis: { code: string; lastCodeEnd: numbe
 
 function withoutTrailingSemicolons(query: string, analysis: ReturnType<typeof analyzeCypher>): string {
   let result = "";
-  let removedTerminator = false;
   for (let index = 0; index < query.length; index += 1) {
     if (
       index >= analysis.lastNonTerminatorEnd &&
       index < analysis.lastCodeEnd &&
       analysis.code[index] === ";"
     ) {
-      removedTerminator = true;
       continue;
     }
     result += query[index];
   }
-  return removedTerminator
-    ? `${result.slice(0, analysis.lastNonTerminatorEnd)}${result.slice(analysis.lastNonTerminatorEnd).replace(/[ \t]{2,}(?=\/[/*])/g, " ")}`
-    : result;
+  return result;
 }
 
 function hasUnionClause(analysis: ReturnType<typeof analyzeCypher>): boolean {

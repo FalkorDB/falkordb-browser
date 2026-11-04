@@ -31,7 +31,7 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
       ["MATCH (n) RETURN n LIMIT 300 // done", 300],
     );
     assert.deepEqual(getQueryWithLimit("RETURN n;;", 300), ["RETURN n LIMIT 300", 300]);
-    assert.deepEqual(getQueryWithLimit("RETURN n; ; // done", 300), ["RETURN n LIMIT 300 // done", 300]);
+    assert.deepEqual(getQueryWithLimit("RETURN n; ; // done", 300), ["RETURN n LIMIT 300  // done", 300]);
     assert.deepEqual(getQueryWithLimit("RETURN ';';", 300), ["RETURN ';' LIMIT 300", 300]);
     assert.deepEqual(getQueryWithLimit("RETURN n LIMIT 5;", 300), ["RETURN n LIMIT 5", 5]);
     assert.deepEqual(getQueryWithLimit("RETURN n;", 0), ["RETURN n", 0]);
