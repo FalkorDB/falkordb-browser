@@ -123,6 +123,7 @@ export default function BrowserSettings() {
     // its edit was cancelled or replaced can be recognised before it commits.
     const editGenerationRef = useRef(0);
     const keyMutationGenerationRef = useRef(0);
+    const keySelectionGenerationRef = useRef(0);
     type ChatKeyState = { keys: typeof chatApiKeys; selectedId: string };
     const keyStateRef = useRef<ChatKeyState>({ keys: chatApiKeys, selectedId: selectedChatApiKeyId });
     useEffect(() => {
@@ -553,6 +554,7 @@ export default function BrowserSettings() {
         const scope = getConnectionPrefix();
         const epoch = getConnectionEpoch();
         const mutationGeneration = keyMutationGenerationRef.current;
+        const selectionGeneration = keySelectionGenerationRef.current;
 
         try {
             for (;;) {
@@ -567,8 +569,6 @@ export default function BrowserSettings() {
                 }
                 const snapshot = keyStateRef.current;
                 const { keys, selectedId } = update(snapshot);
-                const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
-                const nextSelectedId = selectedApiKey?.id ?? "";
                 const encryptedKeys = keys.length > 0 ? await serverEncrypt(JSON.stringify(keys)) : "";
                 if (keyMutationGenerationRef.current !== mutationGeneration || !isCurrent()) return false;
                 if (keys.length > 0 && !encryptedKeys) {
@@ -590,6 +590,10 @@ export default function BrowserSettings() {
                 // Rebase only after an actual commit, never because another
                 // mutation merely started and might still fail or be cancelled.
                 if (keyStateRef.current !== snapshot) continue;
+                // A later explicit selection wins over an add/edit's default.
+                const selectedApiKey = getSelectedChatApiKey(keys,
+                    keySelectionGenerationRef.current === selectionGeneration ? selectedId : snapshot.selectedId);
+                const nextSelectedId = selectedApiKey?.id ?? "";
                 if (keys.length > 0) {
                     setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
                 } else {
@@ -660,6 +664,8 @@ export default function BrowserSettings() {
         setActiveSelectedChatApiKeyId(id);
         const selectedApiKey = getSelectedChatApiKey(chatApiKeys, id);
         const nextSelectedId = selectedApiKey?.id ?? "";
+        keySelectionGenerationRef.current += 1;
+        keyStateRef.current = { ...keyStateRef.current, selectedId: nextSelectedId };
         setSelectedChatApiKeyId(nextSelectedId);
         setSecretKey(selectedApiKey?.key ?? "");
         const restoredKeyModel = perSourceModels["api-key"] ?? "";
