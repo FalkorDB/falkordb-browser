@@ -49,7 +49,8 @@ Abandoned samples are reclaimed on app visits as well as tutorial start/close.
 With Web Locks, active tabs are protected by their ownership lock. Without Web
 Locks, active tabs renew ownership every minute and only records inactive for
 24 hours are eligible. Cleanup requires the same browser's retained ownership
-records; clearing browser storage removes that evidence.
+records; clearing browser storage removes that evidence. Failed cleanup keeps its
+ownership record eligible for retry instead of renewing the inactive owner's lease.
 
 ### Quick start
 
@@ -320,6 +321,7 @@ set `LOAD_CSV_FILE_URI=false`.
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
+
 
 
 
