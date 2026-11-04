@@ -18,7 +18,7 @@ import { GraphTabsContext, PanelContext } from "../components/provider";
  * user can keep several graph/query setups side by side.
  */
 export default function GraphSubHeader() {
-  const { tabs, activeTabId, maxTabs, selectTab, addTab, renameTab, closeTab } = useContext(GraphTabsContext);
+  const { tabs, activeTabId, maxTabs, tabsReady, selectTab, addTab, renameTab, closeTab } = useContext(GraphTabsContext);
   const { mobileNavSlot } = useContext(PanelContext);
   const isMobile = useIsMobile();
 
@@ -32,8 +32,8 @@ export default function GraphSubHeader() {
   const cancelRenameRef = useRef(false);
 
   // The last remaining tab cannot be closed — there is always one context.
-  const canClose = tabs.length > 1;
-  const canAdd = tabs.length < maxTabs;
+  const canClose = tabsReady && tabs.length > 1;
+  const canAdd = tabsReady && tabs.length < maxTabs;
 
   // A full strip has to fit `maxTabs` pills, the add button and the gaps.
   const tabMaxWidth = tabStripItemWidth(maxTabs);
@@ -73,6 +73,7 @@ export default function GraphSubHeader() {
             <button
               type="button"
               data-testid="graphTabsMenu"
+              disabled={!tabsReady}
               className="min-h-11 min-w-0 grow flex items-center gap-1 rounded-lg px-2 py-1 text-sm hover:bg-secondary"
             >
               <span className="min-w-0 truncate">{activeLabel}</span>
@@ -102,6 +103,7 @@ export default function GraphSubHeader() {
                         ? <input
                           data-testid={`graphTabRename-${tab.id}`}
                           className="min-h-11 min-w-0 flex-1 border-b border-primary bg-transparent px-2 py-2.5 text-sm outline-none"
+                          disabled={!tabsReady}
                           aria-label={`Rename ${label}`}
                           placeholder={tab.graphName || "New tab"}
                           value={draft}
@@ -119,6 +121,7 @@ export default function GraphSubHeader() {
                           type="button"
                           data-testid={`graphTabSelect-${tab.id}`}
                           className="min-h-11 min-w-0 flex-1 truncate px-2 py-2.5 text-left text-sm"
+                          disabled={!tabsReady}
                           aria-current={isActive}
                           onClick={() => {
                             selectTab(tab.id);
@@ -132,6 +135,7 @@ export default function GraphSubHeader() {
                       type="button"
                       data-testid={`graphTabRenameTrigger-${tab.id}`}
                       className="shrink-0 min-h-11 min-w-11 flex items-center justify-center rounded p-2 hover:bg-background"
+                      disabled={!tabsReady}
                       aria-label={`Rename ${label}`}
                       onClick={() => {
                         cancelRenameRef.current = false;
@@ -210,6 +214,7 @@ export default function GraphSubHeader() {
                   ? <input
                     data-testid={`graphTabRename-${tab.id}`}
                     className="w-full min-w-0 bg-transparent text-sm outline-none border-b border-primary"
+                    disabled={!tabsReady}
                     aria-label={`Rename ${label}`}
                     placeholder={tab.graphName || "New tab"}
                     value={draft}
@@ -226,6 +231,7 @@ export default function GraphSubHeader() {
                       type="button"
                       data-testid={`graphTabSelect-${tab.id}`}
                       className="min-w-0 flex-1 truncate text-left text-sm"
+                      disabled={!tabsReady}
                       title={label}
                       aria-current={isActive}
                       onClick={() => selectTab(tab.id)}
@@ -238,6 +244,7 @@ export default function GraphSubHeader() {
                           type="button"
                           data-testid={`graphTabRenameTrigger-${tab.id}`}
                           className="rounded hover:bg-background"
+                          disabled={!tabsReady}
                           aria-label={`Rename ${label}`}
                           onClick={() => {
                             cancelRenameRef.current = false;

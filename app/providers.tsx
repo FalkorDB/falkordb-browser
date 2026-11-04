@@ -18,6 +18,7 @@ import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { isAiFixSupported } from "@/lib/aiFix";
+import { isTimeoutInitializationReady, timeoutInitializationKey } from "@/lib/timeoutInitialization";
 import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
@@ -195,6 +196,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // the session, which lags `activeConnectionId` through a switch, so anything
   // writing connection-scoped storage has to know whether the two agree yet.
   const [prefixConnectionId, setPrefixConnectionId] = useState<string | null>(null);
+  const timeoutInitKey = timeoutInitializationKey(status, prefixReady, sessionData, prefixConnectionId);
 
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
@@ -319,7 +321,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [graphName, setGraphName] = useState<string>("");
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
-  const [timeoutLoaded, setTimeoutLoaded] = useState(false);
+  const [timeoutLoadedKey, setTimeoutLoadedKey] = useState<string | null>(null);
+  const timeoutLoaded = isTimeoutInitializationReady(timeoutInitKey, timeoutLoadedKey);
   const [limit, setLimit] = useState(0);
   const [lastLimit, setLastLimit] = useState(0);
   const [newLimit, setNewLimit] = useState(0);
@@ -1677,8 +1680,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   markTabRanRef.current = graphTabs.markRan;
 
   const graphTabsContext = useMemo(
-    () => ({ ...graphTabs, setSchemaMeta }),
-    [graphTabs, setSchemaMeta],
+    () => ({ ...graphTabs, tabsReady, graphNamesReady: graphNamesLoaded, setSchemaMeta }),
+    [graphTabs, graphNamesLoaded, setSchemaMeta, tabsReady],
   );
 
   useEffect(() => {
@@ -1966,7 +1969,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [status, toast]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !prefixReady) return;
+    if (timeoutInitKey === null) {
+      setTimeoutLoadedKey(null);
+      return;
+    }
 
     let cancelled = false;
     const controller = new AbortController();
@@ -2041,7 +2047,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       }
       if (cancelled) return;
       setTimeout(timeoutVal);
-      setTimeoutLoaded(true);
+      setTimeoutLoadedKey(timeoutInitKey);
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);
       setLastLimit(l);
@@ -2102,7 +2108,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       cancelled = true;
       controller.abort();
     };
-  }, [status, prefixReady, toast]);
+  }, [timeoutInitKey, toast]);
 
   // Chat API keys are loaded separately from the settings above because they
   // are connection-scoped: /api/encrypt binds each blob to `username@host:port`,

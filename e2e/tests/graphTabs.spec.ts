@@ -23,8 +23,10 @@ test.describe("@admin Graph tabs", () => {
     });
 
     test.afterAll(async () => {
-        await apiCall.removeGraph(graphOne);
-        await apiCall.removeGraph(graphTwo);
+        for (const graphName of [graphOne, graphTwo]) {
+            const result = await apiCall.removeGraph(graphName, "admin");
+            expect(result.message).toBe(`${graphName} graph deleted`);
+        }
     });
 
     test.beforeEach(async () => {
@@ -149,12 +151,15 @@ test.describe("@admin Graph tabs", () => {
         await graph.clickRunQuery();
         await firstRun;
         await graph.waitForPageIdle();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBeTruthy();
         await expect.poll(() => new URL(page.url()).searchParams.get("tab")).not.toBe("initial");
         const savedTabId = new URL(page.url()).searchParams.get("tab");
 
         await page.addInitScript(() => localStorage.removeItem("timeout"));
+        let releaseConfig!: () => void;
+        const configReleased = new Promise<void>((resolve) => { releaseConfig = resolve; });
         await page.route("**/api/graph/config", async (route) => {
-            await new Promise((resolve) => { setTimeout(resolve, 3000); });
+            await configReleased;
             await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
         });
 
@@ -167,20 +172,26 @@ test.describe("@admin Graph tabs", () => {
         });
 
         const configRequested = page.waitForRequest("**/api/graph/config");
-        await page.reload({ waitUntil: "domcontentloaded" });
-        await configRequested;
-        // Reload inside the config-loading window, after the 300ms URL sync debounce.
-        await page.waitForTimeout(1000);
-        expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
-        expect(restoredQueries).toHaveLength(0);
-        await graph.refreshPage();
-        await graph.waitForPageIdle();
+        try {
+            await page.reload({ waitUntil: "domcontentloaded" });
+            await configRequested;
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+            await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
+            expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
+            expect(restoredQueries).toHaveLength(0);
 
-        await expect.poll(() => restoredQueries.length, { timeout: 15000 }).toBeGreaterThan(0);
-        expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
-        await expect.poll(() => graph.getStripTabCount()).toBe(1);
-        for (const url of restoredQueries) {
-            expect(Number(url.searchParams.get("timeout"))).toBe(12);
+            releaseConfig();
+            await graph.waitForPageIdle();
+
+            await expect.poll(() => restoredQueries.length, { timeout: 15000 }).toBeGreaterThan(0);
+            expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
+            await expect.poll(() => graph.getStripTabCount()).toBe(1);
+            for (const url of restoredQueries) {
+                expect(Number(url.searchParams.get("timeout"))).toBe(12);
+            }
+        } finally {
+            releaseConfig();
         }
     });
 
@@ -191,8 +202,15 @@ test.describe("@admin Graph tabs", () => {
         const page = await browser.getPage();
         await graph.selectGraphByName(graphOne);
         await graph.insertQuery("MATCH (n) RETURN n");
+        const firstRun = page.waitForResponse((response) =>
+            new URL(response.url()).searchParams.get("query")?.startsWith("MATCH (n) RETURN n") ?? false,
+        );
         await graph.clickRunQuery();
+        await firstRun;
         await graph.waitForPageIdle();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBeTruthy();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab")).not.toBe("initial");
+        const savedTabId = new URL(page.url()).searchParams.get("tab");
         await page.addInitScript(() => localStorage.removeItem("timeout"));
         await page.route("**/api/graph/config", () => {});
         const restoredQuery = page.waitForRequest((request) => {
@@ -202,6 +220,7 @@ test.describe("@admin Graph tabs", () => {
         });
         await page.reload({ waitUntil: "domcontentloaded" });
         const request = await restoredQuery;
+        expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
         expect(new URL(request.url()).searchParams.get("timeout")).toBe("60");
         await expect(graph.stripTab(graphOne)).toBeVisible();
     });

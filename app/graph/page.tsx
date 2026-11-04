@@ -80,7 +80,7 @@ export default function Page() {
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
-    const { tabs, activeTabId } = useContext(GraphTabsContext);
+    const { tabs, activeTabId, tabsReady, graphNamesReady } = useContext(GraphTabsContext);
     const isReadOnlyRef = useRef(isReadOnly);
     isReadOnlyRef.current = isReadOnly;
     const {
@@ -825,7 +825,7 @@ export default function Page() {
 
     if (isMobile) {
         return (
-            <div className="h-full w-full flex flex-col min-h-0">
+            <div className="h-full w-full flex flex-col min-h-0" data-testid="graphPage" data-graph-names-ready={graphNamesReady} aria-busy={!tabsReady} inert={tabsReady ? undefined : true}>
                 <GraphSubHeader />
                 <div className="h-1 grow min-h-0 flex flex-col gap-1 p-1">
                     {selectorNode}
@@ -876,7 +876,7 @@ export default function Page() {
     }
 
     return (
-        <div className="h-full w-full flex flex-col min-h-0">
+        <div className="h-full w-full flex flex-col min-h-0" data-testid="graphPage" data-graph-names-ready={graphNamesReady} aria-busy={!tabsReady} inert={tabsReady ? undefined : true}>
             <GraphSubHeader />
             <div className="relative h-1 grow flex">
                 <ResizablePanelGroup orientation="horizontal" className="h-full grow">

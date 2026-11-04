@@ -250,6 +250,12 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Restoring graph tabs
+
+Graph editing waits until saved tabs and the query timeout are initialized for
+the current authenticated session and connection. If the timeout configuration
+does not respond within five seconds, restoration uses the 60-second default.
+
 ### Error help
 
 When a Cypher query fails, the browser shows the database's message together with an
@@ -309,7 +315,6 @@ set `LOAD_CSV_FILE_URI=false`.
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
 
 
 
