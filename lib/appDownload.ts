@@ -28,6 +28,12 @@ export type AppDownload =
 
 export const DESKTOP_RELEASE_BASE = "https://github.com/FalkorDB/falkordb-browser/releases/latest/download";
 
+export const MACOS_INSTALL_GUIDANCE = {
+    title: "Install on macOS",
+    description: "Open the DMG and drag FalkorDB Browser to Applications. For legacy unsigned releases only, see the desktop README for Gatekeeper guidance.",
+    duration: 10_000,
+};
+
 // Keep in step with artifactName in desktop/electron-builder.yml and the
 // runners in .github/workflows/desktop.yml.
 export const DESKTOP_FILES = {
@@ -271,4 +277,3 @@ export function getPromptStorage(win: Pick<Window, "localStorage" | "sessionStor
         return undefined;
     }
 }
-

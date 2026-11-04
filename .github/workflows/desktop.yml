@@ -66,10 +66,10 @@ jobs:
         # Intel Macs (mac-x64). Each runner builds its own architecture natively.
         os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       NEXT_TELEMETRY_DISABLED: "1"
-      # Unsigned builds until signing certificates are configured.
+      # Only the macOS release packaging step enables signing.
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
     steps:
       - name: Checkout
@@ -133,20 +133,28 @@ jobs:
 
       # Native modules in the standalone server are traced for the OS that
       # builds them, which is why each platform builds its own installer.
-      - name: Build installers
+      - name: Build bundled server
+        working-directory: desktop
+        run: npm run build:web && npm run prepare:server
+
+      - name: Build unsigned installers
+        if: runner.os != 'macOS' || github.event_name != 'release'
+        working-directory: desktop
+        run: npx --no-install electron-builder --publish never
+
+      - name: Build signed macOS installers
+        if: runner.os == 'macOS' && github.event_name == 'release'
         working-directory: desktop
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ runner.os == 'macOS' && github.event_name == 'release' }}
-          CSC_LINK: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.MACOS_CERTIFICATE_P12 || '' }}
-          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.MACOS_CERTIFICATE_PASSWORD || '' }}
-          APPLE_ID: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.APPLE_ID || '' }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && github.event_name == 'release' && secrets.APPLE_TEAM_ID || '' }}
-          # electron-builder skips signing when no usable identity is found;
-          # macOS release builds must fail instead of publishing unsigned apps.
-          FORCE_SIGNING_ARGS: ${{ runner.os == 'macOS' && github.event_name == 'release' && '-c.mac.forceCodeSigning=true -c.mac.notarize=true' || '' }}
-        shell: bash
-        run: npm run dist -- $FORCE_SIGNING_ARGS
+          CSC_IDENTITY_AUTO_DISCOVERY: "true"
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # Apple credentials trigger notarization; stapler validation below
+        # enforces that notarization actually completed.
+        run: npx --no-install electron-builder --publish never -c.mac.forceCodeSigning=true
 
       - name: Verify macOS signature and notarization
         if: runner.os == 'macOS' && github.event_name == 'release'
@@ -183,7 +191,7 @@ jobs:
   # hold back the Windows and Linux installers. The job still fails afterwards
   # so the incomplete release is visible.
   attach-to-release:
-    if: ${{ always() && github.event_name == 'release' }}
+    if: ${{ !cancelled() && github.event_name == 'release' }}
     needs: build
     runs-on: ubuntu-latest
     permissions:

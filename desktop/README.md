@@ -58,6 +58,11 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   are still attached to the release. Windows and Linux installers remain unsigned.
   Pull-request, push, and local builds for every platform also remain unsigned.
 
+  **Merge/release prerequisite:** a repository administrator must configure and
+  verify all five secrets below before merging this release workflow or publishing
+  the next release. Otherwise macOS release packaging fails and the latest-release
+  macOS download links have no asset to serve. Do not publish an unsigned fallback.
+
   Configure these repository Actions secrets:
 
   - `MACOS_CERTIFICATE_P12`: base64-encoded Developer ID Application
@@ -70,9 +75,12 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   The workflow passes the certificate as electron-builder's `CSC_LINK` and
   `CSC_KEY_PASSWORD`, and the Apple credentials as `APPLE_ID`,
   `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
-- **macOS Gatekeeper:** until releases are signed and notarized, macOS may block
-  the app after download. Only if you trust the official FalkorDB Browser
-  release, you can remove its quarantine flag after moving it to Applications:
+  The web build and server preparation run without these credentials; only the
+  release credential check and macOS electron-builder packaging receive them.
+- **Legacy macOS Gatekeeper:** unsigned releases such as v2.7.3 may be blocked.
+  This workaround is not needed for successfully signed and notarized releases.
+  Only if you trust the official legacy FalkorDB Browser release, you can remove
+  its quarantine flag after moving it to Applications:
 
   ```sh
   xattr -dr com.apple.quarantine "/Applications/FalkorDB Browser.app"

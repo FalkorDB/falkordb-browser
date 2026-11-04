@@ -5,6 +5,7 @@ import { ArrowUpRight, Download } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
 import useAppDownload from "@/lib/useAppDownload";
+import { MACOS_INSTALL_GUIDANCE } from "@/lib/appDownload";
 
 interface Props {
     className: string
@@ -51,10 +52,7 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
     const handleDownload = (platform: string) => {
         onSelect?.();
         if (platform === "mac") {
-            toast({
-                title: "If macOS blocks the app",
-                description: "Gatekeeper may block builds that are not signed and notarized. For the official release only, see the desktop README for the manual launch workaround.",
-            });
+            toast(MACOS_INSTALL_GUIDANCE);
         }
     };
 

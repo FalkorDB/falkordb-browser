@@ -30,7 +30,8 @@ test("macOS release builds fail without signing and notarization secrets", () =>
 });
 
 test("macOS release builds pass the certificate and Apple credentials to electron-builder", () => {
-    const build = step("Build installers");
+    const build = step("Build signed macOS installers");
+    assert.ok(build.includes(`if: ${RELEASE_ON_MAC}`));
     for (const [env, secret] of [
         ["CSC_LINK", "MACOS_CERTIFICATE_P12"],
         ["CSC_KEY_PASSWORD", "MACOS_CERTIFICATE_PASSWORD"],
@@ -38,16 +39,35 @@ test("macOS release builds pass the certificate and Apple credentials to electro
         ["APPLE_APP_SPECIFIC_PASSWORD", "APPLE_APP_SPECIFIC_PASSWORD"],
         ["APPLE_TEAM_ID", "APPLE_TEAM_ID"],
     ]) {
-        assert.ok(build.includes(`${env}: \${{ ${RELEASE_ON_MAC} && secrets.${secret} || '' }}`), env);
+        assert.ok(build.includes(`${env}: \${{ secrets.${secret} }}`), env);
     }
-    assert.ok(build.includes(`CSC_IDENTITY_AUTO_DISCOVERY: \${{ ${RELEASE_ON_MAC} }}`));
+    assert.ok(build.includes('CSC_IDENTITY_AUTO_DISCOVERY: "true"'));
 });
 
-test("macOS release builds force code signing and notarization instead of shipping ad-hoc builds", () => {
-    const build = step("Build installers");
+test("macOS release builds force code signing; notarization is enforced by ticket validation", () => {
+    const build = step("Build signed macOS installers");
     assert.match(build, /-c\.mac\.forceCodeSigning=true/);
-    assert.match(build, /-c\.mac\.notarize=true/);
-    assert.match(build, /run: npm run dist -- \$FORCE_SIGNING_ARGS/);
+    assert.doesNotMatch(build, /-c\.mac\.notarize/);
+    assert.match(build, /run: npx --no-install electron-builder --publish never/);
+});
+
+test("non-release packaging leaves signing secrets absent rather than empty", () => {
+    const build = step("Build unsigned installers");
+    assert.ok(build.includes("if: runner.os != 'macOS' || github.event_name != 'release'"));
+    assert.doesNotMatch(build, /(?:CSC_LINK|CSC_KEY_PASSWORD|APPLE_\w+|secrets\.)/);
+    assert.match(build, /run: npx --no-install electron-builder --publish never/);
+    // Job-level env must not accidentally reintroduce empty credentials.
+    const jobHeader = workflow.slice(workflow.indexOf("\n  build:"), workflow.indexOf("\n    steps:"));
+    assert.doesNotMatch(jobHeader, /(?:CSC_LINK|CSC_KEY_PASSWORD|APPLE_\w+|secrets\.)/);
+    assert.match(jobHeader, /CSC_IDENTITY_AUTO_DISCOVERY: "false"/);
+});
+
+test("web build and server preparation run before packaging without signing secrets", () => {
+    const build = step("Build bundled server");
+    assert.match(build, /run: npm run build:web && npm run prepare:server/);
+    assert.doesNotMatch(build, /env:|secrets\.|CSC_|APPLE_/);
+    assert.ok(workflow.indexOf("- name: Build bundled server") < workflow.indexOf("- name: Build signed macOS installers"));
+    assert.doesNotMatch(step("Build signed macOS installers"), /npm run (?:dist|build:web|prepare:server)/);
 });
 
 test("macOS release builds are verified with codesign, Gatekeeper and the stapled ticket", () => {
