@@ -485,6 +485,48 @@ test.describe("Graph Tests", () => {
     }
   });
 
+  for (const padding of ["leading", "trailing", "both"] as const) {
+    test(`@admin Saving an unchanged ${padding}-space graph name does not rename it`, async () => {
+      const trimmed = getRandomString("unchanged");
+      const source = `${padding !== "trailing" ? " " : ""}${trimmed}${padding !== "leading" ? " " : ""}`;
+      await apiCall.runQuery(encodeURIComponent(source), "CREATE (:Preserved {value: 42})");
+      try {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await browser.setPageToFullScreen();
+        await graph.clickSelect();
+        await graph.clickManage();
+        await page.getByTestId("searchInputGraphs").fill(trimmed);
+        const row = page.getByRole("row").filter({ has: page.getByTestId(`tableCheckboxGraphs${source}`) });
+        await row.hover();
+        await row.getByTestId("editButtonGraphs").click();
+        const input = row.getByTestId("inputGraphs");
+        await expect(input).toHaveValue(source);
+        const writes: string[] = [];
+        page.on("request", request => {
+          if (request.method() === "PATCH" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
+        });
+        await row.getByTestId("saveButtonGraphs").click();
+        await expect(input).toHaveCount(0);
+        expect(writes).toEqual([]);
+        const { opts } = await apiCall.getGraphs();
+        expect(opts).toContain(source);
+        expect(opts).not.toContain(trimmed);
+        const result = await apiCall.runQuery(encodeURIComponent(source), "MATCH (n:Preserved {value: 42}) RETURN count(n) AS c");
+        expect(Number(result.data[0].c)).toBe(1);
+      } finally {
+        await browser.closeBrowser();
+        const { opts } = await apiCall.getGraphs();
+        for (const name of [source, trimmed]) {
+          if (opts.includes(name)) {
+            const { message } = await apiCall.removeGraph(encodeURIComponent(name), "admin");
+            expect(message).toMatch(/deleted|empty key/);
+          }
+        }
+      }
+    });
+  }
+
   test("@admin Rename trims new names and rejects whitespace-only input", async () => {
     const source = getRandomString("rename");
     const target = getRandomString("renamed");
