@@ -736,18 +736,22 @@ export default function BrowserSettings() {
     };
 
     const handleDeleteKey = async (id: string) => {
-        const saved = await persistChatApiKeys(({ keys, selectedId }) => ({
-            keys: keys.filter(item => item.id !== id),
-            selectedId: selectedId === id ? "" : selectedId,
-        }));
+        let deletedSelectedKey = false;
+        const saved = await persistChatApiKeys(({ keys, selectedId }) => {
+            deletedSelectedKey = selectedId === id;
+            return {
+                keys: keys.filter(item => item.id !== id),
+                selectedId: deletedSelectedKey ? "" : selectedId,
+            };
+        });
         if (!saved) return;
 
-        if (selectedChatApiKeyId === id) {
+        if (deletedSelectedKey) {
             setModel("");
             setNewModel("");
             localStorage.setItem("model", "");
         }
-        if (editingKeyId === id) {
+        if (editingKeyVisibilityRef.current?.id === id) {
             editGenerationRef.current += 1;
             editingKeyVisibilityRef.current = null;
             setEditingKeyId(null);
@@ -1106,7 +1110,10 @@ export default function BrowserSettings() {
                                                                                             className="flex-1 font-mono text-xs"
                                                                                             type={isVisible ? "text" : "password"}
                                                                                             value={editingKeyValue}
-                                                                                            onChange={(e) => setEditingKeyValue(e.target.value)}
+                                                                                            onChange={(e) => {
+                                                                                                editGenerationRef.current += 1;
+                                                                                                setEditingKeyValue(e.target.value);
+                                                                                            }}
                                                                                         />
                                                                                         <button
                                                                                             type="submit"

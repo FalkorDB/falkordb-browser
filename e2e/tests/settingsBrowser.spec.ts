@@ -377,17 +377,24 @@ test.describe('@browser Browser Settings tests', () => {
         test(`@readwrite selecting a key while ${mutation} encrypts preserves the newer selection`, async () => {
             const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
             const page = await browser.getPage();
-            await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
             const suffix = getRandomString("selection");
             const firstKey = `sk-e2e-${suffix}-first`;
             const secondKey = `sk-e2e-${suffix}-second`;
             const thirdKey = `sk-e2e-${suffix}-third`;
+            const firstModel = "gpt-4o-mini";
+            let loadSelectionModel = false;
+            await page.route("**/api/chat/models**", route => route.fulfill({
+                json: { models: loadSelectionModel && route.request().postDataJSON().key === firstKey ? [firstModel] : [] },
+            }));
             await settings.expandChatSection();
             await settings.selectApiKeyModelSource();
             await settings.waitForChatApiKeyInputEnabled();
             await settings.addChatApiKey(firstKey);
             await settings.addChatApiKey(secondKey);
-            if (mutation === "delete") await settings.addChatApiKey(thirdKey);
+            if (mutation === "delete") {
+                await settings.addChatApiKey(thirdKey);
+                await settings.selectChatApiKey(secondKey);
+            }
             const firstCard = page.getByTestId("chatApiKeyCard").filter({
                 has: page.getByTestId("chatApiKeyValue").filter({ hasText: firstKey.slice(-4) }),
             });
@@ -399,12 +406,15 @@ test.describe('@browser Browser Settings tests', () => {
             });
             const encryption = await delayNextKeyEncryption(page);
             try {
-                let deletion: Promise<void> | undefined;
                 if (mutation === "add") {
                     await settings.fillChatApiKey(thirdKey);
                     await page.getByTestId("addChatApiKeyButton").click();
                 } else {
-                    deletion = settings.deleteChatApiKey(secondKey);
+                    const secondCard = page.getByTestId("chatApiKeyCard").filter({
+                        has: page.getByTestId("chatApiKeyValue").filter({ hasText: secondKey.slice(-4) }),
+                    });
+                    await secondCard.getByTestId("deleteChatApiKeyButton").click();
+                    await page.getByTestId("confirmDeleteChatApiKeyButton").click();
                 }
                 await encryption.started;
                 if (mutation === "delete") {
@@ -412,15 +422,24 @@ test.describe('@browser Browser Settings tests', () => {
                     await expect(page.getByTestId("deleteChatApiKeyDialog")).toBeHidden();
                 }
                 await expect(firstCard.getByTestId("selectChatApiKeyButton")).toBeEnabled();
+                loadSelectionModel = true;
                 await firstCard.getByTestId("selectChatApiKeyButton").click();
                 await expect.poll(selectedId).toBe(firstId);
+                const selectedModel = page.getByTestId(`selectModel${firstModel}`);
+                await expect(selectedModel).toHaveAttribute("data-selected", "true");
+                await expect.poll(() => page.evaluate(() => localStorage.getItem("model"))).toBe(firstModel);
                 encryption.release();
-                if (deletion) await deletion;
+                if (mutation === "delete") await expect.poll(() => settings.isChatApiKeyPresent(secondKey)).toBe(false);
                 else await expect.poll(() => settings.isChatApiKeyPresent(thirdKey)).toBe(true);
                 await expect.poll(selectedId).toBe(firstId);
+                await expect(selectedModel).toHaveAttribute("data-selected", "true");
+                expect(await page.evaluate(() => localStorage.getItem("model"))).toBe(firstModel);
                 await page.reload({ waitUntil: "networkidle" });
                 await settings.expandChatSection();
+                await expect(firstCard).toBeVisible({ timeout: 15000 });
                 await expect.poll(selectedId).toBe(firstId);
+                await expect(selectedModel).toHaveAttribute("data-selected", "true", { timeout: 15000 });
+                expect(await page.evaluate(() => localStorage.getItem("model"))).toBe(firstModel);
                 expect(await settings.isChatApiKeyPresent(secondKey)).toBe(mutation === "add");
                 expect(await settings.isChatApiKeyPresent(thirdKey)).toBe(true);
                 await settings.deleteChatApiKey(thirdKey);
@@ -432,6 +451,86 @@ test.describe('@browser Browser Settings tests', () => {
             }
         });
     }
+
+    test('@readwrite a pending deletion does not close an edit started on another key', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
+        const apiKey = `sk-e2e-delete-edit-${getRandomString("key")}-first`;
+        const otherKey = `${apiKey}-other`;
+        const editedKey = `${otherKey}-edited`;
+        await settings.expandChatSection();
+        await settings.selectApiKeyModelSource();
+        await settings.waitForChatApiKeyInputEnabled();
+        await settings.addChatApiKey(apiKey);
+        await settings.addChatApiKey(otherKey);
+        await settings.startChatApiKeyEdit(apiKey, `${apiKey}-abandoned`);
+        const deletingCard = page.getByTestId("chatApiKeyCard").filter({
+            has: page.getByTestId("chatApiKeyEditInput"),
+        });
+        const encryption = await delayNextKeyEncryption(page);
+        try {
+            await deletingCard.getByTestId("deleteChatApiKeyButton").click();
+            await page.getByTestId("confirmDeleteChatApiKeyButton").click();
+            await encryption.started;
+            await page.getByTestId("deleteChatApiKeyDialog").getByRole("button", { name: "Close", exact: true }).click();
+            await expect(page.getByTestId("deleteChatApiKeyDialog")).toBeHidden();
+            await settings.startChatApiKeyEdit(otherKey, editedKey);
+            encryption.release();
+            await expect.poll(() => settings.isChatApiKeyPresent(apiKey)).toBe(false);
+            await expect(page.getByTestId("chatApiKeyEditInput")).toHaveValue(editedKey);
+            await page.getByTestId("saveEditedChatApiKeyButton").click();
+            await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);
+            expect(await settings.getChatApiKeyVisibilityLabel(editedKey)).toBe("Show");
+            await page.reload({ waitUntil: "networkidle" });
+            await settings.expandChatSection();
+            await expect.poll(() => settings.isChatApiKeyPresent(editedKey)).toBe(true);
+            expect(await settings.isChatApiKeyPresent(apiKey)).toBe(false);
+            await settings.deleteChatApiKey(editedKey);
+        } finally {
+            encryption.release();
+            await page.unrouteAll({ behavior: "wait" });
+        }
+    });
+
+    test('@readwrite typing during a pending API key save preserves the newer draft', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
+        const apiKey = `sk-e2e-draft-${getRandomString("key")}-original`;
+        const staleKey = `${apiKey}-stale`;
+        const newerKey = `${apiKey}-newer`;
+        await settings.expandChatSection();
+        await settings.selectApiKeyModelSource();
+        await settings.waitForChatApiKeyInputEnabled();
+        await settings.addChatApiKey(apiKey);
+        const encryption = await delayNextKeyEncryption(page);
+        try {
+            await settings.startChatApiKeyEdit(apiKey, staleKey);
+            await page.getByTestId("saveEditedChatApiKeyButton").click();
+            await encryption.started;
+            await page.getByTestId("chatApiKeyEditInput").fill(newerKey);
+            const staleResponse = page.waitForResponse(response =>
+                response.url().endsWith("/api/encrypt")
+                && response.request().postData()?.includes(staleKey) === true);
+            encryption.release();
+            await (await staleResponse).finished();
+            // Let the resumed save reach its commit guard before checking the draft.
+            await page.waitForTimeout(500);
+            await expect(page.getByTestId("chatApiKeyEditInput")).toHaveValue(newerKey);
+            await page.getByTestId("saveEditedChatApiKeyButton").click();
+            await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);
+            expect(await settings.getChatApiKeyVisibilityLabel(newerKey)).toBe("Show");
+            await page.reload({ waitUntil: "networkidle" });
+            await settings.expandChatSection();
+            await expect.poll(() => settings.isChatApiKeyPresent(newerKey)).toBe(true);
+            expect(await settings.isChatApiKeyPresent(staleKey)).toBe(false);
+            await settings.deleteChatApiKey(newerKey);
+        } finally {
+            encryption.release();
+            await page.unrouteAll({ behavior: "wait" });
+        }
+    });
 
     for (const successor of ["cancel", "fail", "save"] as const) {
         test(`@readwrite a pending API key addition survives a later edit that will ${successor}`, async () => {

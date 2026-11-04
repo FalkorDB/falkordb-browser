@@ -295,6 +295,9 @@ the key's previous visibility. Pending key additions, edits, and deletions are
 rebased onto the latest committed list, so cancelling or failing another edit
 does not discard an unrelated addition. Selecting a key while a mutation is
 pending takes precedence over that mutation's automatic selection.
+Deleting a key does not clear a newer selection's loaded model. Typing a newer
+edit while an earlier save is pending keeps that draft open instead of saving
+and closing the outdated value.
 
 Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 **Insert into editor** actions. Neither action runs the query. The card adapts to
