@@ -35,10 +35,11 @@ test("timeout readiness stays closed until an authenticated prefix is initialize
 
 test("session refresh preserves readiness but connection mismatch closes it", () => {
     const key = timeoutInitializationKey("authenticated", true, session, "connection-a", "connection-a");
+    assert.ok(key);
     assert.equal(timeoutInitializationKey("loading", true, session, "connection-a", "connection-a"), key);
     assert.equal(timeoutInitializationKey("loading", true, null, "connection-a", "connection-a"), null);
     assert.equal(timeoutInitializationKey("unauthenticated", true, session, "connection-a", "connection-a"), null);
     assert.equal(timeoutInitializationKey("authenticated", true, session, "connection-a", "connection-b"), null);
-    assert.equal(timeoutInitializationKey("authenticated", true, session, "connection-b", "connection-b") === key, false);
+    assert.notEqual(timeoutInitializationKey("authenticated", true, session, "connection-b", "connection-b"), key);
     assert.equal(timeoutInitializationKey("authenticated", true, session, "connection-a", null), key);
 });

@@ -47,6 +47,155 @@ test.describe("@admin Graph tabs", () => {
         await expect(graph.stripTab("New tab")).toBeVisible();
     });
 
+    test("A rejected bootstrap sync replaces pending graph lists using the session connection", async () => {
+        test.setTimeout(60_000);
+        await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
+        const { connections } = await (await page.request.get(`${urls.localHost}/api/connections`)).json();
+        expect(connections[0]?.id).toBeTruthy();
+        let releaseSync!: () => void;
+        const syncGate = new Promise<void>(resolve => { releaseSync = resolve; });
+        let releaseLists!: () => void;
+        const listGate = new Promise<void>(resolve => { releaseLists = resolve; });
+        let rejected = false;
+        let syncRequested = false;
+        let heldRequests = 0;
+        let replacementRequests = 0;
+        let discoveries = 0;
+        await page.route("**/api/auth/session", async route => {
+            if (route.request().method() === "POST") {
+                syncRequested = true;
+                await syncGate;
+                rejected = true;
+            }
+            await route.fulfill({ json: { ...session, activeConnectionId: null } });
+        });
+        await page.route("**/api/connections", route => {
+            // Hold retries so this test isolates one failed bootstrap.
+            if (discoveries++ > 0) return;
+            return route.fulfill({ json: { connections } });
+        });
+        await page.route("**/api/graph", async route => {
+            const pinned = !!route.request().headers()["x-connection-id"];
+            if (!rejected || pinned) {
+                heldRequests += 1;
+                await listGate;
+                await route.fulfill({ json: { opts: ["stale-bootstrap-list"] } });
+            } else {
+                replacementRequests += 1;
+                await route.fulfill({ json: { opts: [graphOne, graphTwo] } });
+            }
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await expect.poll(() => syncRequested, { timeout: 15000 }).toBe(true);
+            expect(heldRequests).toBeGreaterThan(0);
+            await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
+            releaseSync();
+            await expect.poll(() => replacementRequests, { timeout: 15000 }).toBeGreaterThan(0);
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
+            await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+            releaseLists();
+            await page.getByTestId("selectGraph").click();
+            await expect(page.getByText(graphOne, { exact: true })).toBeVisible();
+            await expect(page.getByText("stale-bootstrap-list", { exact: true })).toBeHidden();
+        } finally {
+            releaseSync();
+            releaseLists();
+        }
+    });
+
+    test("A bootstrap fetch deferred by the tutorial runs after Skip", async () => {
+        test.setTimeout(60_000);
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
+        const { connections } = await (await page.request.get(`${urls.localHost}/api/connections`)).json();
+        expect(connections[0]?.id).toBeTruthy();
+        await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
+        let syncCompleted = false;
+        let graphLists = 0;
+        let releaseLists!: () => void;
+        const listGate = new Promise<void>(resolve => { releaseLists = resolve; });
+        await page.route("**/api/auth/session", async route => {
+            if (route.request().method() === "POST") syncCompleted = true;
+            await route.fulfill({ json: { ...session, activeConnectionId: connections[0].id } });
+        });
+        await page.route("**/api/connections", route => route.fulfill({
+            json: { connections },
+        }));
+        await page.route(url => /^\/api\/graph\/social-demo(?:-test)?(?:\/|$)/.test(url.pathname), route =>
+            route.request().method() === "DELETE"
+                ? route.fulfill({ json: { message: "Mock tutorial graph deleted" } })
+                : route.fulfill({ contentType: "text/event-stream", body: "event: result\ndata: {}\n\n" }),
+        );
+        await page.route("**/api/graph", async route => {
+            graphLists += 1;
+            await listGate;
+            await route.fulfill({ json: { opts: [graphOne, graphTwo] } });
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+            await expect.poll(() => syncCompleted).toBe(true);
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "false");
+            const beforeSkip = graphLists;
+            await tutorial.skip();
+            await expect.poll(() => graphLists, { timeout: 15000 }).toBeGreaterThan(beforeSkip);
+            releaseLists();
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
+            await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+        } finally {
+            releaseLists();
+        }
+    });
+
+    test("Signing out during bootstrap does not fetch another graph list", async () => {
+        test.setTimeout(60_000);
+        await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
+        const { connections } = await (await page.request.get(`${urls.localHost}/api/connections`)).json();
+        expect(connections[0]?.id).toBeTruthy();
+        let releaseSync!: () => void;
+        const syncGate = new Promise<void>(resolve => { releaseSync = resolve; });
+        let signedOut = false;
+        let syncRequested = false;
+        let signedOutRequests = 0;
+        await page.route("**/api/auth/session", async route => {
+            if (route.request().method() === "POST") {
+                syncRequested = true;
+                await syncGate;
+                signedOut = true;
+            }
+            await route.fulfill({ json: signedOut ? null : session });
+        });
+        await page.route("**/api/connections", route => route.fulfill({
+            json: { connections },
+        }));
+        await page.route("**/api/graph", route => {
+            if (signedOut) signedOutRequests += 1;
+            return route.fulfill({ json: { opts: [graphOne, graphTwo] } });
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await expect.poll(() => syncRequested, { timeout: 15000 }).toBe(true);
+            signedOut = true;
+            await page.evaluate(() => {
+                const channel = new BroadcastChannel("next-auth");
+                channel.postMessage({ event: "session", data: { trigger: "signout" } });
+                channel.close();
+            });
+            await expect(page).toHaveURL(/\/login/, { timeout: 15000 });
+            releaseSync();
+            await page.waitForLoadState("networkidle");
+            expect(signedOutRequests).toBe(0);
+        } finally {
+            releaseSync();
+        }
+    });
+
     test("A tab is labelled by the graph it holds", async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await graph.selectGraphByName(graphOne);

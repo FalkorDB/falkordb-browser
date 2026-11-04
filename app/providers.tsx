@@ -410,7 +410,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [customizingLabel, setCustomizingLabel] = useState<CustomizingRef | null>(null);
   const sessionSyncedRef = useRef(false);
   const prevActiveConnectionIdRef = useRef<string | null>(null);
-  const connectionSwitchFetchedRef = useRef(false);
 
   // ── Graph-operation ownership guards (see docs/design/idea-6-connection-epoch-pinning-plan.md) ──────────────────────
   // contextGen: "what connection + graph the UI represents" — bumped on a
@@ -2429,16 +2428,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
   }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName, refreshOffloadedGraphs]);
 
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    // Skip if the reset effect already triggered a fetch for this switch
-    if (connectionSwitchFetchedRef.current) {
-      connectionSwitchFetchedRef.current = false;
-      return;
-    }
-    handleFetchOptions();
-  }, [handleFetchOptions, status]);
-
   // A stored tab may name a graph that has since been dropped. Rather than
   // querying it (which would make FalkorDB re-create it), clear the selection
   // once the list is known — the tab keeps its query text either way.
@@ -2481,6 +2470,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (prev === activeConnectionId) return;
     setGraphNamesLoaded(false);
     graphNamesLoadedRef.current = false;
+    setGraphNames(undefined);
 
     // Skip the very first selection (initial mount / login) and null resets
     if (prev === null || activeConnectionId === null) {
@@ -2492,10 +2482,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (activeConnectionId !== null && pendingSwitchesRef.current > 0) {
         pendingSwitchesRef.current = 0;
         setSwitchPending(false);
-      }
-      if (activeConnectionId !== null) {
-        connectionSwitchFetchedRef.current = true;
-        handleFetchOptions({ clear: true });
       }
       return;
     }
@@ -2519,11 +2505,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setLabels([]);
     setRelationships([]);
+  }, [activeConnectionId, toast, setIndicator, bumpContextGen]);
 
-    // Re-fetch graph list for the new connection (clearing the old list).
-    connectionSwitchFetchedRef.current = true;
-    handleFetchOptions({ clear: true });
-  }, [activeConnectionId, toast, setIndicator, handleFetchOptions, bumpContextGen]);
+  // Run after the reset, including an authenticated bootstrap rollback to null.
+  // Offline/tutorial deferrals retry through handleFetchOptions's dependencies;
+  // no "already fetched" flag can consume a fetch that never started.
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    handleFetchOptions({ clear: !graphNamesLoadedRef.current });
+  }, [activeConnectionId, handleFetchOptions, status]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);

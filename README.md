@@ -257,6 +257,8 @@ the current authenticated session and connection. A saved local timeout is used
 immediately. Otherwise the 60-second default is capped by the server's `TIMEOUT_MAX`;
 if that configuration does not respond within five seconds, restoration uses
 the 60-second fallback.
+Graph-list initialization retries after a failed connection synchronization,
+when connectivity returns, or after leaving the tutorial.
 
 ### Error help
 
