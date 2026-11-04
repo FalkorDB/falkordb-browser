@@ -140,6 +140,7 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `env.nextauthSecret` | Secret for NextAuth.js. Empty generates a random one on first install and reuses it on upgrade (not under `helm template`/Argo CD — see above). Known placeholders are rejected. Mutually exclusive with `nextauth.existingSecret.name`. | `""` |
 | `env.googleAnalytics` | Google Analytics ID | `""` |
 | `env.cypher` | Enable text-to-cypher feature | `"1"` |
+| `env.urlValidationAllowedDatabases` | Exact hostname:port endpoints the pre-login URL check may contact. No wildcards. Empty disables passwordless URL checks. | `[]` |
 | `persistence.enabled` | Enable persistence for API tokens | `false` |
 | `persistence.size` | Size of persistent volume | `1Gi` |
 | `persistence.accessMode` | Access mode for persistent volume | `ReadWriteOnce` |
@@ -200,6 +201,27 @@ Install:
 ```bash
 helm install falkordb-browser ./falkordb-browser -f ingress-values.yaml
 ```
+
+### Allow pre-login database URL checks
+
+The passwordless URL check makes a server-side database connection to determine
+whether credentials are required. Configure the exact database endpoints this
+deployment is allowed to contact, including their ports:
+
+```yaml
+env:
+  urlValidationAllowedDatabases:
+    - db.example.com:6379
+    - 10.20.30.40:6379
+```
+
+Entries are exact hostname/IP and port matches (case-insensitive); wildcards
+are not accepted. IPv6 addresses must be bracketed, for example
+`[2001:db8::1]:6379`. The default empty list fails closed and disables the
+passwordless check. Users can still submit a URL that already contains
+credentials because the validator does not connect to that URL. For non-Helm
+deployments, set `URL_VALIDATION_ALLOWED_DATABASES` to the same comma-separated
+endpoint list.
 
 ### Installation with persistence
 

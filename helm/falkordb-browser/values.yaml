@@ -241,6 +241,9 @@ env:
   restPort: "8080"
   # Enable/disable text-to-cypher feature (1 = enabled, 0 = disabled)
   cypher: "1"
+  # Exact database endpoints (hostname:port) the pre-login URL check may contact.
+  # Empty disables passwordless URL checks. Wildcards are not supported.
+  urlValidationAllowedDatabases: []
   # Hostname binding
   hostname: "0.0.0.0"
   # API token storage path (for persistent volume if needed)

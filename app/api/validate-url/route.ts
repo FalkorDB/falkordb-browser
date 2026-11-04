@@ -2,6 +2,11 @@ import { FalkorDB } from "falkordb";
 import { NextRequest, NextResponse } from "next/server";
 import { validateBody, validateUrl } from "../validate-body";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "../utils";
+import {
+    getDatabaseUrlEndpoint,
+    isDatabaseEndpointAllowed,
+    parseAllowedDatabaseEndpoints,
+} from "@/lib/url-validation-allowlist";
 
 
 export async function POST(request: NextRequest) {
@@ -40,6 +45,29 @@ export async function POST(request: NextRequest) {
     const isMissingPasswordAndUsername = !url.includes("@");
 
     if (isMissingPasswordAndUsername) {
+        const allowedEndpoints = parseAllowedDatabaseEndpoints(process.env.URL_VALIDATION_ALLOWED_DATABASES);
+        if (allowedEndpoints.status === "unconfigured") {
+            return NextResponse.json(
+                { message: "URL validation is disabled because no database endpoints are configured" },
+                { status: 503, headers: getCorsHeaders(request) }
+            );
+        }
+        if (allowedEndpoints.status === "invalid") {
+            console.error("Invalid URL_VALIDATION_ALLOWED_DATABASES entries", allowedEndpoints.entries);
+            return NextResponse.json(
+                { message: "URL validation is misconfigured" },
+                { status: 500, headers: getCorsHeaders(request) }
+            );
+        }
+
+        const endpoint = getDatabaseUrlEndpoint(url);
+        if (!endpoint || !isDatabaseEndpointAllowed(endpoint, allowedEndpoints.endpoints)) {
+            return NextResponse.json(
+                { message: "Database endpoint is not allowed for pre-login validation" },
+                { status: 403, headers: getCorsHeaders(request) }
+            );
+        }
+
         try {
             const client = await FalkorDB.connect({ url });
             // Only the attempt matters; don't leave the connection open.

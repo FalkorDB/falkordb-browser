@@ -169,6 +169,7 @@ jobs:
           export NEXTAUTH_URL="http://localhost:3000/"
           export NEXTAUTH_SECRET=SECRET
           export ENCRYPTION_KEY="$ENCRYPTION_KEY"
+          export URL_VALIDATION_ALLOWED_DATABASES=localhost:6379
           export PAT_FALKORDB_HOST=localhost
           export PAT_FALKORDB_PORT=6380
           export PAT_FALKORDB_USERNAME=default
