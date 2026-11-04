@@ -295,6 +295,7 @@ the key's previous visibility. Pending key additions, edits, and deletions are
 rebased onto the latest committed list, so cancelling or failing another edit
 does not discard an unrelated addition. Selecting a key while a mutation is
 pending takes precedence over that mutation's automatic selection.
+Deleting the selected key clears the selection instead of choosing another key.
 Deleting a key does not clear a newer selection's loaded model. Typing a newer
 edit while an earlier save is pending keeps that draft open instead of saving
 and closing the outdated value.

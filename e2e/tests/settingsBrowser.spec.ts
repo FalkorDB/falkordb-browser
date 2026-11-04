@@ -452,6 +452,35 @@ test.describe('@browser Browser Settings tests', () => {
         });
     }
 
+    test('@readwrite deleting the selected key does not select another key or reload its models', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        const suffix = getRandomString("clear-selection");
+        const firstKey = `sk-e2e-${suffix}-first`;
+        const secondKey = `sk-e2e-${suffix}-second`;
+        const model = "gpt-4o-mini";
+        const modelLoads: string[] = [];
+        await page.route("**/api/chat/models**", route => {
+            modelLoads.push(route.request().postDataJSON().key);
+            return route.fulfill({ json: { models: [model] } });
+        });
+        await settings.expandChatSection();
+        await settings.selectApiKeyModelSource();
+        await settings.waitForChatApiKeyInputEnabled();
+        await settings.addChatApiKey(firstKey);
+        await settings.addChatApiKey(secondKey);
+        await expect(page.getByTestId(`selectModel${model}`)).toHaveAttribute("data-selected", "true");
+        modelLoads.length = 0;
+        await settings.deleteChatApiKey(secondKey);
+        await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
+        await expect(page.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "false");
+        await expect(page.getByTestId(`selectModel${model}`)).toHaveCount(0);
+        expect(await page.evaluate(() => localStorage.getItem("model"))).toBe("");
+        expect(await page.evaluate(() => Object.keys(localStorage).some(key => key.endsWith(":selectedChatApiKeyId")))).toBe(false);
+        expect(modelLoads).toEqual([]);
+        await settings.deleteChatApiKey(firstKey);
+    });
+
     test('@readwrite a pending deletion does not close an edit started on another key', async () => {
         const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         const page = await browser.getPage();

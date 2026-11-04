@@ -213,7 +213,7 @@ export default function BrowserSettings() {
         createChangeHandler(setter)(clamp(current + delta, min, max), elementId);
     };
 
-    const selectedChatApiKey = chatApiKeys.find(({ id }) => id === activeSelectedChatApiKeyId) ?? chatApiKeys[0];
+    const selectedChatApiKey = chatApiKeys.find(({ id }) => id === activeSelectedChatApiKeyId);
     const pendingDeleteKey = chatApiKeys.find(({ id }) => id === pendingDeleteKeyId);
     const uiSelectedChatApiKeyId = selectedChatApiKey?.id ?? "";
     const modelProviderForDisplay = newChatModelSource === "local"
@@ -221,9 +221,11 @@ export default function BrowserSettings() {
         : selectedChatApiKey?.provider;
 
     useEffect(() => {
-        const nextSelectedId = chatApiKeys.some(({ id }) => id === selectedChatApiKeyId)
-            ? selectedChatApiKeyId
-            : chatApiKeys[0]?.id ?? "";
+        const nextSelectedId = selectedChatApiKeyId
+            ? chatApiKeys.some(({ id }) => id === selectedChatApiKeyId)
+                ? selectedChatApiKeyId
+                : chatApiKeys[0]?.id ?? ""
+            : "";
         setActiveSelectedChatApiKeyId(nextSelectedId);
     }, [chatApiKeys, selectedChatApiKeyId]);
 
@@ -591,8 +593,8 @@ export default function BrowserSettings() {
                 // mutation merely started and might still fail or be cancelled.
                 if (keyStateRef.current !== snapshot) continue;
                 // A later explicit selection wins over an add/edit's default.
-                const selectedApiKey = getSelectedChatApiKey(keys,
-                    keySelectionGenerationRef.current === selectionGeneration ? selectedId : snapshot.selectedId);
+                const commitSelectedId = keySelectionGenerationRef.current === selectionGeneration ? selectedId : snapshot.selectedId;
+                const selectedApiKey = commitSelectedId ? getSelectedChatApiKey(keys, commitSelectedId) : undefined;
                 const nextSelectedId = selectedApiKey?.id ?? "";
                 if (keys.length > 0) {
                     setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
@@ -1032,6 +1034,7 @@ export default function BrowserSettings() {
                                                                         <button
                                                                             type="button"
                                                                             data-testid="selectChatApiKeyButton"
+                                                                            aria-pressed={isSelected}
                                                                             aria-label={`Select ${providerName} API key`}
                                                                             className={cn(
                                                                                 "mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border transition-colors",
