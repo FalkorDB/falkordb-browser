@@ -470,13 +470,22 @@ test.describe('@browser Browser Settings tests', () => {
         await settings.addChatApiKey(firstKey);
         await settings.addChatApiKey(secondKey);
         await expect(page.getByTestId(`selectModel${model}`)).toHaveAttribute("data-selected", "true");
+        await expect.poll(() => modelLoads).toContain(secondKey);
         modelLoads.length = 0;
         await settings.deleteChatApiKey(secondKey);
         await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
         await expect(page.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "false");
         await expect(page.getByTestId(`selectModel${model}`)).toHaveCount(0);
         expect(await page.evaluate(() => localStorage.getItem("model"))).toBe("");
-        expect(await page.evaluate(() => Object.keys(localStorage).some(key => key.endsWith(":selectedChatApiKeyId")))).toBe(false);
+        expect(await page.evaluate(() => {
+            const key = Object.keys(localStorage).find(key => key.endsWith(":selectedChatApiKeyId"));
+            return key ? localStorage.getItem(key) : null;
+        })).toBe("");
+        await page.reload();
+        await settings.expandChatSection();
+        await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
+        await expect(page.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "false");
+        await expect(page.getByTestId(`selectModel${model}`)).toHaveCount(0);
         expect(modelLoads).toEqual([]);
         await settings.deleteChatApiKey(firstKey);
     });
