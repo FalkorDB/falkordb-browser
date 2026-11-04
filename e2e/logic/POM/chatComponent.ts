@@ -53,8 +53,8 @@ export default class ChatComponent extends GraphPage {
   }
 
   // Query Actions
-  private get chatRunQueryButton(): Locator {
-    return this.page.getByTestId("chatRunQueryButton");
+  private get chatInsertQueryButton(): Locator {
+    return this.page.getByTestId("chatInsertQueryButton");
   }
 
   private get chatCopyQueryButton(): Locator {
@@ -172,11 +172,11 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
-  async clickChatRunQueryButton(): Promise<void> {
+  async clickChatInsertQueryButton(): Promise<void> {
     await interactWhenVisible(
-      this.chatRunQueryButton,
+      this.chatInsertQueryButton,
       (el) => el.click(),
-      "Chat Run Query Button"
+      "Chat Insert Query Button"
     );
   }
 
@@ -240,7 +240,9 @@ export default class ChatComponent extends GraphPage {
 
   async getLastAssistantMessageContent(type: string): Promise<string | null> {
     return interactWhenVisible(
-      this.chatAssistantMessage(type).last(),
+      type === "CypherQuery"
+        ? this.chatAssistantMessage(type).last().getByTestId("chatSuggestedQuery")
+        : this.chatAssistantMessage(type).last(),
       (el) => el.textContent(),
       "Last Assistant Message"
     );
