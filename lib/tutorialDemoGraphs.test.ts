@@ -2,10 +2,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   isTutorialDemoGraphName,
+  getTutorialDemoReclaimableNames,
   isTutorialDemoOwnershipExpired,
   TUTORIAL_DEMO_OWNER_TTL_MS,
   parseTutorialDemoOwnership,
   pickTutorialDemoGraphNames,
+  runTutorialDemoLoadOnce,
   tutorialDemoOwnershipKey,
 } from "./tutorialDemoGraphs.ts";
 
@@ -42,6 +44,29 @@ describe("tutorial demo graph names (#2202)", () => {
     assert.throws(() => pickTutorialDemoGraphNames(() => `s${attempts += 1}`, () => true), /50 attempts/);
     assert.equal(attempts, 50);
   });
+
+  it("shares an in-flight load for the same owner across navigation", async () => {
+    const loads = new Map<string, Promise<string>>();
+    let finish!: (value: string) => void;
+    const delayed = new Promise<string>(resolve => { finish = resolve; });
+    let calls = 0;
+    const loadKey = "scope-1:owner-1";
+    const first = runTutorialDemoLoadOnce(loads, loadKey, async () => {
+      calls += 1;
+      return delayed;
+    });
+    const second = runTutorialDemoLoadOnce(loads, loadKey, async () => {
+      calls += 1;
+      return "duplicate";
+    });
+
+    assert.equal(first, second);
+    finish("loaded");
+    assert.equal(await first, "loaded");
+    await Promise.resolve();
+    assert.equal(calls, 1);
+    assert.equal(loads.size, 0);
+  });
 });
 
 describe("tutorial demo graph ownership (#2202)", () => {
@@ -53,8 +78,34 @@ describe("tutorial demo graph ownership (#2202)", () => {
     const names = ["tutorial-social-demo-x", "tutorial-social-test-x", "tutorial-social-demo-x"];
     assert.deepEqual(
       parseTutorialDemoOwnership(stored({ scope, ownerId, names }), scope, ownerId),
-      { scope, ownerId, names: ["tutorial-social-demo-x", "tutorial-social-test-x"] },
+      {
+        scope,
+        ownerId,
+        names: ["tutorial-social-demo-x", "tutorial-social-test-x"],
+        pendingNames: ["tutorial-social-demo-x", "tutorial-social-test-x"],
+      },
     );
+  });
+
+  it("only reclaims names whose setup was confirmed complete", () => {
+    const names = ["tutorial-social-demo-x", "tutorial-social-test-x"];
+    const legacy = parseTutorialDemoOwnership(stored({ scope, ownerId, names }), scope, ownerId);
+    assert.deepEqual(getTutorialDemoReclaimableNames(legacy), []);
+
+    const partiallyCreated = parseTutorialDemoOwnership(
+      stored({ scope, ownerId, names, pendingNames: ["tutorial-social-test-x"] }),
+      scope,
+      ownerId,
+    );
+    assert.deepEqual(getTutorialDemoReclaimableNames(partiallyCreated), ["tutorial-social-demo-x"]);
+    assert.throws(() => parseTutorialDemoOwnership(
+      stored({ scope, ownerId, names, pendingNames: ["tutorial-social-demo-other"] }),
+      scope,
+      ownerId,
+    ));
+    for (const pendingNames of [null, "unknown", [42]]) {
+      assert.throws(() => parseTutorialDemoOwnership(stored({ scope, ownerId, names, pendingNames }), scope, ownerId));
+    }
   });
 
   it("refuses a record that would delete a user's graph", () => {
@@ -83,7 +134,10 @@ describe("tutorial demo graph ownership (#2202)", () => {
 
   it("preserves validated heartbeat timestamps and rejects malformed timestamps", () => {
     const record = { scope, ownerId, names: ["tutorial-social-demo-x"], lastActiveAt: 123 };
-    assert.deepEqual(parseTutorialDemoOwnership(stored(record), scope, ownerId), record);
+    assert.deepEqual(parseTutorialDemoOwnership(stored(record), scope, ownerId), {
+      ...record,
+      pendingNames: record.names,
+    });
     for (const lastActiveAt of [-1, "123", null]) {
       assert.throws(() => parseTutorialDemoOwnership(stored({ ...record, lastActiveAt }), scope, ownerId));
     }

@@ -51,6 +51,13 @@ Locks, active tabs renew ownership every minute and only records inactive for
 24 hours are eligible. Cleanup requires the same browser's retained ownership
 records; clearing browser storage removes that evidence. Failed cleanup keeps its
 ownership record eligible for retry instead of renewing the inactive owner's lease.
+Cleanup also verifies offloaded graphs when the connection supports them and
+does not block a new tutorial if an abandoned sample cannot be removed.
+Initial graph auto-selection and saved-tab queries wait for this recovery pass
+so they cannot recreate a sample that cleanup is removing.
+Samples whose setup did not confirm completion (including older ownership
+records without completion metadata) are retained for manual verification:
+an interrupted request could still create the graph after a reload.
 
 ### Quick start
 

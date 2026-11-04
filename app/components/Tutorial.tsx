@@ -1758,6 +1758,7 @@ function TutorialSpotlight({ targetSelector, spotlightSelector, passthrough }: {
 function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: TutorialProps) {
     const [step, setStep] = useState(0);
     const [demoLoaded, setDemoLoaded] = useState(false);
+    const [demoLoadAttempt, setDemoLoadAttempt] = useState(0);
     const [demoGraphName, setDemoGraphName] = useState("");
     // `demoLoaded` is only set once the load RESOLVES, and the loader itself
     // changes the graph list — which gives it a new identity and re-runs the
@@ -1795,6 +1796,7 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
                             // Let the effect try again once the new connection settles,
                             // rather than leave the tutorial parked on step 0.
                             demoLoadStartedRef.current = false;
+                            setDemoLoadAttempt(attempt => attempt + 1);
                             return;
                         }
 
@@ -1811,7 +1813,7 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
                 setStep(1);
             }
         }
-    }, [open, step, demoLoaded, onLoadDemoGraphs, onClose, setCurrentTab]);
+    }, [open, step, demoLoaded, demoLoadAttempt, onLoadDemoGraphs, onClose, setCurrentTab]);
 
     const handleNextStep = useCallback(async () => {
         const currentStepDef = tutorialSteps[step];
