@@ -11,6 +11,9 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
       const write = `CREATE (:Book {title:'${keyword} station'})`;
       assert.deepEqual(getQueryWithLimit(write, 300), [write, 0]);
     }
+    const writeWithTrailingComment = "CREATE (:Book {title:'The Return of the King'}) // UNION";
+    assert.deepEqual(getQueryWithLimit(writeWithTrailingComment, 300), [writeWithTrailingComment, 0]);
+
     const unionString = "MATCH (n) WHERE n.name = 'European UNION' RETURN n";
     assert.deepEqual(getQueryWithLimit(unionString, 300), [`${unionString} LIMIT 300`, 300]);
 
