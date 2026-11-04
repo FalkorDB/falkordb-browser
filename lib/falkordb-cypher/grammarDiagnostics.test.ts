@@ -69,6 +69,7 @@ describe("Cypher grammar compatibility (#2208)", () => {
     "MATCH (n) WHERE exists(n.name) RETURN n",
     "CALL { MATCH (m) RETURN m } RETURN m",
     "MATCH (n) WHERE EXISTS { MATCH (n)-->(m) } RETURN n",
+    "/* **/ RETURN 1",
     "MATCH (n) RETURN n {.name}",
     "MATCH (n) RETURN n {.*}",
     "MATCH (n) RETURN n {.name} AS person",
