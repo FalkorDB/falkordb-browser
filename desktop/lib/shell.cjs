@@ -19,11 +19,13 @@ function readJson(file) {
 }
 
 function writeJson(file, value) {
-    fs.writeFileSync(file, JSON.stringify(value, null, 2), { mode: 0o600 });
-    // `mode` only applies when the file is created; tighten one that already existed.
-    // POSIX only: on Windows chmod just toggles read-only, and the app-data
-    // folder is private because it sits in the user's own profile.
-    fs.chmodSync(file, 0o600);
+    const temp = `${file}.${crypto.randomBytes(12).toString("hex")}.tmp`;
+    try {
+        fs.writeFileSync(temp, JSON.stringify(value, null, 2), { mode: 0o600, flag: "wx" });
+        fs.renameSync(temp, file);
+    } finally {
+        if (fs.existsSync(temp)) fs.unlinkSync(temp);
+    }
 }
 
 /**
@@ -41,6 +43,7 @@ const HEX_32_BYTES = /^[0-9a-f]{64}$/;
 // Generated once and kept: a new AUTH_SECRET would sign every user out, and a
 // new ENCRYPTION_KEY would make stored credentials unreadable.
 function loadSecrets(dir) {
+    ensurePrivateDir(dir);
     const file = path.join(dir, "secrets.json");
     const stored = readJson(file);
     if (stored && HEX_32_BYTES.test(stored.authSecret) && HEX_32_BYTES.test(stored.encryptionKey)) {

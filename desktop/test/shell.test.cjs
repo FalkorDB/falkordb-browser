@@ -66,6 +66,29 @@ test("loadSecrets makes a kept secrets file owner-only too", (t) => {
     assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 });
 
+test("regeneration replaces the inode so an old descriptor cannot read new secrets", (t) => {
+    if (process.platform === "win32") return t.skip("POSIX open-file replacement");
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    fs.writeFileSync(file, "invalid old secrets", { mode: 0o644 });
+    const fd = fs.openSync(file, "r");
+    try {
+        const oldInode = fs.fstatSync(fd).ino;
+        const secrets = loadSecrets(dir);
+        assert.notEqual(fs.statSync(file).ino, oldInode);
+        const oldContents = fs.readFileSync(fd, "utf8");
+        assert.equal(oldContents, "invalid old secrets");
+        assert.equal(oldContents.includes(secrets.authSecret), false);
+        assert.equal(oldContents.includes(secrets.encryptionKey), false);
+        assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+    } finally {
+        fs.closeSync(fd);
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
 test("ensurePrivateDir creates owner-only folders and tightens existing ones", (t) => {
     if (process.platform === "win32") return t.skip("POSIX file modes");
     const root = tempDir();

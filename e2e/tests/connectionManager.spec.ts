@@ -3,6 +3,48 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import ConnectionManagerComponent from "../logic/POM/connectionManagerComponent";
 import urls from "../config/urls.json";
 
+test("@admin Removed connections cannot be recovered from session fields", async ({ playwright }) => {
+  const origin = new URL(urls.loginUrl).origin;
+  const request = await playwright.request.newContext({
+    baseURL: origin,
+    storageState: { cookies: [], origins: [] },
+    extraHTTPHeaders: { Origin: origin },
+  });
+  try {
+    const csrf = await (await request.get("/api/auth/csrf")).json();
+    const login = await request.post("/api/auth/callback/credentials", {
+      headers: { "X-Auth-Return-Redirect": "1" },
+      form: {
+        csrfToken: csrf.csrfToken, callbackUrl: `${origin}/graph`,
+        host: "localhost", port: "6379", username: "", password: "", tls: "false",
+      },
+    });
+    expect(login.ok()).toBe(true);
+    expect(new URL((await login.json()).url).searchParams.has("error")).toBe(false);
+    expect((await request.get("/api/info")).ok()).toBe(true);
+    const { connections }: { connections: { id: string }[] } =
+      await (await request.get("/api/connections")).json();
+    expect(connections).toHaveLength(1);
+    const connectionId = connections[0].id;
+    expect((await request.delete(`/api/connections/${connectionId}`)).ok()).toBe(true);
+
+    const requestHeaders: Record<string, string>[] = [{}, { "X-Connection-Id": connectionId }];
+    for (const headers of requestHeaders) {
+      const response = await request.get("/api/info", { headers });
+      expect(response.status()).toBe(401);
+      expect((await response.json()).code).toBe("SESSION_INVALID");
+    }
+    await request.get("/api/auth/session");
+    const remaining = await (await request.get("/api/connections")).json();
+    expect(remaining.connections).toEqual([]);
+    expect((await request.get("/api/info")).status()).toBe(401);
+  } finally {
+    const csrf = await (await request.get("/api/auth/csrf")).json();
+    await request.post("/api/auth/signout", { form: { csrfToken: csrf.csrfToken } });
+    await request.dispose();
+  }
+});
+
 test.describe("Connection Manager Tests", () => {
   let browser: BrowserWrapper;
 

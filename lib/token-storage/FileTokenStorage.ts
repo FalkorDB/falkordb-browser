@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorage';
+import type { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorage.ts';
 
 /**
  * File-based token storage implementation
@@ -19,15 +19,39 @@ class FileTokenStorage implements ITokenStorage {
   constructor(filePath?: string) {
     // Default to .data/api_tokens.json in project root
     // Can be overridden via API_TOKEN_STORAGE_PATH environment variable
-    this.filePath = filePath || process.env.API_TOKEN_STORAGE_PATH || path.join(process.cwd(), '.data', 'api_tokens.json');
+    this.filePath = path.resolve(filePath || process.env.API_TOKEN_STORAGE_PATH || path.join(process.cwd(), '.data', 'api_tokens.json'));
   }
 
   /**
-   * Run a read-modify-write operation under the in-process mutex.
+   * Serialize each snapshot update across processes sharing this local file.
+   * Never steal a lock: a paused writer could otherwise overwrite a revocation.
+   * An abandoned lock requires operator recovery after all writers have stopped.
    * Failures do not poison the queue for subsequent callers.
    */
   private withLock<T>(op: () => Promise<T>): Promise<T> {
-    const next = this.writeQueue.then(op, op);
+    const locked = async () => {
+      await this.ensureFileExists();
+      const lockPath = `${this.filePath}.lock`;
+      const deadline = Date.now() + 10_000;
+      while (true) {
+        try {
+          await fs.mkdir(lockPath, { mode: 0o700 });
+          break;
+        } catch (error) {
+          if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
+          if (Date.now() >= deadline) {
+            throw new Error(`Timed out acquiring token storage lock: ${lockPath}. Stop all writers before removing an abandoned lock.`);
+          }
+          await new Promise(resolve => { setTimeout(resolve, 50); });
+        }
+      }
+      try {
+        return await op();
+      } finally {
+        await fs.rmdir(lockPath);
+      }
+    };
+    const next = this.writeQueue.then(locked, locked);
     this.writeQueue = next.catch(() => undefined);
     return next;
   }
@@ -52,15 +76,14 @@ class FileTokenStorage implements ITokenStorage {
       // Enforce permissions on pre-existing directory
       await fs.chmod(dir, 0o700);
 
-      // Check if file exists
       try {
-        await fs.access(this.filePath);
-        // Enforce permissions on pre-existing file
-        await fs.chmod(this.filePath, 0o600);
-      } catch {
-        // File doesn't exist, create it with empty array and restrictive permissions
-        await fs.writeFile(this.filePath, JSON.stringify({ tokens: [] }, null, 2), { encoding: 'utf8', mode: 0o600 });
+        await fs.writeFile(this.filePath, JSON.stringify({ tokens: [] }, null, 2), {
+          encoding: 'utf8', mode: 0o600, flag: 'wx',
+        });
+      } catch (error) {
+        if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
       }
+      await fs.chmod(this.filePath, 0o600);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to ensure token storage file exists:', error);
@@ -80,7 +103,8 @@ class FileTokenStorage implements ITokenStorage {
       try {
         const content = await fs.readFile(this.filePath, 'utf8');
         const data = JSON.parse(content);
-        return data.tokens || [];
+        if (!data || !Array.isArray(data.tokens)) throw new Error('Invalid token storage contents');
+        return data.tokens;
       } catch (error) {
         if (attempt < 2) {
           // Brief wait before retry — allows an in-progress atomic rename to
@@ -90,10 +114,11 @@ class FileTokenStorage implements ITokenStorage {
         } else {
           // eslint-disable-next-line no-console
           console.error('Failed to read tokens from file after retries:', error);
+          throw new Error('Failed to read token storage', { cause: error });
         }
       }
     }
-    return [];
+    throw new Error('Failed to read token storage');
   }
 
   /**
@@ -101,7 +126,7 @@ class FileTokenStorage implements ITokenStorage {
    * fs.rename is atomic on POSIX systems (same filesystem). Each writer uses its
    * own tmp filename (pid + timestamp + random) so concurrent writers cannot
    * consume each other's staging file and trigger ENOENT on rename.
-   * Falls back to direct write if atomic rename fails.
+   * Never overwrite the live file non-atomically.
    */
   private async writeTokens(tokens: TokenData[]): Promise<void> {
     const dir = path.dirname(this.filePath);
@@ -111,18 +136,12 @@ class FileTokenStorage implements ITokenStorage {
     const unique = `${process.pid}.${Date.now()}.${crypto.randomBytes(6).toString('hex')}`;
     const tmpPath = `${this.filePath}.${unique}.tmp`;
     try {
-      await fs.writeFile(tmpPath, content, { encoding: 'utf8', mode: 0o600 });
+      await fs.writeFile(tmpPath, content, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
       await fs.rename(tmpPath, this.filePath);
     } catch (renameError) {
-      // Atomic rename failed — fall back to direct write
       await this.cleanupTempFile(tmpPath);
-      try {
-        await fs.writeFile(this.filePath, content, { encoding: 'utf8', mode: 0o600 });
-      } catch (writeError) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to write tokens to file:', { writeError, renameError });
-        throw new Error('Failed to save tokens');
-      }
+      console.error('Failed to atomically write tokens to file:', renameError);
+      throw new Error('Failed to save tokens', { cause: renameError });
     }
   }
 

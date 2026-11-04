@@ -129,6 +129,29 @@ test("migrateToScopedStorage ignores unrelated and no-longer-scoped keys", () =>
     assert.equal(getConnectionItem("savedContent"), null);
 });
 
+test("unscoped migration preserves foreign connections whose hostnames resemble legacy keys", () => {
+    for (const host of ["chat-db.example", "cypherOnly-db.example", "labelStyle_db.example", "relationshipStyle_db.example"]) {
+        setConnectionPrefix(host, 6379, "alice");
+        setConnectionItem("chat-social", "foreign chat");
+        setConnectionItem("query history", "foreign history");
+        const foreignPrefix = getConnectionPrefix();
+        setConnectionPrefix("target.example", 6379, host);
+        migrateToScopedStorage();
+        assert.equal(storage.getItem(`${foreignPrefix}chat-social`), "foreign chat");
+        assert.equal(storage.getItem(`${foreignPrefix}query history`), "foreign history");
+        assert.equal(getConnectionItem(`${foreignPrefix}chat-social`), null);
+        assert.equal(getConnectionItem(`${foreignPrefix}query history`), null);
+    }
+});
+
+test("unscoped migration leaves ambiguous connection-shaped legacy names untouched", () => {
+    setConnectionPrefix("target.example", 6379, "ambiguous-legacy");
+    storage.setItem("chat-old.example:6380:alice:chat-social", "unknown owner");
+    migrateToScopedStorage();
+    assert.equal(storage.getItem("chat-old.example:6380:alice:chat-social"), "unknown owner");
+    assert.equal(getConnectionItem("chat-old.example:6380:alice:chat-social"), null);
+});
+
 test("migrateToScopedStorage upgrades the username-less legacy prefix", () => {
     setConnectionPrefix("localhost", 6379, "migrate-legacy");
     storage.setItem("localhost:6379:query history", "[2]");

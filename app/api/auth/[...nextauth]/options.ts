@@ -996,9 +996,6 @@ const authOptions: NextAuthConfig = {
       // ── Strip any accumulated bloat from old tokens ──
       // Remove fields that are no longer needed and inflate the cookie.
       // These may have been set by old code or NextAuth defaults.
-      // Save credentialRef before deletion — needed for legacy migration below.
-      const legacyCredentialRef = token.credentialRef as string | undefined;
-
       // If the token still carries a connections[] array (from old code that
       // stored all connections in the JWT), extract the active connection's
       // flat fields BEFORE deleting the array so we don't lose them.
@@ -1029,64 +1026,9 @@ const authOptions: NextAuthConfig = {
       delete token.url;         // Connection URL; stored in Token DB
       delete token.credentialRef; // Legacy field replaced by Token DB
 
-      // ── Migrate old flat-format JWT tokens that have no activeConnectionId ──
-      // Old tokens have host/port/username/role/tls directly on the token
-      // but no activeConnectionId. Persist the connection to Token DB so
-      // GET /api/connections returns it immediately.
-      if (!token.activeConnectionId && token.host) {
-        const legacyConnId = uuidv4();
-        const sessionId = token.id as string;
-        const connHost = (token.host as string) || "localhost";
-        const connPort = typeof token.port === "string" ? parseInt(token.port, 10) : (token.port as number) || 6379;
-        const connUsername = (token.username as string) || "default";
-        const connRole = (token.role as string) || "Read-Only";
-        const connTls = token.tls as boolean;
-
-        token.activeConnectionId = legacyConnId;
-
-        // Persist to Token DB so the connection appears in the connections
-        // list before any API call triggers the getClient() legacy fallback.
-        try {
-          let password = "";
-          if (legacyCredentialRef) {
-            try {
-              password = await getPasswordFromTokenDB(legacyCredentialRef);
-            } catch { /* passwordless fallback — leave password empty */ }
-          }
-
-          const tokenHash = crypto
-            .createHash("sha256")
-            .update(`connection:${legacyConnId}`)
-            .digest("hex");
-
-          await storeEncryptedCredential({
-            tokenHash,
-            tokenId: legacyConnId,
-            userId: sessionId,
-            username: connUsername,
-            name: `connection:${legacyConnId}`,
-            role: connRole,
-            host: connHost,
-            port: connPort,
-            password,
-            kind: "session",
-            tls: connTls,
-            expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
-          });
-
-          // Move old in-memory client (stored under bare session ID)
-          // to the new connection-key format so getClient() finds it.
-          const oldClient = connections.get(sessionId);
-          if (oldClient) {
-            const newKey = sessionConnectionKey(sessionId, legacyConnId);
-            connections.delete(sessionId);
-            connections.set(newKey, oldClient);
-          }
-        } catch (migrateErr) {
-          // Non-fatal: getClient() legacy fallback will retry persistence.
-          // eslint-disable-next-line no-console
-          console.warn("JWT migration: failed to persist connection to Token DB:", migrateErr);
-        }
+      if (!token.activeConnectionId) {
+        console.warn("Session has no bound connection; sign-in required");
+        return null;
       }
 
       // Handle session.update() calls from the frontend.
@@ -1335,23 +1277,21 @@ export async function getClient(
   // If session.activeConnectionId (from the JWT) matches one of the Token DB
   // entries, prefer it over the default (newest-first) order — but ONLY if it
   // actually exists in the Token DB. This prevents a stale session.activeConnectionId
-  // (e.g. after another test signs out and deletes connections) from bypassing
-  // the legacy reconnect fallback and triggering an unexpected SESSION_INVALID.
+  // (e.g. after another tab deletes a connection) from overriding a live record.
   let connId = getConnectionIdFromRequest(request);
 
   if (!connId) {
     try {
       const storage = StorageFactory.getStorage();
       const allTokens = await storage.fetchTokensByUserId(id);
-      const connTokens = allTokens.filter(isConnectionRecord);
+      const connTokens = allTokens.filter(token => isUsableConnectionRecord(token, id));
       if (connTokens.length > 0) {
         // Default: first entry from Token DB
         connId = connTokens[0].token_id;
         // Prefer session.activeConnectionId if it exists in the Token DB list
         // (ensures the correct connection is used after a switch, even when
         // the Token DB sort order would pick a different entry).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sessionActiveId = (session as any).activeConnectionId as string | undefined;
+        const sessionActiveId = session?.activeConnectionId;
         if (sessionActiveId && connTokens.some(t => t.token_id === sessionActiveId)) {
           connId = sessionActiveId;
         }
@@ -1363,130 +1303,8 @@ export async function getClient(
   }
 
   if (!connId) {
-    // ── Legacy session fallback ──
-    // Old sessions (before multi-connection) stored the FalkorDB client
-    // keyed by session ID and credentials via `credentialRef` in the JWT.
-    // Try to reuse the old-style connection so users don't get kicked out.
-    return withConnectionLock(id, async () => {
-    try {
-      const jwt = await getToken({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        req: request as any,
-        secret: getAuthSecret(),
-        secureCookie: shouldUseSecureCookies(request),
-      });
-      const credentialRef = jwt?.credentialRef as string | undefined;
-
-      // Resolve the password: either from Token DB (if credentialRef exists)
-      // or undefined (passwordless connection, e.g. default local FalkorDB).
-      let password: string | undefined;
-      if (credentialRef) {
-        try {
-          password = await getPasswordFromTokenDB(credentialRef);
-        } catch (pwErr) {
-          // Non-fatal: Token DB may be temporarily unavailable (e.g. due
-          // to server-wide config changes). Proceed with undefined password
-          // which works for passwordless connections (common in dev/CI).
-          // eslint-disable-next-line no-console
-          console.warn("Legacy password resolution failed (non-fatal):", pwErr);
-        }
-      }
-
-      // Migrate the legacy connection into the new connection-key
-      // scheme so it appears in listSessionConnections() and all
-      // subsequent requests go through the normal path.
-      const legacyConnId = uuidv4();
-      const legacyKey = sessionConnectionKey(id, legacyConnId);
-
-      // Check for a live connection stored under the old key (session ID)
-      let client = connections.get(id);
-      if (client) {
-        try {
-          const conn = await client.connection;
-          await conn.ping();
-          // Move from old key to new connection-keyed entry
-          connections.delete(id);
-          connections.set(legacyKey, client);
-        } catch {
-          connections.delete(id);
-          client = undefined;
-        }
-      }
-
-      // actualRole tracks the role determined by newClient() (via aclGetUser)
-      // so we always store and return the REAL FalkorDB role, not the
-      // potentially-stale session.user.role which defaults to "Read-Only"
-      // before the JWT migration has run.
-      let actualRole: Role = session.user.role;
-
-      if (!client) {
-        // Reconnect using session user credentials
-        const { user } = session;
-        // Only pass username when password is present; otherwise omit both
-        // so no AUTH command is sent to passwordless FalkorDB instances.
-        const legacyUsername = password ? (user.username || undefined) : undefined;
-        const { client: reconnected, role: reconnectedRole } = await newClient(
-          {
-            host: user.host,
-            port: user.port.toString(),
-            username: legacyUsername,
-            password,
-            tls: user.tls.toString(),
-          },
-          legacyKey
-        );
-        client = reconnected;
-        actualRole = reconnectedRole;
-      }
-
-      // Persist the migrated connection in Token DB so it shows up
-      // in listSessionConnections and future getClient calls use the
-      // normal connection-token path instead of this legacy fallback.
-      try {
-        const tokenHash = crypto
-          .createHash("sha256")
-          .update(`connection:${legacyConnId}`)
-          .digest("hex");
-
-        await storeEncryptedCredential({
-          tokenHash,
-          tokenId: legacyConnId,
-          userId: id,
-          username: session.user.username || "default",
-          name: `connection:${legacyConnId}`,
-          role: actualRole,
-          host: session.user.host || "localhost",
-          port: session.user.port || 6379,
-          password: password || "",
-          kind: "session",
-          tls: session.user.tls ?? false,
-          expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
-        });
-      } catch (persistErr) {
-        // Non-fatal: the connection works in-memory; it just won't
-        // appear in listSessionConnections until next login.
-        // eslint-disable-next-line no-console
-        console.warn("Failed to persist legacy connection to Token DB:", persistErr);
-      }
-
-      return {
-        client,
-        user: {
-          id,
-          username: session.user.username,
-          role: actualRole,
-          host: session.user.host,
-          port: session.user.port,
-          tls: session.user.tls,
-          password,
-        },
-      };
-    } catch (legacyErr) {
-      // eslint-disable-next-line no-console
-      console.warn("Legacy session fallback failed:", legacyErr);
-    }
-    // eslint-disable-next-line no-console
-    console.warn("getClient: returning SESSION_INVALID (legacy path) for session:", id);
+    // A session cookie cannot recreate authority after its connection was removed.
+    console.warn("getClient: no authorized connection for session:", id);
     return NextResponse.json(
       { message: "No active connection. Please sign in again.", code: "SESSION_INVALID" },
       {
@@ -1497,7 +1315,6 @@ export async function getClient(
         },
       }
     );
-    });
   }
 
   // All connections (including the initial login one) go through the

@@ -67,6 +67,34 @@ show a separate error; no preliminary database probe is made. The former
 have been removed. Normal login still accepts user-supplied database addresses,
 so deployments should restrict outbound network access as appropriate.
 
+Session connections must have an active stored connection record. Removing the
+last connection requires a fresh login; old sessions without a connection ID
+must also sign in again instead of reconnecting from cookie fields.
+
+File-backed token storage uses atomic replacements and an exclusive
+`api_tokens.json.lock` directory (next to the configured token file) to serialize
+writers. A writer waits up to 10 seconds for the lock, then fails explicitly.
+Locks are never automatically stolen. After a process crash, stop **all** writers
+before removing an abandoned lock directory and restarting. Use FalkorDB-backed
+token storage for distributed deployments rather than sharing files across
+machines.
+
+Replacing a user's role also clears existing ACL selectors, so selectors cannot
+retain permissions outside the replacement role and key patterns.
+
+Legacy browser-storage migration leaves connection-shaped keys untouched rather
+than guessing ownership, including hostnames beginning with `chat-` or another
+legacy prefix. Desktop secret regeneration atomically replaces the secrets file
+inside an owner-only directory.
+
+HTTP CSV header validation reads at most 8 KiB and cancels the response, even if
+storage ignores Range. A 10-second validation timeout or a storage error produces
+an explicit retryable error. File-URI imports remain validated during upload.
+
+Schema-discovery placement limits, timeouts, and limit-reached UI behavior are
+tracked separately in [#2228](https://github.com/FalkorDB/falkordb-browser/issues/2228);
+no schema limit or sampling change is introduced here.
+
 > Note: the image ships no default `AUTH_SECRET`. If you do not supply one, a
 > random secret is generated per container, which means every session is
 > invalidated when the container is recreated. For anything long-lived, set your
@@ -335,4 +363,3 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
