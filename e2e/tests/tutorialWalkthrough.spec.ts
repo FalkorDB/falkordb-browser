@@ -55,7 +55,11 @@ test.describe("Tutorial", () => {
     test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
         test.setTimeout(120_000);
 
-        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        await apiCall.addGraph(userGraph);
+        const page = await browser.getPage();
+        await page.route("**/api/graph", route => route.fulfill({ json: { opts: [userGraph] } }));
+        await browser.navigateTo(urls.graphUrl);
         await browser.setPageToFullScreen();
 
         const countPeople = async () => {
@@ -69,7 +73,9 @@ test.describe("Tutorial", () => {
 
         try {
             await tutorial.changeLocalStorage("true");
-            await tutorial.refreshPage();
+            // Sole-graph auto-selection adds share parameters. A refresh there
+            // deliberately defers the tutorial, so start from a regular visit.
+            await browser.navigateTo(urls.graphUrl);
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
 

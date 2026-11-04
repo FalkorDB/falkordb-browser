@@ -191,7 +191,7 @@ export default function ForceGraph({
         const handle = setTimeout(apply, CANVAS_AUTO_ZOOM_DELAY);
 
         return () => clearTimeout(handle);
-    }, [canvasRef, viewport, canvasLoaded]);
+    }, [canvasRef, viewport, canvasLoaded, dataRevision]);
 
     // Save the canvas layout on unmount, so leaving the Graph view and coming
     // back restores the positions instead of re-running the simulation.

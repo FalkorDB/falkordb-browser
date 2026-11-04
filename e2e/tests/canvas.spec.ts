@@ -130,6 +130,65 @@ test.describe('Canvas Tests', () => {
         }
     });
 
+    test("@admin a rebuilt tab restores its viewport after a delayed 2D data commit", async () => {
+        test.setTimeout(90000);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        const graphName = getRandomString("rebuilt-viewport");
+        const smallTab = getRandomString("viewport-3d");
+        const savedViewport = { zoom: 1.75, centerX: 123, centerY: -87 };
+        const canvas = () => page.getByTestId("graphCanvasWrapper").locator("falkordb-canvas");
+        await graph.addGraph(graphName);
+        try {
+            await graph.insertQuery("UNWIND range(1, 15) AS i CREATE (n:ViewportRestore {id: i}) RETURN n");
+            await graph.clickRunQuery();
+            await graph.insertQuery("MATCH (n:ViewportRestore) RETURN n");
+            await graph.clickRunQuery();
+            await expect.poll(() => canvas().evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(15);
+            await canvas().evaluate((element, viewport) => (element as FalkorDBCanvas).setViewport(viewport), savedViewport);
+            await graph.addStripTab();
+            await graph.renameStripTab("New tab", smallTab);
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH (n:ViewportRestore) RETURN n LIMIT 2");
+            await graph.clickRunQuery();
+            await graph.clickDimensionControl("3d");
+            await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+            await expect.poll(() => page.evaluate(() => {
+                const key = Object.keys(localStorage).find(name => name.endsWith(":graph-tabs"));
+                const state: { tabs: { graph: { viewport?: { centerX: number } } }[] } = JSON.parse(key ? localStorage.getItem(key)! : '{"tabs":[]}');
+                return state.tabs.some(tab => Math.round(tab.graph.viewport?.centerX ?? 0) === 123);
+            })).toBe(true);
+            await graph.refreshPage();
+            await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+            await canvas().evaluate((element, viewport) => {
+                const c = element as FalkorDBCanvas;
+                const setDimension = c.setDimension.bind(c);
+                c.setDimension = async dimension => {
+                    if (dimension === "2d") await new Promise(resolve => setTimeout(resolve, 350));
+                    await setDimension(dimension);
+                };
+                const setViewport = c.setViewport.bind(c);
+                let restores = 0;
+                c.setViewport = incoming => {
+                    setViewport(incoming);
+                    if (c.getGraphData().nodes.length === 15 && Math.round(incoming?.centerX ?? 0) === viewport.centerX) {
+                        restores += 1;
+                        element.setAttribute("data-saved-viewport-applied", String(restores));
+                    }
+                };
+            }, savedViewport);
+            await graph.selectStripTab(graphName);
+            await expect.poll(() => canvas().evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length), { timeout: 15000 }).toBe(15);
+            await expect.poll(async () => Number(await canvas().getAttribute("data-saved-viewport-applied"))).toBeGreaterThanOrEqual(2);
+            await expect.poll(() => canvas().evaluate(element => {
+                const viewport = (element as FalkorDBCanvas).getViewport();
+                return viewport && { zoom: Math.round(viewport.zoom * 100), centerX: Math.round(viewport.centerX), centerY: Math.round(viewport.centerY) };
+            })).toEqual({ zoom: 175, centerX: 123, centerY: -87 });
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
     for (const interruption of ["tab", "view"] as const) {
         test(`@admin a pending 2D restore survives switching ${interruption} before the renderer is ready`, async () => {
             test.setTimeout(90000);

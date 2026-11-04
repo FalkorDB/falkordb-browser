@@ -80,7 +80,7 @@ export default function Page() {
     const { panel, setPanel, panelOpen, onTogglePanel, infoPanelRef, onInfoPanelResize, customizingLabel, setCustomizingLabel } = useContext(PanelContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
-    const { canvasRef, data, graphData, setViewport } = useContext(ForceGraphContext);
+    const { canvasRef, data, setData, graphData, setViewport } = useContext(ForceGraphContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const { tabs, activeTabId } = useContext(GraphTabsContext);
     const isReadOnlyRef = useRef(isReadOnly);
@@ -594,7 +594,7 @@ export default function Page() {
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const isCurrentOwner = () => getConnectionEpoch() === startEpoch
-            && graphOwnerRef.current.graph === graph && graphOwnerRef.current.data === data
+            && graphOwnerRef.current.graph === graph
             && graphOwnerRef.current.graphName === graphName
             && graphOwnerRef.current.activeTabId === activeTabId;
 
@@ -637,10 +637,13 @@ export default function Page() {
 
         const canvas = canvasRef.current;
         const mayRepaint = () => isCurrentOwner() && canvasRef.current === canvas && !!canvas
-            && ownsCanvasSession(canvas, { graph, data, tabId: activeTabId, epoch: startEpoch });
+            && ownsCanvasSession(canvas, { graph, data: graphOwnerRef.current.data, tabId: activeTabId, epoch: startEpoch });
         let repaintSkipped = false;
         if (result.ok && canvas && mayRepaint()) {
             repaintSkipped = !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), mayRepaint) && isCurrentOwner();
+        } else if (result.ok && isCurrentOwner()) {
+            // Restart a pending restore with the model that includes this mutation.
+            setData({ ...graph.Elements });
         }
         if (result.ok) toast({
             title: repaintSkipped ? `${isAddNode ? "Node" : "Edge"} created; repaint skipped` : "Success",
@@ -649,7 +652,7 @@ export default function Page() {
         });
 
         return result.ok;
-    }, [fetchCount, graph, data, graphName, activeTabId, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
+    }, [fetchCount, graph, graphName, activeTabId, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setData, setIndicator, setLabels, setRelationships, toast]);
 
     const handleDeleteElement = useCallback(async () => {
         if (!canvasRef.current) return;
@@ -657,7 +660,6 @@ export default function Page() {
         const cid = getActiveConnectionIdGlobal();
         const isCurrentOwner = () => getConnectionEpoch() === startEpoch
             && graphOwnerRef.current.graph === graph
-            && graphOwnerRef.current.data === data
             && graphOwnerRef.current.graphName === graphName
             && graphOwnerRef.current.activeTabId === activeTabId;
 
@@ -713,10 +715,12 @@ export default function Page() {
         }
         const canvas = canvasRef.current;
         const mayRepaint = () => isCurrentOwner() && canvasRef.current === canvas && !!canvas
-            && ownsCanvasSession(canvas, { graph, data, tabId: activeTabId, epoch: startEpoch });
+            && ownsCanvasSession(canvas, { graph, data: graphOwnerRef.current.data, tabId: activeTabId, epoch: startEpoch });
         let repaintSkipped = false;
         if (canvas && mayRepaint()) {
             repaintSkipped = !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), mayRepaint) && isCurrentOwner();
+        } else if (deletedElements.length > 0 && isCurrentOwner()) {
+            setData({ ...graph.Elements });
         }
 
         if (deletedElements.length > 0) toast({
@@ -725,7 +729,7 @@ export default function Page() {
             ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.${!isCurrentOwner() ? ` Graph: ${graph.Id}.` : ""}${repaintSkipped ? " The canvas repaint was skipped. Run the query again to refresh the view." : ""}`,
             variant: repaintSkipped ? "destructive" : "default",
         });
-    }, [selectedElements, graph, data, graphName, activeTabId, setLabels, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+    }, [selectedElements, graph, graphName, activeTabId, setData, setLabels, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined;

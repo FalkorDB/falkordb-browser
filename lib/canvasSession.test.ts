@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { commitCanvasSession, ownsCanvasSession } from "./canvasSession.ts";
+import { commitCanvasSession, ownsCanvasSession, renewCanvasSession } from "./canvasSession.ts";
 import { register3DCheck, writeCanvasData } from "./graph3DResources.ts";
 import { getConnectionEpoch, setActiveConnectionIdGlobal } from "./active-connection.ts";
 
@@ -74,4 +74,29 @@ test("an already stale mutation cannot cancel a pending restore or start its res
     ready.resolve(true);
     assert.equal(await restore, true);
     assert.equal(restored, true);
+});
+
+test("rollback renews only the preserved canvas and never revives an old write", async () => {
+    setActiveConnectionIdGlobal("rollback-a");
+    const canvas = { setGraphData() {} };
+    const session = { graph: {}, data: {}, tabId: "a", epoch: getConnectionEpoch() };
+    commitCanvasSession(canvas, session);
+    const ready = Promise.withResolvers<boolean>();
+    register3DCheck(canvas, () => ready.promise);
+    const pending = writeCanvasData(canvas, { nodes: [], links: [] }, () => assert.fail("old write revived"),
+        () => getConnectionEpoch() === session.epoch);
+    setActiveConnectionIdGlobal("rollback-b");
+    setActiveConnectionIdGlobal("rollback-a");
+    const renewed = { ...session, epoch: getConnectionEpoch() };
+    for (const replacement of [
+        { ...renewed, graph: {} }, { ...renewed, data: {} },
+        { ...renewed, tabId: "b" }, { ...renewed, restore: {} },
+    ]) assert.equal(renewCanvasSession(canvas, replacement), false);
+    assert.equal(renewCanvasSession({}, renewed), false);
+    assert.equal(renewCanvasSession(canvas, renewed), true);
+    assert.equal(ownsCanvasSession(canvas, renewed), true);
+    assert.equal(ownsCanvasSession(canvas, session), false);
+    ready.resolve(true);
+    assert.equal(await pending, false);
+    setActiveConnectionIdGlobal(null);
 });

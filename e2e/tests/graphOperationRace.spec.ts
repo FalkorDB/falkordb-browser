@@ -81,7 +81,8 @@ test.describe("Graph operation race conditions", () => {
     }
   });
 
-  test("@admin a held create updates its owning model without repainting another tab", async () => {
+  for (const returnToOwner of ["away", "returned", "restoring"] as const) {
+  test(`@admin a held create reconciles its owning tab while ${returnToOwner}`, async () => {
     test.setTimeout(90000);
     const graphName = getRandomString("create-owner");
     const tabName = getRandomString("create-target");
@@ -118,16 +119,43 @@ test.describe("Graph operation race conditions", () => {
       await graph.selectStripTab(tabName);
       await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(1);
       const before = await canvas.evaluate(element => (element as FalkorDBCanvas).getData());
+      if (returnToOwner === "restoring") {
+        await graph.clickDimensionControl("3d");
+        await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+        await canvas.evaluate(element => {
+          const c = element as FalkorDBCanvas;
+          const setDimension = c.setDimension.bind(c);
+          let hold = true;
+          element.addEventListener("release-restore", () => { hold = false; });
+          c.setDimension = async dimension => {
+            if (dimension === "2d" && hold) {
+              element.setAttribute("data-restore-waiting", "true");
+              await new Promise<void>(resolve => element.addEventListener("release-restore", () => resolve(), { once: true }));
+            }
+            await setDimension(dimension);
+          };
+        });
+      }
+      if (returnToOwner !== "away") {
+        await graph.selectStripTab(graphName);
+        if (returnToOwner === "restoring") await expect(canvas).toHaveAttribute("data-restore-waiting", "true");
+        else await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(3);
+      }
       release.resolve();
       await expect(page.getByTestId("toast").filter({ hasText: "Node created" })).toBeVisible();
-      expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getData())).toEqual(before);
-      await graph.selectStripTab(graphName);
+      if (returnToOwner === "away") {
+        expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getData())).toEqual(before);
+        await graph.selectStripTab(graphName);
+      } else if (returnToOwner === "restoring") {
+        await canvas.dispatchEvent("release-restore");
+      }
       await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(4);
     } finally {
       release.resolve();
       await apiCall.removeGraph(graphName);
     }
   });
+  }
 
   test("@admin a successful create is still reported when its canvas repaint is refused", async () => {
     test.setTimeout(90000);
@@ -207,7 +235,8 @@ test.describe("Graph operation race conditions", () => {
     }
   });
 
-  test("@admin a pending canvas write is discarded as soon as a connection switch starts", async () => {
+  for (const pendingWrite of [true, false]) {
+  test(`@admin connection rollback ${pendingWrite ? "discards a pending write" : "renews the preserved canvas"}`, async () => {
     test.setTimeout(90000);
     const graphName = getRandomString("canvas-connection-owner");
     const graph = await browser.createNewPage(GraphPage);
@@ -224,11 +253,12 @@ test.describe("Graph operation race conditions", () => {
     await browser.navigateTo(urls.graphUrl);
     try {
       await graph.addGraph(graphName);
-      await graph.insertQuery("CREATE (a:PendingConnection {id: 1}), (b:PendingConnection {id: 2}) RETURN a,b");
+      await graph.insertQuery("CREATE (a:PendingConnection {id: 1})-[:REL]->(c:PendingConnection {id: 3}), (b:PendingConnection {id: 2}) RETURN a,b");
       await graph.clickRunQuery();
       await graph.clickDimensionControl("3d");
       await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
       const canvas = page.getByTestId("graphCanvasWrapper").locator("falkordb-canvas");
+      if (pendingWrite) {
       await canvas.evaluate(element => {
         const c = element as FalkorDBCanvas;
         const setDimension = c.setDimension.bind(c);
@@ -246,6 +276,7 @@ test.describe("Graph operation race conditions", () => {
       await graph.insertQuery("UNWIND range(1, 15) AS i CREATE (n:PendingConnection {id: i}) RETURN n");
       await graph.clickRunQuery();
       await expect(canvas).toHaveAttribute("data-restore-waiting", "true");
+      }
       await page.route("**/api/auth/session", async route => {
         if (route.request().method() === "POST") switching.resolve(route);
         else await route.continue();
@@ -253,14 +284,33 @@ test.describe("Graph operation race conditions", () => {
       await page.getByTestId("connections-dropdown-trigger").click();
       await page.getByTestId("connection-item-pending-test-switch").click();
       pendingSwitch = await switching.promise;
-      await canvas.dispatchEvent("release-restore");
-      await expect.poll(() => graph.getCanvasDimension()).toBe("2d");
+      if (pendingWrite) {
+        await canvas.dispatchEvent("release-restore");
+        await expect.poll(() => graph.getCanvasDimension()).toBe("2d");
+      }
+      await pendingSwitch.fulfill({ status: 500, json: { message: "Intentional test rollback" } });
+      pendingSwitch = undefined;
+      await expect(page.getByTestId("toast-destructive").filter({ hasText: "Failed to switch connection" })).toBeVisible();
       expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(2);
+      if (!pendingWrite) {
+        await canvas.evaluate(async element => {
+          const c = element as FalkorDBCanvas;
+          const config: ForceGraphConfig = Reflect.get(c, "config");
+          const click = config.eventHandlers?.onNodeClick;
+          if (!click) throw new Error("Missing node click handler");
+          const node = c.getGraphData().nodes.find(n => n.data.id === 1);
+          if (!node) throw new Error("Missing expansion node");
+          await click(node, new MouseEvent("click"));
+          await click(node, new MouseEvent("click"));
+        });
+        await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(3);
+      }
     } finally {
       await pendingSwitch?.fulfill({ status: 500, json: { message: "Intentional test rollback" } });
       await apiCall.removeGraph(graphName);
     }
   });
+  }
 
   test("@admin a deletion updates the replacement canvas after a responsive remount", async () => {
     test.setTimeout(90000);
@@ -300,7 +350,7 @@ test.describe("Graph operation race conditions", () => {
     }
   });
 
-  for (const switchOwner of ["graph", "tab"] as const) {
+  for (const switchOwner of ["graph", "tab", "returned-tab"] as const) {
     test(`@admin a pending deletion cannot overwrite a different ${switchOwner}`, async () => {
       test.setTimeout(90000);
       const graphA = getRandomString("delete-owner-a");
@@ -329,7 +379,7 @@ test.describe("Graph operation race conditions", () => {
         await reachedDelete.promise;
         await graph.clickDeleteElementCancel();
 
-        if (switchOwner === "tab") {
+        if (switchOwner !== "graph") {
           await graph.addStripTab();
           await graph.renameStripTab("New tab", tabName);
           await graph.selectGraphByName(graphA);
@@ -342,13 +392,18 @@ test.describe("Graph operation race conditions", () => {
         const canvas = page.locator("falkordb-canvas");
         await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(3);
         const before = await canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.map(node => node.data));
+        if (switchOwner === "returned-tab") {
+          await graph.selectStripTab(graphA);
+          await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(2);
+        }
         const deleted = page.waitForResponse(response => response.request().method() === "DELETE"
           && response.url().includes(`/api/graph/${graphA}/`));
         releaseDelete();
         expect((await deleted).ok()).toBe(true);
         await expect(page.getByTestId("toast").filter({ hasText: "deleted" })).toBeVisible();
-        expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.map(node => node.data))).toEqual(before);
+        if (switchOwner !== "returned-tab") expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.map(node => node.data))).toEqual(before);
         if (switchOwner === "tab") await graph.selectStripTab(graphA);
+        else if (switchOwner === "returned-tab") await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(1);
         else await graph.selectGraphByName(graphA);
         await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.some(node => node.data.name === "delete-me"))).toBe(false);
       } finally {

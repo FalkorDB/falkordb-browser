@@ -22,7 +22,7 @@ import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { QueryStatistics } from "falkordb";
-import { ownsCanvasSession } from "@/lib/canvasSession";
+import { ownsCanvasSession, renewCanvasSession } from "@/lib/canvasSession";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
@@ -422,6 +422,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // are rejected while > 0); `switchTicket` is monotonic so a completing switch
   // can tell whether it is still the latest (out-of-order completions are ignored).
   const pendingSwitchesRef = useRef(0);
+  const switchOriginRef = useRef<string | null | undefined>(undefined);
   const switchTicketRef = useRef(0);
   // Rendered mirror of `pendingSwitchesRef`, for effects that must hold off
   // until a switch settles. The ref alone cannot wake them.
@@ -442,6 +443,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // end (on success via the reset effect, on failure/supersession by the caller),
   // so the counter can never get stuck above 0.
   const beginConnectionSwitch = useCallback(() => {
+    if (pendingSwitchesRef.current === 0) switchOriginRef.current = getActiveConnectionIdGlobal();
     pendingSwitchesRef.current += 1;
     switchTicketRef.current += 1;
     setSwitchPending(true);
@@ -1707,6 +1709,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   useEffect(() => {
     if (pendingSwitchesRef.current > 0) return;
     setActiveConnectionIdGlobal(activeConnectionId);
+    if (switchOriginRef.current === undefined) return;
+    const rolledBack = switchOriginRef.current === activeConnectionId;
+    switchOriginRef.current = undefined;
+    const canvas = canvasRef.current;
+    if (rolledBack && activeConnectionId && canvas) {
+      const state = sessionStateRef.current;
+      renewCanvasSession(canvas, {
+        graph: state.graph, data: state.data, tabId: activeCanvasTabRef.current,
+        epoch: getConnectionEpoch(), restore: state.graphData,
+      });
+    }
   });
 
   // Keep "Did you mean…?" function suggestions aware of the loaded UDFs.
