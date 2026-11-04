@@ -3094,7 +3094,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           restorePreTutorialState();
           return { status: "cancelled" };
         }
-        ownership = readTutorialDemoOwnership(scope, ownerId);
         currentGraphs = await fetchTutorialGraphList(cid);
         if (!isCurrent()) {
           restorePreTutorialState();
