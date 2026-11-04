@@ -210,6 +210,52 @@ test.describe("Data panel Tests", () => {
     await apicalls.removeGraph(graphName);
   });
 
+  for (const key of ["a?b", "c#d", "e/f", "g%h"]) {
+    test(`@readwrite Validate modifying attribute with reserved URL character key "${key}" updates that key only`, async () => {
+      const graphName = getRandomString("datapanel");
+      await apicalls.addGraph(graphName);
+      await apicalls.runQuery(
+        graphName,
+        `CREATE (:Person {name: "Alice", \`${key}\`: 1, a: 2, c: 3, e: 4, g: 5})`
+      );
+      const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+      await browser.setPageToFullScreen();
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+      await graph.clickRunQuery();
+      await graph.searchElementInCanvas("Alice");
+      await graph.setAttribute(key, "70", "integer");
+      // The UI save is async, so poll until it lands before checking the other keys.
+      await expect.poll(async () => {
+        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
+        return response.data[0].n.properties;
+      }, { timeout: 10000 }).toEqual({ name: "Alice", [key]: 70, a: 2, c: 3, e: 4, g: 5 });
+      await apicalls.removeGraph(graphName);
+    });
+
+    test(`@readwrite Validate removing attribute with reserved URL character key "${key}" removes that key only`, async () => {
+      const graphName = getRandomString("datapanel");
+      await apicalls.addGraph(graphName);
+      await apicalls.runQuery(
+        graphName,
+        `CREATE (:Person {name: "Alice", \`${key}\`: 1, a: 2, c: 3, e: 4, g: 5})`
+      );
+      const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+      await browser.setPageToFullScreen();
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+      await graph.clickRunQuery();
+      await graph.searchElementInCanvas("Alice");
+      await graph.removeAttribute(key);
+      // The UI save is async, so poll until it lands before checking the other keys.
+      await expect.poll(async () => {
+        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
+        return response.data[0].n.properties;
+      }, { timeout: 10000 }).toEqual({ name: "Alice", a: 2, c: 3, e: 4, g: 5 });
+      await apicalls.removeGraph(graphName);
+    });
+  }
+
   test(`@readwrite Validate modify attribute for node via API and validation via UI`, async () => {
     const graphName = getRandomString("datapanel");
     await apicalls.addGraph(graphName);

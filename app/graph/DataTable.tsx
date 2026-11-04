@@ -1,7 +1,8 @@
 'use client';
 
 import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Trash2, X } from "lucide-react";
-import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
+import getPropertyUrl from "@/lib/propertyUrl";
+import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
 import { formatValue, getDefaultValue, inferValueType, isGeoPoint, parseValue, VALUE_PLACEHOLDERS, VALUE_TYPES, type ValueType } from "@/lib/graphValues";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -287,7 +288,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
         }
         try {
             if (actionType === "set") setIsSetLoading(true);
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${isReadOnly ? '?readOnly=true' : ''}`, {
+            const result = await securedFetch(getPropertyUrl(graph.Id, id, key, isReadOnly), {
                 method: "POST",
                 body: JSON.stringify({
                     value: val,
@@ -405,7 +406,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
         try {
             setIsRemoveLoading(true);
             const { id } = object;
-            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${isReadOnly ? '?readOnly=true' : ''}`, {
+            const success = (await securedFetch(getPropertyUrl(graph.Id, id, key, isReadOnly), {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
             }, toast, setIndicator, cid)).ok;
