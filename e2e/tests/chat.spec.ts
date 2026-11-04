@@ -9,6 +9,24 @@ import { getRandomString } from "../infra/utils";
 
 const DEFAULT_CHAT_MODEL = "gpt-4o-mini";
 
+async function createChatPageWithGraphList(browser: BrowserWrapper, graphNames: string[]) {
+  const chat = await browser.createNewPage(ChatComponent);
+  const page = await browser.getPage();
+  await page.addInitScript(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
+    }
+  });
+  // A single graph is auto-selected, so parallel tests must not determine
+  // whether this page starts with a graph selected.
+  await page.route(url => url.pathname === "/api/graph", route =>
+    route.fulfill({ json: { opts: graphNames } }));
+  await page.goto(urls.graphUrl);
+  await page.waitForLoadState("networkidle");
+  await browser.setPageToFullScreen();
+  return chat;
+}
+
 async function createChatPageWithSettings(
   browser: BrowserWrapper,
   apiKey: string,
@@ -56,15 +74,11 @@ test.describe("Chat Feature Tests", () => {
   });
 
   test(`@readwrite Verify chat button is disabled when no graph is selected`, async () => {
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    
-    // Wait for the chat toggle button to render before checking state
-    await chat.waitForChatToggleButton();
-    const isChatButtonVisible = await chat.isChatToggleButtonVisible();
-    expect(isChatButtonVisible).toBe(true);
-    const isChatButtonDisabled = await chat.isChatToggleButtonDisabled();
-    expect(isChatButtonDisabled).toBe(true);
+    await createChatPageWithGraphList(browser, []);
+    const page = await browser.getPage();
+    await expect(page.getByTestId("selectGraph")).toBeDisabled();
+    await expect(page.getByTestId("chatToggleButton")).toBeVisible();
+    await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
   });
 
   test(`@readwrite Verify chat button is displayed when a graph is selected`, async () => {
@@ -72,16 +86,15 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
     
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    await chat.selectGraphByName(graphName);
-    
-    // Verify chat toggle button is visible when a graph is selected
-    await chat.waitForChatToggleButton();
-    const isChatButtonVisible = await chat.isChatToggleButtonVisible();
-    expect(isChatButtonVisible).toBe(true);
-    
-    await apiCall.removeGraph(graphName);
+    try {
+      await createChatPageWithGraphList(browser, [graphName]);
+      const page = await browser.getPage();
+      await expect(page.getByTestId("selectGraph")).toHaveText(graphName);
+      await expect(page.getByTestId("chatToggleButton")).toBeVisible();
+      await expect(page.getByTestId("chatToggleButton")).toBeEnabled();
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
   });
 
   test(`@readwrite Verify attempting to send a question without API key shows error`, async () => {
