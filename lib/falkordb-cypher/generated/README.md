@@ -59,6 +59,8 @@ npm run generate:grammar
 which (from within `.grammar-src/`, so the combined-grammar token file resolves)
 runs `antlr4ng -Dlanguage=TypeScript` on `Cypher.g4` and copies the emitted
 `CypherLexer.ts`, `CypherParser.ts`, `CypherListener.ts` up into `generated/`.
+The command also rewrites local generated imports to `.ts`, which lets Node's
+test runner load the generated parser directly.
 
 Then commit the regenerated `.ts` files. Day-to-day schema changes (labels,
 procedures, `algo.*`, `$params`) do **not** require regeneration — they are
