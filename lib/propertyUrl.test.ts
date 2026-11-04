@@ -25,6 +25,13 @@ describe("getPropertyUrl (#2205)", () => {
     assert.equal(getPropertyUrl("my graph#1", 3, "k", true), "api/graph/my%20graph%231/3/k?readOnly=true");
   });
 
+  it("encodes string element IDs without allowing query-parameter injection", () => {
+    const url = new URL(getPropertyUrl("g", "a/b?readOnly=false", "k", true), "http://localhost/");
+    assert.equal(url.pathname.split("/").length, 6);
+    assert.equal(decodeURIComponent(url.pathname.split("/")[4]), "a/b?readOnly=false");
+    assert.equal(url.searchParams.get("readOnly"), "true");
+  });
+
   it("preserves graph-name whitespace instead of targeting a trimmed graph (#2209)", () => {
     for (const graphId of [" trail", "trail ", " trail ", "\ttrail\n"]) {
       for (const readOnly of [false, true]) {
