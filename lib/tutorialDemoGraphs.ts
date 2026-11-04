@@ -65,6 +65,23 @@ export function getTutorialDemoReclaimableNames(ownership: TutorialDemoOwnership
   return ownership.names.filter(name => !pending.has(name));
 }
 
+export function completeTutorialDemoGraphSetup(
+  stored: string,
+  scope: string,
+  ownerId: string,
+  completedNames: string[],
+): TutorialDemoOwnership {
+  const ownership = parseTutorialDemoOwnership(stored, scope, ownerId);
+  if (completedNames.some(name => !ownership.names.includes(name))) {
+    throw new Error("Tutorial setup completion does not match its ownership record");
+  }
+  const completed = new Set(completedNames);
+  return {
+    ...ownership,
+    pendingNames: (ownership.pendingNames ?? ownership.names).filter(name => !completed.has(name)),
+  };
+}
+
 export function runTutorialDemoLoadOnce<T>(
   loads: Map<string, Promise<T>>,
   key: string,

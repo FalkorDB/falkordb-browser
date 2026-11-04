@@ -63,6 +63,11 @@ records keep their retry timestamp. Capability and offloaded-graph verification
 are bounded and cannot mark ordinary browsing offline. Browsing without ownership
 records does not wait for tutorial capability probes; unverifiable capabilities
 still block tutorial setup and cleanup rather than risk user graphs.
+Each connection activation waits for its own recovery. Mobile and shared-link
+visits also reclaim completed samples owned by the current tab when no tutorial
+will run. Confirmed setup results stay with their original validated ownership
+record after a connection switch. Closing the tutorial restores only graphs
+still present in a freshly verified list, never a reclaimed sample.
 
 ### Quick start
 

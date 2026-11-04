@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   isTutorialDemoGraphName,
   getTutorialDemoReclaimableNames,
+  completeTutorialDemoGraphSetup,
   isTutorialDemoOwnershipExpired,
   TUTORIAL_DEMO_OWNER_TTL_MS,
   parseTutorialDemoOwnership,
@@ -119,6 +120,25 @@ describe("tutorial demo graph ownership (#2202)", () => {
     for (const pendingNames of [null, "unknown", [42]]) {
       assert.throws(() => parseTutorialDemoOwnership(stored({ scope, ownerId, names, pendingNames }), scope, ownerId));
     }
+  });
+
+  it("records confirmed completion in the original scope without renewing its lease", () => {
+    const names = ["tutorial-social-demo-x", "tutorial-social-test-x"];
+    const ownership = completeTutorialDemoGraphSetup(
+      stored({ scope, ownerId, names, pendingNames: names, lastActiveAt: 123 }),
+      scope, ownerId, [names[0]],
+    );
+    assert.deepEqual(ownership.pendingNames, [names[1]]);
+    assert.equal(ownership.lastActiveAt, 123);
+    assert.deepEqual(getTutorialDemoReclaimableNames(ownership), [names[0]]);
+  });
+
+  it("never applies completion to a different owner, scope, or unrecorded graph", () => {
+    const names = ["tutorial-social-demo-x"];
+    const record = stored({ scope, ownerId, names, pendingNames: names });
+    assert.throws(() => completeTutorialDemoGraphSetup(record, "other:", ownerId, names));
+    assert.throws(() => completeTutorialDemoGraphSetup(record, scope, "other-owner", names));
+    assert.throws(() => completeTutorialDemoGraphSetup(record, scope, ownerId, ["tutorial-social-demo-unowned"]));
   });
 
   it("refuses a record that would delete a user's graph", () => {
