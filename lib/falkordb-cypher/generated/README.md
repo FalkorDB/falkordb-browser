@@ -26,6 +26,7 @@ community) — the same reference grammar that defines the whole Cypher language
 The Apache-2.0 attribution header is preserved in `.grammar-src/Cypher.g4` and
 must stay. It is **extended with FalkorDB-specific clauses**:
 
+- `CYPHER name=value …` parameter headers before a query
 - `FOREACH (x IN list | …)` — list-driven updates
 - `CALL { … }` — inline subqueries
 - `shortestPath(…)` / `allShortestPaths(…)` — shortest-path pattern functions
