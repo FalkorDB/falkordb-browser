@@ -47,6 +47,33 @@ export async function getSSEGraphResult(
     // Always get the admin token and add it to headers
     const adminHeaders = await getAdminToken();
     const mergedHeaders = { ...adminHeaders, ...headers };
+    const requestUrl = new URL(url);
+    const query = requestUrl.searchParams.get("query");
+
+    if (query !== null) {
+      const timeout = requestUrl.searchParams.get("timeout");
+      requestUrl.searchParams.delete("query");
+      requestUrl.searchParams.delete("timeout");
+      const response = await fetch(requestUrl.toString(), {
+        method: "POST",
+        headers: { ...mergedHeaders, Origin: requestUrl.origin, "Content-Type": "application/json" },
+        body: JSON.stringify({ query, timeout: timeout ?? 0 }),
+      });
+      const responseText = await response.text();
+      const event = responseText.split(/\r?\n\r?\n/).find((part) => part.startsWith("event:"));
+      if (!event) throw new Error(`Unexpected query response (${response.status})`);
+      const eventType = event.match(/^event:\s*(.+)$/m)?.[1];
+      const data = event
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).replace(/^ /, ""))
+        .join("\n");
+      if (!data) throw new Error("Query response did not contain event data");
+      const payload = JSON.parse(data);
+      if (eventType === "error") throw new Error(payload.message || "Query failed");
+      if (!response.ok) throw new Error(payload.message || `Query failed (${response.status})`);
+      return payload;
+    }
 
     return await new Promise((resolve, reject) => {
       let handled = false;

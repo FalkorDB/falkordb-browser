@@ -79,6 +79,54 @@ describe("API URL normalization", () => {
       setActiveConnectionIdGlobal(null);
     }
   });
+
+  it("posts query parameters as JSON while preserving connection routing", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { location: { href: "http://localhost/graph" } },
+    });
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init });
+      return new Response(
+        "event: result\ndata: {\"data\":[\ndata: {\"n\":1}\ndata: ]}\n\n",
+        { status: 200, headers: { "Content-Type": "text/event-stream" } },
+      );
+    }) as typeof fetch;
+
+    try {
+      const result = await getSSEGraphResult(
+        "api/graph/demo?query=RETURN%201&timeout=30&readOnly=true",
+        noopToast,
+        noopIndicator,
+        { connectionId: "conn-789", method: "POST" },
+      );
+
+      assert.deepEqual(result, { data: [{ n: 1 }] });
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].init?.method, "POST");
+      assert.equal(calls[0].init?.credentials, "same-origin");
+      assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
+        query: "RETURN 1",
+        timeout: "30",
+      });
+      const requestUrl = new URL(String(calls[0].input));
+      assert.equal(requestUrl.pathname, "/api/graph/demo");
+      assert.equal(requestUrl.searchParams.get("query"), null);
+      assert.equal(requestUrl.searchParams.get("timeout"), null);
+      assert.equal(requestUrl.searchParams.get("connectionId"), "conn-789");
+      assert.equal(requestUrl.searchParams.get("readOnly"), "true");
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalWindow) {
+        Object.defineProperty(globalThis, "window", originalWindow);
+      } else {
+        Reflect.deleteProperty(globalThis, "window");
+      }
+    }
+  });
 });
 
 type MockToast = { title?: unknown; description?: unknown; variant?: unknown };

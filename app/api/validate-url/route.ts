@@ -1,9 +1,21 @@
 import { FalkorDB } from "falkordb";
 import { NextRequest, NextResponse } from "next/server";
 import { validateBody, validateUrl } from "../validate-body";
+import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "../utils";
 
 
 export async function POST(request: NextRequest) {
+    if (!isRequestOriginTrusted(request)) {
+        return rejectUntrustedOrigin(request);
+    }
+
+    if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
+        return NextResponse.json(
+            { message: "Content-Type must be application/json" },
+            { status: 415, headers: getCorsHeaders(request) }
+        );
+    }
+
     let body: unknown;
     
     try {
@@ -11,7 +23,7 @@ export async function POST(request: NextRequest) {
     } catch {
         return NextResponse.json(
             { message: "Invalid JSON" },
-            { status: 400 }
+            { status: 400, headers: getCorsHeaders(request) }
         );
     }
 
@@ -20,7 +32,7 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
         return NextResponse.json(
             { message: validation.error },
-            { status: 400 }
+            { status: 400, headers: getCorsHeaders(request) }
         );
     }
 
@@ -34,10 +46,10 @@ export async function POST(request: NextRequest) {
             await client.close().catch(() => { /* already closed */ });
         } catch (err) {
             if (err instanceof Error && err.message.includes("NOAUTH")) {
-                return NextResponse.json({ result: true }, { status: 200 });
+                return NextResponse.json({ result: true }, { status: 200, headers: getCorsHeaders(request) });
             }
         }
     }
 
-    return NextResponse.json({ result: false }, { status: 200 });
+    return NextResponse.json({ result: false }, { status: 200, headers: getCorsHeaders(request) });
 }

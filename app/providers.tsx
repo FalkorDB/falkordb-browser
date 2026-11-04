@@ -1098,7 +1098,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         `/api/graph/${prepareArg(name)}?query=${prepareArg(query)}${readOnlyParam}`,
         gToast,
         gInd,
-        { connectionId: cid },
+        { connectionId: cid, method: "POST" },
       ) as { data?: Array<{ info?: unknown }> };
 
       if (superseded() || !sse || !Array.isArray(sse.data)) return [];
@@ -1215,6 +1215,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
         query: q,
         connectionId: cid,
+        method: "POST",
       }) as { data: Data; stats: QueryStatistics };
 
       if (!result) throw new Error("Failed to execute query");
@@ -1652,7 +1653,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   );
 
   const graphTabs = useGraphTabs({
-    prefixReady,
+    prefixReady: prefixReady && activeConnectionId !== null && activeConnectionId === prefixConnectionId,
     // Rebuilding a tab queries its graph, and querying a graph that has since
     // been dropped would make FalkorDB re-create it — wait for the list.
     canRestore: graphNamesLoaded,
@@ -2604,8 +2605,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // Both queries are hardcoded, so the SSE layer's parse/connection detail is
       // for the console, not the user — silence it and report once, below.
       const loads = await Promise.allSettled([
-        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid }),
-        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid })
+        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid, method: "POST" }),
+        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid, method: "POST" })
       ]);
 
       const failedLoad = loads.find((load): load is PromiseRejectedResult => load.status === "rejected");

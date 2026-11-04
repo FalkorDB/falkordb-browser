@@ -631,15 +631,16 @@ async function tryJWTAuthentication(): Promise<JWTAuthResult> {
 
       // Validate token is active in FalkorDB (not revoked)
       const tokenActive = await isTokenActive(token);
+      const patConnectionKey = `pat:${payload.jti}`;
 
       if (!tokenActive) {
         // eslint-disable-next-line no-console
         console.warn("JWT authentication failed: token is not active (revoked or expired)");
 
         // Clean up stale connection to prevent connection leak
-        const staleClient = connections.get(payload.sub);
+        const staleClient = connections.get(patConnectionKey);
         if (staleClient) {
-          connections.delete(payload.sub);
+          connections.delete(patConnectionKey);
           try {
             await staleClient.close();
           } catch (closeError) {
@@ -668,7 +669,7 @@ async function tryJWTAuthentication(): Promise<JWTAuthResult> {
       }
 
       // Try to reuse existing connection (performance optimization)
-      let client = connections.get(payload.sub);
+      let client = connections.get(patConnectionKey);
 
       if (client) {
         // Health check: verify connection is still alive
@@ -686,7 +687,7 @@ async function tryJWTAuthentication(): Promise<JWTAuthResult> {
           // Connection is dead, remove from pool and recreate
           // eslint-disable-next-line no-console
           console.warn("Connection health check failed, recreating:", pingError);
-          connections.delete(payload.sub);
+          connections.delete(patConnectionKey);
 
           try {
             await client.close();
@@ -712,7 +713,7 @@ async function tryJWTAuthentication(): Promise<JWTAuthResult> {
             cert: payload.cert || undefined,
             key: payload.key || undefined,
           },
-          payload.sub
+          patConnectionKey
         );
 
         client = reconnectedClient;
@@ -1114,7 +1115,15 @@ const authOptions: NextAuthConfig = {
       return token;
     },
     async redirect({ url, baseUrl }) {
-      return url.startsWith(baseUrl) ? url : baseUrl;
+      try {
+        const destination = new URL(url, baseUrl);
+        if (destination.origin === new URL(baseUrl).origin) {
+          return url.startsWith("/") ? new URL(url, baseUrl).toString() : url;
+        }
+      } catch {
+        // Invalid redirect destinations fall back to the application origin.
+      }
+      return baseUrl;
     },
     async session({ session, token }) {
       if (session.user) {

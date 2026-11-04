@@ -1,4 +1,4 @@
-import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, prepareArg, securedFetch, Query } from "@/lib/utils";
+import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, securedFetch, Query } from "@/lib/utils";
 import { getStatsLines } from "@/lib/queryStats";
 import { JSONTree } from "react-json-tree";
 import { useContext, useMemo, useState } from "react";
@@ -40,9 +40,11 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
         const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
         try {
-            const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
-            const result = await securedFetch(`/api/graph/${query.graphName}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
-                method: "GET",
+            const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+            const result = await securedFetch(`/api/graph/${query.graphName}/profile${readOnlyParam}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: query.text }),
             }, toast, setIndicator, cid);
 
             if (getConnectionEpoch() !== startEpoch) return;

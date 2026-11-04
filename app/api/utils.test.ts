@@ -2,6 +2,7 @@ import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import type { Graph } from "falkordb";
 import { runQuery } from "./run-query.ts";
+import { isRequestOriginTrusted } from "./utils.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,6 +43,62 @@ describe("runQuery", () => {
         await runQuery(graph, "MATCH (n) RETURN n", true);
         assert.equal(roQuerySpy.mock.callCount(), 1);
         assert.equal(querySpy.mock.callCount(), 0);
+    });
+
+    describe("isRequestOriginTrusted", () => {
+        const envKeys = ["ALLOWED_ORIGINS", "AUTH_URL", "NEXTAUTH_URL", "TRUST_PROXY_HEADERS"] as const;
+
+        it("requires a trusted origin for cookie-authenticated mutations", () => {
+            const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+            try {
+                process.env.AUTH_URL = "https://app.example";
+                delete process.env.ALLOWED_ORIGINS;
+                delete process.env.NEXTAUTH_URL;
+                delete process.env.TRUST_PROXY_HEADERS;
+
+                assert.equal(
+                    isRequestOriginTrusted(new Request("https://app.example/api/graph", {
+                        method: "POST",
+                        headers: { host: "app.example", origin: "https://app.example" },
+                    })),
+                    true,
+                );
+                assert.equal(
+                    isRequestOriginTrusted(new Request("https://app.example/api/graph", {
+                        method: "POST",
+                        headers: { host: "app.example", origin: "https://attacker.example" },
+                    })),
+                    false,
+                );
+                assert.equal(
+                    isRequestOriginTrusted(new Request("https://app.example/api/graph", {
+                        method: "POST",
+                        headers: { host: "app.example" },
+                    })),
+                    false,
+                );
+                assert.equal(
+                    isRequestOriginTrusted(new Request("https://app.example/api/graph", {
+                        method: "POST",
+                        headers: { host: "app.example", authorization: "Bearer token" },
+                    })),
+                    true,
+                );
+                assert.equal(
+                    isRequestOriginTrusted(new Request("https://app.example/api/graph", {
+                        method: "GET",
+                        headers: { host: "app.example" },
+                    })),
+                    true,
+                );
+            } finally {
+                for (const key of envKeys) {
+                    const value = originalEnv[key];
+                    if (value === undefined) delete process.env[key];
+                    else process.env[key] = value;
+                }
+            }
+        });
     });
 
     it("forwards options to roQuery when isReadOnly is true", async () => {

@@ -261,6 +261,7 @@ export default function LoginForm({
 
       const result = await securedFetch("/api/validate-url", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url })
       }, toast, setIndicator);
 

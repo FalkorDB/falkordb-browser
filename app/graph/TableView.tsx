@@ -50,8 +50,12 @@ export default function TableView() {
         if (!tableData) return "";
 
         const csvRows: string[] = [];
+        const csvCell = (value: string) => {
+            const safeValue = /^[\s\uFEFF]*[=+\-@]/.test(value) ? `'${value}` : value;
+            return `"${safeValue.replace(/"/g, '""')}"`;
+        };
 
-        csvRows.push(tableData.headers.map(header => `"${header}"`).join(','));
+        csvRows.push(tableData.headers.map(csvCell).join(','));
 
         graph.Data.forEach((row) => {
             const csvRow = tableData.headers.map((header) => {
@@ -59,11 +63,12 @@ export default function TableView() {
                 if (value === null || value === undefined) return '""';
 
                 if (typeof value === 'object') {
-                    return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+                    return csvCell(JSON.stringify(value));
                 }
 
-                const stringValue = String(value).replace(/"/g, '""');
-                return `"${stringValue}"`;
+                return typeof value === 'string'
+                    ? csvCell(value)
+                    : `"${String(value).replace(/"/g, '""')}"`;
             });
             csvRows.push(csvRow.join(','));
         });

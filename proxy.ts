@@ -137,7 +137,7 @@ async function isPreconfiguredSignIn(request: NextRequest): Promise<boolean> {
         if (request.headers.get("content-type")?.includes("application/json")) {
             return (JSON.parse(body) as { preconfigured?: unknown } | null)?.preconfigured === "true";
         }
-        return new URLSearchParams(body).get("preconfigured") === "true";
+        return new URLSearchParams(body).getAll("preconfigured").includes("true");
     } catch {
         // A body this cannot read is one Auth.js cannot read either, so it is
         // not a preconfigured sign-in.

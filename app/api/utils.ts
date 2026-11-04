@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
-export { runQuery } from "./run-query";
+import { NextResponse, type NextRequest } from "next/server.js";
+export { runQuery } from "./run-query.ts";
 
 const AUTO_NEXTAUTH_URL = "auto";
 const UNTRUSTED_REQUEST_ORIGIN_MESSAGE = "Untrusted request origin";
@@ -185,23 +185,19 @@ export function isOriginAllowed(requestOrigin?: string | null, request?: Request
 }
 
 export function isRequestOriginTrusted(request: Request): boolean {
-    if (!isAutoNextAuthUrl()) {
+    const requestOrigin = getRequestOrigin(request);
+    const callerOrigin = getHeaderOrigin(request);
+    if (callerOrigin) {
+        return Boolean(requestOrigin) &&
+            (callerOrigin === requestOrigin || isOriginAllowed(callerOrigin, request));
+    }
+
+    if (["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase())) {
         return true;
     }
 
-    const requestOrigin = getRequestOrigin(request);
-    if (!requestOrigin) {
-        return false;
-    }
-
-    const callerOrigin = getHeaderOrigin(request);
-
-    if (process.env.ALLOWED_ORIGINS) {
-        return isOriginAllowed(requestOrigin, request)
-            && (!callerOrigin || isOriginAllowed(callerOrigin, request));
-    }
-
-    return !callerOrigin || callerOrigin === requestOrigin || isSameOriginBrowserRequest(request);
+    return request.headers.get("authorization")?.startsWith("Bearer ") === true
+        || isSameOriginBrowserRequest(request);
 }
 
 export function shouldUseSecureCookies(request: Request): boolean {

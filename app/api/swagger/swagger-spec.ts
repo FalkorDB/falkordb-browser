@@ -596,8 +596,8 @@ const swaggerSpec = {
     "/api/graph/{graph}": {
       get: {
         tags: ["Graph"],
-        summary: "Execute graph query",
-        description: "Execute a Cypher query on the specified graph (Server-Sent Events)",
+        summary: "Execute a read-only graph query",
+        description: "Execute a read-only Cypher query on the specified graph (Server-Sent Events)",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -623,12 +623,12 @@ const swaggerSpec = {
           {
             in: "query",
             name: "timeout",
-            required: true,
+            required: false,
             schema: {
               type: "number"
             },
-            description: "Query timeout in milliseconds",
-            example: 30000
+            description: "Query timeout in seconds",
+            example: 30
           }
         ],
         responses: {
@@ -639,8 +639,8 @@ const swaggerSpec = {
       },
       post: {
         tags: ["Graph"],
-        summary: "Create or verify a graph",
-        description: "Create a new graph or verify that a graph exists",
+        summary: "Execute a query or verify a graph",
+        description: "Execute a Cypher query using a JSON body, or verify graph access when no query body is supplied",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -653,22 +653,24 @@ const swaggerSpec = {
             description: "Graph name to create or verify"
           }
         ],
-        responses: {
-          "200": {
-            description: "Graph created or verified successfully",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Graph created successfully"
-                    }
-                  }
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string", description: "Cypher query to execute" },
+                  timeout: { type: "number", description: "Query timeout in seconds" }
                 }
               }
             }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Query returns a Server-Sent Events stream; graph checks return JSON"
           },
           "400": {
             description: "Bad request"
@@ -803,7 +805,7 @@ const swaggerSpec = {
       }
     },
     "/api/graph/{graph}/profile": {
-      get: {
+      post: {
         tags: ["Graph"],
         summary: "Profile query execution",
         description: "Get detailed profiling information for a Cypher query",
@@ -818,16 +820,21 @@ const swaggerSpec = {
             },
             description: "Graph name"
           },
-          {
-            in: "query",
-            name: "query",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Cypher query to profile"
-          }
         ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string", description: "Cypher query to profile" }
+                }
+              }
+            }
+          }
+        },
         responses: {
           "200": {
             description: "Query profiling information returned successfully"

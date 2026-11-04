@@ -58,10 +58,11 @@ class FalkorDBTokenStorage implements ITokenStorage {
 
   // eslint-disable-next-line class-methods-use-this
   async fetchTokens(options: TokenFetchOptions): Promise<TokenData[]> {
-    // Filter by username + host + port for non-admin users
+    // Admins may manage any token for their own endpoint, but not tokens
+    // belonging to unrelated database connections.
     const userFilter = options.isAdmin
-      ? ""
-      : "AND t.username = $username AND t.host = $host AND t.port = $port";
+      ? "AND toLower(t.host) = toLower($host) AND t.port = $port"
+      : "AND t.username = $username AND toLower(t.host) = toLower($host) AND t.port = $port";
 
     // Only PAT rows are surfaced in the tokens listing. Session rows are
     // internal (rows missing a kind property are treated as 'pat' for
@@ -94,13 +95,11 @@ class FalkorDBTokenStorage implements ITokenStorage {
 
     const result = await executePATQuery(
       query,
-      options.isAdmin
-        ? {}
-        : {
-            username: options.username || '',
-            host: options.host || 'localhost',
-            port: options.port || 6379,
-          }
+      {
+        username: options.username || '',
+        host: options.host || 'localhost',
+        port: options.port || 6379,
+      }
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -17,6 +17,7 @@ function parseFalkorDBUrl(): {
   port: number;
   username?: string;
   password?: string;
+  tls: boolean;
 } {
   const url = process.env.API_TOKEN_FALKORDB_URL;
   
@@ -24,15 +25,26 @@ function parseFalkorDBUrl(): {
     try {
       // Parse URL (e.g., falkordb://localhost:6380 or falkordb://user:pass@localhost:6380)
       const parsed = new URL(url);
-      const host = parsed.hostname || "localhost";
+      if (!["falkor:", "falkors:", "redis:", "rediss:"].includes(parsed.protocol)) {
+        throw new Error("Unsupported API_TOKEN_FALKORDB_URL scheme");
+      }
+      if (!parsed.hostname) {
+        throw new Error("API_TOKEN_FALKORDB_URL must contain a database host");
+      }
+      const host = parsed.hostname;
       const port = parsed.port ? parseInt(parsed.port, 10) : 6380;
-      const username = parsed.username || "default";
-      const password = parsed.password || undefined;
+      const username = parsed.username ? decodeURIComponent(parsed.username) : "default";
+      const password = parsed.password ? decodeURIComponent(parsed.password) : undefined;
       
-      return { host, port, username, password };
+      return {
+        host,
+        port,
+        username,
+        password,
+        tls: parsed.protocol === "falkors:" || parsed.protocol === "rediss:",
+      };
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn("Failed to parse API_TOKEN_FALKORDB_URL, falling back to PAT_FALKORDB_* env vars:", err);
+      throw new Error("Invalid API_TOKEN_FALKORDB_URL", { cause: err });
     }
   }
   
@@ -42,6 +54,7 @@ function parseFalkorDBUrl(): {
     port: parseInt(process.env.PAT_FALKORDB_PORT || "6380", 10),
     username: process.env.PAT_FALKORDB_USERNAME || "default",
     password: process.env.PAT_FALKORDB_PASSWORD || undefined,
+    tls: false,
   };
 }
 
@@ -64,13 +77,14 @@ export async function getPATFalkorDBClient(): Promise<FalkorDB> {
   }
 
   // Get configuration from API_TOKEN_FALKORDB_URL or individual env vars
-  const { host, port, username, password } = parseFalkorDBUrl();
+  const { host, port, username, password, tls } = parseFalkorDBUrl();
 
   // Build connection options
   const connectionOptions: FalkorDBOptions = {
     socket: {
       host,
       port,
+      ...(tls ? { tls: true as const } : {}),
     },
     username: username || undefined,
     password: password || undefined,

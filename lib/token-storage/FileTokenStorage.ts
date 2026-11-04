@@ -141,8 +141,15 @@ class FileTokenStorage implements ITokenStorage {
     // internal and must never appear in the UI or API surface.
     let filtered = tokens.filter(t => t.is_active && (t.kind ?? 'pat') === 'pat');
 
-    // Apply role-based filtering
-    if (!options.isAdmin) {
+    // Admins may manage any token for their own endpoint, but not tokens
+    // belonging to unrelated database connections.
+    if (options.isAdmin) {
+      filtered = filtered.filter(
+        t =>
+          t.host.toLowerCase() === (options.host || 'localhost').toLowerCase() &&
+          t.port === (options.port || 6379)
+      );
+    } else {
       filtered = filtered.filter(
         t =>
           t.username === options.username &&
