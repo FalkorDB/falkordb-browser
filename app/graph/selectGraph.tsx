@@ -254,6 +254,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             toast({ title: "Error", description: "Graph name cannot be empty" });
             return false;
         }
+        if (option === optionName) return true;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const result = await securedFetch(
