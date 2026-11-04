@@ -60,6 +60,13 @@ docker run -p 3000:3000 -e "NEXTAUTH_URL=https://www.yoururl.com" -p 6379:6379 -
 
 For reverse-proxy deployments using `NEXTAUTH_URL=auto`, set `TRUST_PROXY_HEADERS=true` only when the proxy strips or overwrites incoming `X-Forwarded-Host` and `X-Forwarded-Proto` headers.
 
+URL login uses the authentication attempt itself to detect missing or invalid
+credentials and reveal the credential fields when needed. Connection failures
+show a separate error; no preliminary database probe is made. The former
+`/api/validate-url` endpoint and its `URL_VALIDATION_ALLOWED_DATABASES` setting
+have been removed. Normal login still accepts user-supplied database addresses,
+so deployments should restrict outbound network access as appropriate.
+
 > Note: the image ships no default `AUTH_SECRET`. If you do not supply one, a
 > random secret is generated per container, which means every session is
 > invalidated when the container is recreated. For anything long-lived, set your
@@ -328,5 +335,4 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
 

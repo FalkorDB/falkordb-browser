@@ -11,7 +11,6 @@ data:
   PORT: {{ .Values.env.port | quote }}
   REST_PORT: {{ .Values.env.restPort | quote }}
   CYPHER: {{ .Values.env.cypher | quote }}
-  URL_VALIDATION_ALLOWED_DATABASES: {{ join "," .Values.env.urlValidationAllowedDatabases | quote }}
   HOSTNAME: {{ .Values.env.hostname | quote }}
   API_TOKEN_STORAGE_PATH: {{ .Values.env.apiTokenStoragePath | quote }}
 {{- if .Values.connection.enabled }}

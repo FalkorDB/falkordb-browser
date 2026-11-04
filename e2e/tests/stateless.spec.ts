@@ -140,9 +140,7 @@ test.describe("Stateless server (SERVER_STATE=stateless)", () => {
     await expectServerClients();
   });
 
-  // Not specific to stateless mode: the route never caches its probe client.
-  // Compared with the clients held before it, so it checks this route alone.
-  test("@stateless Validating a URL closes its probe connection", async ({ request }) => {
+  test("@stateless Removed URL validation endpoint opens no connection", async ({ request }) => {
     const held = await serverClients();
     const before = await connectionsReceived();
 
@@ -150,10 +148,8 @@ test.describe("Stateless server (SERVER_STATE=stateless)", () => {
       data: { url: `falkor://${DB.host}:${DB.port}` },
       headers: { Origin: new URL(urls.localHost).origin },
     });
-    expect(response.status()).toBe(200);
-    expect(await response.json()).toEqual({ result: false });
-
-    expect(await connectionsReceived()).toBeGreaterThan(before);
+    expect(response.status()).toBe(404);
+    expect(await connectionsReceived()).toBe(before);
     await expectServerClients(held);
   });
 });

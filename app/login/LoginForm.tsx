@@ -1,14 +1,12 @@
 "use client";
 
-import { FormEvent, useContext, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Check, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
-import { IndicatorContext } from "../components/provider";
-import { useToast } from "@/components/ui/use-toast";
-import { securedFetch } from "@/lib/utils";
+import { LoginError } from "@/lib/login-errors";
 import { matchUrl, parseUrlString, validateUrl } from "./urlUtils";
 
 const DEFAULT_HOST = "localhost";
@@ -102,9 +100,6 @@ export default function LoginForm({
   initialUsername = "",
   initialTLS = false,
 }: LoginFormProps) {
-  const { toast } = useToast();
-  const { setIndicator } = useContext(IndicatorContext);
-
   const [loginMode, setLoginMode] = useState<LoginMode>("manual");
   const [missingFields, setMissingFields] = useState(false);
   const [rawUrl, setRawUrl] = useState("");
@@ -235,6 +230,13 @@ export default function LoginForm({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    let credentials = {
+      host: host.trim() || DEFAULT_HOST,
+      port: port.trim() || DEFAULT_PORT,
+      username,
+      password,
+      tls: TLS,
+    };
 
     // Pre-submit validation for URL mode
     if (loginMode === "url") {
@@ -250,6 +252,14 @@ export default function LoginForm({
       setRawUrl(url);
       setPort(p);
       setHost(h);
+      setTLS(parsed.tls);
+      credentials = {
+        host: h,
+        port: p,
+        username: parsed.username,
+        password: parsed.password,
+        tls: parsed.tls,
+      };
 
       if (parsed.username) {
         setUsername(parsed.username);
@@ -257,21 +267,6 @@ export default function LoginForm({
 
       if (parsed.password) {
         setPassword(parsed.password);
-      }
-
-      const result = await securedFetch("/api/validate-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url })
-      }, toast, setIndicator);
-
-      if (!result.ok) return;
-
-      const json = await result.json();
-
-      if (json.result) {
-        setMissingFields(true);
-        return;
       }
 
       const res = validateUrl(rawUrl || url);
@@ -326,16 +321,16 @@ export default function LoginForm({
 
     try {
       await onSubmit({
-        host: host.trim() || DEFAULT_HOST,
-        port: port.trim() || DEFAULT_PORT,
-        username,
-        password,
-        tls: TLS,
+        ...credentials,
         ca: CA,
         cert: clientCert,
         key: clientKey,
       });
     } catch (err) {
+      if (loginMode === "url" && err instanceof LoginError &&
+        (err.code === "credentials_required" || err.code === "invalid_credentials")) {
+        setMissingFields(true);
+      }
       const msg = err instanceof Error ? err.message : "Connection failed";
       setError({ message: <p className="text-xs text-destructive">{msg}</p>, show: true });
     }

@@ -1,4 +1,5 @@
 import CredentialsProvider from "next-auth/providers/credentials";
+import { CredentialsSignin } from "next-auth";
 import type { User } from "next-auth";
 import type { Role } from "next-auth";
 import type { NextAuthConfig } from "next-auth";
@@ -38,6 +39,14 @@ import {
   getAuthSecret,
 } from "../tokenUtils";
 import { authCredentials } from "../../validate-body";
+import { classifyLoginError } from "@/lib/login-errors";
+
+class DatabaseCredentialsSignin extends CredentialsSignin {
+  constructor(error: unknown) {
+    super();
+    this.code = classifyLoginError(error);
+  }
+}
 
 interface CustomJWTPayload {
   sub: string;
@@ -865,12 +874,12 @@ const authOptions: NextAuthConfig = {
           creds.tls = fromUrl.tls ? "true" : "false";
         }
 
-        try {
-          // Generate random UUID for this session and its first connection
-          const id = uuidv4();
-          const connId = uuidv4();
-          const key = sessionConnectionKey(id, connId);
+        // Generate random UUID for this session and its first connection
+        const id = uuidv4();
+        const connId = uuidv4();
+        const key = sessionConnectionKey(id, connId);
 
+        try {
           const { role } = await newClient(creds, key);
 
           // Opportunistically clean up expired tokens from storage.
@@ -939,7 +948,16 @@ const authOptions: NextAuthConfig = {
         } catch (err) {
           // eslint-disable-next-line no-console
           console.error("FalkorDB Client Connect Error", err);
-          return null;
+          const client = connections.get(key);
+          if (client) {
+            connections.delete(key);
+            try {
+              await client.close();
+            } catch (closeError) {
+              console.warn("Failed to close rejected login connection", closeError);
+            }
+          }
+          throw new DatabaseCredentialsSignin(err);
         }
       },
     }),

@@ -10,6 +10,25 @@ afterEach(() => {
 });
 
 describe("API URL normalization", () => {
+  it("preserves error response bodies for callers to inspect", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json(
+      { message: "Authentication failed", code: "credentials_required" },
+      { status: 400 },
+    );
+
+    try {
+      const response = await securedFetch("/api/connections", {}, noopToast, noopIndicator);
+      assert.equal(response.ok, false);
+      assert.deepEqual(await response.json(), {
+        message: "Authentication failed",
+        code: "credentials_required",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("normalizes relative securedFetch URLs to root-relative paths", async () => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];

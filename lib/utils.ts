@@ -933,7 +933,7 @@ export async function securedFetch(
   }
 
   if (status >= 300) {
-    const message = extractResponseErrorMessage(await response.text());
+    const message = extractResponseErrorMessage(await response.clone().text());
 
     const friendly = toUserFriendlyMessage(message, status);
     toast({

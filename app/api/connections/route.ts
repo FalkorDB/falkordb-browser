@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { addSessionConnection, getSessionFromRequest, listSessionConnections } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin, corsPreflight } from "@/app/api/utils";
 import { addConnection, validateBody } from "@/app/api/validate-body";
+import { classifyLoginError } from "@/lib/login-errors";
 
 export const OPTIONS = corsPreflight;
 
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { message },
+      { message, code: classifyLoginError(err) },
       { status, headers: getCorsHeaders(request) }
     );
   }

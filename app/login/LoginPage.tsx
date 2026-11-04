@@ -13,6 +13,7 @@ import Spinning from "@/app/components/ui/spinning";
 import Button from "@/app/components/ui/Button";
 import AppDownloadLink from "@/app/components/AppDownloadLink";
 import LoginForm, { LoginFormCredentials } from "./LoginForm";
+import { LoginError } from "@/lib/login-errors";
 
 const AUTO_CONNECT_FAILED =
   "Could not connect with the preconfigured connection. Check the FALKORDB_* environment variables and the server logs, then retry, or log in manually below.";
@@ -176,8 +177,8 @@ export default function LoginPage() {
 
     const res: SignInResponse | undefined = await signIn("credentials", params);
 
-    if (res?.error) {
-      throw new Error("Invalid credentials please recheck username and password or your connection settings. Check server logs for more info.");
+    if (!res || res.error) {
+      throw new LoginError(res?.code);
     }
 
     router.push("/graph");
