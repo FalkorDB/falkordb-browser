@@ -15,6 +15,9 @@ import type { UDFEntry } from "./utils.ts";
 // Source of truth: the generated ANTLR grammar tokens in
 // lib/falkordb-cypher/generated/.grammar-src/Cypher.g4.
 export const CYPHER_KEYWORDS = [
+  // Query prefix
+  "CYPHER",
+
   // Core query clauses
   "OPTIONAL MATCH",
   "MATCH",
