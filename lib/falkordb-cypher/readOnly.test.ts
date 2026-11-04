@@ -12,6 +12,7 @@ describe("isReadOnlyQuery (#2206)", () => {
     "RETURN 1 // CREATE (:Injected)\n",
     "RETURN 1 /* DELETE n */",
     "MATCH (n:Create) RETURN n.set",
+    "CALL { MATCH (n) RETURN n } RETURN n",
   ];
 
   for (const query of readOnly) {
@@ -34,7 +35,15 @@ describe("isReadOnlyQuery (#2206)", () => {
     "MATCH (n) RETURN n UNION CREATE (m:M) RETURN m",
     "CREATE INDEX FOR (n:Item) ON (n.name)",
     "CREATE VECTOR INDEX FOR (n:Item) ON (n.embedding)",
+    "FOREACH (x IN [1] | CREATE (:Dup))",
+    "DROP INDEX FOR (n:Item) ON (n.name)",
+    "CREATE CONSTRAINT FOR (n:Item) REQUIRE n.name IS UNIQUE",
+    "DROP CONSTRAINT FOR (n:Item) REQUIRE n.name IS UNIQUE",
+    "CYPHER p=1 CREATE (:Dup {value: $p})",
+    "RETURN 1; CREATE (:Dup)",
     "CALL db.labels()",
+    "CALL db.idx.vector.queryNodes('Item', 'embedding', 5, [1, 2])",
+    "CALL db.idx.fulltext.queryNodes('Item', 'search')",
     "MATCH (n) CALL db.labels() YIELD label RETURN label",
   ];
 

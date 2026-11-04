@@ -38,6 +38,8 @@ test.describe('Metadata Tests', () => {
         const profileResponse = page.waitForResponse((response) => response.url().includes('/profile?'));
         await metadataView.clickProfileButton();
         expect((await profileResponse).status()).toBe(400);
+        await expect(page.getByText("Profile only supports valid read-only Cypher queries; update clauses and CALL procedures are not profiled.", { exact: true })).toBeVisible();
+        await expect(page.getByText("Only read-only Cypher is profiled. CALL procedures, including read-only procedures, are not supported.", { exact: true })).toBeVisible();
         const result = await apiCalls.runQuery(GRAPH_NAME, "MATCH (n:ProfileDup) RETURN count(n) AS c");
         expect(Number(result.data[0].c)).toBe(1);
     });
