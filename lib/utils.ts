@@ -1526,11 +1526,87 @@ function hasCallBlockWithReturnNoLimit(query: string): boolean {
   return false;
 }
 
+function skipCypherTrivia(query: string, start: number): number {
+  let index = start;
+  while (index < query.length) {
+    if (/\s/.test(query[index])) {
+      index += 1;
+    } else if (query.startsWith("//", index)) {
+      while (index < query.length && query[index] !== "\n" && query[index] !== "\r") index += 1;
+    } else if (query.startsWith("/*", index)) {
+      const end = query.indexOf("*/", index + 2);
+      index = end === -1 ? query.length : end + 2;
+    } else {
+      break;
+    }
+  }
+  return index;
+}
+
+function readCypherIdentifierEnd(query: string, start: number): number {
+  const index = skipCypherTrivia(query, start);
+  if (query[index] === "`") {
+    let end = index + 1;
+    while (end < query.length) {
+      if (query[end] === "`") {
+        if (query[end + 1] === "`") {
+          end += 2;
+        } else {
+          return end + 1;
+        }
+      } else {
+        end += 1;
+      }
+    }
+    return -1;
+  }
+
+  const match = /^[\w]+/.exec(query.slice(index));
+  return match ? index + match[0].length : -1;
+}
+
+function hasCallTarget(query: string, start: number): boolean {
+  let index = skipCypherTrivia(query, start);
+  if (query[index] === "{") return true;
+
+  index = readCypherIdentifierEnd(query, index);
+  if (index === -1) return false;
+  index = skipCypherTrivia(query, index);
+
+  while (query[index] === ".") {
+    index = readCypherIdentifierEnd(query, index + 1);
+    if (index === -1) return false;
+    index = skipCypherTrivia(query, index);
+  }
+
+  return query[index] === "(";
+}
+
+// Comments are whitespace between CALL and its target. Reject punctuation
+// contexts such as labels and properties before checking for a target.
+function hasCallClause(query: string, code: string): boolean {
+  const callKeyword = /\bCALL\b/gi;
+  let match = callKeyword.exec(code);
+  while (match) {
+    const before = code.slice(0, match.index).trimEnd();
+    if (!/[.:$]$/.test(before) && hasCallTarget(query, match.index + match[0].length)) return true;
+    match = callKeyword.exec(code);
+  }
+  return false;
+}
+
 // Strings, comments and backtick identifiers are replaced with spaces in
 // `code` (newlines kept) so keyword checks only see actual Cypher tokens.
-function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
+function analyzeCypher(query: string): {
+  code: string;
+  lastCodeEnd: number;
+  lastNonTerminatorEnd: number;
+  quotedIdentifiers: { start: number; end: number }[];
+} {
   const code = query.split("");
   let lastCodeEnd = 0;
+  let lastNonTerminatorEnd = 0;
+  const quotedIdentifiers: { start: number; end: number }[] = [];
   let i = 0;
 
   const maskRange = (target: string[], start: number, end: number) => {
@@ -1582,14 +1658,19 @@ function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
       i = Math.min(query.length, i);
       maskRange(code, start, i);
       lastCodeEnd = i;
+      lastNonTerminatorEnd = i;
+      if (quote === "`") quotedIdentifiers.push({ start, end: i });
       continue;
     }
 
-    if (!/\s/.test(char)) lastCodeEnd = i + 1;
+    if (!/\s/.test(char)) {
+      lastCodeEnd = i + 1;
+      if (char !== ";") lastNonTerminatorEnd = i + 1;
+    }
     i += 1;
   }
 
-  return { code: code.join(""), lastCodeEnd };
+  return { code: code.join(""), lastCodeEnd, lastNonTerminatorEnd, quotedIdentifiers };
 }
 
 function insertLimit(query: string, analysis: { code: string; lastCodeEnd: number }, limit: number): string {
@@ -1597,10 +1678,61 @@ function insertLimit(query: string, analysis: { code: string; lastCodeEnd: numbe
   return `${query.slice(0, insertAt)} LIMIT ${limit}${query.slice(insertAt)}`;
 }
 
+function withoutTrailingSemicolons(query: string, analysis: ReturnType<typeof analyzeCypher>): string {
+  let result = "";
+  for (let index = 0; index < query.length; index += 1) {
+    if (
+      index >= analysis.lastNonTerminatorEnd &&
+      index < analysis.lastCodeEnd &&
+      analysis.code[index] === ";"
+    ) {
+      continue;
+    }
+    result += query[index];
+  }
+  return result;
+}
+
+function hasUnionClause(analysis: ReturnType<typeof analyzeCypher>): boolean {
+  const { code, quotedIdentifiers } = analysis;
+  const keyword = /\bUNION\b/gi;
+  let match = keyword.exec(code);
+  while (match) {
+    const unionStart = match.index;
+    const unionEnd = unionStart + match[0].length;
+    const before = code.slice(0, unionStart).trimEnd();
+    const after = code.slice(unionEnd);
+    const previousIdentifier = quotedIdentifiers.some(({ end }) =>
+      end <= unionStart && /^\s*$/.test(code.slice(end, unionStart)),
+    );
+    if (
+      (!/[.:$]$/.test(before) || previousIdentifier) &&
+      /^\s+(?:ALL\s+)?(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD|FOREACH)\b/i.test(after)
+    ) {
+      return true;
+    }
+    match = keyword.exec(code);
+  }
+  return false;
+}
+
+function wrapUnionQuery(query: string, code: string, limit: number): string {
+  const header = /^\s*CYPHER\b/i.exec(code);
+  if (!header) return `CALL { ${query}\n} RETURN * LIMIT ${limit}`;
+
+  const clause = /\b(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD\s+CSV|FOREACH|DELETE|SET|REMOVE)\b/gi;
+  clause.lastIndex = header[0].length;
+  const bodyStart = clause.exec(code)?.index;
+  if (bodyStart === undefined) return `CALL { ${query}\n} RETURN * LIMIT ${limit}`;
+
+  return `${query.slice(0, bodyStart)}CALL { ${query.slice(bodyStart)}\n} RETURN * LIMIT ${limit}`;
+}
+
 export function getQueryWithLimit(
   query: string,
   limit: number
 ): [string, number] {
+  query = withoutTrailingSemicolons(query, analyzeCypher(query));
   const analysis = analyzeCypher(query);
   let existingLimit = 0;
 
@@ -1613,13 +1745,13 @@ export function getQueryWithLimit(
 
   if (limit === 0) return [query, existingLimit];
 
-  if (query.includes("UNION")) {
-    if (!query.includes("CALL")) {
-      return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
+  if (hasUnionClause(analysis)) {
+    if (!hasCallClause(query, analysis.code)) {
+      return [wrapUnionQuery(query, analysis.code, limit), limit];
     }
 
-    if (hasCallBlockWithReturnNoLimit(query)) {
-      return [`${query} LIMIT ${limit}`, limit];
+    if (hasCallBlockWithReturnNoLimit(analysis.code)) {
+      return [insertLimit(query, analysis, limit), limit];
     }
   }
 
