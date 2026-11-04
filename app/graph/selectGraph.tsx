@@ -247,7 +247,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         return cells;
     }, [offloadedGraphs, showMemoryUsage, loadMemory, loadNodesCount, loadEdgesCount]);
 
-    const handleSetOption = useCallback(async (option: string, optionName: string) => {
+    const handleSetOption = useCallback(async (input: string, optionName: string) => {
+        const option = input.trim();
+        if (!option) {
+            toast({ title: "Error", description: "Graph name cannot be empty" });
+            return false;
+        }
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const result = await securedFetch(

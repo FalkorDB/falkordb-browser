@@ -449,6 +449,81 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName, "admin");
   });
 
+  test("@admin Duplicate trims new names and rejects whitespace-only input", async () => {
+    const source = getRandomString("duplicate");
+    const target = getRandomString("copy");
+    await apiCall.addGraph(source);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await graph.clickSelect();
+      await graph.clickManage();
+      await page.getByTestId("searchInputGraphs").fill(source);
+      await graph.clickTableCheckboxByName(source);
+      await graph.clickDuplicateGraphBtn();
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "PATCH" && new URL(request.url()).pathname.endsWith("/duplicate")) writes.push(request.url());
+      });
+      await graph.insertDuplicateGraphInput("   ");
+      await page.getByTestId("duplicateGraphConfirm").click();
+      await expect(page.getByText("Graph name cannot be empty", { exact: true })).toBeVisible();
+      expect(writes).toEqual([]);
+      await graph.insertDuplicateGraphInput(` ${target} `);
+      await page.getByTestId("duplicateGraphConfirm").click();
+      await expect.poll(async () => (await apiCall.getGraphs()).opts).toContain(target);
+      expect(writes).toHaveLength(1);
+      expect(decodeURIComponent(new URL(writes[0]).pathname.split("/")[3])).toBe(target);
+      expect((await apiCall.getGraphs()).opts).not.toContain(` ${target} `);
+    } finally {
+      await browser.closeBrowser();
+      await apiCall.removeGraph(source);
+      const { opts } = await apiCall.getGraphs();
+      if (opts.includes(target)) await apiCall.removeGraph(target);
+      if (opts.includes(` ${target} `)) await apiCall.removeGraph(encodeURIComponent(` ${target} `));
+    }
+  });
+
+  test("@admin Rename trims new names and rejects whitespace-only input", async () => {
+    const source = getRandomString("rename");
+    const target = getRandomString("renamed");
+    await apiCall.addGraph(source);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await graph.clickSelect();
+      await graph.clickManage();
+      await page.getByTestId("searchInputGraphs").fill(source);
+      const row = page.getByRole("row").filter({ has: page.getByTestId(`tableCheckboxGraphs${source}`) });
+      await row.hover();
+      await row.getByTestId("editButtonGraphs").click();
+      const input = row.getByTestId("inputGraphs");
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "PATCH" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
+      });
+      await input.fill("   ");
+      await input.press("Enter");
+      await expect(page.getByText("Graph name cannot be empty", { exact: true })).toBeVisible();
+      expect(writes).toEqual([]);
+      await expect(input).toBeVisible();
+      await input.fill(` ${target} `);
+      await input.press("Enter");
+      await expect.poll(async () => (await apiCall.getGraphs()).opts).toContain(target);
+      expect(writes).toHaveLength(1);
+      expect(decodeURIComponent(new URL(writes[0]).pathname.split("/")[3])).toBe(target);
+      expect((await apiCall.getGraphs()).opts).not.toContain(` ${target} `);
+    } finally {
+      await browser.closeBrowser();
+      const { opts } = await apiCall.getGraphs();
+      for (const name of [source, target, ` ${target} `]) {
+        if (opts.includes(name)) await apiCall.removeGraph(encodeURIComponent(name));
+      }
+    }
+  });
+
   test(`@admin Validate duplicate graph functionality via UI and verify via API`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
