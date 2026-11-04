@@ -251,6 +251,7 @@ type QueryLoadingContextType = {
 };
 
 type GraphTabsContextType = {
+  recoveryReady: boolean;
   /** Working contexts for the current connection, ordered left to right. */
   tabs: GraphTab[];
   activeTabId: string;
@@ -600,6 +601,7 @@ export const QueryLoadingContext = createContext<QueryLoadingContextType>({
 });
 
 export const GraphTabsContext = createContext<GraphTabsContextType>({
+  recoveryReady: false,
   tabs: [],
   activeTabId: "",
   maxTabs: DEFAULT_GRAPH_TABS,

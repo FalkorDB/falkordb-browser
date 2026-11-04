@@ -67,6 +67,19 @@ describe("tutorial demo graph names (#2202)", () => {
     assert.equal(calls, 1);
     assert.equal(loads.size, 0);
   });
+
+  it("isolates recovery scopes and releases failed work for retry", async () => {
+    const loads = new Map<string, Promise<string>>();
+    const first = runTutorialDemoLoadOnce(loads, "connection-a", async () => "a");
+    const second = runTutorialDemoLoadOnce(loads, "connection-b", async () => "b");
+    assert.notEqual(first, second);
+    assert.deepEqual(await Promise.all([first, second]), ["a", "b"]);
+    await assert.rejects(runTutorialDemoLoadOnce(loads, "connection-a", async () => {
+      throw new Error("probe failed");
+    }), /probe failed/);
+    assert.equal(loads.size, 0);
+    assert.equal(await runTutorialDemoLoadOnce(loads, "connection-a", async () => "retried"), "retried");
+  });
 });
 
 describe("tutorial demo graph ownership (#2202)", () => {

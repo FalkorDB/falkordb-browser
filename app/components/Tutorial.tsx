@@ -17,6 +17,7 @@ interface TutorialStep {
     description: string;
     position?: { top?: string; bottom?: string; left?: string; right?: string };
     targetSelector?: string;
+    demoGraphTarget?: boolean;
     spotlightSelector?: string;
     placementAxis?: "x" | "y";
     advanceOn?: string;
@@ -136,7 +137,7 @@ const tutorialSteps: TutorialStep[] = [
         title: "Select a Demo Graph",
         description: "Click on the tutorial's social demo graph to select and load it. It contains sample social network data with users, posts, and relationships that you can explore.",
         placementAxis: "x",
-        targetSelector: '[data-testid^="selectGraphtutorial-social-demo-"][data-testid$="Button"]',
+        demoGraphTarget: true,
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
         hidePrev: true
@@ -779,14 +780,23 @@ function destroySubMenuKeepAlive(state: SubMenuKeepAliveState): void {
     });
 }
 
+function getTutorialStep(step: number, demoGraphName: string): TutorialStep {
+    const current = tutorialSteps[step];
+    return current.demoGraphTarget
+        ? { ...current, targetSelector: demoGraphName ? `[data-testid="selectGraph${demoGraphName}Button"]` : undefined }
+        : current;
+}
+
 function TutorialPortal({
     step,
+    demoGraphName,
     onNext,
     onPrev,
     onClose,
     onGoToTrack
 }: {
     step: number;
+    demoGraphName: string;
     onNext: () => void;
     onPrev: () => void;
     onClose: () => void;
@@ -837,9 +847,9 @@ function TutorialPortal({
         }
     }, []);
 
-    const currentStep = tutorialSteps[step];
+    const currentStep = getTutorialStep(step, demoGraphName);
     const { targetSelector, advanceOn, forward, description, position, title, hidePrev, spotlightSelector, placementAxis } = currentStep;
-    const nextTargetSelector = tutorialSteps[step + 1]?.targetSelector;
+    const nextTargetSelector = step + 1 < tutorialSteps.length ? getTutorialStep(step + 1, demoGraphName).targetSelector : undefined;
 
     useEffect(() => {
         setMounted(true);
@@ -1768,7 +1778,7 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
     const { setLayout, setDirection, canvasRef } = useContext(ForceGraphContext);
 
-    const currentStep = tutorialSteps[step];
+    const currentStep = getTutorialStep(step, demoGraphName);
 
     // Load demo graphs when tutorial opens and auto-advance to step 1
     useEffect(() => {
@@ -1862,6 +1872,7 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
             <TutorialSpotlight targetSelector={currentStep.targetSelector} spotlightSelector={currentStep.spotlightSelector} passthrough={currentStep.passthrough || (currentStep.advanceOn === 'pointermove' && !!currentStep.advanceCondition)} />
             <TutorialPortal
                 step={step}
+                demoGraphName={demoGraphName}
                 onNext={handleNextStep}
                 onPrev={handlePrevStep}
                 onClose={handleClose}

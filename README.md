@@ -58,6 +58,11 @@ so they cannot recreate a sample that cleanup is removing.
 Samples whose setup did not confirm completion (including older ownership
 records without completion metadata) are retained for manual verification:
 an interrupted request could still create the graph after a reload.
+Only active tutorials renew ownership heartbeats; inactive failed-cleanup
+records keep their retry timestamp. Capability and offloaded-graph verification
+are bounded and cannot mark ordinary browsing offline. Browsing without ownership
+records does not wait for tutorial capability probes; unverifiable capabilities
+still block tutorial setup and cleanup rather than risk user graphs.
 
 ### Quick start
 

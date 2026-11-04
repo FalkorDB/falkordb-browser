@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, Loader2, Settings, X } from "lucide-react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, BrowserSettingsContext, ConnectionContext } from "../components/provider";
+import { IndicatorContext, BrowserSettingsContext, ConnectionContext, GraphTabsContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
@@ -45,6 +45,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { recoveryReady } = useContext(GraphTabsContext);
     const isMobile = useIsMobile();
     const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const {
@@ -59,10 +60,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     // an offloaded graph disappears from the UI instead of showing as offloaded.
     const safeOptions = useMemo(() => {
         const opts = options ?? [];
-        const missing = offloadedGraphs.filter((name) => !opts.includes(name));
+        const missing = tutorialOpen ? [] : offloadedGraphs.filter((name) => !opts.includes(name));
 
         return missing.length ? [...opts, ...missing].sort((a, b) => a.localeCompare(b)) : opts;
-    }, [options, offloadedGraphs]);
+    }, [options, offloadedGraphs, tutorialOpen]);
+    const canRefreshRef = useRef(false);
+    canRefreshRef.current = recoveryReady && !tutorialOpen;
 
     const inputRef = useRef<HTMLInputElement>(null);
     // Monotonic sequence so two overlapping graph-list refreshes on the SAME
@@ -150,6 +153,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
 
     const getOptions = useCallback(async () => {
+        if (!canRefreshRef.current) return;
         // Pin the refresh to the connection active when it started and discard a
         // stale result if the connection changed mid-flight (epoch), a mutation
         // published a confirmed list (generation) or a newer refresh on the same
@@ -158,7 +162,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         const startEpoch = getConnectionEpoch();
         const generation = getGraphListGeneration();
         const cid = getActiveConnectionIdGlobal();
-        const isCurrent = () => getConnectionEpoch() === startEpoch
+        const isCurrent = () => canRefreshRef.current && getConnectionEpoch() === startEpoch
             && getGraphListGeneration() === generation
             && optionsSeqRef.current === seq;
         const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
@@ -327,13 +331,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     // the list (and with it the offloaded stubs) on the same interval the rest
     // of the app polls with, on top of the refresh done when the list is opened.
     useEffect(() => {
-        if (status !== "authenticated" || indicator === "offline") return undefined;
+        if (status !== "authenticated" || indicator === "offline" || !recoveryReady || tutorialOpen) return undefined;
 
         const seconds = Number.isFinite(refreshInterval) && refreshInterval > 0 ? refreshInterval : 30;
         const interval = setInterval(() => { getOptions(); }, seconds * 1000);
 
         return () => clearInterval(interval);
-    }, [status, indicator, refreshInterval, getOptions]);
+    }, [status, indicator, refreshInterval, getOptions, recoveryReady, tutorialOpen]);
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o);

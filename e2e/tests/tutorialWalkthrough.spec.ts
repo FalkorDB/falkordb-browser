@@ -150,7 +150,7 @@ test.describe("Tutorial", () => {
         }
     });
 
-    for (const [webLocks, ownRecord, failedCleanup] of [[true, false, false], [false, false, false], [true, true, false], [false, false, true]]) {
+    for (const [webLocks, ownRecord, failedCleanup] of [[true, false, false], [false, false, false], [true, true, false], [false, false, true], [false, true, true]]) {
         test(`@admin app startup reclaims recorded abandoned tutorials only (Web Locks ${webLocks}, own record ${ownRecord}, failed cleanup ${failedCleanup})`, async () => {
             test.setTimeout(90_000);
             const suffix = getRandomString("owner").replaceAll("_", "-");
@@ -196,6 +196,7 @@ test.describe("Tutorial", () => {
                         : route.continue());
                 }
                 await page.goto(urls.graphUrl);
+                if (ownRecord && !webLocks) await page.reload();
                 if (failedCleanup) {
                     await expect(page.getByText("Tutorial cleanup failed", { exact: true })).toBeVisible({ timeout: 30000 });
                     expect((await apiCall.getGraphs()).opts).toContain(orphan);
@@ -251,24 +252,36 @@ test.describe("Tutorial", () => {
         const gate = new Promise<void>(resolve => { release = resolve; });
         let started!: () => void;
         const deletionStarted = new Promise<void>(resolve => { started = resolve; });
+        let finished!: () => void;
+        const deletionFinished = new Promise<void>(resolve => { finished = resolve; });
+        let deletionPending = false;
         const queries: string[] = [];
+        let listReads = 0;
         let deleted = false;
-        await page.route(url => url.pathname === "/api/graph", route => route.fulfill({
-            json: { opts: deleted ? [] : [name], ...(deleted ? {} : { autoSelect: name }) },
-        }));
+        await page.route(url => url.pathname === "/api/graph", route => {
+            listReads += 1;
+            return route.fulfill({ json: { opts: deleted ? [] : [name] } });
+        });
         await page.route(url => url.pathname === `/api/graph/${name}` || url.pathname.startsWith(`/api/graph/${name}/`), async route => {
             if (route.request().method() === "DELETE") {
+                deletionPending = true;
                 started();
-                await gate;
-                const response = await route.fetch();
-                deleted = response.ok();
-                return route.fulfill({ response });
+                try {
+                    await gate;
+                    const response = await route.fetch();
+                    deleted = response.ok();
+                    await route.fulfill({ response });
+                    return;
+                } finally {
+                    finished();
+                }
             }
             queries.push(route.request().url());
             return route.fulfill({ status: 400, json: { message: "Unexpected query during tutorial recovery" } });
         });
         await page.addInitScript(({ ownershipKey, ownerId, name, scope, tab, tabsKey }) => {
             localStorage.setItem("tutorial", "false");
+            localStorage.setItem("refreshInterval", "1");
             localStorage.setItem(ownershipKey, JSON.stringify({
                 scope, ownerId, names: [name], pendingNames: [], lastActiveAt: Date.now() - 25 * 60 * 60 * 1000,
             }));
@@ -277,6 +290,10 @@ test.describe("Tutorial", () => {
         try {
             await page.goto(`${urls.graphUrl}?tab=${tab.id}`);
             await deletionStarted;
+            const readsBeforePolling = listReads;
+            await page.clock.install();
+            await page.clock.runFor(2000);
+            expect(listReads).toBe(readsBeforePolling);
             expect(queries).toEqual([]);
             release();
             await expect.poll(() => page.evaluate(key => localStorage.getItem(key), ownershipKey)).toBeNull();
@@ -285,13 +302,14 @@ test.describe("Tutorial", () => {
             expect((await apiCall.getGraphs()).opts).not.toContain(name);
         } finally {
             release();
+            if (deletionPending) await deletionFinished;
             await browser.closeBrowser();
             const { message } = await apiCall.removeGraph(name, "admin");
             expect(message).toMatch(/deleted|empty key/);
         }
     });
 
-    for (const failedVerification of [false, true]) {
+    for (const failedVerification of [false, true, "stalled"] as const) {
         test(`@admin cleanup verifies offloaded tutorial samples (failed verification ${failedVerification})`, async () => {
             test.setTimeout(60_000);
             const suffix = getRandomString("offloaded").replaceAll("_", "-");
@@ -304,10 +322,16 @@ test.describe("Tutorial", () => {
             let exists = true;
             let deletes = 0;
             let stubReads = 0;
+            let listReads = 0;
+            await page.route(url => url.pathname === "/api/graph", route => {
+                listReads += 1;
+                return route.fulfill({ json: { opts: [] } });
+            });
             await page.route("**/api/DBVersion", route =>
                 route.fulfill({ json: { result: ["graph", 999999], enterprise: true } }));
             await page.route("**/api/graph/stubs", route => {
                 stubReads += 1;
+                if (failedVerification === "stalled") return;
                 return failedVerification
                     ? route.fulfill({ status: 503, json: { message: "Unavailable stubs" } })
                     : route.fulfill({ json: { stubs: exists ? [name] : [] } });
@@ -329,6 +353,7 @@ test.describe("Tutorial", () => {
                 await expect(page.getByText("Tutorial cleanup failed", { exact: true })).toBeVisible({ timeout: 30000 });
                 expect(deletes).toBe(0);
                 expect(await page.evaluate(key => localStorage.getItem(key), ownershipKey)).not.toBeNull();
+                await expect.poll(() => listReads, { timeout: 30000 }).toBeGreaterThan(1);
             } else {
                 await expect.poll(() => deletes, { timeout: 30000 }).toBe(1);
                 await expect.poll(() => page.evaluate(key => localStorage.getItem(key), ownershipKey)).toBeNull();
@@ -337,6 +362,71 @@ test.describe("Tutorial", () => {
             expect(stubReads).toBeGreaterThan(0);
         });
     }
+
+    test("@admin tutorial selection targets its owned sample, not an offloaded user graph", async () => {
+        test.setTimeout(60_000);
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        const unowned = "tutorial-social-demo-00000000-user";
+        const unownedQueries: string[] = [];
+        await page.route("**/api/DBVersion", route => route.fulfill({ json: { result: ["graph", 999999], enterprise: true } }));
+        await page.route("**/api/graph/stubs", route => route.fulfill({ json: { stubs: [unowned] } }));
+        await page.route(url => url.pathname === `/api/graph/${unowned}` || url.pathname.startsWith(`/api/graph/${unowned}/`), route => {
+            unownedQueries.push(route.request().url());
+            return route.fulfill({ status: 400, json: { message: "Must not query the unowned graph" } });
+        });
+        await page.goto(urls.graphUrl);
+        await tutorial.changeLocalStorage("true");
+        await page.reload();
+        let completed = false;
+        try {
+            await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+            await tutorial.clickNextButton();
+            await tutorial.waitForStep("Select a Graph");
+            await tutorial.clickTutorialTarget('[data-testid="selectGraph"]');
+            await tutorial.waitForStep("Manage Graphs");
+            await tutorial.clickTutorialTarget('[data-testid="manageGraphs"]');
+            await tutorial.waitForStep("Manage Graphs Window");
+            await tutorial.clickNextButton();
+            await tutorial.waitForStep("Close Manage Graphs Window");
+            await tutorial.clickTutorialTarget('[data-testid="closeManage"]');
+            await tutorial.waitForStep("Select a Demo Graph");
+            await expect(page.getByTestId(`selectGraph${unowned}Button`)).toHaveCount(0);
+            const option = page.locator('[data-testid^="selectGraphtutorial-social-demo-"][data-testid$="Button"]').first();
+            const optionId = await option.getAttribute("data-testid");
+            if (!optionId) throw new Error("Owned tutorial sample option is missing");
+            await tutorial.clickTutorialTarget(`[data-testid="${optionId}"]`);
+            await tutorial.waitForStep("Graph Info Panel");
+            await expect(page.getByTestId("selectGraph")).toContainText(optionId.slice("selectGraph".length, -"Button".length));
+            expect(unownedQueries).toEqual([]);
+            completed = true;
+        } finally {
+            if (completed) {
+                await page.getByTestId("skipTutorial").click();
+                await expect(page.getByTestId("tutorialSpotlight")).toBeHidden({ timeout: 30000 });
+            }
+        }
+    });
+
+    test("@admin ordinary startup does not wait for tutorial capabilities without ownership records", async () => {
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        await page.route("**/api/DBVersion", route => route.fulfill({ status: 503, json: { message: "Capability probe unavailable" } }));
+        let listReads = 0;
+        await page.route(url => url.pathname === "/api/graph", route => {
+            listReads += 1;
+            return route.fulfill({ json: { opts: [] } });
+        });
+        await page.addInitScript(() => {
+            if (localStorage.getItem("tutorial") === null) localStorage.setItem("tutorial", "false");
+        });
+        await page.goto(urls.graphUrl);
+        await expect.poll(() => listReads, { timeout: 8000 }).toBeGreaterThan(0);
+        await tutorial.changeLocalStorage("true");
+        await page.reload();
+        await expect(page.getByText("Tutorial unavailable", { exact: true })).toBeVisible({ timeout: 8000 });
+        await expect(page.getByTestId("skipTutorial")).toBeHidden();
+    });
 
     test("@admin startup retains ownership while tutorial graph creation may still finish", async () => {
         test.setTimeout(60_000);
