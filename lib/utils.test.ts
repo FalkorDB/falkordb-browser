@@ -14,15 +14,38 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
     assert.deepEqual(getQueryWithLimit(trailingComment, 300), ["MATCH (n) RETURN n LIMIT 300 // UNION", 300]);
   });
 
-  it("places auto LIMIT before a trailing semicolon", () => {
+  it("removes trailing statement terminators before adding LIMIT", () => {
     assert.deepEqual(
       getQueryWithLimit("MATCH (n) RETURN n;", 300),
-      ["MATCH (n) RETURN n LIMIT 300;", 300],
+      ["MATCH (n) RETURN n LIMIT 300", 300],
     );
     assert.deepEqual(
       getQueryWithLimit("MATCH (n) RETURN n; // done", 300),
-      ["MATCH (n) RETURN n LIMIT 300; // done", 300],
+      ["MATCH (n) RETURN n LIMIT 300 // done", 300],
     );
+    assert.deepEqual(getQueryWithLimit("RETURN n;;", 300), ["RETURN n LIMIT 300", 300]);
+    assert.deepEqual(getQueryWithLimit("RETURN n; ; // done", 300), ["RETURN n LIMIT 300 // done", 300]);
+    assert.deepEqual(getQueryWithLimit("RETURN ';';", 300), ["RETURN ';' LIMIT 300", 300]);
+    assert.deepEqual(getQueryWithLimit("RETURN n LIMIT 5;", 300), ["RETURN n LIMIT 5", 5]);
+    assert.deepEqual(getQueryWithLimit("RETURN n;", 0), ["RETURN n", 0]);
+  });
+
+  it("does not mistake UNION identifiers for clauses", () => {
+    for (const identifier of ["n:Union", "n : Union", "n:UNION", "n:union"]) {
+      const query = `MATCH (${identifier}) SET n.x = 1`;
+      assert.deepEqual(getQueryWithLimit(query, 300), [query, 0]);
+      const limited = `MATCH (${identifier}) RETURN n LIMIT 5`;
+      assert.deepEqual(getQueryWithLimit(limited, 300), [limited, 5]);
+    }
+    for (const expression of ["n.union", "n . UNION", "{union: 1}", "$union", "union"]) {
+      const query = `MATCH (n) RETURN ${expression}`;
+      assert.deepEqual(getQueryWithLimit(query, 300), [`${query} LIMIT 300`, 300]);
+    }
+  });
+
+  it("wraps lowercase union all clauses", () => {
+    const query = "return 1 as n union all return 2 as n";
+    assert.deepEqual(getQueryWithLimit(query, 300), [`CALL { ${query}\n} RETURN * LIMIT 300`, 300]);
   });
 
   it("wraps actual UNION queries without retaining a trailing semicolon", () => {

@@ -1610,21 +1610,38 @@ function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
 }
 
 function insertLimit(query: string, analysis: { code: string; lastCodeEnd: number }, limit: number): string {
-  let insertAt = analysis.lastCodeEnd;
-  if (analysis.code[insertAt - 1] === ";") insertAt -= 1;
+  const insertAt = analysis.lastCodeEnd;
   return `${query.slice(0, insertAt)} LIMIT ${limit}${query.slice(insertAt)}`;
 }
 
-function withoutTrailingSemicolon(query: string, analysis: { code: string; lastCodeEnd: number }): string {
-  const semicolonAt = analysis.lastCodeEnd - 1;
-  if (analysis.code[semicolonAt] !== ";") return query;
-  return `${query.slice(0, semicolonAt)}${query.slice(semicolonAt + 1)}`;
+function withoutTrailingSemicolons(query: string, lastCodeEnd: number): string {
+  let end = lastCodeEnd;
+  while (end > 0 && query[end - 1] === ";") {
+    end -= 1;
+    while (end > 0 && /\s/.test(query[end - 1])) end -= 1;
+  }
+  return `${query.slice(0, end)}${query.slice(lastCodeEnd)}`;
+}
+
+function hasUnionClause(code: string): boolean {
+  const keyword = /\bUNION\b/gi;
+  let match = keyword.exec(code);
+  while (match) {
+    const before = code.slice(0, match.index).trimEnd();
+    const after = code.slice(match.index + match[0].length);
+    if (!/[.:$]$/.test(before) && /^\s+(?:ALL\s+)?(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD|FOREACH)\b/i.test(after)) {
+      return true;
+    }
+    match = keyword.exec(code);
+  }
+  return false;
 }
 
 export function getQueryWithLimit(
   query: string,
   limit: number
 ): [string, number] {
+  query = withoutTrailingSemicolons(query, analyzeCypher(query).lastCodeEnd);
   const analysis = analyzeCypher(query);
   let existingLimit = 0;
 
@@ -1637,10 +1654,9 @@ export function getQueryWithLimit(
 
   if (limit === 0) return [query, existingLimit];
 
-  if (/\bUNION\b/i.test(analysis.code)) {
+  if (hasUnionClause(analysis.code)) {
     if (!hasCallClause(query, analysis.code)) {
-      const body = withoutTrailingSemicolon(query, analysis);
-      return [`CALL { ${body}\n} RETURN * LIMIT ${limit}`, limit];
+      return [`CALL { ${query}\n} RETURN * LIMIT ${limit}`, limit];
     }
 
     if (hasCallBlockWithReturnNoLimit(analysis.code)) {
