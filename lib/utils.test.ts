@@ -7,6 +7,10 @@ const noopIndicator = () => {};
 
 describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
   it("does not wrap a query whose string or comment mentions UNION", () => {
+    for (const keyword of ["UNION", "CALL"]) {
+      const write = `CREATE (:Book {title:'${keyword} station'})`;
+      assert.deepEqual(getQueryWithLimit(write, 300), [write, 0]);
+    }
     const unionString = "MATCH (n) WHERE n.name = 'European UNION' RETURN n";
     assert.deepEqual(getQueryWithLimit(unionString, 300), [`${unionString} LIMIT 300`, 300]);
 
