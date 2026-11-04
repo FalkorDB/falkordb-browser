@@ -297,6 +297,8 @@ does not discard an unrelated addition. Selecting a key while a mutation is
 pending takes precedence over that mutation's automatic selection.
 Deleting the selected key clears the selection instead of choosing another key,
 including after a reload or connection round trip.
+Temporary saved-key loading failures preserve the stored keys and selection
+for recovery on the next successful load.
 Deleting a key does not clear a newer selection's loaded model. Typing a newer
 edit while an earlier save is pending keeps that draft open instead of saving
 and closing the outdated value.

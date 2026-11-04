@@ -592,8 +592,10 @@ export default function BrowserSettings() {
                 // Rebase only after an actual commit, never because another
                 // mutation merely started and might still fail or be cancelled.
                 if (keyStateRef.current !== snapshot) continue;
-                // A later explicit selection wins over an add/edit's default.
-                const commitSelectedId = keySelectionGenerationRef.current === selectionGeneration ? selectedId : snapshot.selectedId;
+                // A later selection wins only if the mutation did not remove it.
+                const keepLaterSelection = keySelectionGenerationRef.current !== selectionGeneration
+                    && (!snapshot.selectedId || keys.some(({ id }) => id === snapshot.selectedId));
+                const commitSelectedId = keepLaterSelection ? snapshot.selectedId : selectedId;
                 const selectedApiKey = commitSelectedId ? getSelectedChatApiKey(keys, commitSelectedId) : undefined;
                 const nextSelectedId = selectedApiKey?.id ?? "";
                 if (keys.length > 0) {

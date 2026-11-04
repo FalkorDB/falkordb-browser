@@ -452,6 +452,106 @@ test.describe('@browser Browser Settings tests', () => {
         });
     }
 
+    test('@readwrite a temporary saved-key decryption failure preserves the selected preference and ciphertext', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        const suffix = getRandomString("decrypt");
+        const firstKey = `sk-e2e-${suffix}-first`;
+        const secondKey = `sk-e2e-${suffix}-second`;
+        const model = "gpt-4o-mini";
+        await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [model] } }));
+        await settings.expandChatSection();
+        await settings.selectApiKeyModelSource();
+        await settings.waitForChatApiKeyInputEnabled();
+        await settings.addChatApiKey(firstKey);
+        await expect(page.getByTestId(`selectModel${model}`)).toHaveAttribute("data-selected", "true");
+        await settings.addChatApiKey(secondKey);
+        await expect(page.getByTestId(`selectModel${model}`)).toHaveAttribute("data-selected", "true");
+        const savedState = () => page.evaluate(() => {
+            const keys = Object.keys(localStorage).filter(name =>
+                name.endsWith(":chatApiKeys") || name.endsWith(":selectedChatApiKeyId"));
+            return Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)]));
+        });
+        const saved = await savedState();
+        const selectedId = await page.getByTestId("chatApiKeyCard").filter({
+            has: page.getByTestId("chatApiKeyValue").filter({ hasText: secondKey.slice(-4) }),
+        }).getAttribute("data-api-key-id");
+        let failedDecrypts = 0;
+        await page.route("**/api/encrypt", route => {
+            if (route.request().postDataJSON().action !== "decrypt") return route.continue();
+            failedDecrypts += 1;
+            return route.fulfill({ status: 503, json: { error: "Simulated temporary decryption failure" } });
+        });
+        await page.clock.install();
+        await page.reload({ waitUntil: "networkidle" });
+        await settings.expandChatSection();
+        await expect.poll(() => failedDecrypts).toBeGreaterThan(0);
+        await page.clock.runFor(1000);
+        await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(0);
+        expect(await savedState()).toEqual(saved);
+        await page.unroute("**/api/encrypt");
+        await page.reload({ waitUntil: "networkidle" });
+        await settings.expandChatSection();
+        await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(2);
+        await expect(page.locator(`[data-api-key-id="${selectedId}"]`).getByTestId("selectChatApiKeyButton"))
+            .toHaveAttribute("aria-pressed", "true");
+        await page.clock.runFor(1000);
+        await expect(page.getByTestId(`selectModel${model}`)).toHaveAttribute("data-selected", "true");
+        expect(await savedState()).toEqual(saved);
+        await settings.deleteChatApiKey(secondKey);
+        await settings.deleteChatApiKey(firstKey);
+    });
+
+    test('@readwrite selecting the key being deleted while encryption is pending leaves no key selected', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        const suffix = getRandomString("delete-selection");
+        const firstKey = `sk-e2e-${suffix}-first`;
+        const secondKey = `sk-e2e-${suffix}-second`;
+        const model = "gpt-4o-mini";
+        await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [model] } }));
+        await settings.expandChatSection();
+        await settings.selectApiKeyModelSource();
+        await settings.waitForChatApiKeyInputEnabled();
+        await settings.addChatApiKey(firstKey);
+        await expect(page.getByTestId(`selectModel${model}`)).toHaveAttribute("data-selected", "true");
+        await settings.addChatApiKey(secondKey);
+        await settings.selectChatApiKey(firstKey);
+        const secondCard = page.getByTestId("chatApiKeyCard").filter({
+            has: page.getByTestId("chatApiKeyValue").filter({ hasText: secondKey.slice(-4) }),
+        });
+        const encryption = await delayNextKeyEncryption(page);
+        try {
+            await secondCard.getByTestId("deleteChatApiKeyButton").click();
+            await page.getByTestId("confirmDeleteChatApiKeyButton").click();
+            await encryption.started;
+            await page.getByTestId("deleteChatApiKeyDialog").getByRole("button", { name: "Close", exact: true }).click();
+            await expect(page.getByTestId("deleteChatApiKeyDialog")).toBeHidden();
+            await settings.selectChatApiKey(secondKey);
+            await expect(secondCard.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "true");
+            await expect(page.getByTestId(`selectModel${model}`)).toHaveAttribute("data-selected", "true");
+            encryption.release();
+            await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
+            await expect(page.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "false");
+            expect(await page.evaluate(() => {
+                const key = Object.keys(localStorage).find(name => name.endsWith(":selectedChatApiKeyId"));
+                return key ? localStorage.getItem(key) : null;
+            })).toBe("");
+            expect(await page.evaluate(() => localStorage.getItem("model"))).toBe("");
+            await page.clock.install();
+            await page.reload({ waitUntil: "networkidle" });
+            await settings.expandChatSection();
+            await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
+            await page.clock.runFor(1000);
+            await expect(page.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "false");
+            await expect(page.getByTestId(`selectModel${model}`)).toHaveCount(0);
+            await settings.deleteChatApiKey(firstKey);
+        } finally {
+            encryption.release();
+            await page.unrouteAll({ behavior: "wait" });
+        }
+    });
+
     test('@readwrite deleting the selected key does not select another key or reload its models', async () => {
         const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         const page = await browser.getPage();
@@ -481,12 +581,21 @@ test.describe('@browser Browser Settings tests', () => {
             const key = Object.keys(localStorage).find(key => key.endsWith(":selectedChatApiKeyId"));
             return key ? localStorage.getItem(key) : null;
         })).toBe("");
-        await page.reload();
+        await page.clock.install();
+        await page.reload({ waitUntil: "networkidle" });
         await settings.expandChatSection();
         await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
-        await expect(page.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "false");
-        await expect(page.getByTestId(`selectModel${model}`)).toHaveCount(0);
-        expect(modelLoads).toEqual([]);
+        for (const interval of [100, 400, 1000]) {
+            await page.clock.runFor(interval);
+            await expect(page.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "false");
+            await expect(page.getByTestId(`selectModel${model}`)).toHaveCount(0);
+            expect(modelLoads).toEqual([]);
+        }
+        // Positive control: the same clock advances a real selection's debounce.
+        await settings.selectChatApiKey(firstKey);
+        await page.clock.runFor(1000);
+        await expect.poll(() => modelLoads).toEqual([firstKey]);
+        await expect(page.getByTestId(`selectModel${model}`)).toHaveAttribute("data-selected", "true");
         await settings.deleteChatApiKey(firstKey);
     });
 

@@ -2213,6 +2213,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             // The value belongs to another connection. Keep it: switching back
             // to that connection restores access.
             console.warn('Stored API keys belong to a different connection, leaving them untouched');
+            return;
           } else if (error instanceof ServerDecryptError && error.status === 400) {
             // The only permanent refusal: the value predates owner binding and
             // can never be read again.
@@ -2223,6 +2224,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             // A 5xx or a dropped request says nothing about the value itself;
             // deleting on one would destroy a perfectly good key.
             console.error('Failed to decrypt API keys, keeping them for a later attempt:', error);
+            // Runtime credentials were cleared before loading. Do not turn a
+            // failed load into a persisted deselection or a legacy migration.
+            return;
           }
         }
       }
