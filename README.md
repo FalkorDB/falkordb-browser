@@ -334,3 +334,4 @@ Optimize failures close the dialog and show only a toast with the Settings actio
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
 
+
