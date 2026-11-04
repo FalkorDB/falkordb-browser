@@ -93,7 +93,10 @@ test.describe("Chat Feature Tests", () => {
       await expect(page.getByTestId("chatToggleButton")).toBeVisible();
       await expect(page.getByTestId("chatToggleButton")).toBeEnabled();
     } finally {
-      await apiCall.removeGraph(graphName);
+      await browser.closeBrowser();
+      const { message } = await apiCall.removeGraph(graphName, "admin");
+      expect(message).toMatch(/deleted|empty key/);
+      expect((await apiCall.getGraphs()).opts).not.toContain(graphName);
     }
   });
 

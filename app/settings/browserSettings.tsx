@@ -123,6 +123,11 @@ export default function BrowserSettings() {
     // its edit was cancelled or replaced can be recognised before it commits.
     const editGenerationRef = useRef(0);
     const keyMutationGenerationRef = useRef(0);
+    type ChatKeyState = { keys: typeof chatApiKeys; selectedId: string };
+    const keyStateRef = useRef<ChatKeyState>({ keys: chatApiKeys, selectedId: selectedChatApiKeyId });
+    useEffect(() => {
+        keyStateRef.current = { keys: chatApiKeys, selectedId: selectedChatApiKeyId };
+    }, [chatApiKeys, selectedChatApiKeyId]);
     useEffect(() => () => {
         editGenerationRef.current += 1;
         keyMutationGenerationRef.current += 1;
@@ -519,12 +524,9 @@ export default function BrowserSettings() {
     };
 
     const persistChatApiKeys = async (
-        keys: typeof chatApiKeys,
-        selectedId: string,
+        update: (current: ChatKeyState) => ChatKeyState,
         isCurrent: () => boolean = () => true,
     ): Promise<boolean> => {
-        const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
-        const nextSelectedId = selectedApiKey?.id ?? "";
         // `serverEncrypt` binds the ciphertext to the connection behind the
         // request, while the storage prefix is resolved only once the promise
         // settles. If the user switches connections in between, writing would
@@ -550,21 +552,10 @@ export default function BrowserSettings() {
         }
         const scope = getConnectionPrefix();
         const epoch = getConnectionEpoch();
-        const mutationGeneration = ++keyMutationGenerationRef.current;
+        const mutationGeneration = keyMutationGenerationRef.current;
 
         try {
-            if (keys.length > 0) {
-                const encryptedKeys = await serverEncrypt(JSON.stringify(keys));
-                if (!encryptedKeys) {
-                    toast({
-                        title: "Error",
-                        description: "Could not encrypt API keys. Please try again.",
-                        variant: "destructive",
-                    });
-                    return false;
-                }
-                // Every mutation writes the full list, so an older add/edit/delete
-                // must not commit after a newer mutation has started.
+            for (;;) {
                 if (keyMutationGenerationRef.current !== mutationGeneration || !isCurrent()) return false;
                 if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
                     toast({
@@ -574,20 +565,49 @@ export default function BrowserSettings() {
                     });
                     return false;
                 }
-                setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
-            } else {
-                removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
-            }
-            // The legacy single-key setting is superseded once this connection
-            // has its own list — but only if the value is ours to drop. A
-            // server-encrypted one may belong to another connection, which the
-            // loader deliberately preserves so switching back recovers it.
-            const legacySecretKey = localStorage.getItem("secretKey");
-            if (legacySecretKey && !looksServerEncrypted(legacySecretKey)) {
-                localStorage.removeItem("secretKey");
-            }
+                const snapshot = keyStateRef.current;
+                const { keys, selectedId } = update(snapshot);
+                const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
+                const nextSelectedId = selectedApiKey?.id ?? "";
+                const encryptedKeys = keys.length > 0 ? await serverEncrypt(JSON.stringify(keys)) : "";
+                if (keyMutationGenerationRef.current !== mutationGeneration || !isCurrent()) return false;
+                if (keys.length > 0 && !encryptedKeys) {
+                    toast({
+                        title: "Error",
+                        description: "Could not encrypt API keys. Please try again.",
+                        variant: "destructive",
+                    });
+                    return false;
+                }
+                if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
+                    toast({
+                        title: "Error",
+                        description: "The connection changed while saving. Please try again.",
+                        variant: "destructive",
+                    });
+                    return false;
+                }
+                // Rebase only after an actual commit, never because another
+                // mutation merely started and might still fail or be cancelled.
+                if (keyStateRef.current !== snapshot) continue;
+                if (keys.length > 0) {
+                    setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+                } else {
+                    removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
+                }
+                // Keep legacy ciphertext that may belong to another connection.
+                const legacySecretKey = localStorage.getItem("secretKey");
+                if (legacySecretKey && !looksServerEncrypted(legacySecretKey)) {
+                    localStorage.removeItem("secretKey");
+                }
 
-            persistSelectedChatApiKeyId(nextSelectedId);
+                persistSelectedChatApiKeyId(nextSelectedId);
+                keyStateRef.current = { keys, selectedId: nextSelectedId };
+                setChatApiKeys(keys);
+                setSelectedChatApiKeyId(nextSelectedId);
+                setSecretKey(selectedApiKey?.key ?? "");
+                return true;
+            }
         } catch (error) {
             console.error('Failed to encrypt API keys:', error);
             toast({
@@ -597,11 +617,6 @@ export default function BrowserSettings() {
             });
             return false;
         }
-
-        setChatApiKeys(keys);
-        setSelectedChatApiKeyId(nextSelectedId);
-        setSecretKey(selectedApiKey?.key ?? "");
-        return true;
     };
 
     const handleSaveKey = async () => {
@@ -615,17 +630,20 @@ export default function BrowserSettings() {
             const provider = detectProviderFromApiKey(trimmedKey);
             const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
             const id = crypto.randomUUID();
-            const nextKeys = [
-                ...chatApiKeys,
-                {
-                    id,
-                    label: `${providerName} key ${chatApiKeys.filter(item => item.provider === provider).length + 1}`,
-                    key: trimmedKey,
-                    provider,
-                    createdAt: Date.now(),
-                },
-            ];
-            const saved = await persistChatApiKeys(nextKeys, id);
+            const createdAt = Date.now();
+            const saved = await persistChatApiKeys(({ keys }) => ({
+                keys: [
+                    ...keys,
+                    {
+                        id,
+                        label: `${providerName} key ${keys.filter(item => item.provider === provider).length + 1}`,
+                        key: trimmedKey,
+                        provider,
+                        createdAt,
+                    },
+                ],
+                selectedId: id,
+            }));
             if (saved) {
                 setKeyInput("");
             }
@@ -690,20 +708,19 @@ export default function BrowserSettings() {
 
         const provider = detectProviderFromApiKey(trimmedKey);
         const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
-        const nextKeys = chatApiKeys.map(item => item.id === id
-            ? {
-                ...item,
-                key: trimmedKey,
-                provider,
-                label: item.label || `${providerName} key`,
-            }
-            : item);
         // Each save attempt takes its own generation, so a newer submission of
         // the same edit supersedes an older one that is still encrypting.
         editGenerationRef.current += 1;
         const generation = editGenerationRef.current;
-        const isCurrentEdit = () => editGenerationRef.current === generation && editingKeyVisibilityRef.current?.id === id;
-        const saved = await persistChatApiKeys(nextKeys, id, isCurrentEdit);
+        const isCurrentEdit = () => editGenerationRef.current === generation
+            && editingKeyVisibilityRef.current?.id === id
+            && keyStateRef.current.keys.some(item => item.id === id);
+        const saved = await persistChatApiKeys(({ keys }) => ({
+            keys: keys.map(item => item.id === id
+                ? { ...item, key: trimmedKey, provider, label: item.label || `${providerName} key` }
+                : item),
+            selectedId: id,
+        }), isCurrentEdit);
         if (saved && isCurrentEdit()) {
             editGenerationRef.current += 1;
             restoreEditingKeyVisibility(id);
@@ -713,9 +730,10 @@ export default function BrowserSettings() {
     };
 
     const handleDeleteKey = async (id: string) => {
-        const nextKeys = chatApiKeys.filter(item => item.id !== id);
-        const nextSelectedId = selectedChatApiKeyId === id ? nextKeys[0]?.id ?? "" : selectedChatApiKeyId;
-        const saved = await persistChatApiKeys(nextKeys, nextSelectedId);
+        const saved = await persistChatApiKeys(({ keys, selectedId }) => ({
+            keys: keys.filter(item => item.id !== id),
+            selectedId: selectedId === id ? "" : selectedId,
+        }));
         if (!saved) return;
 
         if (selectedChatApiKeyId === id) {

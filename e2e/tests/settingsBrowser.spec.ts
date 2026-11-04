@@ -328,7 +328,7 @@ test.describe('@browser Browser Settings tests', () => {
     }
 
     for (const mutation of ["delete", "add"] as const) {
-        test(`@readwrite ${mutation} of another key supersedes a pending edit save`, async () => {
+        test(`@readwrite ${mutation} of another key is preserved when a pending edit finishes`, async () => {
             const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
             const page = await browser.getPage();
             await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
@@ -356,21 +356,101 @@ test.describe('@browser Browser Settings tests', () => {
                     && response.request().postData()?.includes(staleKey) === true);
                 release();
                 await (await staleResponse).finished();
-                await page.waitForTimeout(500);
+                await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);
                 // Reload verifies the full encrypted list, not just optimistic UI state.
                 await page.reload({ waitUntil: "networkidle" });
                 await settings.expandChatSection();
-                await expect.poll(() => settings.isChatApiKeyPresent(apiKey)).toBe(true);
+                const retainedKey = mutation === "delete" ? staleKey : apiKey;
+                await expect.poll(() => settings.isChatApiKeyPresent(retainedKey)).toBe(true);
                 expect(await settings.isChatApiKeyPresent(otherKey)).toBe(mutation === "add");
-                expect(await settings.getMaskedChatApiKeyText(apiKey)).toContain(apiKey.slice(-4));
+                expect(await settings.getMaskedChatApiKeyText(retainedKey)).toContain(retainedKey.slice(-4));
                 if (mutation === "add") await settings.deleteChatApiKey(otherKey);
-                await settings.deleteChatApiKey(apiKey);
+                await settings.deleteChatApiKey(retainedKey);
             } finally {
                 release();
                 await page.unrouteAll({ behavior: "wait" });
             }
         });
     }
+
+    for (const successor of ["cancel", "fail", "save"] as const) {
+        test(`@readwrite a pending API key addition survives a later edit that will ${successor}`, async () => {
+            const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+            const page = await browser.getPage();
+            await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
+            const apiKey = `sk-e2e-rebase-${getRandomString("key")}`;
+            const addedKey = `${apiKey}-added`;
+            const editedKey = `${apiKey}-edited`;
+            await settings.expandChatSection();
+            await settings.selectApiKeyModelSource();
+            await settings.waitForChatApiKeyInputEnabled();
+            await settings.addChatApiKey(apiKey);
+            const addition = await delayNextKeyEncryption(page);
+            let edit: Awaited<ReturnType<typeof delayNextKeyEncryption>> | undefined;
+            try {
+                await settings.fillChatApiKey(addedKey);
+                await page.getByTestId("addChatApiKeyButton").click();
+                await addition.started;
+                await settings.startChatApiKeyEdit(apiKey, editedKey);
+                if (successor === "fail") {
+                    await page.route("**/api/encrypt", route => route.fulfill({ status: 503, json: { message: "Simulated encryption failure" } }), { times: 1 });
+                } else if (successor === "cancel") {
+                    edit = await delayNextKeyEncryption(page);
+                }
+                await page.getByTestId("saveEditedChatApiKeyButton").click();
+                if (successor === "cancel") {
+                    await edit!.started;
+                    await page.getByTestId("editChatApiKeyButton").filter({ hasText: "Cancel edit" }).click();
+                    edit!.release();
+                } else if (successor === "fail") {
+                    await expect(page.getByText("Could not encrypt API keys. Please try again.", { exact: true })).toBeVisible();
+                } else {
+                    await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);
+                }
+                addition.release();
+                await expect.poll(() => settings.isChatApiKeyPresent(addedKey)).toBe(true);
+                await page.reload({ waitUntil: "networkidle" });
+                await settings.expandChatSection();
+                const retainedKey = successor === "save" ? editedKey : apiKey;
+                await expect.poll(() => settings.isChatApiKeyPresent(retainedKey)).toBe(true);
+                expect(await settings.isChatApiKeyPresent(addedKey)).toBe(true);
+                await settings.deleteChatApiKey(addedKey);
+                await settings.deleteChatApiKey(retainedKey);
+            } finally {
+                addition.release();
+                edit?.release();
+                await page.unrouteAll({ behavior: "wait" });
+            }
+        });
+    }
+
+    test('@readwrite API key editing remains available while its models are loading', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        const apiKey = `sk-e2e-loading-${getRandomString("key")}`;
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        await page.route("**/api/chat/models**", async route => {
+            await gate;
+            await route.fulfill({ json: { models: [] } });
+        });
+        try {
+            await settings.expandChatSection();
+            await settings.selectApiKeyModelSource();
+            await settings.waitForChatApiKeyInputEnabled();
+            await settings.addChatApiKey(apiKey);
+            await expect(page.getByTestId("chatApiKeyCard").filter({
+                has: page.getByTestId("chatApiKeyValue").filter({ hasText: apiKey.slice(-4) }),
+            }).getByTestId("selectChatApiKeyButton")).toBeDisabled();
+            expect(await settings.startChatApiKeyEdit(apiKey, `${apiKey}-edited`)).toBe("text");
+            await expect(page.getByTestId("chatApiKeyEditInput")).toHaveValue(`${apiKey}-edited`);
+            await page.getByTestId("editChatApiKeyButton").filter({ hasText: "Cancel edit" }).click();
+        } finally {
+            release();
+            await page.unrouteAll({ behavior: "wait" });
+        }
+        await settings.deleteChatApiKey(apiKey);
+    });
 
     test('@readwrite masked key collisions preserve the identity of the edited and deleted card', async () => {
         const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
@@ -394,6 +474,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(await settings.getVisibleChatApiKeyText(firstKey)).toBe(firstKey);
         await settings.showChatApiKey(editedKey);
         expect(await settings.getVisibleChatApiKeyText(editedKey)).toBe(editedKey);
+        expect(await settings.isChatApiKeyPresent(secondKey)).toBe(false);
         await page.reload({ waitUntil: "networkidle" });
         await settings.expandChatSection();
         await settings.deleteChatApiKey(editedKey);
@@ -407,8 +488,8 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         const page = await browser.getPage();
         await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
-        const apiKey = `sk-e2e-${getRandomString("key")}`;
-        const editedApiKey = `sk-e2e-edited-${getRandomString("key")}`;
+        const apiKey = `sk-e2e-${getRandomString("key")}-old1`;
+        const editedApiKey = `sk-e2e-edited-${getRandomString("key")}-new2`;
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.selectApiKeyModelSource();
@@ -420,6 +501,9 @@ test.describe('@browser Browser Settings tests', () => {
         expect(maskedKeyText).toContain(apiKey.slice(-4));
 
         expect(await settingsBrowserPage.editChatApiKey(apiKey, editedApiKey)).toBe("text");
+        expect(await settingsBrowserPage.isChatApiKeyPresent(apiKey)).toBe(false);
+        expect(await settingsBrowserPage.editChatApiKey(editedApiKey, editedApiKey)).toBe("text");
+        expect(await settingsBrowserPage.isChatApiKeyPresent(editedApiKey)).toBe(true);
         expect(await settingsBrowserPage.getChatApiKeyVisibilityLabel(editedApiKey)).toBe("Show");
         const editedMaskedKeyText = await settingsBrowserPage.getMaskedChatApiKeyText(editedApiKey);
         expect(editedMaskedKeyText).toContain(editedApiKey.slice(0, 6));

@@ -384,7 +384,7 @@ export default class SettingsBrowserPage extends BasePage {
 
   async startChatApiKeyEdit(currentApiKey: string, nextApiKey: string): Promise<string | null> {
     const card = this.getChatApiKeyCard(currentApiKey);
-    await expect(card.getByTestId("selectChatApiKeyButton")).toBeEnabled();
+    await expect(card.getByTestId("editChatApiKeyButton")).toBeEnabled();
     await interactWhenVisible(
       card.getByTestId("editChatApiKeyButton"),
       (el) => el.click(),
@@ -413,11 +413,14 @@ export default class SettingsBrowserPage extends BasePage {
       (el) => el.click(),
       "Save Edited Chat API Key Button"
     );
-    this.chatApiKeyIds.set(nextApiKey, id);
     await expect.poll(async () => {
-      const text = await this.getChatApiKeyCard(nextApiKey).getByTestId("chatApiKeyValue").textContent();
+      const text = await this.chatApiKeyCards
+        .and(this.page.locator(`[data-api-key-id=${JSON.stringify(id)}]`))
+        .getByTestId("chatApiKeyValue").textContent();
       return text === nextApiKey || text === this.getMaskedApiKey(nextApiKey);
     }, { timeout: 10000 }).toBe(true);
+    this.chatApiKeyIds.delete(currentApiKey);
+    this.chatApiKeyIds.set(nextApiKey, id);
     return inputType;
   }
 

@@ -290,6 +290,11 @@ It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without exe
 the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
 If index metadata is unavailable, analysis continues with an explicit warning.
 
+API keys remain editable while models load. Saving or cancelling an edit restores
+the key's previous visibility. Pending key additions, edits, and deletions are
+rebased onto the latest committed list, so cancelling or failing another edit
+does not discard an unrelated addition.
+
 Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 **Insert into editor** actions. Neither action runs the query. The card adapts to
 mobile screens, and long Chat queries can be collapsed.
@@ -328,5 +333,4 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
 
