@@ -30,7 +30,11 @@ export const DESKTOP_RELEASE_BASE = "https://github.com/FalkorDB/falkordb-browse
 
 export const MACOS_INSTALL_GUIDANCE = {
     title: "Install on macOS",
-    description: "Open the DMG and drag FalkorDB Browser to Applications. For legacy unsigned releases only, see the desktop README for Gatekeeper guidance.",
+    description: "Open the DMG and drag FalkorDB Browser to Applications. For legacy unsigned releases only, see the recovery instructions below. Only use the workaround if you trust the official release.",
+    hintLink: {
+        href: "https://github.com/FalkorDB/falkordb-browser/blob/main/desktop/README.md#legacy-macos-gatekeeper",
+        label: "Legacy macOS recovery instructions",
+    },
     duration: 10_000,
 };
 

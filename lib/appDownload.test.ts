@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
     APP_PROMPT_DISMISSED_KEY,
     APP_PROMPT_SHOWN_KEY,
     DESKTOP_FILES,
     DESKTOP_RELEASE_BASE,
+    MACOS_INSTALL_GUIDANCE,
     detectPlatform,
     dismissAppPrompt,
     ANDROID_DOWNLOAD_ROUTE,
@@ -19,6 +21,18 @@ import {
     resolveReleaseFile,
     shouldShowAppPrompt,
 } from "./appDownload.ts";
+
+test("macOS guidance links directly to the documented legacy recovery steps and trust caveat", () => {
+    const guidance = MACOS_INSTALL_GUIDANCE;
+    assert.deepEqual(guidance.hintLink, {
+        href: "https://github.com/FalkorDB/falkordb-browser/blob/main/desktop/README.md#legacy-macos-gatekeeper",
+        label: "Legacy macOS recovery instructions",
+    });
+    assert.match(guidance.description, /Only use the workaround if you trust the official release/);
+    const documentation = readFileSync(new URL("../desktop/README.md", import.meta.url), "utf8");
+    assert.match(documentation, /^## Legacy macOS Gatekeeper$/m);
+    assert.match(documentation, /Do not use it for\s+an app from an untrusted source/);
+});
 
 const UA = {
     android: "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36",

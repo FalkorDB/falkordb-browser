@@ -77,16 +77,19 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
   The web build and server preparation run without these credentials; only the
   release credential check and macOS electron-builder packaging receive them.
-- **Legacy macOS Gatekeeper:** unsigned releases such as v2.7.3 may be blocked.
-  This workaround is not needed for successfully signed and notarized releases.
-  Only if you trust the official legacy FalkorDB Browser release, you can remove
-  its quarantine flag after moving it to Applications:
-
-  ```sh
-  xattr -dr com.apple.quarantine "/Applications/FalkorDB Browser.app"
-  ```
-
-  This bypasses Gatekeeper's quarantine check for that app. Do not use it for
-  an app from an untrusted source.
 - **App icon:** electron-builder's default icon is used. Add `build/icon.png`
   (512×512 or larger) and set `directories.buildResources: build`.
+
+## Legacy macOS Gatekeeper
+
+Unsigned releases such as v2.7.3 may be blocked.
+This workaround is not needed for successfully signed and notarized releases.
+Only if you trust the official legacy FalkorDB Browser release, you can remove
+its quarantine flag after moving it to Applications:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/FalkorDB Browser.app"
+```
+
+This bypasses Gatekeeper's quarantine check for that app. Do not use it for
+an app from an untrusted source.

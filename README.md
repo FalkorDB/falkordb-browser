@@ -45,7 +45,7 @@ Access the Browser: (https://browser.falkordb.com)
 Desktop installers are attached to successful GitHub releases. macOS releases
 require configured signing and notarization credentials before publishing.
 For legacy unsigned releases and their security caveat, see the
-[desktop app notes](./desktop/README.md#not-done-yet).
+[desktop app notes](./desktop/README.md#legacy-macos-gatekeeper).
 
 ### Quick start
 

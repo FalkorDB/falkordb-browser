@@ -19,6 +19,7 @@ const RELEASES_ROUTE = "**/api/releases";
 // An APK on a GitHub release is linked through this route: on github.com the
 // GitHub app, when installed, would open it without Chrome's download prompt.
 const ANDROID_DOWNLOAD = "/api/app-download/android";
+const MACOS_RECOVERY = "https://github.com/FalkorDB/falkordb-browser/blob/main/desktop/README.md#legacy-macos-gatekeeper";
 
 const UA = {
     windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
@@ -101,6 +102,21 @@ async function openPage(context: BrowserContext, url: string): Promise<[Page, Ap
 async function expectNoPrompt(app: AppDownloadComponent) {
     await app.waitForTimeout(STAYS_CLOSED_FOR);
     await expect(app.prompt).toBeHidden();
+}
+
+async function expectMacOSGuidance(page: Page) {
+    const toast = page.getByTestId("toast").filter({ has: page.getByText("Install on macOS", { exact: true }) });
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText("Only use the workaround if you trust the official release.");
+    const link = toast.getByTestId("toast-hint-link");
+    await expect(link).toHaveText("Legacy macOS recovery instructions →");
+    await expect(link).toHaveAttribute("href", MACOS_RECOVERY);
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    const destination = page.context().waitForEvent("request", request =>
+        request.url() === MACOS_RECOVERY.split("#")[0]);
+    await link.click();
+    expect((await destination).isNavigationRequest()).toBe(true);
 }
 
 test.describe("@admin App download", () => {
@@ -307,7 +323,7 @@ test.describe("@admin App download", () => {
         const fetched = fetchedInNewTab(context, `${RELEASES}/FalkorDB-Browser-mac-arm64.dmg`);
         await app.link.click();
         await fetched;
-        await expect(page.getByText("Install on macOS", { exact: true })).toBeVisible();
+        await expectMacOSGuidance(page);
     });
 
     test("Windows: downloading from the help menu shows no macOS warning", async ({ browser }) => {
@@ -333,7 +349,7 @@ test.describe("@admin App download", () => {
             const fetched = fetchedInNewTab(context, `${RELEASES}/${file}`);
             await (alternate ? app.promptAlternate : app.promptDownload).click();
             await fetched;
-            await expect(page.getByText("Install on macOS", { exact: true })).toBeVisible();
+            await expectMacOSGuidance(page);
             await expect(app.prompt).toBeHidden();
         });
     }
