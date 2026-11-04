@@ -59,6 +59,12 @@ describe("Cypher grammar compatibility (#2208)", () => {
     assert.notDeepEqual(lint("MATCH (n RETURN n"), []);
   });
 
+  for (const query of ["MATCH (n) RETURN n {.name .age}", "MATCH (n) RETURN n {.name,}"]) {
+    it(`rejects malformed map projection: ${query}`, () => {
+      assert.notDeepEqual(lint(query), []);
+    });
+  }
+
   const validQueries = [
     "MATCH (n) WHERE exists(n.name) RETURN n",
     "MATCH (n) RETURN n {.name}",
@@ -66,6 +72,11 @@ describe("Cypher grammar compatibility (#2208)", () => {
     "MATCH (n) RETURN n {.name} AS person",
     "MATCH (n) RETURN collect(n {.name})",
     "MATCH (n) RETURN collect(n {.name}) AS people",
+    "MATCH (n) RETURN n {name: n.name, answer: 42}",
+    "MATCH (n) WITH n, 42 AS answer RETURN n {.name, answer}",
+    "MATCH (n) RETURN n {nested: n {.name}}",
+    "CALL db.labels() YIELD label AS name WHERE name = 'Person' RETURN name",
+    "MATCH (n) CALL db.labels() YIELD label AS name WHERE name = 'Person' RETURN n, name",
     "MATCH (n:Call) RETURN n",
     "MATCH (n) RETURN n.call",
     "MATCH (n:Yield) RETURN n.yield",
