@@ -138,6 +138,8 @@ test.describe("@admin Graph tabs", () => {
     });
 
     test("Reloading re-runs the restored tab's query with the saved timeout, not 0", async () => {
+        test.setTimeout(60_000);
+        browser = new BrowserWrapper({ seedTimeout: false });
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const page = await browser.getPage();
 
@@ -147,21 +149,14 @@ test.describe("@admin Graph tabs", () => {
         await graph.clickRunQuery();
         await firstRun;
         await graph.waitForPageIdle();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab")).not.toBe("initial");
+        const savedTabId = new URL(page.url()).searchParams.get("tab");
 
-        // With no saved timeout the app loads it from /api/graph/config. Clear the
-        // value the E2E harness seeds and slow that request down, so the tab
-        // restore would win the race if it did not wait for the timeout.
         await page.addInitScript(() => localStorage.removeItem("timeout"));
         await page.route("**/api/graph/config", async (route) => {
             await new Promise((resolve) => { setTimeout(resolve, 3000); });
-            await route.continue();
+            await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
         });
-
-        // Listen only once the reloaded document exists, so no request from the
-        // run above can be counted; the delayed config keeps the restore later.
-        const reloadedDocument = page.waitForEvent("domcontentloaded");
-        const refresh = graph.refreshPage();
-        await reloadedDocument;
 
         const restoredQueries: URL[] = [];
         page.on("request", (request) => {
@@ -171,13 +166,44 @@ test.describe("@admin Graph tabs", () => {
             }
         });
 
-        await refresh;
+        const configRequested = page.waitForRequest("**/api/graph/config");
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await configRequested;
+        // Reload inside the config-loading window, after the 300ms URL sync debounce.
+        await page.waitForTimeout(1000);
+        expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
+        expect(restoredQueries).toHaveLength(0);
+        await graph.refreshPage();
         await graph.waitForPageIdle();
 
         await expect.poll(() => restoredQueries.length, { timeout: 15000 }).toBeGreaterThan(0);
+        expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
+        await expect.poll(() => graph.getStripTabCount()).toBe(1);
         for (const url of restoredQueries) {
-            expect(Number(url.searchParams.get("timeout"))).toBeGreaterThan(0);
+            expect(Number(url.searchParams.get("timeout"))).toBe(12);
         }
+    });
+
+    test("A stalled timeout config falls back to 60 and restores the saved tab", async () => {
+        test.setTimeout(60_000);
+        browser = new BrowserWrapper({ seedTimeout: false });
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await graph.selectGraphByName(graphOne);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.clickRunQuery();
+        await graph.waitForPageIdle();
+        await page.addInitScript(() => localStorage.removeItem("timeout"));
+        await page.route("**/api/graph/config", () => {});
+        const restoredQuery = page.waitForRequest((request) => {
+            const url = new URL(request.url());
+            return /^\/api\/graph\/[^/]+$/.test(url.pathname)
+                && url.searchParams.get("query")?.startsWith("MATCH (n) RETURN n") === true;
+        });
+        await page.reload({ waitUntil: "domcontentloaded" });
+        const request = await restoredQuery;
+        expect(new URL(request.url()).searchParams.get("timeout")).toBe("60");
+        await expect(graph.stripTab(graphOne)).toBeVisible();
     });
 
     test("Closing a tab drops it and falls back to a neighbour", async () => {

@@ -35,6 +35,8 @@ async function launchBrowser(projectName: string): Promise<Browser> {
 
 export default class BrowserWrapper {
 
+    constructor(private readonly options: { seedTimeout?: boolean } = {}) {}
+
     private browser: Browser | null = null;
 
     private context: BrowserContext | null = null;
@@ -70,7 +72,7 @@ export default class BrowserWrapper {
             // Initialize localStorage before any navigation.
             // Explicitly pass host/port so the scoped storage prefix
             // matches the runtime connection context used by the app.
-            await this.page.addInitScript(initializeLocalStorage("localhost", 6379));
+            await this.page.addInitScript(initializeLocalStorage("localhost", 6379, "default", this.options.seedTimeout));
         }
         if (url) {
             await this.navigateTo(url)

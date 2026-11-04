@@ -1652,12 +1652,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     [layout, direction, schemaLayout],
   );
 
+  const tabsReady = graphNamesLoaded && timeoutLoaded;
   const graphTabs = useGraphTabs({
     prefixReady,
     // Rebuilding a tab queries its graph, and querying a graph that has since
     // been dropped would make FalkorDB re-create it — wait for the list. It
     // must also wait for the saved timeout, or the rebuild runs with timeout=0.
-    canRestore: graphNamesLoaded && timeoutLoaded,
+    canRestore: tabsReady,
     connectionKey: activeConnectionId,
     // The tutorial gets a strip of its own; the user's tabs come back with it.
     tutorialOpen,
@@ -1967,6 +1968,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   useEffect(() => {
     if (status !== "authenticated" || !prefixReady) return;
 
+    let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       try {
         const raw: Query[] = JSON.parse(getConnectionItem("query history") || "[]");
@@ -2002,7 +2005,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         // The timeout query param is in seconds (the API multiplies by 1000), so TIMEOUT_MAX (ms) is converted to seconds below.
         let fallback = 60;
         try {
-          const configRes = await fetch("/api/graph/config", { method: "GET" });
+          const configRes = await fetch("/api/graph/config", {
+            method: "GET",
+            signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
+          });
           if (configRes.ok) {
             const { configs } = await configRes.json();
             const typedConfigs: [string, string | number][] = Array.isArray(configs)
@@ -2027,11 +2033,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             }
           }
         } catch (error) {
+          if (cancelled) return;
           // If config fetch fails, use the default as-is
           console.warn("Failed to fetch /api/graph/config for timeout initialization", error);
         }
         timeoutVal = fallback;
       }
+      if (cancelled) return;
       setTimeout(timeoutVal);
       setTimeoutLoaded(true);
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
@@ -2090,6 +2098,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         if (storedPerSourceModels) setPerSourceModels(sanitizePerSourceModels(JSON.parse(storedPerSourceModels)));
       } catch { /* ignore corrupted data */ }
     })();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [status, prefixReady, toast]);
 
   // Chat API keys are loaded separately from the settings above because they
@@ -2448,13 +2460,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // The tab strip only settles once the graph list has loaded; writing before
     // then would strip ?tab= before it has been read back.
-    if (!graphNamesLoaded) return;
+    if (!tabsReady) return;
 
     const timer = window.setTimeout(() => {
       syncRouteUrlParams(pathname, { tab: graphTabs.activeTabId, share: graphTabs.activeShareParams });
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [pathname, graphTabs.activeTabId, graphTabs.activeShareParams, tutorialOpen, graphNamesLoaded]);
+  }, [pathname, graphTabs.activeTabId, graphTabs.activeShareParams, tutorialOpen, tabsReady]);
 
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
