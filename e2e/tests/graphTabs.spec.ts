@@ -4,6 +4,7 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import GraphPage from "../logic/POM/graphPage";
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
+import TutorialPanel from "../logic/POM/tutorialPanelComponent";
 
 // The tab strip in the /graph sub-header. Each tab is an independent working
 // context (graph, query, view, canvas state), so these tests assert both the
@@ -23,8 +24,9 @@ test.describe("@admin Graph tabs", () => {
     });
 
     test.afterAll(async () => {
-        for (const graphName of [graphOne, graphTwo]) {
-            const result = await apiCall.removeGraph(graphName, "admin");
+        const results = await Promise.all([graphOne, graphTwo].map(graphName => apiCall.removeGraph(graphName, "admin")));
+        for (const [index, result] of results.entries()) {
+            const graphName = [graphOne, graphTwo][index];
             expect(result.message).toBe(`${graphName} graph deleted`);
         }
     });
@@ -173,9 +175,13 @@ test.describe("@admin Graph tabs", () => {
 
         const configRequested = page.waitForRequest("**/api/graph/config");
         try {
+            await page.addInitScript(() => {
+                const timeout = AbortSignal.timeout.bind(AbortSignal);
+                AbortSignal.timeout = milliseconds => timeout(milliseconds === 5000 ? 60000 : milliseconds);
+            });
             await page.reload({ waitUntil: "domcontentloaded" });
             await configRequested;
-            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true", { timeout: 15000 });
             await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
             await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
             expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
@@ -223,6 +229,68 @@ test.describe("@admin Graph tabs", () => {
         expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
         expect(new URL(request.url()).searchParams.get("timeout")).toBe("60");
         await expect(graph.stripTab(graphOne)).toBeVisible();
+    });
+
+    test("The mobile portalled toolbar waits for timeout restoration", async () => {
+        browser = new BrowserWrapper({ seedTimeout: false });
+        await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        await page.setViewportSize({ width: 900, height: 900 });
+        await page.addInitScript(() => localStorage.removeItem("timeout"));
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        await page.route("**/api/graph/config", async route => {
+            await gate;
+            await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
+        });
+        await page.addInitScript(() => {
+            const timeout = AbortSignal.timeout.bind(AbortSignal);
+            AbortSignal.timeout = milliseconds => timeout(milliseconds === 5000 ? 60000 : milliseconds);
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await expect(page.getByTestId("mobileSelectorToolbar")).toHaveAttribute("inert", "", { timeout: 15000 });
+            await expect(page.getByTestId("selectorMore")).toBeDisabled();
+            release();
+            await expect(page.getByTestId("selectorMore")).toBeEnabled({ timeout: 15000 });
+            await expect(page.getByTestId("mobileSelectorToolbar")).not.toHaveAttribute("inert");
+            await page.getByTestId("selectorMore").click();
+            await expect(page.getByTestId("uploadGraphToolbarTrigger")).toBeVisible();
+        } finally {
+            release();
+        }
+    });
+
+    test("The tutorial strip stays interactive when the initial user graph list is pending", async () => {
+        test.setTimeout(60_000);
+        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
+        const page = await browser.getPage();
+        await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
+        await tutorial.changeLocalStorage("true");
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        let held = false;
+        await page.route(url => /^\/api\/graph\/social-demo(?:-test)?(?:\/|$)/.test(url.pathname), route =>
+            route.request().method() === "DELETE"
+                ? route.fulfill({ json: { message: "Mock tutorial graph deleted" } })
+                : route.fulfill({ contentType: "text/event-stream", body: "event: result\ndata: {}\n\n" }),
+        );
+        await page.route("**/api/graph", async route => {
+            if (held) return route.continue();
+            held = true;
+            await gate;
+            return route.continue();
+        });
+        try {
+            await page.reload();
+            await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+            expect(held).toBe(true);
+            await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+            release();
+            await tutorial.skip();
+        } finally {
+            release();
+        }
     });
 
     test("Closing a tab drops it and falls back to a neighbour", async () => {

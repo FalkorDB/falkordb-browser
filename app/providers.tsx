@@ -196,7 +196,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // the session, which lags `activeConnectionId` through a switch, so anything
   // writing connection-scoped storage has to know whether the two agree yet.
   const [prefixConnectionId, setPrefixConnectionId] = useState<string | null>(null);
-  const timeoutInitKey = timeoutInitializationKey(status, prefixReady, sessionData, prefixConnectionId);
+  const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
+  const timeoutInitKey = timeoutInitializationKey(status, prefixReady, sessionData, prefixConnectionId, activeConnectionId);
 
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
@@ -386,7 +387,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [additionalConnections, setAdditionalConnections] = useState<SessionConnection[]>([]);
-  const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
   const [captionsKeys, setCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newCaptionsKeys, setNewCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix] = useState<boolean>(false);
@@ -1655,7 +1655,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     [layout, direction, schemaLayout],
   );
 
-  const tabsReady = graphNamesLoaded && timeoutLoaded;
+  const tabsReady = (tutorialOpen || graphNamesLoaded) && timeoutLoaded;
   const graphTabs = useGraphTabs({
     prefixReady,
     // Rebuilding a tab queries its graph, and querying a graph that has since
@@ -2478,6 +2478,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   useEffect(() => {
     const prev = prevActiveConnectionIdRef.current;
     prevActiveConnectionIdRef.current = activeConnectionId;
+    if (prev === activeConnectionId) return;
+    setGraphNamesLoaded(false);
+    graphNamesLoadedRef.current = false;
 
     // Skip the very first selection (initial mount / login) and null resets
     if (prev === null || activeConnectionId === null) {
@@ -2490,11 +2493,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         pendingSwitchesRef.current = 0;
         setSwitchPending(false);
       }
+      if (activeConnectionId !== null) {
+        connectionSwitchFetchedRef.current = true;
+        handleFetchOptions({ clear: true });
+      }
       return;
     }
-    // Skip if unchanged
-    if (prev === activeConnectionId) return;
-
     // The connection actually changed and React state now agrees: supersede any
     // in-flight graph op and fully release the switch gate so new ops are accepted
     // again (any still-pending older switch is no longer latest, so it's a no-op).
@@ -2510,7 +2514,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setGraphName("");
     setSelectedParam("");
-    setGraphNamesLoaded(false);
     graphInfoSyncRef.current.setNodesCount(undefined);
     graphInfoSyncRef.current.setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));

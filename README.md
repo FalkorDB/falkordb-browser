@@ -253,8 +253,10 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 ### Restoring graph tabs
 
 Graph editing waits until saved tabs and the query timeout are initialized for
-the current authenticated session and connection. If the timeout configuration
-does not respond within five seconds, restoration uses the 60-second default.
+the current authenticated session and connection. A saved local timeout is used
+immediately. Otherwise the 60-second default is capped by the server's `TIMEOUT_MAX`;
+if that configuration does not respond within five seconds, restoration uses
+the 60-second fallback.
 
 ### Error help
 

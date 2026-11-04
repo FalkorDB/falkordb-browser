@@ -172,7 +172,7 @@ export default function GraphSubHeader() {
               }}
             >
               <Plus size={16} />
-              <span>{canAdd ? "New tab" : `Max ${maxTabs} tabs`}</span>
+              <span>{tabs.length < maxTabs ? "New tab" : `Max ${maxTabs} tabs`}</span>
             </button>
           </PopoverContent>
         </Popover>
@@ -276,7 +276,7 @@ export default function GraphSubHeader() {
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {canClose ? "Close tab" : "The last tab can't be closed"}
+                  {tabs.length > 1 ? "Close tab" : "The last tab can't be closed"}
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -300,7 +300,7 @@ export default function GraphSubHeader() {
           </span>
         </TooltipTrigger>
         <TooltipContent>
-          {canAdd ? "New tab" : `Max ${maxTabs} tabs — raise the limit in Settings`}
+          {tabs.length < maxTabs ? "New tab" : `Max ${maxTabs} tabs — raise the limit in Settings`}
         </TooltipContent>
       </Tooltip>
     </div>

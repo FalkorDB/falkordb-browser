@@ -13,8 +13,14 @@ export function timeoutInitializationKey(
     prefixReady: boolean,
     session: TimeoutSession,
     prefixConnectionId: string | null,
+    activeConnectionId: string | null = null,
 ): string | null {
-    if (status !== "authenticated" || !prefixReady) return null;
+    if (
+        !session?.user ||
+        (status !== "authenticated" && status !== "loading") ||
+        !prefixReady ||
+        (activeConnectionId !== null && activeConnectionId !== prefixConnectionId)
+    ) return null;
 
     return JSON.stringify([
         session?.user?.id ?? null,
