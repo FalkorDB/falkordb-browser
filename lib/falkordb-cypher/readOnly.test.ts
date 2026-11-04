@@ -11,6 +11,7 @@ describe("isReadOnlyQuery (#2206)", () => {
     "RETURN 'CREATE DELETE SET MERGE'",
     "RETURN 1 // CREATE (:Injected)\n",
     "RETURN 1 /* DELETE n */",
+    "/* **/ RETURN 1",
     "MATCH (n:Create) RETURN n.set",
     "CALL { MATCH (n) RETURN n } RETURN n",
   ];
@@ -41,6 +42,7 @@ describe("isReadOnlyQuery (#2206)", () => {
     "DROP CONSTRAINT FOR (n:Item) REQUIRE n.name IS UNIQUE",
     "CYPHER p=1 CREATE (:Dup {value: $p})",
     "RETURN 1; CREATE (:Dup)",
+    "/* **/ CREATE (:ProfileDup) /* x */ RETURN 1",
     "CALL db.labels()",
     "CALL db.idx.vector.queryNodes('Item', 'embedding', 5, [1, 2])",
     "CALL db.idx.fulltext.queryNodes('Item', 'search')",
