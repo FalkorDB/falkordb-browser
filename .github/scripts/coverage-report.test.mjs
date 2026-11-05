@@ -230,7 +230,8 @@ test('reports every source file of a flag, and a file the same from Node and fro
       }, { url: 'node:fs', functions: [] }],
     }));
     assert.deepEqual(report(root, 'e2e', dockerRaw, { COVERAGE_SERVER_ROOT: '/app' }), fromBrowser);
-    const externalSource = out.outputText.replace(/\/\/# sourceMappingURL=.*$/m, '//# sourceMappingURL=area.js.map');
+    const externalSource = 'const embedded = `\n//# sourceMappingURL=not-a-sidecar.js.map\n`;\n'
+      + out.outputText.replace(/\/\/# sourceMappingURL=.*$/m, '//# sourceMappingURL=area.js.map');
     writeFileSync(path.join(root, serverFile), externalSource);
     writeFileSync(path.join(root, `${serverFile}.map`), JSON.stringify(map));
     const dockerRecording = JSON.parse(readFileSync(path.join(dockerRaw, 'coverage-1.json'), 'utf8'));
