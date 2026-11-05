@@ -47,10 +47,10 @@ export function urlPath(url: string | null | undefined): string {
  * Global user preferences use plain keys. Per-connection data (e.g. query history)
  * is prefixed with host:port: to match the runtime connection-scoped storage.
  */
-export const initializeLocalStorage = (host = "localhost", port = 6379, username = "default") => {
+export const initializeLocalStorage = (host = "localhost", port = 6379, username = "default", seedTimeout = true) => {
     const prefix = `${host}:${port}:${username}:`;
     return `
-        if (!localStorage.getItem("timeout")) localStorage.setItem("timeout", "0");
+        ${seedTimeout ? 'if (!localStorage.getItem("timeout")) localStorage.setItem("timeout", "0");' : ""}
         if (!localStorage.getItem("limit")) localStorage.setItem("limit", "300");
         if (!localStorage.getItem("defaultQuery")) localStorage.setItem("defaultQuery", "");
         if (!localStorage.getItem("runDefaultQuery")) localStorage.setItem("runDefaultQuery", "false");

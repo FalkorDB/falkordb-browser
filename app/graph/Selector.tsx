@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
-import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, GraphTabsContext, IndicatorContext, PanelContext } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
@@ -69,6 +69,7 @@ export default function Selector({
     const { isReadOnly } = useContext(ConnectionContext);
     const { cypherLanguageConfig, setCypherLanguageConfig } = useContext(CypherLanguageContext);
     const { panelOpen, onTogglePanel, mobileToolbarSlot } = useContext(PanelContext);
+    const { tabsReady } = useContext(GraphTabsContext);
     const isMobile = useIsMobile();
 
     const [maximize, setMaximize] = useState(false);
@@ -216,13 +217,14 @@ export default function Selector({
         // rest of the desktop bar folds into the overflow so the tab name keeps
         // the width it needs to be readable.
         const toolbar = (
-            <>
+            <div className="contents" data-testid="mobileSelectorToolbar" aria-busy={!tabsReady}>
                 {graphInfoButton}
-                <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
+                <DropdownMenu open={tabsReady && actionsOpen} onOpenChange={setActionsOpen}>
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
                             data-testid="selectorMore"
+                            disabled={!tabsReady}
                             aria-label="More actions"
                             className={cn(action, "flex items-center justify-center")}
                         >
@@ -261,7 +263,7 @@ export default function Selector({
                     </DropdownMenuContent>
                 </DropdownMenu>
                 {chatButton}
-            </>
+            </div>
         );
 
         return (

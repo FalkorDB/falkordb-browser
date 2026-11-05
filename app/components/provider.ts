@@ -254,6 +254,10 @@ type GraphTabsContextType = {
   /** Working contexts for the current connection, ordered left to right. */
   tabs: GraphTab[];
   activeTabId: string;
+  /** Whether restored tabs and the query timeout are ready for interaction. */
+  tabsReady: boolean;
+  /** Whether the graph list has settled for the active connection. */
+  graphNamesReady: boolean;
   /** The user's tab limit, also used to size the tab strip. */
   maxTabs: number;
   selectTab: (id: string) => void;
@@ -602,6 +606,8 @@ export const QueryLoadingContext = createContext<QueryLoadingContextType>({
 export const GraphTabsContext = createContext<GraphTabsContextType>({
   tabs: [],
   activeTabId: "",
+  tabsReady: false,
+  graphNamesReady: false,
   maxTabs: DEFAULT_GRAPH_TABS,
   selectTab: () => { },
   addTab: () => { },

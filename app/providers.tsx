@@ -18,6 +18,7 @@ import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { isAiFixSupported } from "@/lib/aiFix";
+import { isTimeoutInitializationReady, timeoutInitializationKey } from "@/lib/timeoutInitialization";
 import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
@@ -188,6 +189,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // re-trigger when the function identity changes on session refresh.
   const updateSessionRef = useRef(updateSession);
   useEffect(() => { updateSessionRef.current = updateSession; }, [updateSession]);
+  const sessionConnectionIdRef = useRef(sessionData?.activeConnectionId);
+  sessionConnectionIdRef.current = sessionData?.activeConnectionId;
 
   // Set connection prefix for scoped localStorage
   const [prefixReady, setPrefixReady] = useState(false);
@@ -195,6 +198,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // the session, which lags `activeConnectionId` through a switch, so anything
   // writing connection-scoped storage has to know whether the two agree yet.
   const [prefixConnectionId, setPrefixConnectionId] = useState<string | null>(null);
+  const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
+  const timeoutInitKey = timeoutInitializationKey(status, prefixReady, sessionData, prefixConnectionId, activeConnectionId);
 
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
@@ -319,6 +324,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [graphName, setGraphName] = useState<string>("");
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
+  const [timeoutLoadedKey, setTimeoutLoadedKey] = useState<string | null>(null);
+  const timeoutLoaded = isTimeoutInitializationReady(timeoutInitKey, timeoutLoadedKey);
   const [limit, setLimit] = useState(0);
   const [lastLimit, setLastLimit] = useState(0);
   const [newLimit, setNewLimit] = useState(0);
@@ -382,7 +389,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [additionalConnections, setAdditionalConnections] = useState<SessionConnection[]>([]);
-  const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
   const [captionsKeys, setCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newCaptionsKeys, setNewCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix] = useState<boolean>(false);
@@ -406,7 +412,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [customizingLabel, setCustomizingLabel] = useState<CustomizingRef | null>(null);
   const sessionSyncedRef = useRef(false);
   const prevActiveConnectionIdRef = useRef<string | null>(null);
-  const connectionSwitchFetchedRef = useRef(false);
+  const sameConnectionBootstrapRef = useRef<{ id: string; epoch: number } | null>(null);
 
   // ── Graph-operation ownership guards (see docs/design/idea-6-connection-epoch-pinning-plan.md) ──────────────────────
   // contextGen: "what connection + graph the UI represents" — bumped on a
@@ -1651,12 +1657,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     [layout, direction, schemaLayout],
   );
 
+  const tabsReady = (tutorialOpen || graphNamesLoaded) && timeoutLoaded;
   const graphTabs = useGraphTabs({
     prefixReady,
     // Rebuilding a tab queries its graph, and querying a graph that has since
-    // been dropped would make FalkorDB re-create it — wait for the list.
-    canRestore: graphNamesLoaded,
-    connectionKey: activeConnectionId,
+    // been dropped would make FalkorDB re-create it — wait for the list. It
+    // must also wait for the saved timeout, or the rebuild runs with timeout=0.
+    canRestore: tabsReady,
+    connectionKey: activeConnectionId ?? prefixConnectionId,
     // The tutorial gets a strip of its own; the user's tabs come back with it.
     tutorialOpen,
     initialTabId: initialTabIdRef.current,
@@ -1674,8 +1682,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   markTabRanRef.current = graphTabs.markRan;
 
   const graphTabsContext = useMemo(
-    () => ({ ...graphTabs, setSchemaMeta }),
-    [graphTabs, setSchemaMeta],
+    () => ({ ...graphTabs, tabsReady, graphNamesReady: graphNamesLoaded, setSchemaMeta }),
+    [graphTabs, graphNamesLoaded, setSchemaMeta, tabsReady],
   );
 
   useEffect(() => {
@@ -1693,6 +1701,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   useEffect(() => {
     if (pendingSwitchesRef.current > 0) return;
+    const bootstrap = sameConnectionBootstrapRef.current;
+    // A previous null-state commit can flush after discovery has pinned the
+    // session's connection but before React commits that id.
+    if (activeConnectionId === null && bootstrap?.id === getActiveConnectionIdGlobal()
+      && bootstrap.epoch === getConnectionEpoch()) return;
     setActiveConnectionIdGlobal(activeConnectionId);
   });
 
@@ -1868,9 +1881,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // the server declined the switch, so the prefix still describes the other
     // connection.
     const pinAndSync = async (id: string) => {
+      const sameConnection = getActiveConnectionIdGlobal() === null
+        && sessionConnectionIdRef.current === id;
       setActiveConnectionId(id);
       setActiveConnectionIdGlobal(id);
       const pinnedEpoch = getConnectionEpoch();
+      // Capture the JWT identity before updateSession can adopt a different id.
+      sameConnectionBootstrapRef.current = sameConnection ? { id, epoch: pinnedEpoch } : null;
       try {
         await switchSessionConnection(updateSessionRef.current, id);
       } catch (error) {
@@ -1963,8 +1980,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [status, toast]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !prefixReady) return;
+    if (timeoutInitKey === null) {
+      setTimeoutLoadedKey(null);
+      return;
+    }
 
+    let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       try {
         const raw: Query[] = JSON.parse(getConnectionItem("query history") || "[]");
@@ -2000,7 +2022,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         // The timeout query param is in seconds (the API multiplies by 1000), so TIMEOUT_MAX (ms) is converted to seconds below.
         let fallback = 60;
         try {
-          const configRes = await fetch("/api/graph/config", { method: "GET" });
+          const configRes = await fetch("/api/graph/config", {
+            method: "GET",
+            signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
+          });
           if (configRes.ok) {
             const { configs } = await configRes.json();
             const typedConfigs: [string, string | number][] = Array.isArray(configs)
@@ -2025,12 +2050,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             }
           }
         } catch (error) {
+          if (cancelled) return;
           // If config fetch fails, use the default as-is
           console.warn("Failed to fetch /api/graph/config for timeout initialization", error);
         }
         timeoutVal = fallback;
       }
+      if (cancelled) return;
       setTimeout(timeoutVal);
+      setTimeoutLoadedKey(timeoutInitKey);
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);
       setLastLimit(l);
@@ -2087,7 +2115,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         if (storedPerSourceModels) setPerSourceModels(sanitizePerSourceModels(JSON.parse(storedPerSourceModels)));
       } catch { /* ignore corrupted data */ }
     })();
-  }, [status, prefixReady, toast]);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [timeoutInitKey, toast]);
 
   // Chat API keys are loaded separately from the settings above because they
   // are connection-scoped: /api/encrypt binds each blob to `username@host:port`,
@@ -2408,16 +2440,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
   }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName, refreshOffloadedGraphs]);
 
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    // Skip if the reset effect already triggered a fetch for this switch
-    if (connectionSwitchFetchedRef.current) {
-      connectionSwitchFetchedRef.current = false;
-      return;
-    }
-    handleFetchOptions();
-  }, [handleFetchOptions, status]);
-
   // A stored tab may name a graph that has since been dropped. Rather than
   // querying it (which would make FalkorDB re-create it), clear the selection
   // once the list is known — the tab keeps its query text either way.
@@ -2445,18 +2467,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // The tab strip only settles once the graph list has loaded; writing before
     // then would strip ?tab= before it has been read back.
-    if (!graphNamesLoaded) return;
+    if (!tabsReady) return;
 
     const timer = window.setTimeout(() => {
       syncRouteUrlParams(pathname, { tab: graphTabs.activeTabId, share: graphTabs.activeShareParams });
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [pathname, graphTabs.activeTabId, graphTabs.activeShareParams, tutorialOpen, graphNamesLoaded]);
+  }, [pathname, graphTabs.activeTabId, graphTabs.activeShareParams, tutorialOpen, tabsReady]);
 
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
     const prev = prevActiveConnectionIdRef.current;
     prevActiveConnectionIdRef.current = activeConnectionId;
+    if (prev === activeConnectionId) return;
+    const bootstrap = sameConnectionBootstrapRef.current;
+    sameConnectionBootstrapRef.current = null;
+    if (prev === null && activeConnectionId === bootstrap?.id && getConnectionEpoch() === bootstrap.epoch) return;
+    setGraphNamesLoaded(false);
+    graphNamesLoadedRef.current = false;
+    setGraphNames(undefined);
 
     // Skip the very first selection (initial mount / login) and null resets
     if (prev === null || activeConnectionId === null) {
@@ -2471,9 +2500,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       }
       return;
     }
-    // Skip if unchanged
-    if (prev === activeConnectionId) return;
-
     // The connection actually changed and React state now agrees: supersede any
     // in-flight graph op and fully release the switch gate so new ops are accepted
     // again (any still-pending older switch is no longer latest, so it's a no-op).
@@ -2489,17 +2515,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setGraphName("");
     setSelectedParam("");
-    setGraphNamesLoaded(false);
     graphInfoSyncRef.current.setNodesCount(undefined);
     graphInfoSyncRef.current.setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setLabels([]);
     setRelationships([]);
+  }, [activeConnectionId, toast, setIndicator, bumpContextGen]);
 
-    // Re-fetch graph list for the new connection (clearing the old list).
-    connectionSwitchFetchedRef.current = true;
-    handleFetchOptions({ clear: true });
-  }, [activeConnectionId, toast, setIndicator, handleFetchOptions, bumpContextGen]);
+  // Run after the reset, including an authenticated bootstrap rollback to null.
+  // Offline/tutorial deferrals retry through handleFetchOptions's dependencies;
+  // no "already fetched" flag can consume a fetch that never started.
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    handleFetchOptions({ clear: !graphNamesLoadedRef.current });
+  }, [activeConnectionId, handleFetchOptions, status]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);

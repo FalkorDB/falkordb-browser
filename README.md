@@ -250,6 +250,20 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Restoring graph tabs
+
+Graph editing waits until saved tabs and the query timeout are initialized for
+the current authenticated session and connection. A saved local timeout is used
+immediately. Otherwise the 60-second default is capped by the server's `TIMEOUT_MAX`;
+if that configuration does not respond within five seconds, restoration uses
+the 60-second fallback.
+Graph-list initialization retries after a failed connection synchronization,
+when connectivity returns, or after leaving the tutorial.
+Discovering the connection already identified by the session preserves loaded
+graphs and restored tabs instead of replaying their queries.
+On mobile, graph information and Chat remain available during restoration;
+tab-dependent overflow actions stay disabled until initialization finishes.
+
 ### Error help
 
 When a Cypher query fails, the browser shows the database's message together with an
