@@ -446,20 +446,19 @@ test("totals the changed lines the commit's coverage counts", () => {
   ], report), { hits: 2, misses: 2, partials: 1 });
 });
 
-test('gate: a pull request moved to another base fails a workflow that never ran, rather than wait for it', async () => {
-  // Moved to staging: Playwright now applies but never ran for this commit,
-  // and no event will start it.
-  const runs = [run('Build'), run('Desktop app')];
-  const moved = world({ runs });
-  assert.equal(await gate({ ...moved.args, retarget: true }), false);
-  assert.deepEqual(moved.posted, [
+test('gate: fails a workflow that never ran once every run has finished, rather than wait for it', async () => {
+  // Every run of the trigger finished and Playwright never started (a pull
+  // request moved to staging, say): no event will start it.
+  const done = world({ runs: [run('Build'), run('Desktop app')] });
+  assert.equal(await gate(done.args), false);
+  assert.deepEqual(done.posted, [
     'coverage/project failure: Playwright Tests never ran for this commit: push a commit or reopen the pull request',
     'coverage/patch failure: Playwright Tests never ran for this commit: push a commit or reopen the pull request',
   ]);
-  // Outside a move, a workflow not started yet is only waited for.
-  const fresh = world({ runs });
-  await gate(fresh.args);
-  assert.match(fresh.posted[0], /pending: Waiting for Playwright Tests/);
-  // A running one is waited for, moved or not.
+  // While a run is still going, the others may yet show up: wait.
+  const early = world({ runs: [run('Build'), run('Desktop app', null, 'in_progress')] });
+  await gate(early.args);
+  assert.match(early.posted[0], /pending: Waiting for Desktop app, Playwright Tests/);
   assert.deepEqual(notStarted(['Build', 'Playwright Tests'], [run('Build'), run('Playwright Tests', null, 'in_progress')]), []);
 });
+
