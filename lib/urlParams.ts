@@ -5,11 +5,41 @@
  * `./useUrlParams` re-exports them alongside the hooks that use them.
  */
 
+let pendingNavigations = 0;
+let deferredParams: { url: string; updates: Record<string, string | null> } | undefined;
+
+function currentUrl(): string {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+export function beginUrlNavigation(): () => void {
+  pendingNavigations += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    pendingNavigations -= 1;
+    if (pendingNavigations !== 0) return;
+    const deferred = deferredParams;
+    deferredParams = undefined;
+    if (deferred?.url === currentUrl()) setUrlParam(deferred.updates);
+  };
+}
+
 /**
  * Update one or more URL search params via history.replaceState.
  * Pass `null` as a value to delete a param.
  */
 export function setUrlParam(updates: Record<string, string | null>) {
+  // Next's patched replaceState can supersede an in-flight router navigation.
+  if (pendingNavigations > 0) {
+    const url = currentUrl();
+    deferredParams = {
+      url,
+      updates: { ...(deferredParams?.url === url ? deferredParams.updates : {}), ...updates },
+    };
+    return;
+  }
   const params = new URLSearchParams(window.location.search);
 
   // Delete all managed keys first so re-adding preserves the caller's order
@@ -87,6 +117,7 @@ export const URL_PARAM_BUILDERS: Record<string, (state: any) => Record<string, s
  * No-op if the pathname has no registered builder.
  */
 export function syncRouteUrlParams(pathname: string, state: Record<string, unknown>) {
+  if (window.location.pathname !== pathname) return;
   const builder = URL_PARAM_BUILDERS[pathname];
   if (!builder) return;
   setUrlParam(builder(state));

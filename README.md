@@ -40,6 +40,50 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 
 Access the Browser: (https://browser.falkordb.com)
 
+### Tutorial samples
+
+The tutorial uses unique graph names, checks for existing names before creation,
+and records the exact names it owns per connection. Cleanup never deletes graphs
+just because their names resemble tutorial samples, including `social-demo`.
+Abandoned samples are reclaimed on app visits as well as tutorial start/close.
+With Web Locks, active tabs are protected by their ownership lock. Without Web
+Locks, active tabs renew ownership every minute and only records inactive for
+24 hours are eligible. Cleanup requires the same browser's retained ownership
+records; clearing browser storage removes that evidence. Failed cleanup keeps its
+ownership record eligible for retry instead of renewing the inactive owner's lease.
+Cleanup also verifies offloaded graphs when the connection supports them and
+does not block a new tutorial if an abandoned sample cannot be removed.
+Initial graph auto-selection and saved-tab queries wait for this recovery pass
+so they cannot recreate a sample that cleanup is removing.
+Samples whose setup did not confirm completion (including older ownership
+records without completion metadata) are retained for manual verification:
+an interrupted request could still create the graph after a reload.
+Only active tutorials renew ownership heartbeats; inactive failed-cleanup
+records keep their retry timestamp. Capability and offloaded-graph verification
+are bounded and cannot mark ordinary browsing offline. Browsing without ownership
+records does not wait for tutorial capability probes; unverifiable capabilities
+still block tutorial setup and cleanup rather than risk user graphs.
+Each connection activation waits for its own recovery. Mobile and shared-link
+visits also reclaim completed samples owned by the current tab when no tutorial
+will run. Confirmed setup results stay with their original validated ownership
+record after a connection switch. Closing the tutorial restores only graphs
+still present in a freshly verified list, never a reclaimed sample.
+Graph selection, including offloaded options, is unavailable during recovery.
+Configuration initialization and waiting for in-flight setup are bounded; a
+timed-out setup retains its pending ownership rather than assuming it completed.
+Closing on mobile discards the tutorial's step state and ignores late setup
+results, so Replay starts fresh. Background reads of generated samples use
+non-creating read-only queries even if cleanup has already deleted the graph.
+Tutorial track setup and step-advance queries are also explicitly read-only.
+Unreadable ownership records block a new tutorial snapshot before it creates
+samples, rather than risk restoring an unverified sample as a user graph.
+Explicit editor queries retain the user's chosen query mode even on graphs
+whose names match sample names; mutation permissions are not inferred from names.
+Each open/close transition starts a new recovery pass. A shared verification
+failure stops the abandoned-owner sweep rather than repeating its timeout for
+every record; untouched ownership records remain available for retry. Browsing
+without ownership records does not wait for connection discovery or session sync.
+
 ### Quick start
 
 #### Run the graph database and browser from one docker container
@@ -295,8 +339,14 @@ Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 mobile screens, and long Chat queries can be collapsed.
 
 Missing AI configuration and provider errors offer **Go to Settings**. Returning
-to the graph preserves the editor query and unsent Chat input. Chat drafts are
-scoped to the connection, tab, and graph, and survive closing and reopening Chat.
+to the graph preserves the editor query and unsent Chat input. Debounced URL
+updates wait for route transitions, so a draft update cannot cancel navigation
+to Settings. Chat drafts are scoped to the connection, tab, and graph, and survive
+closing and reopening Chat.
+The transition guard covers mounted programmatic push/replace/refresh calls.
+History back/forward and toast callbacks retained after unmount use Next's native
+navigation without acquiring a transition token. Deferred URL updates are
+discarded when the destination's path, search, or hash differs from their source.
 Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.

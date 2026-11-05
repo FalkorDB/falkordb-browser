@@ -1,7 +1,8 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { useEffect } from "react";
 
 export default function LoginVerification({ children }: { children: React.ReactNode }) {
