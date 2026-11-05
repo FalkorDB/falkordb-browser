@@ -12,7 +12,7 @@
 
 import { test as base, type BrowserContext, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
 
 const dir = process.env.E2E_COVERAGE_DIR;
@@ -29,10 +29,15 @@ async function save(page: Page) {
     if (!dir || !entries.length) return;
     mkdirSync(dir, { recursive: true });
     // The chunks are content-hashed, so a URL always serves the same source:
-    // save each source once, not once per page.
+    // save each source once, not once per page. `wx` creates the file only if
+    // no page (in any worker) has saved it yet.
     for (const { url, source } of entries) {
         const file = path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
-        if (source !== undefined && !existsSync(file)) writeFileSync(file, source);
+        try {
+            if (source !== undefined) writeFileSync(file, source, { flag: 'wx' });
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        }
     }
     const data = entries.map(({ url, scriptId, functions }) => ({ url, scriptId, functions }));
     writeFileSync(path.join(dir, `browser-${randomUUID()}.json`), JSON.stringify(data));
