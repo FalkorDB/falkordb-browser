@@ -205,7 +205,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-shard-${{ matrix.shard }}-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload server logs
@@ -291,7 +293,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-stateless-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload server logs
@@ -441,7 +445,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-tls-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload server logs
@@ -582,7 +588,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-cluster-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload server logs
@@ -684,7 +692,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-smoke-docker-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload container logs

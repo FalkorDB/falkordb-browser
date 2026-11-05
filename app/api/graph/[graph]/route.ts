@@ -3,7 +3,7 @@ import type { FalkorDB } from "falkordb";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
 import { getCorsHeaders, resolveReadOnly, runQuery, corsPreflight } from "../../utils";
-import { queryStream, queryStreamError } from "../../query-stream";
+import { QueryInputError, queryStream, queryStreamError } from "../../query-stream";
 
 export const OPTIONS = corsPreflight;
 
@@ -16,8 +16,8 @@ async function streamQuery(
   isReadOnly: boolean,
 ): Promise<Response> {
   return queryStream(request.signal, async () => {
-    if (!query) throw new Error("Missing parameter query");
-    if (Number.isNaN(timeout)) throw new Error("Invalid parameter timeout");
+    if (!query) throw new QueryInputError("Missing parameter query");
+    if (Number.isNaN(timeout)) throw new QueryInputError("Invalid parameter timeout");
 
     const graph = client.selectGraph(graphId);
     return runQuery(graph, query, isReadOnly, { TIMEOUT: timeout });

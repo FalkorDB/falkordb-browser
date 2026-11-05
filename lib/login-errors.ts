@@ -5,8 +5,8 @@ export type LoginErrorCode =
 
 export function classifyLoginError(error: unknown): LoginErrorCode {
   const message = error instanceof Error ? error.message : "";
-  if (/\bNOAUTH\b/i.test(message)) return "credentials_required";
-  if (/\bWRONGPASS\b|\binvalid password\b/i.test(message)) return "invalid_credentials";
+  if (/(?:^|: )NOAUTH(?:\s|$)/i.test(message)) return "credentials_required";
+  if (/(?:^|: |^ERR )(?:WRONGPASS|invalid password)(?:\s|$)/i.test(message)) return "invalid_credentials";
   return "connection_failed";
 }
 

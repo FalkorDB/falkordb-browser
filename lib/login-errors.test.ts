@@ -11,6 +11,13 @@ describe("login errors", () => {
     assert.equal(classifyLoginError(undefined), "connection_failed");
     assert.equal(classifyLoginError(new Error("Connection failed: NOAUTH Authentication required")), "credentials_required");
     assert.equal(classifyLoginError(new Error("Invalid password")), "invalid_credentials");
+    assert.equal(classifyLoginError(new Error("ERR invalid password")), "invalid_credentials");
+    for (const host of ["noauth.db", "wrongpass.db", "invalid password.db"]) {
+      for (const failure of ["getaddrinfo ENOTFOUND", "connect ECONNREFUSED", "connect ETIMEDOUT"]) {
+        assert.equal(classifyLoginError(new Error(`${failure} ${host}`)), "connection_failed");
+        assert.equal(classifyLoginError(new Error(`${failure}: ${host}`)), "connection_failed");
+      }
+    }
   });
 
   it("only maps recognized add-connection codes to credential prompts", async (t) => {

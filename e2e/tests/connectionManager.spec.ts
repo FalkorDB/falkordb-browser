@@ -27,6 +27,10 @@ test("@admin Removed connections cannot be recovered from session fields", async
     expect(connections).toHaveLength(1);
     const connectionId = connections[0].id;
     expect((await request.delete(`/api/connections/${connectionId}`)).ok()).toBe(true);
+    const migration = await request.post("/api/auth/migrate-session");
+    expect(migration.status()).toBe(401);
+    expect((await migration.json()).code).toBe("SESSION_INVALID");
+    expect(migration.headers()["x-session-invalid"]).toBe("1");
 
     const requestHeaders: Record<string, string>[] = [{}, { "X-Connection-Id": connectionId }];
     for (const headers of requestHeaders) {

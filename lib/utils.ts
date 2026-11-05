@@ -732,6 +732,9 @@ const USER_READABLE_ERROR_PATTERNS = [
   // Connection errors from /api/connections
   /^cannot connect to falkordb\b/i,
   /^authentication failed\b/i,
+  /^this database requires credentials\. please enter your username and password\.$/i,
+  /^invalid credentials\. please check your username and password\.$/i,
+  /^could not connect to the database\. please check your connection settings and server logs\.$/i,
   /^connection timed out\b/i,
   // Data ingestion / file upload (app/api/upload, app/api/graph/[graph]/upload).
   // These messages are authored for end users, so show them verbatim.

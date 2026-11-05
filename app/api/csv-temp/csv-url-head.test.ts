@@ -66,6 +66,17 @@ test("aborts stalled header requests after ten seconds", async (t) => {
     assert.deepEqual(await pending, { status: "unavailable" });
 });
 
+test("a range response confirms an empty object only when its total size is zero", async (t) => {
+    t.mock.method(console, "warn", () => {});
+    for (const total of ["0", "123", null]) {
+        globalThis.fetch = async () => new Response(null, {
+            status: 416, headers: total === null ? {} : { "Content-Range": `bytes */${total}` },
+        });
+        assert.deepEqual(await validateCsvHeadFromUrl("https://storage.example/file.csv"),
+            total === "0" ? { status: "invalid", message: "The uploaded CSV is empty." } : { status: "unavailable" });
+    }
+});
+
 test("file imports remain supported without an HTTP precheck", async () => {
     globalThis.fetch = async () => { throw new Error("must not fetch file imports"); };
     assert.deepEqual(await validateCsvHeadFromUrl("file://imports/owner/file.csv"), { status: "skipped" });

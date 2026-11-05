@@ -120,6 +120,38 @@ test("ensurePrivateDir creates owner-only folders and tightens existing ones", (
     assert.equal(fs.statSync(old).mode & 0o777, 0o700);
 });
 
+test("secret replacement flushes file contents before renaming", (t) => {
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    const calls = [];
+    const fsync = fs.fsyncSync;
+    const rename = fs.renameSync;
+    t.mock.method(fs, "fsyncSync", fd => { fsync(fd); calls.push("flush"); });
+    t.mock.method(fs, "renameSync", (from, to) => { calls.push("rename"); rename(from, to); });
+    try {
+        loadSecrets(dir);
+        assert.deepEqual(calls, ["flush", "rename"]);
+    } finally {
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
+test("a failed secret flush preserves the previous file and removes the temporary file", (t) => {
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    fs.writeFileSync(file, "old damaged contents");
+    t.mock.method(fs, "fsyncSync", () => { throw new Error("flush failed"); });
+    try {
+        assert.throws(() => loadSecrets(dir), /flush failed/);
+        assert.equal(fs.readFileSync(file, "utf8"), "old damaged contents");
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+    } finally {
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
 test("loadSecrets replaces a damaged or weak secrets file", () => {
     for (const content of ["not json", JSON.stringify({ authSecret: "SECRET", encryptionKey: "changeme" })]) {
         const dir = tempDir();

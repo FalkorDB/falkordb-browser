@@ -2,7 +2,7 @@ import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import type { Graph } from "falkordb";
 import { runQuery } from "./run-query.ts";
-import { isRequestOriginTrusted } from "./utils.ts";
+import { getCorsHeaders, isOriginAllowed, isRequestOriginTrusted } from "./utils.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -52,6 +52,7 @@ describe("runQuery", () => {
             const previous = { ...process.env };
             t.after(() => { process.env = previous; });
             process.env.AUTH_URL = "auto";
+            process.env.NEXTAUTH_URL = "auto";
             process.env.ALLOWED_ORIGINS = "https://allowed.example";
             for (const origin of ["https://unlisted.example", "https://allowed.example"]) {
                 const request = new Request(`${origin}/api/graph`, {
@@ -59,6 +60,44 @@ describe("runQuery", () => {
                 });
                 assert.equal(isRequestOriginTrusted(request), origin === "https://allowed.example");
             }
+        });
+
+        it("allows explicit cross-origin frontends without requiring the API host in the caller list", (t) => {
+            const previous = { ...process.env };
+            t.after(() => { process.env = previous; });
+            process.env.NEXTAUTH_URL = "auto";
+            process.env.ALLOWED_ORIGINS = "https://frontend.example";
+            const request = new Request("https://api.example/api/graph", {
+                method: "POST",
+                headers: { host: "api.example", origin: "https://frontend.example" },
+            });
+            assert.equal(isRequestOriginTrusted(request), true);
+            assert.equal(getCorsHeaders(request)["Access-Control-Allow-Origin"], "https://frontend.example");
+            assert.equal(isRequestOriginTrusted(new Request(request, {
+                headers: { host: "api.example", origin: "https://api.example" },
+            })), false);
+        });
+
+        it("requires explicit configuration for cross-origin localhost callers in auto mode", (t) => {
+            const previous = { ...process.env };
+            t.after(() => { process.env = previous; });
+            delete process.env.ALLOWED_ORIGINS;
+            process.env.NEXTAUTH_URL = "auto";
+            for (const origin of ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"]) {
+                const request = new Request("http://localhost:3001/api/graph", {
+                    method: "POST", headers: { host: "localhost:3001", origin, "sec-fetch-site": "same-origin" },
+                });
+                const sameOrigin = origin === "http://localhost:3001";
+                assert.equal(isRequestOriginTrusted(request), sameOrigin);
+                assert.equal(isOriginAllowed(origin, request), sameOrigin);
+                assert.equal(Boolean(getCorsHeaders(request)["Access-Control-Allow-Origin"]), sameOrigin);
+            }
+            process.env.ALLOWED_ORIGINS = "http://localhost:3000";
+            const request = new Request("http://localhost:3001/api/graph", {
+                method: "POST", headers: { host: "localhost:3001", origin: "http://localhost:3000" },
+            });
+            assert.equal(isRequestOriginTrusted(request), true);
+            assert.equal(getCorsHeaders(request)["Access-Control-Allow-Credentials"], "true");
         });
 
         it("does not override an untrusted or malformed Origin with Fetch Metadata", (t) => {

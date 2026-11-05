@@ -41,7 +41,7 @@ export async function isPreconfiguredSignIn(request: Request): Promise<boolean> 
             }
             chunks.push(value);
         }
-        const body = Buffer.concat(chunks).toString("utf8");
+        const body = new TextDecoder().decode(Buffer.concat(chunks));
         if (request.headers.get("content-type")?.includes("application/json")) {
             return (JSON.parse(body) as { preconfigured?: unknown } | null)?.preconfigured === "true";
         }

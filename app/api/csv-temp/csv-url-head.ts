@@ -19,6 +19,9 @@ export async function validateCsvHeadFromUrl(csvUrl: string): Promise<CsvHeadVal
             signal: controller.signal,
         });
         reader = response.body?.getReader();
+        if (response.status === 416 && response.headers.get("content-range")?.trim() === "bytes */0") {
+            return { status: "invalid", message: "The uploaded CSV is empty." };
+        }
         if (!response.ok) throw new Error(`CSV storage returned HTTP ${response.status}`);
 
         const buffer = Buffer.alloc(CSV_HEAD_INSPECT_BYTES);

@@ -41,7 +41,16 @@ test("@admin Query transports enforce read-only profiling and preserve SSE error
     const readOnly = await request.get(`/api/graph/${graph}`, {
       params: { query: "CREATE (:Forbidden)", timeout: 1 },
     });
-    expect(await readOnly.text()).toContain("event: error");
+    const readOnlyEvent = await readOnly.text();
+    expect(readOnlyEvent).toContain("event: error");
+    expect(JSON.parse(readOnlyEvent.split("data: ")[1]).status).toBe(400);
+
+    const invalidQuery = await request.post(`/api/graph/${graph}`, {
+      data: { query: "MATCH (", timeout: 1 },
+    });
+    const invalidQueryEvent = await invalidQuery.text();
+    expect(invalidQueryEvent).toContain("event: error");
+    expect(JSON.parse(invalidQueryEvent.split("data: ")[1]).status).toBe(400);
 
     const write = await request.post(`/api/graph/${graph}`, {
       data: { query: "CREATE (:Allowed)", timeout: 1 },

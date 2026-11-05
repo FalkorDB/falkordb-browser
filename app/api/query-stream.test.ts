@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { queryStream, queryStreamError } from "./query-stream.ts";
+import { SimpleError } from "@redis/client";
+import { QueryInputError, queryStream, queryStreamError } from "./query-stream.ts";
 
 test("query stream emits a result and closes once even after a later abort", async () => {
   const controller = new AbortController();
@@ -40,8 +41,25 @@ test("already aborted queries never start", async () => {
 
 test("query rejection emits one error event", async (t) => {
   t.mock.method(console, "error", () => {});
-  const response = queryStream(new AbortController().signal, async () => { throw new Error("syntax error"); }, {});
+  const response = queryStream(new AbortController().signal, async () => { throw new SimpleError("syntax error"); }, {});
   assert.equal(await response.text(), 'event: error\ndata: {"message":"syntax error","status":400}\n\n');
+});
+
+test("query input failures stay 400 while backend and connection failures report 500", async (t) => {
+  t.mock.method(console, "error", () => {});
+  for (const [error, status] of [
+    [new QueryInputError("Missing parameter query"), 400],
+    [new SimpleError("NOPERM permission denied"), 400],
+    [new Error("Socket closed unexpectedly"), 500],
+    [new Error("connect ECONNREFUSED localhost:6379"), 500],
+    [new SimpleError("OOM command not allowed"), 500],
+    [new SimpleError("CLUSTERDOWN cluster is down"), 500],
+  ] as const) {
+    const response = queryStream(new AbortController().signal, async () => { throw error; }, {});
+    assert.deepEqual(JSON.parse((await response.text()).split("data: ")[1]), {
+      message: error.message, status,
+    });
+  }
 });
 
 test("authentication errors preserve status and connection error code in SSE", async () => {

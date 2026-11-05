@@ -1,9 +1,17 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
+import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
+import { LoginError } from "./login-errors.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
+
+it("preserves predefined login messages through the toast error sanitizer", () => {
+  for (const code of ["credentials_required", "invalid_credentials", "connection_failed"]) {
+    const message = new LoginError(code).message;
+    assert.equal(toUserFriendlyMessage(message, 400).description, message);
+  }
+});
 
 afterEach(() => {
   setActiveConnectionIdGlobal(null);

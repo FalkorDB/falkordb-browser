@@ -851,7 +851,12 @@ const swaggerSpec = {
         responses: {
           "200": {
             description: "Query profiling information returned successfully"
-          }
+          },
+          "400": { description: "Invalid JSON, missing query, or query profiling failed" },
+          "401": { description: "Authentication or an active connection is required" },
+          "403": { description: "Profiling is unavailable in read-only mode" },
+          "415": { description: "Content-Type must be application/json" },
+          "500": { description: "Internal server error" }
         }
       }
     },

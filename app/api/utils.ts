@@ -4,10 +4,6 @@ export { runQuery } from "./run-query.ts";
 const AUTO_NEXTAUTH_URL = "auto";
 const UNTRUSTED_REQUEST_ORIGIN_MESSAGE = "Untrusted request origin";
 const TRUST_PROXY_HEADERS = "true";
-const LOCALHOST_ORIGINS = new Set([
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]);
 
 /**
  * Determine whether a request must use read-only queries.
@@ -136,7 +132,7 @@ export function getRequestOrigin(request?: Request): string | null {
 }
 
 /**
- * Get allowed origins from environment variable or use defaults
+ * Cross-origin callers must be explicitly configured.
  */
 function getAllowedOrigins(): string[] {
     const envOrigins = process.env.ALLOWED_ORIGINS;
@@ -147,18 +143,7 @@ function getAllowedOrigins(): string[] {
             .filter((origin): origin is string => Boolean(origin));
     }
 
-    const defaults = [...LOCALHOST_ORIGINS];
-
-    // Add AUTH_URL / NEXTAUTH_URL if configured
-    const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
-    if (authUrl && !isAutoNextAuthUrl()) {
-        const authOrigin = normalizeOrigin(authUrl);
-        if (authOrigin) {
-            defaults.push(authOrigin);
-        }
-    }
-
-    return [...new Set(defaults)];
+    return [];
 }
 
 export function isOriginAllowed(requestOrigin?: string | null, request?: Request): boolean {
@@ -177,7 +162,7 @@ export function isOriginAllowed(requestOrigin?: string | null, request?: Request
         return true;
     }
 
-    if (!process.env.ALLOWED_ORIGINS && isAutoNextAuthUrl()) {
+    if (!process.env.ALLOWED_ORIGINS) {
         return origin === getRequestOrigin(request);
     }
 
@@ -186,14 +171,11 @@ export function isOriginAllowed(requestOrigin?: string | null, request?: Request
 
 export function isRequestOriginTrusted(request: Request): boolean {
     const requestOrigin = getRequestOrigin(request);
-    if (process.env.ALLOWED_ORIGINS && !isOriginAllowed(requestOrigin, request)) {
-        return false;
-    }
     const callerOrigin = getHeaderOrigin(request);
     if (request.headers.has("origin") && !callerOrigin) return false;
     if (callerOrigin) {
         return Boolean(requestOrigin) &&
-            (callerOrigin === requestOrigin || isOriginAllowed(callerOrigin, request));
+            isOriginAllowed(callerOrigin, request);
     }
 
     if (["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase())) {
@@ -254,9 +236,8 @@ export function getCorsHeaders(request?: Request): Record<string, string> {
         normalizedOrigin
         && !headers['Access-Control-Allow-Origin']
         && !process.env.ALLOWED_ORIGINS
-        && isAutoNextAuthUrl()
         && request
-        && (normalizedOrigin === getRequestOrigin(request) || isSameOriginBrowserRequest(request))
+        && normalizedOrigin === getRequestOrigin(request)
     ) {
         headers['Access-Control-Allow-Origin'] = normalizedOrigin;
         headers['Access-Control-Allow-Credentials'] = 'true';

@@ -20,11 +20,17 @@ function readJson(file) {
 
 function writeJson(file, value) {
     const temp = `${file}.${crypto.randomBytes(12).toString("hex")}.tmp`;
+    let fd;
     try {
-        fs.writeFileSync(temp, JSON.stringify(value, null, 2), { mode: 0o600, flag: "wx" });
-        fs.chmodSync(temp, 0o600);
+        fd = fs.openSync(temp, "wx", 0o600);
+        fs.writeFileSync(fd, JSON.stringify(value, null, 2));
+        fs.fchmodSync(fd, 0o600);
+        fs.fsyncSync(fd);
+        fs.closeSync(fd);
+        fd = undefined;
         fs.renameSync(temp, file);
     } finally {
+        if (fd !== undefined) fs.closeSync(fd);
         if (fs.existsSync(temp)) fs.unlinkSync(temp);
     }
 }

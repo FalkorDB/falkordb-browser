@@ -17,6 +17,21 @@ test("preconfigured sign-in classification cannot be bypassed with duplicate fla
     })), false);
 });
 
+test("preconfigured sign-in decoding agrees with Request for a UTF-8 BOM", async () => {
+    for (const [type, text] of [
+        ["application/json", '{"preconfigured":"true"}'],
+        ["application/x-www-form-urlencoded", "preconfigured=true"],
+    ]) {
+        const body = Buffer.from(`\uFEFF${text}`);
+        const request = new Request("https://app.example/api/auth/callback/credentials", {
+            method: "POST", body,
+            headers: { "content-type": type, "content-length": String(body.byteLength) },
+        });
+        assert.equal(await isPreconfiguredSignIn(request), true);
+        assert.equal(await request.text(), text);
+    }
+});
+
 // ---------------------------------------------------------------------------
 // readNonNegativeInt
 // ---------------------------------------------------------------------------

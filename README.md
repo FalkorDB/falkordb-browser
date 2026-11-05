@@ -60,6 +60,11 @@ docker run -p 3000:3000 -e "NEXTAUTH_URL=https://www.yoururl.com" -p 6379:6379 -
 
 For reverse-proxy deployments using `NEXTAUTH_URL=auto`, set `TRUST_PROXY_HEADERS=true` only when the proxy strips or overwrites incoming `X-Forwarded-Host` and `X-Forwarded-Proto` headers.
 
+Cross-origin callers (including other localhost ports) must be explicitly listed
+in `ALLOWED_ORIGINS`. This is a caller-origin list, not an API-host allowlist: a
+separate frontend origin can be listed without listing the API server's origin.
+Without that setting, browser callers must match the request's own origin.
+
 URL login uses the authentication attempt itself to detect missing or invalid
 credentials and reveal the credential fields when needed. Connection failures
 show a separate error; no preliminary database probe is made. The former
@@ -70,6 +75,8 @@ so deployments should restrict outbound network access as appropriate.
 Session connections must have an active stored connection record. Removing the
 last connection requires a fresh login; old sessions without a connection ID
 must also sign in again instead of reconnecting from cookie fields.
+The retired session-migration endpoint rejects reconstruction, and the UI signs
+out when no stored connections remain.
 
 File-backed token storage uses atomic replacements and an exclusive
 `<token-file>.lock` directory (the full configured token path with `.lock`
@@ -94,7 +101,9 @@ retain permissions outside the replacement role and key patterns.
 Legacy browser-storage migration leaves connection-shaped keys untouched rather
 than guessing ownership, including hostnames beginning with `chat-` or another
 legacy prefix. Desktop secret regeneration atomically replaces the secrets file
-inside an owner-only directory.
+inside an owner-only directory, flushing the temporary file before renaming it.
+Ambiguous legacy graph keys that could belong to another connection are left
+untouched rather than copied across scopes; this can require manual recovery.
 
 HTTP CSV header validation inspects and retains at most 8 KiB, then cancels the
 response. A stream chunk and the underlying network transfer may exceed 8 KiB

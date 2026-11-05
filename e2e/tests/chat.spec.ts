@@ -58,6 +58,7 @@ test.describe("Chat Feature Tests", () => {
   test(`@readwrite Verify chat button is disabled when no graph is selected`, async () => {
     await browser.createNewPage(ChatComponent);
     const page = await browser.getPage();
+    await page.route("**/api/graph", route => route.fulfill({ json: { opts: [] } }));
     await page.addInitScript(() => {
       for (const key of Object.keys(localStorage)) {
         if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);

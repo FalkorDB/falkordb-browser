@@ -45,8 +45,9 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   // Keep falkordb server-only to avoid bundling BigInt in client/runtime
+  // Share Redis error classes with the external driver for status classification.
   // Keep text-to-cypher external to avoid bundling native .node binaries
-  serverExternalPackages: ['falkordb', '@falkordb/text-to-cypher'],
+  serverExternalPackages: ['falkordb', '@redis/client', '@falkordb/text-to-cypher'],
   images: {
     unoptimized: true
   },

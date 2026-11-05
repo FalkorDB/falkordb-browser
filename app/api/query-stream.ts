@@ -1,3 +1,13 @@
+import { ErrorReply } from "@redis/client";
+
+export class QueryInputError extends Error {}
+
+function queryErrorStatus(error: unknown): number {
+  if (error instanceof QueryInputError) return 400;
+  if (error instanceof ErrorReply && !/^(?:OOM|LOADING|MASTERDOWN|CLUSTERDOWN|TRYAGAIN)\b/.test(error.message)) return 400;
+  return 500;
+}
+
 export function queryStream(
   signal: AbortSignal,
   execute: () => Promise<unknown>,
@@ -29,7 +39,7 @@ export function queryStream(
           console.error("Graph query failed:", error);
           controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({
             message: error instanceof Error ? error.message : "Internal server error",
-            status: 400,
+            status: queryErrorStatus(error),
           })}\n\n`));
         }
       } finally {
