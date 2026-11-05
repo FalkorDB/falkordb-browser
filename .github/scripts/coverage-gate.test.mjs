@@ -494,6 +494,8 @@ test('finds a move to another base after the coverage runs were made', () => {
   assert.equal(movedSince(moved('2026-11-05T11:00:00Z'), runs, ['Build']), '2026-11-05T11:00:00Z');
   assert.equal(movedSince(moved('2026-11-05T09:00:00Z'), runs, ['Build']), undefined);
   assert.equal(movedSince([], runs, ['Build']), undefined);
+  // GitHub's own move, when the base branch was merged and deleted.
+  assert.equal(movedSince([{ event: 'automatic_base_change_succeeded', created_at: '2026-11-05T11:00:00Z' }], runs, ['Build']), '2026-11-05T11:00:00Z');
   // Moved, then moved again after the runs: the last move counts.
   assert.equal(movedSince([...moved('2026-11-05T09:00:00Z'), ...moved('2026-11-05T11:00:00Z')], runs, ['Build']), '2026-11-05T11:00:00Z');
 });

@@ -150,12 +150,16 @@ export function waitingFor(expected, runs) {
   });
 }
 
+// A pull request moved to another base: by hand, or by GitHub when its base
+// branch was merged and deleted.
+const MOVES = ['base_ref_changed', 'automatic_base_change_succeeded'];
+
 /**
  * When a pull request last moved to another base, if that was after any
  * expected workflow's latest run was made (its coverage is the old base's).
  */
 export function movedSince(timeline, runs, expected) {
-  const moves = timeline.filter((e) => e.event === 'base_ref_changed').map((e) => e.created_at).sort();
+  const moves = timeline.filter((e) => MOVES.includes(e.event)).map((e) => e.created_at).sort();
   const movedAt = moves.at(-1);
   if (!movedAt) return undefined;
   const latest = latestRuns(runs);
