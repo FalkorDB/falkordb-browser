@@ -208,9 +208,9 @@ function world({
   const heads = [head].flat();
   const gh = async (path) => {
     if (path === `pulls/${pr?.number}`) return { head: { sha: githubHead } };
-    if (path.startsWith(`pulls/${pr?.number}/files`)) return path.includes('page=1') ? files.map((filename) => ({ filename })) : [];
-    if (path.startsWith(`commits/${SHA}`)) return { files: path.includes('page=1') ? files.map((filename) => ({ filename })) : [] };
-    if (path.startsWith('actions/runs')) return { workflow_runs: path.includes('page=1') ? runs : [] };
+    if (path.startsWith(`pulls/${pr?.number}/files`)) return /[?&]page=1(&|$)/.test(path) ? files.map((filename) => ({ filename })) : [];
+    if (path.startsWith(`commits/${SHA}`)) return { files: /[?&]page=1(&|$)/.test(path) ? files.map((filename) => ({ filename })) : [] };
+    if (path.startsWith('actions/runs')) return { workflow_runs: /[?&]page=1(&|$)/.test(path) ? runs : [] };
     if (path.startsWith('contents/')) {
       const file = path.slice('contents/'.length).split('?')[0];
       return { content: readFileSync(`${ROOT}${file}`).toString('base64') };
@@ -401,4 +401,13 @@ test('gate: every wait shares one deadline, inside the job timeout', async () =>
   await assert.rejects(retry(async () => { calls += 1; throw down; }, async (ms) => { left -= ms; }, 10, () => left), /503/);
   // 50s: fails, waits 20s; 30s: fails, waits; 10s: fails, no room to wait.
   assert.equal(calls, 3);
+});
+
+test('gate: past 300 changed files, trusts the runs GitHub started', async () => {
+  // GitHub filters on the first 300 files only, so it may not have started
+  // Playwright for this change: the gate must not wait for it forever.
+  const files = [...Array(300).fill('docs/a.md').map((f, i) => `docs/${i}.md`), 'app/graph/page.tsx'];
+  const big = world({ files, runs: [run('Build')], uploads: [FRESH.slice(0, 2)] });
+  assert.equal(await gate(big.args), true);
+  assert.equal(big.posted[0], 'coverage/project success: 96.00% (target 95%)');
 });

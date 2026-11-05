@@ -94,6 +94,18 @@ export function pathFilters(workflow, event) {
   return filters;
 }
 
+// GitHub matches path filters against the first 300 changed files only.
+const FILTERED_FILES = 300;
+
+/**
+ * Whether the gate can tell from `files` which workflows GitHub runs: past
+ * 300 changed files GitHub's choice is its own, and the gate trusts the
+ * runs it started.
+ */
+export function filtersApply(files) {
+  return files.length <= FILTERED_FILES;
+}
+
 /** Whether a workflow with these filters runs for a change to `files`, as GitHub decides. */
 export function runsFor(filters, files) {
   if (filters.paths) {
@@ -399,7 +411,7 @@ export async function gate({
       throw error;
     }
     const workflow = Buffer.from(content.content, 'base64').toString('utf8');
-    if (!expected.includes(name) && runsFor(pathFilters(workflow, trigger), files)) expected.push(name);
+    if (!expected.includes(name) && filtersApply(files) && runsFor(pathFilters(workflow, trigger), files)) expected.push(name);
   }
   const waiting = waitingFor(expected, runs);
   if (waiting.length) {
