@@ -43,7 +43,9 @@ test.describe('Canvas Tests', () => {
             await graph.fillElementCanvasSearch("keyboard-");
             await expect(graph.elementCanvasSuggestionList.locator("li")).toHaveCount(2);
             await graph.elementCanvasSearch.press("ArrowDown");
+            await expect(graph.elementCanvasSuggestionList.getByRole("option", { selected: true })).toContainText("keyboard-beta");
             await graph.elementCanvasSearch.press("ArrowDown");
+            await expect(graph.elementCanvasSuggestionList.getByRole("option", { selected: true })).toContainText("keyboard-alpha");
             await graph.elementCanvasSearch.press("Enter");
             await expect(page.getByTestId("DataPanelAttributekeyboard-alpha")).toBeVisible();
         } finally {
@@ -62,6 +64,8 @@ test.describe('Canvas Tests', () => {
             await graph.selectGraphByName(graphName);
             await graph.insertQuery("MATCH (n) RETURN n");
             await graph.clickRunQuery();
+            await graph.fillElementCanvasSearch("existing-search-node");
+            await expect(graph.elementCanvasSuggestionList.locator("li")).toHaveCount(1);
             await graph.fillElementCanvasSearch("no-such-canvas-value");
             await expect(graph.elementCanvasSuggestionList).toBeHidden();
             await graph.elementCanvasSearch.press("Enter");
