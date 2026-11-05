@@ -2,6 +2,7 @@
 [![Dockerhub](https://img.shields.io/docker/pulls/falkordb/falkordb-browser?label=Docker)](https://hub.docker.com/r/falkordb/falkordb-browser/)
 [![Discord](https://img.shields.io/discord/1146782921294884966?style=flat-square)](https://discord.gg/6M4QwDXn2w)
 [![Workflow](https://github.com/FalkorDB/falkordb-browser/actions/workflows/nextjs.yml/badge.svg?branch=main)](https://github.com/FalkorDB/falkordb-browser/actions/workflows/nextjs.yml)
+[![Codecov](https://codecov.io/gh/FalkorDB/falkordb-browser/branch/staging/graph/badge.svg)](https://codecov.io/gh/FalkorDB/falkordb-browser)
 
 # FalkorDB Browser
 
