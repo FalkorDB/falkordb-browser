@@ -66,10 +66,10 @@ jobs:
         # Intel Macs (mac-x64). Each runner builds its own architecture natively.
         os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       NEXT_TELEMETRY_DISABLED: "1"
-      # Unsigned builds until signing certificates are configured.
+      # Only the macOS release packaging step enables signing.
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
     steps:
       - name: Checkout
@@ -113,11 +113,67 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: npm version "${TAG#v}" --no-git-tag-version --allow-same-version
 
+      - name: Verify macOS signing credentials
+        if: runner.os == 'macOS' && github.event_name == 'release'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$MACOS_CERTIFICATE_P12" ] ||
+             [ -z "$MACOS_CERTIFICATE_PASSWORD" ] ||
+             [ -z "$APPLE_ID" ] ||
+             [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ||
+             [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::error::Configure all documented macOS signing and notarization secrets before publishing a desktop release."
+            exit 1
+          fi
+
       # Native modules in the standalone server are traced for the OS that
       # builds them, which is why each platform builds its own installer.
-      - name: Build installers
+      - name: Build bundled server
         working-directory: desktop
-        run: npm run dist
+        run: npm run build:web && npm run prepare:server
+
+      - name: Build unsigned installers
+        if: runner.os != 'macOS' || github.event_name != 'release'
+        working-directory: desktop
+        run: npx --no-install electron-builder --publish never
+
+      - name: Build signed macOS installers
+        if: runner.os == 'macOS' && github.event_name == 'release'
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "true"
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # Apple credentials trigger notarization; stapler validation below
+        # enforces that notarization actually completed.
+        run: npx --no-install electron-builder --publish never -c.mac.forceCodeSigning=true
+
+      - name: Verify macOS signature and notarization
+        if: runner.os == 'macOS' && github.event_name == 'release'
+        working-directory: desktop/dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apps=(mac*/*.app)
+          dmgs=(*.dmg)
+          if [ ${#apps[@]} -eq 0 ] || [ ${#dmgs[@]} -eq 0 ]; then
+            echo "::error::No macOS app bundle or DMG was built."
+            exit 1
+          fi
+          for app in "${apps[@]}"; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+            xcrun stapler validate "$app"
+          done
 
       - name: Upload installers
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -131,8 +187,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Runs even when some platforms fail, so a missing macOS credential does not
+  # hold back the Windows and Linux installers. The job still fails afterwards
+  # so the incomplete release is visible.
   attach-to-release:
-    if: github.event_name == 'release'
+    if: ${{ !cancelled() && github.event_name == 'release' }}
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -149,4 +208,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --clobber
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(installers/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::No desktop installers were built."
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Fail when a platform build failed
+        if: ${{ needs.build.result != 'success' }}
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          echo "::error::Desktop build result was '$BUILD_RESULT'; installers for the failed platforms were not attached."
+          exit 1

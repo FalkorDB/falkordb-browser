@@ -5,6 +5,7 @@ import { ArrowUpRight, Download } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
 import useAppDownload from "@/lib/useAppDownload";
+import { MACOS_INSTALL_GUIDANCE } from "@/lib/appDownload";
 
 interface Props {
     className: string
@@ -48,14 +49,29 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
         );
     }
 
+    const handleDownload = (platform: string) => {
+        onSelect?.();
+        if (platform === "mac") {
+            toast(MACOS_INSTALL_GUIDANCE);
+        }
+    };
+
     const primary = item(
-        <a className={className} href={download.href} target="_blank" rel="noreferrer" data-testid="appDownload" onClick={onSelect}>
+        <a
+            className={className}
+            href={download.href}
+            target="_blank"
+            rel="noreferrer"
+            data-testid="appDownload"
+            onClick={() => handleDownload(download.platform)}
+        >
             <Download size={iconSize} />
             <span>{download.label}</span>
             <ArrowUpRight size={15} className="ml-auto" />
         </a>
     );
-    if (!download.alternate) return primary;
+    const alternate = download.alternate;
+    if (!alternate) return primary;
 
     // The other build for this OS (Intel next to Apple silicon), for the
     // visitors whose browser cannot tell which one they need.
@@ -63,9 +79,9 @@ export default function AppDownloadLink({ className, iconSize = 20, onSelect, as
         <>
             {primary}
             {item(
-                <a className={className} href={download.alternate.href} target="_blank" rel="noreferrer" data-testid="appDownloadAlternate" onClick={onSelect}>
+                <a className={className} href={alternate.href} target="_blank" rel="noreferrer" data-testid="appDownloadAlternate" onClick={() => handleDownload(download.platform)}>
                     <Download size={iconSize} />
-                    <span>{download.alternate.label}</span>
+                    <span>{alternate.label}</span>
                     <ArrowUpRight size={15} className="ml-auto" />
                 </a>
             )}

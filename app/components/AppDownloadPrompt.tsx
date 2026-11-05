@@ -4,7 +4,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { dismissAppPrompt, getPromptStorage, markAppPromptShown, shouldShowAppPrompt } from "@/lib/appDownload";
+import { dismissAppPrompt, getPromptStorage, markAppPromptShown, shouldShowAppPrompt, MACOS_INSTALL_GUIDANCE } from "@/lib/appDownload";
+import { useToast } from "@/components/ui/use-toast";
 import useAppDownload from "@/lib/useAppDownload";
 import { useWhatsNewActive } from "@/lib/popupTurn";
 import Button from "./ui/Button";
@@ -32,6 +33,7 @@ interface Props {
  */
 export default function AppDownloadPrompt({ blocked: blockedByCaller }: Props) {
     const download = useAppDownload();
+    const { toast } = useToast();
     // The release's news goes first; the download offer waits for it.
     const whatsNewActive = useWhatsNewActive();
     const blocked = blockedByCaller || whatsNewActive;
@@ -67,6 +69,10 @@ export default function AppDownloadPrompt({ blocked: blockedByCaller }: Props) {
 
     const isHomeScreen = download.kind === "homeScreen";
     const platformName = PLATFORM_NAMES[download.platform];
+    const handleDownload = () => {
+        close(true);
+        if (download.platform === "mac") toast(MACOS_INSTALL_GUIDANCE);
+    };
 
     return (
         <Dialog open={open} onOpenChange={(next) => { if (!next) close(dontShowAgain); }}>
@@ -132,7 +138,7 @@ export default function AppDownloadPrompt({ blocked: blockedByCaller }: Props) {
                                 target="_blank"
                                 rel="noreferrer"
                                 data-testid="appDownloadPromptDownload"
-                                onClick={() => close(true)}
+                                onClick={handleDownload}
                             >
                                 <Download size={18} />
                                 {download.label}
@@ -147,7 +153,7 @@ export default function AppDownloadPrompt({ blocked: blockedByCaller }: Props) {
                         target="_blank"
                         rel="noreferrer"
                         data-testid="appDownloadPromptAlternate"
-                        onClick={() => close(true)}
+                        onClick={handleDownload}
                     >
                         {download.alternate.label}
                     </a>
