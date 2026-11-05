@@ -1,7 +1,7 @@
 name: Coverage status
 
-# The coverage gate. Each time a workflow that uploads coverage finishes, this
-# posts coverage/project and coverage/patch to its commit (branch protection
+# The coverage gate. Each time a workflow that uploads coverage starts or
+# finishes, this posts coverage/project and coverage/patch to its commit (branch protection
 # requires both): pending until every coverage workflow the commit triggers
 # has finished and Codecov has processed their uploads, then a pass or a
 # fail against the target. .github/scripts/coverage-gate.mjs has the details.
@@ -15,7 +15,9 @@ name: Coverage status
 on:
   workflow_run:
     workflows: ["Build", "Playwright Tests", "Desktop app", "Mobile app"]
-    types: [completed]
+    # requested: a new run or a re-run puts the gate back to pending at once,
+    # rather than leave an earlier verdict up until the run is done.
+    types: [requested, completed]
 
 permissions:
   contents: read

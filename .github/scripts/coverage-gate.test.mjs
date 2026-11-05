@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  COVERAGE_WORKFLOWS, codecovSettled, globToRegExp, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, globToRegExp, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
@@ -128,6 +128,17 @@ test("finds the flags a commit's workflows uploaded no coverage of", () => {
   ];
   assert.deepEqual(missingFlags(['Build'], uploads), []);
   assert.deepEqual(missingFlags(['Build', 'Playwright Tests', 'Mobile app'], uploads), ['e2e', 'mobile']);
+});
+
+test("finds the commit's uploads Codecov could not process", () => {
+  const uploads = [
+    { name: 'e2e-shard-1', flags: ['e2e'], upload_type: 'uploaded', state: 'merged' },
+    { name: 'e2e-shard-2', flags: ['e2e'], upload_type: 'uploaded', state: 'error' },
+    { name: 'CF[1]', flags: ['mobile'], upload_type: 'carriedforward', state: 'error' },
+  ];
+  assert.deepEqual(failedUploads(uploads).map((u) => u.name), ['e2e-shard-2']);
+  // The flag still has another shard's upload: only failedUploads catches it.
+  assert.deepEqual(missingFlags(['Playwright Tests'], uploads), []);
 });
 
 test('waits until Codecov has processed every upload', () => {

@@ -147,6 +147,11 @@ export function unsuccessful(expected, runs) {
   return expected.filter((name) => latest.get(name)?.conclusion !== 'success');
 }
 
+/** The commit's own uploads that Codecov could not process. */
+export function failedUploads(uploads) {
+  return uploads.filter((u) => u.upload_type !== 'carriedforward' && u.state === 'error');
+}
+
 /**
  * The flags the expected workflows upload that the commit has no upload of
  * its own for (a carried-forward one is an earlier commit's).
@@ -319,6 +324,15 @@ async function gate({ gh, post, contexts, pr, sha, repo, target }) {
     }
     if (attempt >= 45) throw new Error('Codecov did not process every upload in 15 minutes');
     await new Promise((resolve) => { setTimeout(resolve, 20_000); });
+  }
+
+  // One shard's lost upload would leave its flag looking complete.
+  const broken = failedUploads(uploads);
+  if (broken.length) {
+    const names = broken.map((u) => u.name || u.flags.join(',')).join(', ');
+    console.log(`Codecov could not process: ${names}`);
+    for (const context of contexts) await post(context, { state: 'failure', description: `Codecov could not process ${broken.length} upload(s): ${names}`.slice(0, 140) });
+    return;
   }
 
   const missing = missingFlags(expected, uploads);
