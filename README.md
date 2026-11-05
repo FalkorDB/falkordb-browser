@@ -319,11 +319,13 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   tests, type declarations or the generated grammar — by every kind of test: unit, smoke,
   e2e (browser and server side), desktop and mobile. A file no test loads counts as 0%.
   Each CI job records raw V8 coverage and turns it into a report with
-  `.github/scripts/coverage-report.mjs`; Codecov merges the reports per commit and requires
-  **95%** of the whole codebase (`codecov/project`, on every commit to `main` and
-  `staging` and on PRs) and of the lines a PR changes (`codecov/patch`). Codecov posts both
-  only once every workflow that uploads coverage has finished for the commit (the **Coverage
-  status** workflow tells it to). Locally:
+  `.github/scripts/coverage-report.mjs`, and Codecov merges the reports per commit. The
+  **Coverage status** workflow is the gate: once every coverage workflow a commit triggers
+  has finished, and Codecov has processed their uploads, it requires **95%** of the whole
+  codebase (`coverage/project`, on every commit to `main` and `staging` and on PRs) and of
+  the lines a PR changes (`coverage/patch`). A coverage workflow that fails or is cancelled
+  fails the gate, since its coverage is incomplete (`.github/scripts/coverage-gate.mjs`).
+  Locally:
   ```bash
   rm -rf coverage
   NODE_V8_COVERAGE=coverage/raw/unit npm run test:coverage

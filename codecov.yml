@@ -6,13 +6,17 @@
 #   desktop  Electron shell tests                (Desktop app workflow)
 #   mobile   Capacitor shell tests               (Mobile app workflow)
 # Codecov merges them per commit: a line any test runs is covered.
+#
+# The gate is not Codecov's: the Coverage status workflow posts
+# coverage/project and coverage/patch (95%, required by branch protection) once
+# every coverage workflow of the commit has finished and Codecov has processed
+# its uploads (.github/scripts/coverage-gate.mjs). Codecov posts its statuses
+# whenever a pull request changes, before the tests are done, so they are off.
 
 codecov:
   require_ci_to_pass: yes
   notify:
-    # Post the statuses only when the Coverage status workflow says every
-    # upload of the commit is in, never from a partial merge. (wait_for_ci
-    # does not do this: it does not wait for GitHub Actions jobs.)
+    # Comment once the Coverage status workflow says the coverage is complete.
     manual_trigger: true
 
 coverage:
@@ -21,16 +25,8 @@ coverage:
   range: "95...100"
 
   status:
-    # The whole codebase, on every commit: pushes to main and staging, and PRs.
-    project:
-      default:
-        target: 95%
-        threshold: 0%
-    # The lines a PR adds or changes.
-    patch:
-      default:
-        target: 95%
-        threshold: 0%
+    project: off
+    patch: off
 
 flag_management:
   default_rules:

@@ -1,18 +1,16 @@
 name: Coverage status
 
-# Codecov holds codecov/project and codecov/patch for a commit until this
-# workflow says every upload is in (codecov.yml: notify.manual_trigger).
-# Otherwise it would post them after the first upload, from that one and the
-# other flags carried forward from an earlier commit, before the e2e tests
-# have run.
+# The coverage gate. Each time a workflow that uploads coverage finishes, this
+# posts coverage/project and coverage/patch to its commit (branch protection
+# requires both): pending until every coverage workflow the commit triggers
+# has finished and Codecov has processed their uploads, then a pass or a
+# fail against the target. .github/scripts/coverage-gate.mjs has the details.
+# Once the gate has posted, it tells Codecov to post its pull request comment
+# (codecov.yml: notify.manual_trigger).
 #
-# It runs each time a workflow that uploads coverage finishes, and tells
-# Codecov to post once none of them is still running for the commit. A
-# workflow that a commit's paths skip never starts, so it is not waited for.
-# A re-run posts again with what it adds.
-#
-# workflow_run runs the workflow file from the default branch, with this
-# repository's secrets, for pull requests from forks as well.
+# workflow_run runs this file and the gate script from the default branch,
+# with a token that can post statuses, for pull requests from forks and
+# Dependabot too. It never checks out or runs the pull request's code.
 
 on:
   workflow_run:
@@ -22,45 +20,44 @@ on:
 permissions:
   contents: read
   actions: read
+  pull-requests: read
+  statuses: write
 
 concurrency:
+  # The latest event of a commit decides: an earlier run is superseded.
   group: ${{ github.workflow }}-${{ github.event.workflow_run.head_sha }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  notify:
+  gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Check every coverage workflow of the commit has finished
-        id: runs
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          running=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA&per_page=100" --jq '
-            [.workflow_runs[]
-             | select(.name == "Build" or .name == "Playwright Tests" or .name == "Desktop app" or .name == "Mobile app")
-             | select(.status != "completed")
-             | .name] | unique | join(", ")')
-          if [ -n "$running" ]; then
-            echo "Still running for $SHA: $running"
-          else
-            echo "Every coverage workflow of $SHA has finished"
-            echo "done=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      # The Codecov CLI reads the repository from the checkout's remote.
       - name: Checkout
-        if: steps.runs.outputs.done == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Tell Codecov to post the coverage statuses
-        if: steps.runs.outputs.done == 'true'
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Post the coverage gate
+        id: gate
+        run: node .github/scripts/coverage-gate.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT: ${{ github.event.workflow_run.event }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          TARGET: "95"
+
+      - name: Tell Codecov to post its comment
+        if: steps.gate.outputs.decided == 'true'
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           run_command: send-notifications
           override_commit: ${{ github.event.workflow_run.head_sha }}
-          fail_ci_if_error: true

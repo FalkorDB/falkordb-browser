@@ -1,0 +1,295 @@
+// The coverage gate: posts coverage/project (the whole codebase) and
+// coverage/patch (the lines a pull request changes) to a commit, each a pass
+// at TARGET% or more, once every coverage workflow the commit triggers has
+// finished and Codecov has processed every upload. Until then it posts them
+// as pending. Branch protection requires both.
+//
+// Codecov's own statuses cannot be the gate: on a pull request they are
+// posted as soon as the pull request changes, from whatever was uploaded by
+// then plus flags carried forward from an earlier commit, and Codecov cannot
+// see GitHub Actions jobs to wait for them.
+//
+// Run by the Coverage status workflow (workflow_run), from the default
+// branch. Environment: GITHUB_REPOSITORY, GH_TOKEN, SHA, EVENT (push or
+// pull_request), BRANCH (the pushed branch), PR (the pull request's number,
+// when GitHub gives it), TARGET (95 by default). DRY_RUN prints the statuses
+// instead of posting them.
+
+import { appendFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const GITHUB = 'https://api.github.com';
+const CODECOV = 'https://api.codecov.io/api/v2/github';
+
+// The workflows that upload coverage: the file that defines when each runs,
+// and the Codecov flags it uploads.
+export const COVERAGE_WORKFLOWS = {
+  Build: { file: '.github/workflows/nextjs.yml', flags: ['unit', 'smoke'] },
+  'Playwright Tests': { file: '.github/workflows/playwright.yml', flags: ['e2e'] },
+  'Desktop app': { file: '.github/workflows/desktop.yml', flags: ['desktop'] },
+  'Mobile app': { file: '.github/workflows/mobile.yml', flags: ['mobile'] },
+};
+
+// The branches the gate guards (branch protection requires it there).
+const PROTECTED = ['main', 'staging'];
+
+/** A GitHub path filter glob as a regular expression over a repository path. */
+export function globToRegExp(glob) {
+  let re = '';
+  for (let i = 0; i < glob.length; i += 1) {
+    const c = glob[i];
+    if (c === '*' && glob[i + 1] === '*') {
+      // `**/` matches any number of directories, `**` anything.
+      if (glob[i + 2] === '/') {
+        re += '(?:.*/)?';
+        i += 2;
+      } else {
+        re += '.*';
+        i += 1;
+      }
+    } else if (c === '*') {
+      re += '[^/]*';
+    } else if (c === '?') {
+      re += '[^/]';
+    } else {
+      re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    }
+  }
+  return new RegExp(`^${re}$`);
+}
+
+/**
+ * The `paths` and `paths-ignore` filters of one event (`push` or
+ * `pull_request`) in a workflow file. Reads the block layout these
+ * workflows use, not YAML in general.
+ */
+export function pathFilters(workflow, event) {
+  const lines = workflow.split('\n');
+  const onAt = lines.findIndex((l) => /^on:\s*$/.test(l));
+  if (onAt < 0) return {};
+  let eventIndent;
+  let list;
+  let listIndent;
+  const filters = {};
+  for (const line of lines.slice(onAt + 1)) {
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    if (/^\S/.test(line)) break; // the next top-level key
+    const indent = line.length - line.trimStart().length;
+    const key = /^(\s*)([\w-]+):/.exec(line);
+    if (eventIndent === undefined) {
+      if (key && key[2] === event) eventIndent = indent;
+      continue;
+    }
+    if (indent <= eventIndent) break; // the next event
+    const item = /^\s*-\s*['"]?([^'"#]+?)['"]?\s*(#.*)?$/.exec(line);
+    if (list && item && indent > listIndent) {
+      filters[list].push(item[1]);
+    } else if (key) {
+      list = key[2] === 'paths' || key[2] === 'paths-ignore' ? key[2] : undefined;
+      listIndent = indent;
+      if (list) filters[list] = [];
+    }
+  }
+  return filters;
+}
+
+/** Whether a workflow with these filters runs for a change to `files`, as GitHub decides. */
+export function runsFor(filters, files) {
+  if (filters.paths) {
+    const res = filters.paths.map(globToRegExp);
+    return files.some((f) => res.some((re) => re.test(f)));
+  }
+  if (filters['paths-ignore']) {
+    const res = filters['paths-ignore'].map(globToRegExp);
+    return files.some((f) => !res.some((re) => re.test(f)));
+  }
+  return true;
+}
+
+/** Each workflow's latest run (a re-run is the run that counts). */
+function latestRuns(runs) {
+  const latest = new Map();
+  for (const run of runs) {
+    const seen = latest.get(run.name);
+    if (!seen || run.id > seen.id) latest.set(run.name, run);
+  }
+  return latest;
+}
+
+/**
+ * The expected workflows still to finish: missing (not started yet), or
+ * started and not completed. A run waiting for approval has not run.
+ */
+export function waitingFor(expected, runs) {
+  const latest = latestRuns(runs);
+  return expected.filter((name) => {
+    const run = latest.get(name);
+    return !run || run.status !== 'completed' || run.conclusion === 'action_required';
+  });
+}
+
+/**
+ * The finished workflows that did not succeed. Their coverage is missing or
+ * partial, and Codecov would fill the gap with an earlier commit's.
+ */
+export function unsuccessful(expected, runs) {
+  const latest = latestRuns(runs);
+  return expected.filter((name) => latest.get(name)?.conclusion !== 'success');
+}
+
+/**
+ * The flags the expected workflows upload that the commit has no upload of
+ * its own for (a carried-forward one is an earlier commit's).
+ */
+export function missingFlags(expected, uploads) {
+  const uploaded = new Set(uploads
+    .filter((u) => u.upload_type !== 'carriedforward' && u.state !== 'error')
+    .flatMap((u) => u.flags));
+  return expected.flatMap((name) => COVERAGE_WORKFLOWS[name].flags).filter((flag) => !uploaded.has(flag));
+}
+
+/** Whether Codecov has processed every upload of the commit. */
+export function codecovSettled(uploads) {
+  return uploads.every((u) => ['merged', 'complete', 'error'].includes(u.state));
+}
+
+/** A coverage status for `pct` against `target`. */
+export function verdict(pct, target) {
+  const shown = `${(Math.floor(pct * 100) / 100).toFixed(2)}%`;
+  return pct >= target
+    ? { state: 'success', description: `${shown} (target ${target}%)` }
+    : { state: 'failure', description: `${shown}, below the ${target}% target` };
+}
+
+/** The coverage/patch status from Codecov's patch totals for a pull request. */
+export function patchVerdict(patch, target) {
+  const lines = patch.hits + patch.misses + patch.partials;
+  if (lines === 0) return { state: 'success', description: 'No changed lines to cover' };
+  return verdict((100 * patch.hits) / lines, target);
+}
+
+async function api(url, { token, method = 'GET', body } = {}) {
+  const res = await fetch(url, {
+    method,
+    headers: {
+      accept: url.startsWith(GITHUB) ? 'application/vnd.github+json' : 'application/json',
+      ...(token && { authorization: `Bearer ${token}` }),
+      ...(body && { 'content-type': 'application/json' }),
+    },
+    body: body && JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${method} ${url}: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+async function main() {
+  const { GITHUB_REPOSITORY: repo, GH_TOKEN: token, SHA: sha, EVENT: event, BRANCH: branch } = process.env;
+  const target = Number(process.env.TARGET ?? 95);
+  const gh = (path, options) => api(`${GITHUB}/repos/${repo}/${path}`, { token, ...options });
+
+  // The pull request, for a pull_request run. GitHub names it only for one
+  // from this repository, so look up one from a fork.
+  let pr = process.env.PR ? await gh(`pulls/${process.env.PR}`) : undefined;
+  if (!pr && event === 'pull_request') {
+    const found = await api(`${GITHUB}/search/issues?q=${encodeURIComponent(`repo:${repo} is:pr is:open ${sha}`)}`, { token });
+    if (found.items.length) pr = await gh(`pulls/${found.items[0].number}`);
+  }
+  if (event === 'pull_request' && !pr) {
+    console.log(`No open pull request has ${sha} as its head`);
+    return;
+  }
+  const base = pr ? pr.base.ref : branch;
+  if (!PROTECTED.includes(base)) {
+    console.log(`${base} is not a protected branch: no gate`);
+    return;
+  }
+
+  const post = (context, { state, description }) => (process.env.DRY_RUN
+    ? console.log(`would post ${context}: ${state}, ${description}`)
+    : gh(`statuses/${sha}`, {
+    method: 'POST',
+    body: {
+      context,
+      state,
+      description,
+      target_url: `https://app.codecov.io/gh/${repo}/${pr ? `pull/${pr.number}` : `commit/${sha}`}`,
+    },
+  }));
+  const contexts = pr ? ['coverage/project', 'coverage/patch'] : ['coverage/project'];
+
+  // The workflows this commit triggers, as their path filters decide.
+  const files = [];
+  if (pr) {
+    for (let page = 1; ; page += 1) {
+      const batch = await gh(`pulls/${pr.number}/files?per_page=100&page=${page}`);
+      files.push(...batch.map((f) => f.filename));
+      if (batch.length < 100) break;
+    }
+  } else {
+    files.push(...(await gh(`commits/${sha}`)).files.map((f) => f.filename));
+  }
+  const expected = [];
+  for (const [name, { file }] of Object.entries(COVERAGE_WORKFLOWS)) {
+    const content = await gh(`contents/${file}?ref=${sha}`).catch(() => undefined);
+    if (!content) continue;
+    const workflow = Buffer.from(content.content, 'base64').toString('utf8');
+    if (runsFor(pathFilters(workflow, pr ? 'pull_request' : 'push'), files)) expected.push(name);
+  }
+
+  const { workflow_runs: runs } = await gh(`actions/runs?head_sha=${sha}&per_page=100`);
+  const waiting = waitingFor(expected, runs);
+  if (waiting.length) {
+    console.log(`Waiting for ${waiting.join(', ')}`);
+    for (const context of contexts) await post(context, { state: 'pending', description: `Waiting for ${waiting.join(', ')}` });
+    return;
+  }
+
+  const failed = unsuccessful(expected, runs);
+  if (failed.length) {
+    console.log(`Did not succeed: ${failed.join(', ')}`);
+    for (const context of contexts) await post(context, { state: 'failure', description: `${failed.join(', ')} did not succeed: the coverage is incomplete` });
+    return;
+  }
+
+  // Every upload is in once its workflow finished; wait for Codecov to
+  // process them (up to 15 minutes).
+  const codecov = `${CODECOV}/${repo.split('/')[0]}/repos/${repo.split('/')[1]}`;
+  let uploads;
+  for (let attempt = 0; ; attempt += 1) {
+    ({ results: uploads } = await api(`${codecov}/commits/${sha}/uploads/?page_size=100`));
+    if (uploads.length && codecovSettled(uploads)) break;
+    if (attempt >= 45) {
+      for (const context of contexts) await post(context, { state: 'error', description: 'Codecov did not process the coverage in time' });
+      throw new Error('Codecov did not process every upload in 15 minutes');
+    }
+    await new Promise((resolve) => { setTimeout(resolve, 20_000); });
+  }
+
+  const missing = missingFlags(expected, uploads);
+  if (missing.length) {
+    console.log(`No upload of ${missing.join(', ')}`);
+    for (const context of contexts) await post(context, { state: 'failure', description: `No ${missing.join(', ')} coverage was uploaded for this commit` });
+    return;
+  }
+
+  const commit = await api(`${codecov}/commits/${sha}/`);
+  const project = verdict(commit.totals.coverage, target);
+  console.log(`coverage/project: ${project.description}`);
+  await post('coverage/project', project);
+  // The workflow tells Codecov to post its comment once the gate decided.
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, 'decided=true\n');
+  if (pr) {
+    const compare = await api(`${codecov}/compare/?pullid=${pr.number}`);
+    if (compare.head_commit !== sha) {
+      console.log(`The pull request moved on to ${compare.head_commit}: its own gate will post`);
+      return;
+    }
+    const patch = patchVerdict(compare.totals.patch, target);
+    console.log(`coverage/patch: ${patch.description}`);
+    await post('coverage/patch', patch);
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  await main();
+}
