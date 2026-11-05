@@ -183,7 +183,7 @@ export function browserEntries(dir, name) {
   });
 }
 
-export function validateBrowserCoverage(dirs) {
+export function validateBrowserCoverage(dirs, required = true) {
   let entries = 0;
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;
@@ -191,10 +191,15 @@ export function validateBrowserCoverage(dirs) {
       if (/^browser-error-.*\.json$/.test(name)) {
         throw new Error(`Browser coverage collection failed: ${readFileSync(path.join(dir, name), 'utf8')}`);
       }
-      if (/^browser-[^.]+\.json$/.test(name)) entries += browserEntries(dir, name).length;
+      if (/^browser-[^.]+\.json$/.test(name)) {
+        const saved = browserEntries(dir, name);
+        const recorded = JSON.parse(readFileSync(path.join(dir, name), 'utf8'));
+        if (saved.length !== recorded.length) throw new Error(`Browser coverage is missing chunk sources in ${name}`);
+        entries += saved.length;
+      }
     }
   }
-  if (!entries) throw new Error('No usable browser coverage was recorded');
+  if (required && !entries) throw new Error('No usable browser coverage was recorded');
 }
 
 // Docker's server runs under /app, not the reporting checkout. Its exact
@@ -219,7 +224,7 @@ async function main([flag, ...dirs]) {
     console.error('usage: coverage-report.mjs <flag> <raw dir>...');
     process.exit(2);
   }
-  if (process.env.REQUIRE_BROWSER_COVERAGE === '1') validateBrowserCoverage(dirs);
+  validateBrowserCoverage(dirs, process.env.REQUIRE_BROWSER_COVERAGE === '1');
   // A source file of this checkout that the flag covers (source maps also
   // name files of dependencies).
   const inScope = (sourcePath) => {

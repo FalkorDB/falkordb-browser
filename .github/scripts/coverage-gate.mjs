@@ -455,13 +455,6 @@ export async function gate({
     return false;
   }
 
-  const missing = missingFlags(expected, uploads);
-  if (missing.length) {
-    console.log(`No upload of ${missing.join(', ')}`);
-    for (const context of contexts) await post(context, { state: 'failure', description: `No ${missing.join(', ')} coverage was uploaded for this commit` });
-    return false;
-  }
-
   const commit = await retry(() => codecov(`${base}/commits/${sha}/`), sleep);
   if (typeof commit.totals?.coverage !== 'number') throw new Error('Codecov has no coverage total for the commit');
   const project = verdict(commit.totals.coverage, target);

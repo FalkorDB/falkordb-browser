@@ -109,10 +109,13 @@ test('requires usable browser recordings only when explicitly requested', () => 
     assert.throws(() => validateBrowserCoverage([path.join(dir, 'missing')]), /No usable browser coverage/);
     writeFileSync(path.join(dir, 'coverage-1.json'), JSON.stringify({ result: [] }));
     assert.throws(() => validateBrowserCoverage([dir]), /No usable browser coverage/);
+    validateBrowserCoverage([dir], false);
     writeFileSync(path.join(dir, 'browser-1.json'), JSON.stringify([{ url: 'http://localhost/_next/static/a.js' }]));
-    assert.throws(() => validateBrowserCoverage([dir]), /No usable browser coverage/);
+    assert.throws(() => validateBrowserCoverage([dir]), /missing chunk sources/);
     writeFileSync(path.join(dir, 'browser-error-1.json'), JSON.stringify({ message: 'disk failure' }));
+    rmSync(path.join(dir, 'browser-1.json'));
     assert.throws(() => validateBrowserCoverage([dir]), /disk failure/);
+    assert.throws(() => validateBrowserCoverage([dir], false), /disk failure/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -229,6 +232,8 @@ test('reports every source file of a flag, and a file the same from Node and fro
 
     // The desktop flag covers its own file only.
     assert.deepEqual(Object.keys(report(root, 'desktop', nodeRaw)), ['desktop/main.cjs']);
+    writeFileSync(path.join(browserRaw, 'browser-error-1.json'), JSON.stringify({ message: 'recorder failed' }));
+    assert.throws(() => report(root, 'e2e', browserRaw), /Browser coverage collection failed.*recorder failed/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
