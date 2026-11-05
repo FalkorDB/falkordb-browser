@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
+  BUDGET_MS, COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
   transient, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
@@ -203,6 +203,7 @@ function world({
 } = {}) {
   const posted = [];
   const sleeps = [];
+  let clock = 0;
   const pages = [...uploads];
   const heads = [head].flat();
   const gh = async (path) => {
@@ -232,7 +233,8 @@ function world({
   const args = {
     gh,
     codecov,
-    sleep: async (ms) => { sleeps.push(ms); },
+    sleep: async (ms) => { sleeps.push(ms); clock += ms; },
+    now: () => clock,
     post: async (context, { state, description }) => { posted.push(`${context} ${state}: ${description}`); },
     contexts: pr ? ['coverage/project', 'coverage/patch'] : ['coverage/project (push)'],
     pr: pr ?? undefined,
@@ -379,4 +381,24 @@ test("gate: waits for Codecov's record of the pull request to catch up, then pos
   assert.deepEqual(lagging.sleeps, [20_000, 20_000]);
   // Never catching up is an error, not a pending check left forever.
   await assert.rejects(gate(world({ runs: ALL_DONE, head: 'older' }).args), /still compares older/);
+});
+
+test('gate: every wait shares one deadline, inside the job timeout', async () => {
+  assert.ok(BUDGET_MS < 30 * 60_000, 'the Coverage status job stops at 30 minutes');
+  // Codecov failing every call: retries stop at the deadline, not after
+  // each loop's own limit.
+  const down = Object.assign(new Error('503'), { status: 503 });
+  const outage = world({ runs: ALL_DONE, uploads: Array(200).fill(down) });
+  await assert.rejects(gate({ ...outage.args, deadline: 3 * 60_000 }), /in time/);
+  assert.ok(outage.sleeps.reduce((a, b) => a + b, 0) <= 3 * 60_000);
+  // Codecov's record of the pull request never catching up.
+  const lagging = world({ runs: ALL_DONE, head: 'older' });
+  await assert.rejects(gate({ ...lagging.args, deadline: 60_000 }), /still compares older/);
+  assert.ok(lagging.sleeps.reduce((a, b) => a + b, 0) <= 60_000);
+  // A retry gives up when the time left has no room for another wait.
+  let left = 50_000;
+  let calls = 0;
+  await assert.rejects(retry(async () => { calls += 1; throw down; }, async (ms) => { left -= ms; }, 10, () => left), /503/);
+  // 50s: fails, waits 20s; 30s: fails, waits; 10s: fails, no room to wait.
+  assert.equal(calls, 3);
 });

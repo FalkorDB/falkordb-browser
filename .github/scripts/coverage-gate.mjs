@@ -216,13 +216,20 @@ export function transient(error) {
   return !error.status || error.status >= 500 || error.status === 429;
 }
 
-/** `call`, tried again after a transient error, up to `attempts` times in all. */
-export async function retry(call, sleep, attempts = 5) {
+// How long a gate may take: its job stops at 30 minutes, which would leave
+// its statuses pending; this leaves time to post an error instead.
+export const BUDGET_MS = 25 * 60_000;
+
+/**
+ * `call`, tried again after a transient error, up to `attempts` times in
+ * all, and only while `timeLeft()` has room for another wait.
+ */
+export async function retry(call, sleep, attempts = 5, timeLeft = () => Infinity) {
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await call();
     } catch (error) {
-      if (!transient(error) || attempt >= attempts) throw error;
+      if (!transient(error) || attempt >= attempts || timeLeft() < 20_000) throw error;
       console.log(`Retrying after: ${error.message}`);
       await sleep(20_000);
     }
@@ -355,9 +362,13 @@ async function main() {
  * polls of Codecov. Resolves to whether coverage/project was decided.
  */
 export async function gate({
-  gh, codecov = (url) => api(url), sleep = wait,
+  gh, codecov = (url) => api(url), sleep = wait, now = Date.now, deadline = now() + BUDGET_MS,
   post, contexts, pr, sha, repo, target,
 }) {
+  // Every wait below shares one deadline, so the gate decides, or fails and
+  // says so, before its job is stopped.
+  const timeLeft = () => deadline - now();
+  const again = (call) => retry(call, sleep, 5, timeLeft);
   // The workflows this commit triggers, as their path filters decide.
   // The files the trigger changed: a pull request's whole diff, or the pushed
   // commit's own changes (for a merge commit, all that the merge brought).
@@ -416,7 +427,7 @@ export async function gate({
       if (!transient(error)) throw error;
       console.log(`Codecov: ${error.message}`);
     }
-    if (attempt >= 45) throw new Error('Codecov did not process every upload in 15 minutes');
+    if (attempt >= 45 || timeLeft() < 20_000) throw new Error('Codecov did not process every upload in time');
     await sleep(20_000);
   }
 
@@ -436,7 +447,7 @@ export async function gate({
     return false;
   }
 
-  const commit = await retry(() => codecov(`${base}/commits/${sha}/`), sleep);
+  const commit = await again(() => codecov(`${base}/commits/${sha}/`));
   if (typeof commit.totals?.coverage !== 'number') throw new Error('Codecov has no coverage total for the commit');
   const project = verdict(commit.totals.coverage, target);
   console.log(`${contexts[0]}: ${project.description}`);
@@ -446,14 +457,14 @@ export async function gate({
     // until it compares this commit, unless the pull request did move on.
     let compare;
     for (let attempt = 0; ; attempt += 1) {
-      compare = await retry(() => codecov(`${base}/compare/?pullid=${pr.number}`), sleep);
+      compare = await again(() => codecov(`${base}/compare/?pullid=${pr.number}`));
       if (compare.head_commit === sha) break;
-      const { head } = await retry(() => gh(`pulls/${pr.number}`), sleep);
+      const { head } = await again(() => gh(`pulls/${pr.number}`));
       if (head.sha !== sha) {
         console.log(`The pull request moved on to ${head.sha}: its own gate will post`);
         return true;
       }
-      if (attempt >= 15) throw new Error(`Codecov still compares ${compare.head_commit}, not this commit`);
+      if (attempt >= 15 || timeLeft() < 20_000) throw new Error(`Codecov still compares ${compare.head_commit}, not this commit`);
       console.log(`Codecov compares ${compare.head_commit} still; waiting for it to catch up`);
       await sleep(20_000);
     }
