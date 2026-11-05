@@ -46,7 +46,7 @@ test("query rejection emits one error event", async (t) => {
 });
 
 test("query input failures stay 400 while backend and connection failures report 500", async (t) => {
-  t.mock.method(console, "error", () => {});
+  const log = t.mock.method(console, "error", () => {});
   for (const [error, status] of [
     [new QueryInputError("Missing parameter query"), 400],
     [new SimpleError("NOPERM permission denied"), 400],
@@ -54,11 +54,15 @@ test("query input failures stay 400 while backend and connection failures report
     [new Error("connect ECONNREFUSED localhost:6379"), 500],
     [new SimpleError("OOM command not allowed"), 500],
     [new SimpleError("CLUSTERDOWN cluster is down"), 500],
+    [new SimpleError("LOADING Redis is loading the dataset"), 500],
+    [new SimpleError("MASTERDOWN Link with MASTER is down"), 500],
+    [new SimpleError("TRYAGAIN Multiple keys request during rehashing of slot"), 500],
   ] as const) {
     const response = queryStream(new AbortController().signal, async () => { throw error; }, {});
     assert.deepEqual(JSON.parse((await response.text()).split("data: ")[1]), {
-      message: error.message, status,
+      message: status === 500 ? "Internal server error" : error.message, status,
     });
+    assert.deepEqual(log.mock.calls.at(-1)?.arguments, ["Graph query failed:", error]);
   }
 });
 

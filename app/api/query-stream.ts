@@ -37,9 +37,10 @@ export function queryStream(
       } catch (error) {
         if (!stopped) {
           console.error("Graph query failed:", error);
+          const status = queryErrorStatus(error);
           controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({
-            message: error instanceof Error ? error.message : "Internal server error",
-            status: queryErrorStatus(error),
+            message: status === 400 && error instanceof Error ? error.message : "Internal server error",
+            status,
           })}\n\n`));
         }
       } finally {

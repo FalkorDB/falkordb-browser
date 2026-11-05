@@ -123,6 +123,10 @@ already-running database query: the current driver has no per-query cancellation
 API. Existing query timeouts still apply; shared database connections are not
 closed to cancel an individual request.
 
+Query-stream infrastructure failures return a generic server-error message;
+raw backend details remain in server logs. Query/input errors retain their
+actionable messages.
+
 > Note: the image ships no default `AUTH_SECRET`. If you do not supply one, a
 > random secret is generated per container, which means every session is
 > invalidated when the container is recreated. For anything long-lived, set your
