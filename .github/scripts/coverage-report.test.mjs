@@ -112,6 +112,7 @@ test('requires usable browser recordings only when explicitly requested', () => 
     validateBrowserCoverage([dir], false);
     writeFileSync(path.join(dir, 'browser-1.json'), JSON.stringify([{ url: 'http://localhost/_next/static/a.js' }]));
     assert.throws(() => validateBrowserCoverage([dir]), /missing chunk sources/);
+    assert.throws(() => validateBrowserCoverage([dir], false), /missing chunk sources/);
     writeFileSync(path.join(dir, 'browser-error-1.json'), JSON.stringify({ message: 'disk failure' }));
     rmSync(path.join(dir, 'browser-1.json'));
     assert.throws(() => validateBrowserCoverage([dir]), /disk failure/);
@@ -229,6 +230,15 @@ test('reports every source file of a flag, and a file the same from Node and fro
       }, { url: 'node:fs', functions: [] }],
     }));
     assert.deepEqual(report(root, 'e2e', dockerRaw, { COVERAGE_SERVER_ROOT: '/app' }), fromBrowser);
+    const externalSource = out.outputText.replace(/\/\/# sourceMappingURL=.*$/m, '//# sourceMappingURL=area.js.map');
+    writeFileSync(path.join(root, serverFile), externalSource);
+    writeFileSync(path.join(root, `${serverFile}.map`), JSON.stringify(map));
+    const dockerRecording = JSON.parse(readFileSync(path.join(dockerRaw, 'coverage-1.json'), 'utf8'));
+    dockerRecording.result[0].functions[0].ranges[0].endOffset = externalSource.length;
+    writeFileSync(path.join(dockerRaw, 'coverage-1.json'), JSON.stringify(dockerRecording));
+    assert.deepEqual(report(root, 'e2e', dockerRaw, { COVERAGE_SERVER_ROOT: '/app' }), fromBrowser);
+    rmSync(path.join(root, `${serverFile}.map`));
+    assert.throws(() => report(root, 'e2e', dockerRaw, { COVERAGE_SERVER_ROOT: '/app' }), /ENOENT.*area\.js\.map/);
 
     // The desktop flag covers its own file only.
     assert.deepEqual(Object.keys(report(root, 'desktop', nodeRaw)), ['desktop/main.cjs']);
