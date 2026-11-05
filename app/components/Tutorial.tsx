@@ -1779,7 +1779,9 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
         mountedRef.current = true;
         return () => { mountedRef.current = false; };
     }, []);
-    const { handleSetGraphName, runQuery, setCurrentTab, setGraph } = useContext(GraphContext);
+    const { handleSetGraphName, runQuery: runGraphQuery, setCurrentTab, setGraph } = useContext(GraphContext);
+    const runQuery = useCallback((query: string, name?: string) =>
+        runGraphQuery(query, name, { readOnly: true }), [runGraphQuery]);
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
     const { setLayout, setDirection, canvasRef } = useContext(ForceGraphContext);
 

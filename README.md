@@ -74,6 +74,9 @@ timed-out setup retains its pending ownership rather than assuming it completed.
 Closing on mobile discards the tutorial's step state and ignores late setup
 results, so Replay starts fresh. Background reads of generated samples use
 non-creating read-only queries even if cleanup has already deleted the graph.
+Tutorial track setup and step-advance queries are also explicitly read-only.
+Unreadable ownership records block a new tutorial snapshot before it creates
+samples, rather than risk restoring an unverified sample as a user graph.
 Explicit editor queries retain the user's chosen query mode even on graphs
 whose names match sample names; mutation permissions are not inferred from names.
 Each open/close transition starts a new recovery pass. A shared verification

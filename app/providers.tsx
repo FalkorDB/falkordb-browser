@@ -222,11 +222,7 @@ function getOtherTutorialDemoOwnerIds(scope: string, currentOwnerId: string): st
 function getRecordedTutorialDemoNames(scope: string, ownerId: string): Set<string> {
   const names = new Set(readTutorialDemoOwnership(scope, ownerId).names);
   for (const id of getOtherTutorialDemoOwnerIds(scope, ownerId)) {
-    try {
-      readTutorialDemoOwnership(scope, id).names.forEach(name => names.add(name));
-    } catch (error) {
-      console.error(`Ignoring unreadable tutorial ownership for ${id}`, error);
-    }
+    readTutorialDemoOwnership(scope, id).names.forEach(name => names.add(name));
   }
   return names;
 }

@@ -526,28 +526,101 @@ test.describe("Tutorial", () => {
     });
     }
 
-    test("@admin malformed other-owner records do not strand new setup", async () => {
+    test("@admin unreadable other-owner records block setup without stranding pending names", async () => {
         test.setTimeout(60_000);
         const tutorial = await browser.createNewPage(TutorialPanel);
         const page = await browser.getPage();
         const badKey = `localhost:6379:default:tutorialDemoGraphOwnership:bad-${getRandomString().replaceAll("_", "-")}`;
         await page.addInitScript(key => {
+            if (sessionStorage.getItem(key)) return;
+            sessionStorage.setItem(key, "seeded");
             localStorage.setItem("tutorial", "true");
             localStorage.setItem(key, "not-json");
         }, badKey);
+        const failures: string[] = [];
+        page.on("console", message => {
+            if (message.type() === "error") failures.push(message.text());
+        });
+        const creations: string[] = [];
+        page.on("request", request => {
+            const url = new URL(request.url());
+            if (url.pathname.startsWith("/api/graph/tutorial-social-demo-")
+                && url.searchParams.get("query")?.trim().startsWith("CREATE")) creations.push(url.pathname);
+        });
         await page.goto(urls.graphUrl);
-        await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+        await expect.poll(() => failures.some(message => message.includes("Failed to load demo graphs")), { timeout: 30000 }).toBe(true);
+        await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
         const ownership = await page.evaluate(() => {
             const owner = sessionStorage.getItem("tutorialDemoOwnerId");
             const key = Object.keys(localStorage).find(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
             return key ? JSON.parse(localStorage.getItem(key)!) as { names: string[]; pendingNames: string[] } : null;
         });
-        expect(ownership?.names).toHaveLength(2);
-        expect(ownership?.pendingNames).toEqual([]);
+        expect(ownership).toBeNull();
+        expect(creations).toEqual([]);
         expect(await page.evaluate(key => localStorage.getItem(key), badKey)).toBe("not-json");
+        await page.evaluate(key => localStorage.removeItem(key), badKey);
+        await page.reload();
+        await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
         await page.getByTestId("skipTutorial").click();
         await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0, { timeout: 30000 });
     });
+
+    for (const [trackIndex, advance] of [[2, false], [3, false], [4, false], [5, false], [3, true]] as const) {
+        test(`@admin a delayed tutorial track ${trackIndex} read cannot recreate samples after mobile cleanup (advance ${advance})`, async () => {
+            test.setTimeout(60_000);
+            const tutorial = await browser.createNewPage(TutorialPanel);
+            const page = await browser.getPage();
+            await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
+            let release!: () => void;
+            const gate = new Promise<void>(resolve => { release = resolve; });
+            let heldUrl: URL | undefined;
+            let responseBody = "";
+            let completed!: () => void;
+            const routeCompleted = new Promise<void>(resolve => { completed = resolve; });
+            await page.route(url => {
+                const query = url.searchParams.get("query") ?? "";
+                return query.startsWith("MATCH p=") && (!advance || query.includes("[:MANAGES]"));
+            }, async route => {
+                heldUrl = new URL(route.request().url());
+                await gate;
+                const response = await route.fetch();
+                responseBody = await response.text();
+                await route.fulfill({ response });
+                completed();
+            });
+            let name: string | undefined;
+            try {
+                await page.goto(urls.graphUrl);
+                await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+                await page.getByTestId(`track-${trackIndex}`).click();
+                if (advance) {
+                    await tutorial.waitForStep("Graph View", 15000);
+                    await tutorial.mousedownTutorialTarget('[data-testid="graphTab"]');
+                }
+                await expect.poll(() => heldUrl?.pathname).toBeTruthy();
+                name = decodeURIComponent(heldUrl!.pathname.split("/").pop()!);
+                await page.setViewportSize({ width: 900, height: 900 });
+                await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+                await expect.poll(async () => (await apiCall.getGraphs()).opts.includes(name!), { timeout: 30000 }).toBe(false);
+                await expect.poll(() => page.evaluate(() => {
+                    const owner = sessionStorage.getItem("tutorialDemoOwnerId");
+                    return Object.keys(localStorage).some(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
+                }), { timeout: 30000 }).toBe(false);
+                release();
+                await routeCompleted;
+                expect(heldUrl!.searchParams.get("readOnly")).toBe("true");
+                expect(responseBody).toContain("event: error");
+                expect((await apiCall.getGraphs()).opts).not.toContain(name);
+            } finally {
+                release();
+                await browser.closeBrowser();
+                if (name && (await apiCall.getGraphs()).opts.includes(name)) {
+                    const { message } = await apiCall.removeGraph(name, "admin");
+                    expect(message).toMatch(/deleted|empty key/);
+                }
+            }
+        });
+    }
 
     test("@admin explicit editor writes work on unrecorded generated-looking names", async () => {
         test.setTimeout(60_000);
