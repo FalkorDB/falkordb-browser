@@ -442,10 +442,20 @@ export async function gate({
   console.log(`${contexts[0]}: ${project.description}`);
   await post(contexts[0], project);
   if (pr) {
-    const compare = await retry(() => codecov(`${base}/compare/?pullid=${pr.number}`), sleep);
-    if (compare.head_commit !== sha) {
-      console.log(`The pull request moved on to ${compare.head_commit}: its own gate will post`);
-      return true;
+    // Codecov's record of the pull request can lag behind GitHub's: wait
+    // until it compares this commit, unless the pull request did move on.
+    let compare;
+    for (let attempt = 0; ; attempt += 1) {
+      compare = await retry(() => codecov(`${base}/compare/?pullid=${pr.number}`), sleep);
+      if (compare.head_commit === sha) break;
+      const { head } = await retry(() => gh(`pulls/${pr.number}`), sleep);
+      if (head.sha !== sha) {
+        console.log(`The pull request moved on to ${head.sha}: its own gate will post`);
+        return true;
+      }
+      if (attempt >= 15) throw new Error(`Codecov still compares ${compare.head_commit}, not this commit`);
+      console.log(`Codecov compares ${compare.head_commit} still; waiting for it to catch up`);
+      await sleep(20_000);
     }
     // No patch total is not a pass.
     if (!compare.totals?.patch) throw new Error('Codecov has no patch total for the pull request');

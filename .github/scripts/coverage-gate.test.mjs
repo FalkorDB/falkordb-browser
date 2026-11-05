@@ -199,12 +199,14 @@ const FRESH = [fresh('build', ['unit']), fresh('smoke', ['smoke']), fresh('e2e-s
 
 function world({
   pr = { number: 7 }, files = ['app/graph/page.tsx'], runs, uploads = [FRESH], coverage = 96,
-  patch = { hits: 19, misses: 1, partials: 0 }, head = SHA, compareErrors = [],
+  patch = { hits: 19, misses: 1, partials: 0 }, head = SHA, compareErrors = [], githubHead = SHA,
 } = {}) {
   const posted = [];
   const sleeps = [];
   const pages = [...uploads];
+  const heads = [head].flat();
   const gh = async (path) => {
+    if (path === `pulls/${pr?.number}`) return { head: { sha: githubHead } };
     if (path.startsWith(`pulls/${pr?.number}/files`)) return path.includes('page=1') ? files.map((filename) => ({ filename })) : [];
     if (path.startsWith(`commits/${SHA}`)) return { files: path.includes('page=1') ? files.map((filename) => ({ filename })) : [] };
     if (path.startsWith('actions/runs')) return { workflow_runs: path.includes('page=1') ? runs : [] };
@@ -223,7 +225,7 @@ function world({
     if (url.endsWith(`/commits/${SHA}/`)) return { totals: coverage === null ? null : { coverage } };
     if (url.includes('/compare/')) {
       if (compareErrors.length) throw compareErrors.shift();
-      return { head_commit: head, totals: { patch } };
+      return { head_commit: heads.length > 1 ? heads.shift() : heads[0], totals: { patch } };
     }
     throw new Error(`unexpected Codecov call ${url}`);
   };
@@ -300,7 +302,7 @@ test('gate: a missing total is an error, not a pass', async () => {
 });
 
 test('gate: leaves the patch to a newer head, and gates a push on the project only', async () => {
-  const moved = world({ runs: ALL_DONE, head: 'newer' });
+  const moved = world({ runs: ALL_DONE, head: 'newer', githubHead: 'newer' });
   assert.equal(await gate(moved.args), true);
   assert.deepEqual(moved.posted, ['coverage/project success: 96.00% (target 95%)']);
   const push = world({ pr: null, files: ['README.md'], runs: [run('Build', 'success', 'completed', 'push')], uploads: [FRESH.slice(0, 2)] });
@@ -365,4 +367,16 @@ test('marks error on the statuses a failed gate gave no verdict, keeping those i
     post, decided: new Set(['coverage/project']), contexts: ['coverage/project', 'coverage/patch'], error: new Error('Codecov is down'),
   });
   assert.deepEqual(posted, ['coverage/patch error: The coverage gate failed: Codecov is down']);
+});
+
+test("gate: waits for Codecov's record of the pull request to catch up, then posts the patch", async () => {
+  const lagging = world({ runs: ALL_DONE, head: ['older', 'older', SHA] });
+  assert.equal(await gate(lagging.args), true);
+  assert.deepEqual(lagging.posted, [
+    'coverage/project success: 96.00% (target 95%)',
+    'coverage/patch success: 95.00% (target 95%)',
+  ]);
+  assert.deepEqual(lagging.sleeps, [20_000, 20_000]);
+  // Never catching up is an error, not a pending check left forever.
+  await assert.rejects(gate(world({ runs: ALL_DONE, head: 'older' }).args), /still compares older/);
 });
