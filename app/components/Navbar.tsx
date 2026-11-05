@@ -19,7 +19,6 @@ import useIsMobile, { MOBILE_BREAKPOINT } from "@/lib/useIsMobile";
 import Button from "./ui/Button";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
-import AppDownloadLink from "./AppDownloadLink";
 import ReleaseNotes from "./ReleaseNotes";
 
 interface Props {
@@ -172,7 +171,6 @@ export default function Navbar({ showUDF }: Props) {
                             </div>
                             {/* Help, theme and logout sit at the bottom, away from the navigation. */}
                             <div className="mt-auto flex shrink-0 flex-col gap-1 pt-4">
-                                <AppDownloadLink className={item} onSelect={() => setMenuOpen(false)} />
                                 <a className={item} href="https://docs.falkordb.com/" target="_blank" rel="noreferrer">
                                     <FileCode size={20} />
                                     <span>Documentation</span>
@@ -381,7 +379,6 @@ export default function Navbar({ showUDF }: Props) {
                                         <ArrowUpRight size={15} />
                                     </a>
                                 </DropdownMenuItem>
-                                <AppDownloadLink asMenuItem className="flex gap-2 items-center px-2 py-1.5 rounded-sm hover:bg-secondary focus:bg-secondary" iconSize={18} />
                                 <DropdownMenuSeparator />
                                 {/* On the item, not the button, so Enter and Space open it too. */}
                                 <DropdownMenuItem className="focus:bg-transparent" onSelect={() => setReleasesOpen(true)}>

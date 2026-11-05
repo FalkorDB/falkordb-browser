@@ -30,7 +30,6 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
-import AppDownloadPrompt from "./components/AppDownloadPrompt";
 import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDimension, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
@@ -2753,11 +2752,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                       }
                                     </GraphTabsContext.Provider>
                                     <AiFixDialogs />
-                                    {/* At the root, not on /graph or /login: a saved session skips the
-                                        login page, and the graph page is not where everyone lands.
-                                        It waits until the session and the tutorial have both been decided,
-                                        and until What's New, if there is one, has been read. */}
-                                    <AppDownloadPrompt blocked={tutorialOpen || status === "loading" || (status === "authenticated" && !tutorialDecided)} />
                                   </AiFixContext.Provider>
                                 </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>
