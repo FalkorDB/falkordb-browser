@@ -859,7 +859,7 @@ export default function Page() {
                             height="full"
                             data-testid="mobileDataSheet"
                         >
-                            <div className="h-full w-full" inert={tabsReady ? undefined : true}>
+                            <div className="h-full w-full">
                                 {getCurrentPanel()}
                             </div>
                         </BottomSheet>

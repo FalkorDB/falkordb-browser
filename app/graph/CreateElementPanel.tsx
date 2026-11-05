@@ -15,7 +15,7 @@ import Button from "../components/ui/Button";
 import HelpTip from "../components/ui/HelpTip";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
-import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
+import { BrowserSettingsContext, GraphTabsContext, IndicatorContext } from "../components/provider";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
 import DialogComponent from "../components/DialogComponent";
@@ -44,6 +44,7 @@ export default function CreateElementPanel(props: Props) {
     const setSelectedNodes = !type ? props.setSelectedNodes : undefined;
 
     const { indicator } = useContext(IndicatorContext);
+    const { tabsReady } = useContext(GraphTabsContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
 
@@ -422,7 +423,7 @@ export default function CreateElementPanel(props: Props) {
             >
                 <X size={16} />
             </Button>
-            <div className="flex flex-col gap-2">
+            <fieldset className="flex min-w-0 flex-col gap-2" disabled={!tabsReady} inert={tabsReady ? undefined : true}>
                 <div className="flex items-center justify-between pr-5">
                     <h1 className="text-lg font-semibold">Create {type ? "Node" : "Edge"}</h1>
                     {
@@ -445,7 +446,7 @@ export default function CreateElementPanel(props: Props) {
                             className="flex gap-2 p-1 bg-secondary rounded-full items-center"
                         >
                             <p>{l}</p>
-                            <RemoveLabel
+                            {tabsReady && <RemoveLabel
                                 onRemoveLabel={handleRemoveLabel}
                                 selectedLabel={l}
                                 trigger={
@@ -455,12 +456,12 @@ export default function CreateElementPanel(props: Props) {
                                         <X size={15} />
                                     </Button>
                                 }
-                            />
+                            />}
                         </li>
                     ))}
                     <li className="h-8 w-[106px] flex justify-center items-center">
                         {
-                            (type ? (labelsHover || labels.length === 0) : labels.length === 0) &&
+                            tabsReady && (type ? (labelsHover || labels.length === 0) : labels.length === 0) &&
                             <AddLabel
                                 type={type ? "Label" : "Type"}
                                 onAddLabel={handleAddLabel}
@@ -477,8 +478,8 @@ export default function CreateElementPanel(props: Props) {
                         }
                     </li>
                 </ul>
-            </div>
-            <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
+            </fieldset>
+            <fieldset className="min-w-0 w-full h-1 grow flex flex-col justify-between items-start font-medium" disabled={!tabsReady} inert={tabsReady ? undefined : true}>
                 <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden w-full">
                     <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(60px,1fr)]">
                         <div className="flex items-center font-medium text-muted-foreground px-2 border-y border-border h-10">Key</div>
@@ -598,7 +599,7 @@ export default function CreateElementPanel(props: Props) {
                                                             <Pencil size={20} />
                                                         </Button>
                                                     )}
-                                                    <DialogComponent
+                                                    {tabsReady && <DialogComponent
                                                         trigger={
                                                             <Button
                                                                 variant="button"
@@ -621,7 +622,7 @@ export default function CreateElementPanel(props: Props) {
                                                                 variant="Cancel"
                                                             />
                                                         </div>
-                                                    </DialogComponent>
+                                                    </DialogComponent>}
                                                 </>
                                         }
                                     </div>
@@ -760,7 +761,7 @@ export default function CreateElementPanel(props: Props) {
                         />
                     </form>
                 </div>
-            </div>
+            </fieldset>
         </div>
     );
 }

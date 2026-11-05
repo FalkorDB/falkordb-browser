@@ -679,6 +679,81 @@ test.describe("@admin Graph tabs", () => {
         }
     });
 
+    for (const panel of ["data", "data-editor", "create"]) {
+        test(`A mobile ${panel} sheet can close while restoration blocks editing`, async () => {
+            test.setTimeout(60_000);
+            const create = panel === "create";
+            await apiCall.runQuery(graphOne, "MERGE (:RestorationClose {name: 'close-control'})");
+            const graph = await browser.createNewPage(TutorialPanel, urls.graphUrl);
+            const page = await browser.getPage();
+            await graph.selectGraphByName(graphOne);
+            await graph.insertQuery("MATCH (n) RETURN n");
+            await graph.clickRunQuery();
+            await graph.waitForPageIdle();
+            if (create) {
+                await page.getByTestId("elementCanvasAddNodeGraph").click();
+            } else {
+                expect(await graph.clickCanvasUntilDataPanel()).toBe(true);
+            }
+            await page.setViewportSize({ width: 900, height: 900 });
+            const sheet = page.getByTestId("mobileDataSheet");
+            await expect(sheet).toHaveAttribute("data-state", "open");
+            if (create) {
+                await expect(sheet.getByRole("button", { name: "Add a new node to the graph", exact: true })).toBeEnabled();
+                await sheet.getByRole("button", { name: "Add a new label", exact: true }).click();
+            } else if (panel === "data-editor") {
+                await page.getByTestId("DataPanelSetAttribute").click();
+                await expect(page.getByTestId("DataPanelSetAttributeConfirm")).toBeVisible();
+            } else {
+                await expect(page.getByTestId("DataPanelSetAttribute")).toBeVisible();
+                await page.getByTestId("DataPanelAddLabel").click();
+            }
+            if (panel !== "data-editor") await expect(page.getByRole("dialog")).toBeVisible();
+            const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
+            await page.evaluate(() => localStorage.removeItem("timeout"));
+            let release!: () => void;
+            const gate = new Promise<void>(resolve => { release = resolve; });
+            let configRequested = false;
+            await page.route("**/api/graph/config", async route => {
+                configRequested = true;
+                await gate;
+                await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
+            });
+            await page.route("**/api/auth/session", route => route.fulfill({
+                json: { ...session, user: { ...session.user, id: `${session.user.id}-restoration` } },
+            }));
+            try {
+                await page.evaluate(() => {
+                    const channel = new BroadcastChannel("next-auth");
+                    channel.postMessage({ event: "session", data: { trigger: "getSession" } });
+                    channel.close();
+                });
+                await expect.poll(() => configRequested).toBe(true);
+                await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+                await expect(page.getByRole("dialog")).toHaveCount(0);
+                const close = create ? sheet.getByRole("button", { name: "Close", exact: true }) : page.getByTestId("DataPanelClose");
+                await close.focus();
+                await expect(close).toBeFocused();
+                if (create) {
+                    await expect(sheet.getByRole("button", { name: "Add a new node to the graph", exact: true })).toBeDisabled();
+                } else {
+                    await expect(page.getByTestId("DataPanelSetAttribute")).toHaveCount(0);
+                    await expect(page.getByTestId("DataPanelSetAttributeConfirm")).toHaveCount(0);
+                    await expect(page.getByTestId("DataPanelAddAttribute")).toHaveCount(0);
+                    await expect(page.getByTestId("DataPanelAddLabel")).toHaveCount(0);
+                    await expect(page.getByTestId("DataPanelAttributeclose-control")).toBeVisible();
+                }
+                await close.click();
+                await expect(sheet).toHaveAttribute("data-state", "closed");
+                await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+                release();
+                await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "false");
+            } finally {
+                release();
+            }
+        });
+    }
+
     test("The tutorial strip stays interactive when the initial user graph list is pending", async () => {
         test.setTimeout(60_000);
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
