@@ -337,6 +337,19 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   exit), then `node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e`. Pages are
   recorded in Chromium only; a spec that uses Playwright's `page`, `context` or `browser`
   fixtures imports `test` from `e2e/infra/coverage.ts` so its pages are recorded too.
+  Browser-running CI jobs use `REQUIRE_BROWSER_COVERAGE=1` when generating the report:
+  missing recordings or recorder errors fail collection, even when server coverage exists.
+  Server-only test jobs do not require or launch a browser. The gate waits for all six
+  shard uploads plus the TLS, cluster, stateless and Docker E2E uploads, not just an
+  `e2e` flag from one job.
+
+  Docker smoke tests still check the normal production image first. They also run against
+  a separate image built with `--build-arg COVERAGE=1`; its browser and server coverage
+  is uploaded as `e2e-docker`. The report uses that container's exact `.next` artifacts
+  and `COVERAGE_SERVER_ROOT=/app` to translate server paths into the reporting checkout.
+  The default Docker build remains optimized and does not expose browser source maps.
+  Stacked PR branches can validate the same jobs with
+  `gh workflow run playwright.yml --ref <branch>` before their base reaches `staging`.
 * **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — runs every `lib/**/*.smoke.ts`
   suite against the actual server error wording. This covers the "Did you mean…?"
   suggestions and the **error-hint drift guard**: each entry in the hint catalog
@@ -354,5 +367,3 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
-

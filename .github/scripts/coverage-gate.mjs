@@ -183,6 +183,25 @@ export function missingFlags(expected, uploads) {
   return expected.flatMap((name) => COVERAGE_WORKFLOWS[name].flags).filter((flag) => !uploaded.has(flag));
 }
 
+/** Named E2E uploads in the commit's workflow, including its shard matrix. */
+export function workflowUploads(workflow) {
+  const names = [...workflow.matchAll(/^\s+name:\s+(e2e-[^\r\n]+)$/gm)].map((match) => match[1].trim());
+  return names.flatMap((name) => {
+    if (!name.includes('${{')) return [name];
+    if (name !== 'e2e-shard-${{ matrix.shard }}') throw new Error(`Unknown coverage upload expression: ${name}`);
+    const matrix = /^\s+shard:\s+\[([\d,\s]+)\]/m.exec(workflow);
+    if (!matrix) throw new Error('No shard matrix for the E2E coverage uploads');
+    return matrix[1].split(',').map((shard) => `e2e-shard-${Number(shard.trim())}`);
+  });
+}
+
+export function missingUploads(expected, uploads) {
+  const uploaded = new Set(currentUploads(uploads)
+    .filter((u) => u.upload_type !== 'carriedforward' && u.state !== 'error')
+    .map((u) => u.name));
+  return expected.filter((name) => !uploaded.has(name));
+}
+
 /**
  * Whether Codecov has processed every current upload of the commit (an
  * earlier attempt's upload, stuck part way, does not hold the gate).
@@ -388,6 +407,7 @@ export async function gate({
   // files above leave out, still has a run of each workflow it triggered;
   // and a workflow its files call for is waited for even before it shows.
   const expected = [...new Set(runs.map((run) => run.name).filter((name) => name in COVERAGE_WORKFLOWS))];
+  const requiredUploads = [];
   for (const [name, { file }] of Object.entries(COVERAGE_WORKFLOWS)) {
     let content;
     try {
@@ -400,6 +420,7 @@ export async function gate({
     }
     const workflow = Buffer.from(content.content, 'base64').toString('utf8');
     if (!expected.includes(name) && runsFor(pathFilters(workflow, trigger), files)) expected.push(name);
+    if (expected.includes(name)) requiredUploads.push(...workflowUploads(workflow));
   }
   const waiting = waitingFor(expected, runs);
   if (waiting.length) {
@@ -422,12 +443,17 @@ export async function gate({
   for (let attempt = 0; ; attempt += 1) {
     try {
       uploads = await followPages(`${base}/commits/${sha}/uploads/?page_size=100`, codecov);
-      if (uploads.length && codecovSettled(uploads)) break;
+      if (failedUploads(uploads).length) break;
+      if (uploads.length && codecovSettled(uploads)
+        && !missingFlags(expected, uploads).length && !missingUploads(requiredUploads, uploads).length) break;
     } catch (error) {
       if (!transient(error)) throw error;
       console.log(`Codecov: ${error.message}`);
     }
-    if (attempt >= 45 || timeLeft() < 20_000) throw new Error('Codecov did not process every upload in time');
+    if (attempt >= 45 || timeLeft() < 20_000) {
+      const missing = [...missingFlags(expected, uploads ?? []), ...missingUploads(requiredUploads, uploads ?? [])];
+      throw new Error(`Codecov did not process every expected upload in time${missing.length ? `; missing: ${missing.join(', ')}` : ''}`);
+    }
     await sleep(20_000);
   }
 
@@ -437,13 +463,6 @@ export async function gate({
     const names = broken.map((u) => u.name || u.flags.join(',')).join(', ');
     console.log(`Codecov could not process: ${names}`);
     for (const context of contexts) await post(context, { state: 'failure', description: `Codecov could not process ${broken.length} upload(s): ${names}`.slice(0, 140) });
-    return false;
-  }
-
-  const missing = missingFlags(expected, uploads);
-  if (missing.length) {
-    console.log(`No upload of ${missing.join(', ')}`);
-    for (const context of contexts) await post(context, { state: 'failure', description: `No ${missing.join(', ')} coverage was uploaded for this commit` });
     return false;
   }
 
