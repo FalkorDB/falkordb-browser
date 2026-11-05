@@ -216,7 +216,7 @@ export function containerEntries(dir, name, serverRoot) {
     const local = path.join(ROOT, '.next/server', fileURLToPath(entry.url).slice(path.join(serverRoot, '.next/server').length));
     const source = readFileSync(local, 'utf8');
     let sourceMap = data['source-map-cache']?.[entry.url]?.data;
-    const externalMap = /\/\/# sourceMappingURL=(?!data:)(\S+)/.exec(source);
+    const externalMap = /\/\/# sourceMappingURL=(?!data:)(\S+)\s*$/.exec(source);
     if (!sourceMap && externalMap) {
       sourceMap = JSON.parse(readFileSync(new URL(externalMap[1], pathToFileURL(local)), 'utf8'));
     }
