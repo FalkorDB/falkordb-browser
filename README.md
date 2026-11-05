@@ -347,6 +347,8 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   a separate image built with `--build-arg COVERAGE=1`; its browser and server coverage
   is uploaded as `e2e-docker`. The report uses that container's exact `.next` artifacts
   and `COVERAGE_SERVER_ROOT=/app` to translate server paths into the reporting checkout.
+  Server mappings use the V8 source-map cache or the container's copied external map;
+  a missing referenced server map fails reporting rather than silently dropping hits.
   The default Docker build remains optimized and does not expose browser source maps.
   Stacked PR branches can validate the same jobs with
   `gh workflow run playwright.yml --ref <branch>` before their base reaches `staging`.

@@ -165,6 +165,10 @@ async function transpile(entry) {
   entry.sourceMap = { ...JSON.parse(out.sourceMapText), sources: [entry.url] };
 }
 
+function browserSourceFile(dir, url) {
+  return path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
+}
+
 /**
  * One page's coverage as e2e/infra/coverage.ts saved it, each entry given back
  * the chunk source saved beside it. An entry whose source was never saved is
@@ -172,7 +176,7 @@ async function transpile(entry) {
  */
 export function browserEntries(dir, name) {
   return JSON.parse(readFileSync(path.join(dir, name), 'utf8')).filter((entry) => {
-    const sourceFile = path.join(dir, `browser-source-${createHash('sha1').update(entry.url).digest('hex')}.js`);
+    const sourceFile = browserSourceFile(dir, entry.url);
     try {
       entry.source = readFileSync(sourceFile, 'utf8');
       return true;
@@ -192,10 +196,11 @@ export function validateBrowserCoverage(dirs, required = true) {
         throw new Error(`Browser coverage collection failed: ${readFileSync(path.join(dir, name), 'utf8')}`);
       }
       if (/^browser-[^.]+\.json$/.test(name)) {
-        const saved = browserEntries(dir, name);
         const recorded = JSON.parse(readFileSync(path.join(dir, name), 'utf8'));
-        if (saved.length !== recorded.length) throw new Error(`Browser coverage is missing chunk sources in ${name}`);
-        entries += saved.length;
+        if (recorded.some(({ url }) => !existsSync(browserSourceFile(dir, url)))) {
+          throw new Error(`Browser coverage is missing chunk sources in ${name}`);
+        }
+        entries += recorded.length;
       }
     }
   }
@@ -209,11 +214,17 @@ export function containerEntries(dir, name, serverRoot) {
   const prefix = pathToFileURL(path.join(serverRoot, '.next/server') + path.sep).href;
   return data.result.filter((entry) => entry.url.startsWith(prefix)).map((entry) => {
     const local = path.join(ROOT, '.next/server', fileURLToPath(entry.url).slice(path.join(serverRoot, '.next/server').length));
+    const source = readFileSync(local, 'utf8');
+    let sourceMap = data['source-map-cache']?.[entry.url]?.data;
+    const externalMap = /\/\/# sourceMappingURL=(?!data:)(\S+)/.exec(source);
+    if (!sourceMap && externalMap) {
+      sourceMap = JSON.parse(readFileSync(new URL(externalMap[1], pathToFileURL(local)), 'utf8'));
+    }
     return {
       ...entry,
       url: pathToFileURL(local).href,
-      source: readFileSync(local, 'utf8'),
-      sourceMap: data['source-map-cache']?.[entry.url]?.data,
+      source,
+      sourceMap,
     };
   });
 }
