@@ -11,9 +11,10 @@
 //
 // Run by the Coverage status workflow (workflow_run), from the default
 // branch. Environment: GITHUB_REPOSITORY, GH_TOKEN, SHA, EVENT (push or
-// pull_request), BRANCH (the pushed branch), PR (the pull request's number,
-// when GitHub gives it), TARGET (95 by default). DRY_RUN prints the statuses
-// instead of posting them.
+// pull_request), BRANCH (the pushed branch, or the pull request's head
+// branch), HEAD_OWNER (the owner of the repository that branch is in), PR
+// (the pull request's number, when GitHub gives it), TARGET (95 by default).
+// DRY_RUN prints the statuses instead of posting them.
 
 import { appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -210,16 +211,20 @@ async function main() {
   const target = Number(process.env.TARGET ?? 95);
   const gh = (path, options) => api(`${GITHUB}/repos/${repo}/${path}`, { token, ...options });
 
-  // The pull request, for a pull_request run. GitHub names it only for one
-  // from this repository, so look up one from a fork.
-  let pr = process.env.PR ? await gh(`pulls/${process.env.PR}`) : undefined;
-  if (!pr && event === 'pull_request') {
-    const found = await api(`${GITHUB}/search/issues?q=${encodeURIComponent(`repo:${repo} is:pr is:open ${sha}`)}`, { token });
-    if (found.items.length) pr = await gh(`pulls/${found.items[0].number}`);
-  }
-  if (event === 'pull_request' && !pr) {
-    console.log(`No open pull request has ${sha} as its head`);
-    return;
+  // The pull request, for a pull_request run: one whose head is still this
+  // commit (else a newer commit's gate decides) and that targets a protected
+  // branch. GitHub names it only for one from this repository, so look one
+  // from a fork up by its head branch.
+  let pr;
+  if (event === 'pull_request') {
+    const candidates = process.env.PR
+      ? [await gh(`pulls/${process.env.PR}`)]
+      : await gh(`pulls?state=open&per_page=100&head=${encodeURIComponent(`${process.env.HEAD_OWNER}:${branch}`)}`);
+    pr = candidates.find((p) => p.head.sha === sha && PROTECTED.includes(p.base.ref));
+    if (!pr) {
+      console.log(`No open pull request into ${PROTECTED.join(' or ')} has ${sha} as its head`);
+      return;
+    }
   }
   const base = pr ? pr.base.ref : branch;
   if (!PROTECTED.includes(base)) {
