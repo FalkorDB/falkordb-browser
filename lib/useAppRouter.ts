@@ -8,6 +8,7 @@ export default function useAppRouter(): ReturnType<typeof useRouter> {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const releaseRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(false);
   const release = useCallback(() => {
     releaseRef.current?.();
     releaseRef.current = null;
@@ -16,10 +17,21 @@ export default function useAppRouter(): ReturnType<typeof useRouter> {
   useEffect(() => {
     if (!pending) release();
   }, [pending, release]);
-  useEffect(() => release, [release]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      release();
+    };
+  }, [release]);
 
   return useMemo(() => {
     const navigate = (action: () => void) => {
+      // Toast actions can outlive their component; they cannot own a token.
+      if (!mountedRef.current) {
+        action();
+        return;
+      }
       releaseRef.current ??= beginUrlNavigation();
       startTransition(action);
     };
@@ -27,8 +39,6 @@ export default function useAppRouter(): ReturnType<typeof useRouter> {
       ...router,
       push: (...args) => navigate(() => router.push(...args)),
       replace: (...args) => navigate(() => router.replace(...args)),
-      back: () => navigate(() => router.back()),
-      forward: () => navigate(() => router.forward()),
       refresh: () => navigate(() => router.refresh()),
     };
   }, [router]);

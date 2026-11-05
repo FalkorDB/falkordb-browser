@@ -220,9 +220,18 @@ function getOtherTutorialDemoOwnerIds(scope: string, currentOwnerId: string): st
 }
 
 function getRecordedTutorialDemoNames(scope: string, ownerId: string): Set<string> {
-  return new Set([ownerId, ...getOtherTutorialDemoOwnerIds(scope, ownerId)]
-    .flatMap(id => readTutorialDemoOwnership(scope, id).names));
+  const names = new Set(readTutorialDemoOwnership(scope, ownerId).names);
+  for (const id of getOtherTutorialDemoOwnerIds(scope, ownerId)) {
+    try {
+      readTutorialDemoOwnership(scope, id).names.forEach(name => names.add(name));
+    } catch (error) {
+      console.error(`Ignoring unreadable tutorial ownership for ${id}`, error);
+    }
+  }
+  return names;
 }
+
+class TutorialGraphVerificationError extends Error {}
 
 function makeTutorialDemoGraphSuffix(): string {
   if (typeof window !== "undefined" && typeof window.crypto?.randomUUID === "function") {
@@ -556,7 +565,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const tutorialRecoveryUser = sessionData?.user;
   const tutorialRecoveryKey = status !== "unauthenticated" && tutorialRecoveryUser && prefixReady
     && (activeConnectionId === null || prefixConnectionId === activeConnectionId)
-    ? JSON.stringify([tutorialRecoveryUser.id, tutorialRecoveryUser.host, tutorialRecoveryUser.port, tutorialRecoveryUser.username, prefixConnectionId, activeConnectionId, getConnectionEpoch()])
+    ? JSON.stringify([tutorialRecoveryUser.id, tutorialRecoveryUser.host, tutorialRecoveryUser.port, tutorialRecoveryUser.username, prefixConnectionId, activeConnectionId, getConnectionEpoch(), tutorialOpen])
     : null;
   const [tutorialRecoveredKey, setTutorialRecoveredKey] = useState<string | null>(null);
   const tutorialRecoveryReady = tutorialRecoveryKey !== null && tutorialRecoveredKey === tutorialRecoveryKey;
@@ -1396,6 +1405,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
         query: q,
         connectionId: cid,
+        allowTutorialCreation: !options?.silent,
       }) as { data: Data; stats: QueryStatistics };
 
       if (!result) throw new Error("Failed to execute query");
@@ -2556,6 +2566,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [checkStatus, status]);
 
   const handleFetchOptions = useCallback(async (options?: { clear?: boolean }) => {
+    // Only connection resets clear the list, even while recovery blocks fetching.
+    if (options?.clear) setGraphNames(undefined);
     if (!tutorialRecoveryReady) {
       connectionSwitchFetchedRef.current = false;
       return;
@@ -2574,10 +2586,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       && optionsSeqRef.current === oseq;
     const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
     const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
-
-    // Only the connection-reset path clears the list; an ordinary refresh keeps
-    // the last good list so a failed/slow refresh can't empty the selector.
-    if (options?.clear) setGraphNames(undefined);
 
     const res = await fetchOptions(gToast, gInd, indicator, cid);
 
@@ -2699,44 +2707,48 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   };
 
   const fetchTutorialGraphList = useCallback(async (cid: string | null) => {
-    // Session synchronization can re-probe this connection while cleanup is in flight.
-    const deadline = Date.now() + TUTORIAL_CONNECTION_TIMEOUT_MS;
-    let capabilities = tutorialGraphCapabilitiesRef.current;
-    while (capabilities.connectionId === cid && !capabilities.ready && !capabilities.failed && Date.now() < deadline) {
-      await new Promise(resolve => { window.setTimeout(resolve, TUTORIAL_CONNECTION_POLL_MS); });
-      capabilities = tutorialGraphCapabilitiesRef.current;
-    }
-    if (!capabilities.ready || capabilities.connectionId !== cid) {
-      throw new Error("Could not verify tutorial graph capabilities for this connection");
-    }
+    try {
+      // Session synchronization can re-probe this connection while cleanup is in flight.
+      const deadline = Date.now() + TUTORIAL_CONNECTION_TIMEOUT_MS;
+      let capabilities = tutorialGraphCapabilitiesRef.current;
+      while (capabilities.connectionId === cid && !capabilities.ready && !capabilities.failed && Date.now() < deadline) {
+        await new Promise(resolve => { window.setTimeout(resolve, TUTORIAL_CONNECTION_POLL_MS); });
+        capabilities = tutorialGraphCapabilitiesRef.current;
+      }
+      if (!capabilities.ready || capabilities.connectionId !== cid) {
+        throw new Error("Could not verify tutorial graph capabilities for this connection");
+      }
 
-    const headers = cid ? { "X-Connection-Id": cid } : undefined;
-    const listResponse = await fetch("/api/graph", {
-      method: "GET", headers, signal: AbortSignal.timeout(STUBS_PROBE_TIMEOUT),
-    });
-    if (!listResponse.ok) throw new Error("Could not verify graph names before tutorial cleanup");
-    const graphList = await listResponse.json() as { opts?: unknown };
-    if (!Array.isArray(graphList.opts) || !graphList.opts.every((name): name is string => typeof name === "string")) {
-      throw new Error("The loaded graph list is invalid");
-    }
-
-    let stubs: string[] = [];
-    if (capabilities.supportsOffload) {
-      const response = await fetch("/api/graph/stubs", {
+      const headers = cid ? { "X-Connection-Id": cid } : undefined;
+      const listResponse = await fetch("/api/graph", {
         method: "GET", headers, signal: AbortSignal.timeout(STUBS_PROBE_TIMEOUT),
       });
-      if (!response.ok) throw new Error("Could not verify offloaded tutorial graph names");
-      const result = await response.json() as Partial<StubsResponse>;
-      if (!Array.isArray(result.stubs) || !result.stubs.every(name => typeof name === "string")) {
-        throw new Error("The offloaded graph list is invalid");
+      if (!listResponse.ok) throw new Error("Could not verify graph names before tutorial cleanup");
+      const graphList = await listResponse.json() as { opts?: unknown };
+      if (!Array.isArray(graphList.opts) || !graphList.opts.every((name): name is string => typeof name === "string")) {
+        throw new Error("The loaded graph list is invalid");
       }
-      stubs = result.stubs;
-    }
 
-    return {
-      opts: graphList.opts,
-      names: [...new Set([...graphList.opts, ...stubs])],
-    };
+      let stubs: string[] = [];
+      if (capabilities.supportsOffload) {
+        const response = await fetch("/api/graph/stubs", {
+          method: "GET", headers, signal: AbortSignal.timeout(STUBS_PROBE_TIMEOUT),
+        });
+        if (!response.ok) throw new Error("Could not verify offloaded tutorial graph names");
+        const result = await response.json() as Partial<StubsResponse>;
+        if (!Array.isArray(result.stubs) || !result.stubs.every(name => typeof name === "string")) {
+          throw new Error("The offloaded graph list is invalid");
+        }
+        stubs = result.stubs;
+      }
+
+      return {
+        opts: graphList.opts,
+        names: [...new Set([...graphList.opts, ...stubs])],
+      };
+    } catch (error) {
+      throw new TutorialGraphVerificationError("Could not verify tutorial graphs; retaining ownership for retry", { cause: error });
+    }
   }, []);
 
   const deleteTutorialGraphs = useCallback(async (
@@ -2775,6 +2787,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         if (!graphList.names.includes(name)) continue;
       } catch (error) {
         console.error(`Could not verify tutorial graph cleanup for ${name}`, error);
+        throw error;
       }
 
       remaining.push(name);
@@ -2798,6 +2811,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           description: "Could not refresh the graph list after cleanup. Reload the app to verify its current state.",
         });
       }
+      throw error;
     }
 
     return remaining;
@@ -2926,6 +2940,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       } catch (error) {
         cleanupFailed = true;
         console.error(`Failed to reclaim tutorial graphs for owner ${otherOwnerId}`, error);
+        if (error instanceof TutorialGraphVerificationError) break;
       }
     }
     if (cleanupFailed) {
@@ -2945,11 +2960,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     let cancelled = false;
     void (async () => {
       try {
+        const earlyScope = getConnectionPrefix();
+        const earlyOwnerId = await getTutorialDemoOwnerId();
+        if (cancelled) return;
+        if (earlyScope && readTutorialDemoOwnership(earlyScope, earlyOwnerId).names.length === 0
+          && getOtherTutorialDemoOwnerIds(earlyScope, earlyOwnerId).length === 0
+          && !tutorialDemoLoadsRef.current.has(JSON.stringify([earlyScope, earlyOwnerId]))) return;
         const connection = await waitForTutorialConnection(false);
         if (cancelled) return;
         const { scope, cid } = connection;
         const isCurrent = () => getConnectionPrefix() === scope && getActiveConnectionIdGlobal() === cid;
-        const recoveryKey = JSON.stringify([scope, cid]);
+        const recoveryKey = JSON.stringify([scope, cid, tutorialOpen]);
         await runTutorialDemoLoadOnce(tutorialRecoveryLoadsRef.current, recoveryKey, async () => {
           const ownerId = await getTutorialDemoOwnerId();
           if (!isCurrent()) return;
@@ -3123,6 +3144,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         makeTutorialDemoGraphSuffix,
         name => currentGraphs.names.includes(name) || recorded.includes(name),
       );
+      const recordedTutorialNames = getRecordedTutorialDemoNames(scope, ownerId);
       // Keep any earlier graphs whose cleanup failed so they are retried later.
       const allNames = [...ownership.names, ...demoGraphNames];
       const pendingNames = [...(ownership.pendingNames ?? []), ...demoGraphNames];
@@ -3132,7 +3154,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       // Snapshot the fresh verified list, excluding only exact graphs recorded
       // as tutorial-owned when a prior cleanup could not remove them.
-      const recordedTutorialNames = getRecordedTutorialDemoNames(scope, ownerId);
       const userGraphs = currentGraphs.opts.filter(name => !recordedTutorialNames.has(name));
       setUserGraphsBeforeTutorial(userGraphs);
       setUserGraphBeforeTutorial(userGraphs.includes(graphName) ? graphName : "");

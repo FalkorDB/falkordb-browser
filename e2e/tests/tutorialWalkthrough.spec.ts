@@ -441,6 +441,140 @@ test.describe("Tutorial", () => {
         }
     });
 
+    test("@admin closing a tutorial gates browsing until cleanup retry finishes", async () => {
+        test.setTimeout(90_000);
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
+        await page.goto(urls.graphUrl);
+        await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+        const name = await page.evaluate(() => {
+            const owner = sessionStorage.getItem("tutorialDemoOwnerId");
+            const key = Object.keys(localStorage).find(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
+            if (!key) throw new Error("Missing tutorial ownership");
+            return (JSON.parse(localStorage.getItem(key)!) as { names: string[] }).names[0];
+        });
+        let attempts = 0;
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        const pending: Promise<void>[] = [];
+        await page.route(url => url.pathname === `/api/graph/${name}`, route => {
+            if (route.request().method() !== "DELETE") return route.continue();
+            attempts += 1;
+            if (attempts === 1) return route.fulfill({ status: 503, json: { message: "Temporary delete failure" } });
+            const request = gate.then(() => route.continue());
+            pending.push(request);
+            return request;
+        });
+        try {
+            await page.getByTestId("skipTutorial").click();
+            await expect.poll(() => attempts, { timeout: 30000 }).toBe(2);
+            await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+            await expect(page.getByTestId("selectGraph")).toBeDisabled();
+            await expect(page.getByTestId("selectGraph")).toHaveAttribute("aria-label", "Restoring graphs");
+            release();
+            await Promise.all(pending);
+            await expect.poll(() => apiCall.getGraphs().then(result => result.opts.includes(name)), { timeout: 30000 }).toBe(false);
+        } finally {
+            release();
+            await Promise.all(pending);
+        }
+    });
+
+    test("@admin ordinary browsing without ownership does not wait for failed discovery", async () => {
+        await apiCall.runQuery(userGraph, "CREATE (:Mine)");
+        await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        await page.route("**/api/connections", route => route.fulfill({ status: 503, json: { message: "Discovery unavailable" } }));
+        await page.goto(urls.graphUrl);
+        await expect(page.getByTestId("selectGraph")).toBeEnabled({ timeout: 10000 });
+        await expect(page.getByTestId("toast-title").filter({ hasText: "Tutorial cleanup failed" })).toHaveCount(0);
+    });
+
+    for (const failPublication of [false, true]) {
+        test(`@admin a shared verification failure stops the abandoned-owner sweep (publication ${failPublication})`, async () => {
+            test.setTimeout(60_000);
+            await browser.createNewPage(TutorialPanel);
+            const page = await browser.getPage();
+            const scope = "localhost:6379:default:";
+            const owners = Array.from({ length: 20 }, (_, index) => `verification-owner-${index}-${getRandomString().replaceAll("_", "-")}`);
+            await page.addInitScript(({ scope, owners }) => {
+                localStorage.setItem("tutorial", "false");
+                for (const ownerId of owners) {
+                    localStorage.setItem(`${scope}tutorialDemoGraphOwnership:${ownerId}`, JSON.stringify({
+                        scope, ownerId, names: [`tutorial-social-demo-${ownerId}`], pendingNames: [], lastActiveAt: 1,
+                    }));
+                }
+            }, { scope, owners });
+            let requests = 0;
+            await page.route(url => url.pathname === "/api/graph", async route => {
+                requests += 1;
+                if (failPublication && requests === 1) {
+                    await route.fulfill({ json: { opts: [] } });
+                }
+            });
+            try {
+                await page.goto(urls.graphUrl);
+                await expect(page.getByTestId("toast-title").filter({ hasText: "Tutorial cleanup failed" })).toBeVisible({ timeout: 25000 });
+                await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+                expect(requests).toBeLessThan(5);
+                expect(await page.evaluate(({ scope, owners }) => owners.every(owner =>
+                    localStorage.getItem(`${scope}tutorialDemoGraphOwnership:${owner}`) !== null), { scope, owners })).toBe(true);
+            } finally {
+                await browser.closeBrowser();
+            }
+    });
+    }
+
+    test("@admin malformed other-owner records do not strand new setup", async () => {
+        test.setTimeout(60_000);
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        const badKey = `localhost:6379:default:tutorialDemoGraphOwnership:bad-${getRandomString().replaceAll("_", "-")}`;
+        await page.addInitScript(key => {
+            localStorage.setItem("tutorial", "true");
+            localStorage.setItem(key, "not-json");
+        }, badKey);
+        await page.goto(urls.graphUrl);
+        await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+        const ownership = await page.evaluate(() => {
+            const owner = sessionStorage.getItem("tutorialDemoOwnerId");
+            const key = Object.keys(localStorage).find(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
+            return key ? JSON.parse(localStorage.getItem(key)!) as { names: string[]; pendingNames: string[] } : null;
+        });
+        expect(ownership?.names).toHaveLength(2);
+        expect(ownership?.pendingNames).toEqual([]);
+        expect(await page.evaluate(key => localStorage.getItem(key), badKey)).toBe("not-json");
+        await page.getByTestId("skipTutorial").click();
+        await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0, { timeout: 30000 });
+    });
+
+    test("@admin explicit editor writes work on unrecorded generated-looking names", async () => {
+        test.setTimeout(60_000);
+        const name = `tutorial-social-demo-user-${getRandomString().replaceAll("_", "-")}`;
+        await apiCall.runQuery(name, "CREATE (:Existing)");
+        const graph = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        const query = "CREATE (:WrittenByUser) RETURN 1";
+        try {
+            await page.goto(`${urls.graphUrl}?graph=${name}&query=${encodeURIComponent(query)}`);
+            await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", query, { timeout: 30000 });
+            const request = page.waitForRequest(request => {
+                const url = new URL(request.url());
+                return url.pathname === `/api/graph/${name}` && url.searchParams.get("query")?.startsWith(query) === true;
+            });
+            await graph.clickRunQuery(false);
+            expect(new URL((await request).url()).searchParams.get("readOnly")).not.toBe("true");
+            await expect(page.getByTestId("editorRun")).not.toHaveAttribute("aria-busy", "true", { timeout: 30000 });
+            const result = await apiCall.runQuery(name, "MATCH (n:WrittenByUser) RETURN count(n) AS total");
+            expect(Number(result.data[0].total)).toBe(1);
+        } finally {
+            await browser.closeBrowser();
+            const { message } = await apiCall.removeGraph(name, "admin");
+            expect(message).toMatch(/deleted|empty key/);
+        }
+    });
+
     test("@admin stalled config initialization releases recovery and saved tabs", async ({ page }) => {
         test.setTimeout(60_000);
         await apiCall.runQuery(userGraph, "CREATE (:Mine)");
@@ -496,7 +630,7 @@ test.describe("Tutorial", () => {
     test("@admin stalled setup cannot block mobile recovery or publish a late tutorial", async () => {
         test.setTimeout(90_000);
         await apiCall.runQuery(userGraph, "CREATE (:Mine)");
-        const tutorial = await browser.createNewPage(TutorialPanel);
+        await browser.createNewPage(TutorialPanel);
         const page = await browser.getPage();
         let release!: () => void;
         const gate = new Promise<void>(resolve => { release = resolve; });

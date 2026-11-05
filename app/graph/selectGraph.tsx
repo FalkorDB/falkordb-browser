@@ -388,7 +388,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     <Button
                         className="min-w-0 basis-0 grow bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 p-1 text-sm"
                         label={selectedValue || "Select Graph"}
-                        title={safeOptions.length === 0 ? "There are no Graphs" : undefined}
+                        title={!recoveryReady ? "Restoring graphs" : safeOptions.length === 0 ? "There are no Graphs" : undefined}
                         indicator={indicator}
                         data-testid="selectGraph"
                     >
@@ -468,10 +468,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                     <h2 className="font-medium">Manage Graphs</h2>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <button type="button" className="cursor-default bg-transparent">[{isLoading ? <Loader2 className="inline animate-spin" /> : safeOptions.length}]</button>
+                                            <button type="button" className="cursor-default bg-transparent">[{isLoading || !recoveryReady ? <Loader2 className="inline animate-spin" /> : safeOptions.length}]</button>
                                         </TooltipTrigger>
                                         <TooltipContent className="max-w-[300px]">
-                                            <p>Graphs Count: {safeOptions.length}</p>
+                                            <p>{recoveryReady ? `Graphs Count: ${safeOptions.length}` : "Restoring graphs"}</p>
                                             <ul className="mt-1 max-h-[200px] overflow-auto flex flex-col gap-1">
                                                 {
                                                     sortedOptions.map((name) => (

@@ -64,10 +64,13 @@ test("syncing the graph route clears share params the active tab does not have",
 
 test("URL synchronization cannot replace an in-flight route navigation", () => {
     const release = beginUrlNavigation();
-    syncRouteUrlParams("/graph", { tab: "abc", share: { query: "RETURN 1" } });
-    assert.deepEqual(replaceStateCalls, []);
-    location.pathname = "/settings";
-    release();
+    try {
+        syncRouteUrlParams("/graph", { tab: "abc", share: { query: "RETURN 1" } });
+        assert.deepEqual(replaceStateCalls, []);
+        location.pathname = "/settings";
+    } finally {
+        release();
+    }
     assert.deepEqual(replaceStateCalls, []);
     setUrlParam({ tab: "browser" });
     assert.deepEqual(replaceStateCalls, ["/settings?tab=browser"]);
@@ -75,21 +78,53 @@ test("URL synchronization cannot replace an in-flight route navigation", () => {
 
 test("an interrupted navigation applies the latest deferred parameters", () => {
     const release = beginUrlNavigation();
-    setUrlParam({ tab: "old", graph: "movies" });
-    setUrlParam({ tab: "new", query: "RETURN 1" });
-    release();
-    release();
+    try {
+        setUrlParam({ tab: "old", graph: "movies" });
+        setUrlParam({ tab: "new", query: "RETURN 1" });
+    } finally {
+        release();
+        release();
+    }
     assert.deepEqual(replaceStateCalls, ["/graph?tab=new&graph=movies&query=RETURN+1"]);
 });
 
 test("overlapping transitions defer writes until both finish", () => {
     const first = beginUrlNavigation();
     const second = beginUrlNavigation();
-    setUrlParam({ tab: "abc" });
-    first();
-    assert.deepEqual(replaceStateCalls, []);
-    second();
+    try {
+        setUrlParam({ tab: "abc" });
+        first();
+        assert.deepEqual(replaceStateCalls, []);
+    } finally {
+        first();
+        second();
+    }
     assert.deepEqual(replaceStateCalls, ["/graph?tab=abc"]);
+});
+
+test("same-path navigation preserves its destination search and hash", () => {
+    const release = beginUrlNavigation();
+    try {
+        setUrlParam({ tab: "old", graph: "movies" });
+        location.search = "?tab=destination&graph=other";
+        location.hash = "#target";
+    } finally {
+        release();
+    }
+    assert.deepEqual(replaceStateCalls, []);
+    assert.equal(location.search, "?tab=destination&graph=other");
+});
+
+test("deferred writes after navigation use only the destination state", () => {
+    const release = beginUrlNavigation();
+    try {
+        setUrlParam({ graph: "old" });
+        location.search = "?tab=destination";
+        setUrlParam({ query: "RETURN 2" });
+    } finally {
+        release();
+    }
+    assert.deepEqual(replaceStateCalls, ["/graph?tab=destination&query=RETURN+2"]);
 });
 
 test("stale route synchronization cannot write parameters into another route", () => {

@@ -74,6 +74,12 @@ timed-out setup retains its pending ownership rather than assuming it completed.
 Closing on mobile discards the tutorial's step state and ignores late setup
 results, so Replay starts fresh. Background reads of generated samples use
 non-creating read-only queries even if cleanup has already deleted the graph.
+Explicit editor queries retain the user's chosen query mode even on graphs
+whose names match sample names; mutation permissions are not inferred from names.
+Each open/close transition starts a new recovery pass. A shared verification
+failure stops the abandoned-owner sweep rather than repeating its timeout for
+every record; untouched ownership records remain available for retry. Browsing
+without ownership records does not wait for connection discovery or session sync.
 
 ### Quick start
 
@@ -334,6 +340,10 @@ to the graph preserves the editor query and unsent Chat input. Debounced URL
 updates wait for route transitions, so a draft update cannot cancel navigation
 to Settings. Chat drafts are scoped to the connection, tab, and graph, and survive
 closing and reopening Chat.
+The transition guard covers mounted programmatic push/replace/refresh calls.
+History back/forward and toast callbacks retained after unmount use Next's native
+navigation without acquiring a transition token. Deferred URL updates are
+discarded when the destination's path, search, or hash differs from their source.
 Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
