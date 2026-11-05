@@ -1,7 +1,14 @@
-export type LoginErrorCode =
-  | "credentials_required"
-  | "invalid_credentials"
-  | "connection_failed";
+const LOGIN_ERROR_MESSAGES = {
+  credentials_required: "This database requires credentials. Please enter your username and password.",
+  invalid_credentials: "Invalid credentials. Please check your username and password.",
+  connection_failed: "Could not connect to the database. Please check your connection settings and server logs.",
+} as const;
+
+export type LoginErrorCode = keyof typeof LOGIN_ERROR_MESSAGES;
+
+function isLoginErrorCode(code: unknown): code is LoginErrorCode {
+  return typeof code === "string" && Object.hasOwn(LOGIN_ERROR_MESSAGES, code);
+}
 
 export function classifyLoginError(error: unknown): LoginErrorCode {
   const message = error instanceof Error ? error.message : "";
@@ -19,8 +26,7 @@ export async function connectionResponseError(response: Response): Promise<Error
     return new Error("Failed to add connection. Please retry or check the server logs.");
   }
   if (body && typeof body === "object" && "code" in body &&
-    typeof body.code === "string" &&
-    ["credentials_required", "invalid_credentials", "connection_failed"].includes(body.code)) {
+    isLoginErrorCode(body.code)) {
     return new LoginError(body.code);
   }
   return new Error("Failed to add connection. Please retry or check the server logs.");
@@ -30,15 +36,8 @@ export class LoginError extends Error {
   readonly code: LoginErrorCode;
 
   constructor(code?: string) {
-    const messages: Record<LoginErrorCode, string> = {
-      credentials_required: "This database requires credentials. Please enter your username and password.",
-      invalid_credentials: "Invalid credentials. Please check your username and password.",
-      connection_failed: "Could not connect to the database. Please check your connection settings and server logs.",
-    };
-    const safeCode = code === "credentials_required" || code === "invalid_credentials"
-      ? code
-      : "connection_failed";
-    super(messages[safeCode]);
+    const safeCode = isLoginErrorCode(code) ? code : "connection_failed";
+    super(LOGIN_ERROR_MESSAGES[safeCode]);
     this.code = safeCode;
   }
 }

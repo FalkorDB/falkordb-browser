@@ -470,6 +470,7 @@ export async function getSSEGraphResult(
         credentials: "same-origin",
       }).then(async (response) => {
         const responseText = await response.text();
+        if (settled || signal?.aborted) return;
         const events = responseText.split(/\r?\n\r?\n/);
         for (const rawEvent of events) {
           let eventName = "";

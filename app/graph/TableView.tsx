@@ -3,6 +3,7 @@
 
 import { useContext, useMemo, useEffect, useRef } from "react";
 import { Row } from "@/lib/utils";
+import { csvCell } from "@/lib/csv-export";
 import TableComponent from "../components/TableComponent";
 import { BrowserSettingsContext, GraphContext, TableViewContext } from "../components/provider";
 import Export from "../components/Export";
@@ -50,11 +51,6 @@ export default function TableView() {
         if (!tableData) return "";
 
         const csvRows: string[] = [];
-        const csvCell = (value: string) => {
-            const safeValue = /^[\s\uFEFF]*[=+\-@]/.test(value) ? `'${value}` : value;
-            return `"${safeValue.replace(/"/g, '""')}"`;
-        };
-
         csvRows.push(tableData.headers.map(csvCell).join(','));
 
         graph.Data.forEach((row) => {

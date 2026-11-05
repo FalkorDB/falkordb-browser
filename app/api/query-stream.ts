@@ -4,7 +4,7 @@ export class QueryInputError extends Error {}
 
 function queryErrorStatus(error: unknown): number {
   if (error instanceof QueryInputError) return 400;
-  if (error instanceof ErrorReply && !/^(?:OOM|LOADING|MASTERDOWN|CLUSTERDOWN|TRYAGAIN)\b/.test(error.message)) return 400;
+  if (error instanceof ErrorReply && !/^(?:OOM|LOADING|MASTERDOWN|CLUSTERDOWN|TRYAGAIN|READONLY|MISCONF|NOREPLICAS)\b/.test(error.message)) return 400;
   return 500;
 }
 

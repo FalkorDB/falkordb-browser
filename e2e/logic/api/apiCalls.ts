@@ -61,7 +61,16 @@ export async function getSSEGraphResult(
       });
       const responseText = await response.text();
       const event = responseText.split(/\r?\n\r?\n/).find((part) => part.startsWith("event:"));
-      if (!event) throw new Error(`Unexpected query response (${response.status})`);
+      if (!event) {
+        let payload: unknown;
+        try {
+          payload = JSON.parse(responseText);
+        } catch {
+          throw new Error(`Unexpected query response (${response.status})`);
+        }
+        throw new Error(payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+          ? payload.message : `Unexpected query response (${response.status})`);
+      }
       const eventType = event.match(/^event:\s*(.+)$/m)?.[1];
       const data = event
         .split(/\r?\n/)

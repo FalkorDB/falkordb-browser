@@ -48,7 +48,11 @@ class FileTokenStorage implements ITokenStorage {
       try {
         return await op();
       } finally {
-        await fs.rmdir(lockPath);
+        try {
+          await fs.rmdir(lockPath);
+        } catch (error) {
+          console.error('Failed to release token storage lock; stop all writers before recovery:', { lockPath, error });
+        }
       }
     };
     const next = this.writeQueue.then(locked, locked);

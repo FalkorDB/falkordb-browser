@@ -113,6 +113,25 @@ describe("runQuery", () => {
             }
         });
 
+        it("keeps origin-less API requests usable without treating the API host as a caller", (t) => {
+            const previous = { ...process.env };
+            t.after(() => { process.env = previous; });
+            process.env.ALLOWED_ORIGINS = "https://frontend.example";
+            for (const method of ["GET", "HEAD", "OPTIONS"]) {
+                const request = new Request("https://api.example/api/connections", { method });
+                assert.equal(isRequestOriginTrusted(request), true);
+                assert.equal(getCorsHeaders(request)["Access-Control-Allow-Origin"], undefined);
+            }
+            const mutation = new Request("https://api.example/api/connections", { method: "POST" });
+            assert.equal(isRequestOriginTrusted(mutation), false);
+            assert.equal(isRequestOriginTrusted(new Request(mutation, {
+                headers: { authorization: "Bearer fixture" },
+            })), true);
+            assert.equal(isRequestOriginTrusted(new Request(mutation, {
+                headers: { origin: "https://unlisted.example", authorization: "Bearer fixture" },
+            })), false);
+        });
+
         it("requires a trusted origin for cookie-authenticated mutations", () => {
             const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
             try {

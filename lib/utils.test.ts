@@ -158,6 +158,49 @@ describe("API URL normalization", () => {
 
 type MockToast = { title?: unknown; description?: unknown; variant?: unknown };
 
+it("ignores POST response side effects when abort wins the body-read continuation race", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  let windowReads = 0;
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    get: () => { windowReads += 1; return { location: { href: "http://localhost/graph" } }; },
+  });
+  try {
+    for (const [body, status] of [
+      ['event: result\ndata: {"data":[]}\n\n', 200],
+      ['event: error\ndata: {"message":"Backend failed","status":500}\n\n', 200],
+      ['{"message":"Expired","code":"SESSION_INVALID"}', 401],
+    ] as const) {
+      const controller = new AbortController();
+      const response = new Response(body, { status });
+      response.text = () => {
+        const text = Promise.resolve(body);
+        text.then(() => controller.abort());
+        return text;
+      };
+      globalThis.fetch = async () => response;
+      const toasts: MockToast[] = [];
+      const indicators: string[] = [];
+      const result = getSSEGraphResult(
+        "/api/graph/demo?query=RETURN%201",
+        toast => { toasts.push(toast); },
+        state => { indicators.push(state); },
+        { method: "POST", signal: controller.signal },
+      );
+      await assert.rejects(result, isAbortError);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(toasts, []);
+      assert.deepEqual(indicators, []);
+    }
+    assert.equal(windowReads, 3, "stale session errors must not initiate sign-out");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});
+
 it("reports an empty successful POST stream instead of silently rejecting", async () => {
   const originalFetch = globalThis.fetch;
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");

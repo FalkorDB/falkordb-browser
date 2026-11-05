@@ -64,6 +64,8 @@ Cross-origin callers (including other localhost ports) must be explicitly listed
 in `ALLOWED_ORIGINS`. This is a caller-origin list, not an API-host allowlist: a
 separate frontend origin can be listed without listing the API server's origin.
 Without that setting, browser callers must match the request's own origin.
+Origin-less API reads remain supported and still require authentication; the
+allowlist is not a trusted-host list or a replacement for authorization.
 
 URL login uses the authentication attempt itself to detect missing or invalid
 credentials and reveal the credential fields when needed. Connection failures
@@ -75,8 +77,9 @@ so deployments should restrict outbound network access as appropriate.
 Session connections must have an active stored connection record. Removing the
 last connection requires a fresh login; old sessions without a connection ID
 must also sign in again instead of reconnecting from cookie fields.
-The retired session-migration endpoint rejects reconstruction, and the UI signs
-out when no stored connections remain.
+The compatibility session-migration endpoint only returns an existing usable
+active connection; it never reconstructs missing records or opens database
+clients. The UI signs out when no stored connections remain.
 
 File-backed token storage uses atomic replacements and an exclusive
 `<token-file>.lock` directory (the full configured token path with `.lock`
@@ -95,13 +98,18 @@ token-database certificate, mount the issuing CA PEM and set
 for the token store and other Node TLS connections without disabling certificate
 or hostname verification.
 
+Redis URL schemes default to port 6379; the FalkorDB URL aliases and legacy
+`PAT_FALKORDB_*` fallback retain their existing port 6380 default.
+
 Replacing a user's role also clears existing ACL selectors, so selectors cannot
 retain permissions outside the replacement role and key patterns.
 
 Legacy browser-storage migration leaves connection-shaped keys untouched rather
 than guessing ownership, including hostnames beginning with `chat-` or another
 legacy prefix. Desktop secret regeneration atomically replaces the secrets file
-inside an owner-only directory, flushing the temporary file before renaming it.
+inside an owner-only directory, flushing the temporary file before renaming it
+and flushing the parent directory afterward on POSIX. Windows sharing failures
+are retried a bounded number of times without a non-atomic fallback.
 Ambiguous legacy graph keys that could belong to another connection are left
 untouched rather than copied across scopes; this can require manual recovery.
 

@@ -130,7 +130,7 @@ test("secret replacement flushes file contents before renaming", (t) => {
     t.mock.method(fs, "renameSync", (from, to) => { calls.push("rename"); rename(from, to); });
     try {
         loadSecrets(dir);
-        assert.deepEqual(calls, ["flush", "rename"]);
+        assert.deepEqual(calls, process.platform === "win32" ? ["flush", "rename"] : ["flush", "rename", "flush"]);
     } finally {
         fs.unlinkSync(file);
         fs.rmdirSync(dir);
@@ -146,6 +146,76 @@ test("a failed secret flush preserves the previous file and removes the temporar
         assert.throws(() => loadSecrets(dir), /flush failed/);
         assert.equal(fs.readFileSync(file, "utf8"), "old damaged contents");
         assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+    } finally {
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
+test("a failed close is not retried and temporary-file cleanup still runs", (t) => {
+    const dir = tempDir();
+    const close = fs.closeSync;
+    const calls = [];
+    t.mock.method(fs, "closeSync", fd => {
+        calls.push(fd);
+        close(fd);
+        throw new Error("close failed");
+    });
+    try {
+        assert.throws(() => loadSecrets(dir), /close failed/);
+        assert.equal(calls.length, 1);
+        assert.deepEqual(fs.readdirSync(dir), []);
+    } finally {
+        fs.rmdirSync(dir);
+    }
+});
+
+test("Windows replacement retries transient sharing failures but remains bounded", (t) => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "win32" });
+    t.after(() => Object.defineProperty(process, "platform", platform));
+    const rename = fs.renameSync;
+    let attempts = 0;
+    t.mock.method(Atomics, "wait", () => "timed-out");
+    const mock = t.mock.method(fs, "renameSync", (from, to) => {
+        attempts += 1;
+        if (attempts < 3) throw Object.assign(new Error("sharing violation"), { code: "EPERM" });
+        rename(from, to);
+    });
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    try {
+        loadSecrets(dir);
+        assert.equal(attempts, 3);
+        mock.mock.mockImplementation(() => {
+            attempts += 1;
+            throw Object.assign(new Error("sharing violation"), { code: "EPERM" });
+        });
+        fs.writeFileSync(file, "old damaged contents");
+        attempts = 0;
+        assert.throws(() => loadSecrets(dir), /sharing violation/);
+        assert.equal(attempts, 5);
+        assert.equal(fs.readFileSync(file, "utf8"), "old damaged contents");
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+    } finally {
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
+test("directory flush errors are surfaced after an atomic replacement", (t) => {
+    if (process.platform === "win32") return t.skip("POSIX directory flush");
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    const fsync = fs.fsyncSync;
+    t.mock.method(fs, "fsyncSync", fd => {
+        if (fs.fstatSync(fd).isDirectory()) throw new Error("directory flush failed");
+        fsync(fd);
+    });
+    try {
+        assert.throws(() => loadSecrets(dir), /directory flush failed/);
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+        assert.match(JSON.parse(fs.readFileSync(file, "utf8")).encryptionKey, /^[0-9a-f]{64}$/);
     } finally {
         fs.unlinkSync(file);
         fs.rmdirSync(dir);

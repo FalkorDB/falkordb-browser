@@ -20,14 +20,18 @@ test("abort stops output while an in-flight database promise settles safely", as
   await new Promise(resolve => setImmediate(resolve));
 });
 
-test("consumer cancellation does not enqueue to a cancelled controller", async () => {
+test("consumer cancellation does not enqueue to a cancelled controller", async (t) => {
+  const log = t.mock.method(console, "error", () => {});
   const controller = new AbortController();
   const pending = Promise.withResolvers<unknown>();
   const response = queryStream(controller.signal, () => pending.promise, {});
-  await response.body!.cancel();
+  const reader = response.body!.getReader();
+  await reader.cancel();
   pending.resolve({ data: [] });
   controller.abort();
   await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(await reader.read(), { done: true, value: undefined });
+  assert.equal(log.mock.callCount(), 0);
 });
 
 test("already aborted queries never start", async () => {
@@ -57,6 +61,9 @@ test("query input failures stay 400 while backend and connection failures report
     [new SimpleError("LOADING Redis is loading the dataset"), 500],
     [new SimpleError("MASTERDOWN Link with MASTER is down"), 500],
     [new SimpleError("TRYAGAIN Multiple keys request during rehashing of slot"), 500],
+    [new SimpleError("READONLY You can't write against a read only replica"), 500],
+    [new SimpleError("MISCONF Redis is configured to save RDB snapshots"), 500],
+    [new SimpleError("NOREPLICAS Not enough good replicas to write"), 500],
   ] as const) {
     const response = queryStream(new AbortController().signal, async () => { throw error; }, {});
     assert.deepEqual(JSON.parse((await response.text()).split("data: ")[1]), {

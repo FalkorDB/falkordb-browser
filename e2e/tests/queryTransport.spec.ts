@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
+import { getSSEGraphResult } from "../logic/api/apiCalls";
+
+test("@admin Query helper preserves non-SSE JSON authentication errors", async () => {
+  const origin = new URL(urls.loginUrl).origin;
+  await expect(getSSEGraphResult(`${origin}/api/graph/unauthenticated?query=RETURN%201`, {
+    Cookie: "",
+  })).rejects.toThrow("Not authenticated");
+});
 
 test("@admin Query transports enforce read-only profiling and preserve SSE errors", async ({ playwright }) => {
   const origin = new URL(urls.loginUrl).origin;
@@ -68,9 +76,15 @@ test("@admin Query transports enforce read-only profiling and preserve SSE error
     });
     expect(rejected.status()).toBe(400);
   } finally {
-    if (created) await request.delete(`/api/graph/${graph}`);
-    const csrf = await (await request.get("/api/auth/csrf")).json();
-    await request.post("/api/auth/signout", { form: { csrfToken: csrf.csrfToken } });
-    await request.dispose();
+    try {
+      if (created) expect((await request.delete(`/api/graph/${graph}`)).ok()).toBe(true);
+    } finally {
+      try {
+        const csrf = await (await request.get("/api/auth/csrf")).json();
+        expect((await request.post("/api/auth/signout", { form: { csrfToken: csrf.csrfToken } })).ok()).toBe(true);
+      } finally {
+        await request.dispose();
+      }
+    }
   }
 });

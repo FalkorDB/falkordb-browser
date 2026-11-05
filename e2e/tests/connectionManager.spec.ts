@@ -26,6 +26,11 @@ test("@admin Removed connections cannot be recovered from session fields", async
       await (await request.get("/api/connections")).json();
     expect(connections).toHaveLength(1);
     const connectionId = connections[0].id;
+    const existing = await request.post("/api/auth/migrate-session");
+    expect(existing.status()).toBe(200);
+    expect((await existing.json()).connection.id).toBe(connectionId);
+    expect(existing.headers()["x-session-invalid"]).toBeUndefined();
+    expect((await (await request.get("/api/connections")).json()).connections).toHaveLength(1);
     expect((await request.delete(`/api/connections/${connectionId}`)).ok()).toBe(true);
     const migration = await request.post("/api/auth/migrate-session");
     expect(migration.status()).toBe(401);
@@ -43,9 +48,12 @@ test("@admin Removed connections cannot be recovered from session fields", async
     expect(remaining.connections).toEqual([]);
     expect((await request.get("/api/info")).status()).toBe(401);
   } finally {
-    const csrf = await (await request.get("/api/auth/csrf")).json();
-    await request.post("/api/auth/signout", { form: { csrfToken: csrf.csrfToken } });
-    await request.dispose();
+    try {
+      const csrf = await (await request.get("/api/auth/csrf")).json();
+      expect((await request.post("/api/auth/signout", { form: { csrfToken: csrf.csrfToken } })).ok()).toBe(true);
+    } finally {
+      await request.dispose();
+    }
   }
 });
 

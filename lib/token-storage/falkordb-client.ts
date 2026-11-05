@@ -40,7 +40,8 @@ export function parseFalkorDBUrl(): {
       throw new Error("API_TOKEN_FALKORDB_URL may only select database 0 and cannot contain query options or fragments");
     }
     const host = parsed.hostname.replace(/^\[([0-9a-f:]+)\]$/i, "$1");
-    const port = parsed.port ? parseInt(parsed.port, 10) : 6380;
+    const defaultPort = parsed.protocol === "redis:" || parsed.protocol === "rediss:" ? 6379 : 6380;
+    const port = parsed.port ? parseInt(parsed.port, 10) : defaultPort;
     let username: string;
     let password: string | undefined;
     try {

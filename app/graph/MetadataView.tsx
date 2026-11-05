@@ -36,6 +36,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
 
 
     const handleProfile = async () => {
+        if (isReadOnly) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
@@ -76,6 +77,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
                     label="Profile"
                     onClick={handleProfile}
                     isLoading={isLoading}
+                    disabled={isReadOnly}
                 />
                 <Button
                     className="cursor-default"

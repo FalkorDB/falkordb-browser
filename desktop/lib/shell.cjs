@@ -26,12 +26,31 @@ function writeJson(file, value) {
         fs.writeFileSync(fd, JSON.stringify(value, null, 2));
         fs.fchmodSync(fd, 0o600);
         fs.fsyncSync(fd);
-        fs.closeSync(fd);
+        const writtenFd = fd;
         fd = undefined;
-        fs.renameSync(temp, file);
+        fs.closeSync(writtenFd);
+        for (let attempt = 0; ; attempt += 1) {
+            try {
+                fs.renameSync(temp, file);
+                break;
+            } catch (error) {
+                if (process.platform !== "win32" || !["EPERM", "EACCES", "EBUSY"].includes(error.code) || attempt >= 4) throw error;
+                Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+            }
+        }
+        if (process.platform !== "win32") {
+            fd = fs.openSync(path.dirname(file), "r");
+            fs.fsyncSync(fd);
+            const directoryFd = fd;
+            fd = undefined;
+            fs.closeSync(directoryFd);
+        }
     } finally {
-        if (fd !== undefined) fs.closeSync(fd);
-        if (fs.existsSync(temp)) fs.unlinkSync(temp);
+        try {
+            if (fd !== undefined) fs.closeSync(fd);
+        } finally {
+            if (fs.existsSync(temp)) fs.unlinkSync(temp);
+        }
     }
 }
 

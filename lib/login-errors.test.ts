@@ -23,13 +23,17 @@ describe("login errors", () => {
   it("only maps recognized add-connection codes to credential prompts", async (t) => {
     t.mock.method(console, "warn", () => {});
     for (const code of ["credentials_required", "invalid_credentials", "connection_failed"]) {
-      const error = await connectionResponseError(Response.json({ code }, { status: 400 }));
+      const message = new LoginError(code).message;
+      const error = await connectionResponseError(Response.json({ code, message }, { status: 400 }));
       assert.ok(error instanceof LoginError);
       assert.equal(error.code, code);
+      assert.equal(error.message, message);
     }
     for (const response of [
       Response.json({ message: "Maximum connections reached" }, { status: 400 }),
       Response.json({ code: "UNKNOWN_ERROR" }, { status: 500 }),
+      Response.json({ code: "__proto__" }, { status: 400 }),
+      Response.json({ code: "toString" }, { status: 400 }),
       new Response("<html>Proxy error</html>", { status: 502 }),
       new Response(null, { status: 500 }),
     ]) {

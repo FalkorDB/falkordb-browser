@@ -92,6 +92,26 @@ test("a failed atomic replacement preserves the previous snapshot and releases t
     assert.equal(await storage.isTokenActive("hash:existing"), false);
 });
 
+test("admin and non-admin listings stay scoped to the endpoint with case-insensitive hosts", async (t) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-list-test-"));
+    const file = path.join(dir, "tokens.json");
+    t.after(async () => { await fs.unlink(file); await fs.rmdir(dir); });
+    const storage = new FileTokenStorage(file);
+    for (const row of [
+        { ...token("own") },
+        { ...token("other-user"), username: "other" },
+        { ...token("other-host"), host: "remote.example" },
+        { ...token("other-port"), port: 6380 },
+        { ...token("session"), kind: "session" as const },
+    ]) await storage.createToken(row);
+    for (const host of ["localhost", "LOCALHOST"]) {
+        assert.deepEqual((await storage.fetchTokens({ isAdmin: true, host, port: 6379 }))
+            .map(row => row.token_id).sort(), ["other-user", "own"]);
+        assert.deepEqual((await storage.fetchTokens({ isAdmin: false, host, port: 6379, username: "fixture" }))
+            .map(row => row.token_id), ["own"]);
+    }
+});
+
 test("lock timeout fails without stealing another writer's lock", async (t) => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-timeout-test-"));
     const file = path.join(dir, "tokens.json");
@@ -102,25 +122,6 @@ test("lock timeout fails without stealing another writer's lock", async (t) => {
         await fs.rmdir(dir);
     });
 
-    test("admin and non-admin listings stay scoped to the endpoint with case-insensitive hosts", async (t) => {
-        const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-list-test-"));
-        const file = path.join(dir, "tokens.json");
-        t.after(async () => { await fs.unlink(file); await fs.rmdir(dir); });
-        const storage = new FileTokenStorage(file);
-        for (const row of [
-            { ...token("own") },
-            { ...token("other-user"), username: "other" },
-            { ...token("other-host"), host: "remote.example" },
-            { ...token("other-port"), port: 6380 },
-            { ...token("session"), kind: "session" as const },
-        ]) await storage.createToken(row);
-        for (const host of ["localhost", "LOCALHOST"]) {
-            assert.deepEqual((await storage.fetchTokens({ isAdmin: true, host, port: 6379 }))
-                .map(row => row.token_id).sort(), ["other-user", "own"]);
-            assert.deepEqual((await storage.fetchTokens({ isAdmin: false, host, port: 6379, username: "fixture" }))
-                .map(row => row.token_id), ["own"]);
-        }
-    });
     const storage = new FileTokenStorage(file);
     await storage.createToken(token("existing"));
     await fs.mkdir(lockPath);
@@ -138,4 +139,31 @@ test("lock timeout fails without stealing another writer's lock", async (t) => {
     await assert.rejects(storage.revokeToken("existing", "fixture"), /Timed out acquiring token storage lock/);
     assert.equal((await fs.stat(lockPath)).isDirectory(), true);
     assert.equal(await fs.readFile(file, "utf8"), before);
+});
+
+test("lock-release failure is logged without replacing a committed result or original write error", async (t) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-release-test-"));
+    const file = path.join(dir, "tokens.json");
+    const lockPath = `${file}.lock`;
+    const rmdir = fs.rmdir;
+    t.after(async () => {
+        await fs.unlink(file);
+        await rmdir(dir);
+    });
+    const log = t.mock.method(console, "error", () => {});
+    t.mock.method(fs, "rmdir", async (target: Parameters<typeof fs.rmdir>[0]) => {
+        if (target === lockPath) throw new Error("release failed");
+        return rmdir(target);
+    });
+    const storage = new FileTokenStorage(file);
+    await storage.createToken(token("existing"));
+    assert.ok(await storage.fetchTokenById("existing"));
+    assert.equal(log.mock.callCount(), 1);
+    assert.match(String(log.mock.calls[0].arguments[0]), /Failed to release token storage lock/);
+    assert.equal((await fs.stat(lockPath)).isDirectory(), true);
+    await rmdir(lockPath);
+    t.mock.method(fs, "rename", async () => { throw new Error("write failed"); });
+    await assert.rejects(storage.createToken(token("new")), /Failed to save tokens/);
+    assert.equal(await storage.fetchTokenById("new"), null);
+    await rmdir(lockPath);
 });
