@@ -1,18 +1,13 @@
 name: Build
 
+# No path filters: `build`, `codecov/project` and `codecov/patch` are required
+# checks, and a skipped run would leave them pending forever. Codecov reports
+# only for a commit that uploaded coverage, which this workflow always does.
 on:
   push:
     branches: ["main", "staging"]
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE.txt'
-      - '.github/dependabot.yml'
 
   pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE.txt'
-      - '.github/dependabot.yml'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
