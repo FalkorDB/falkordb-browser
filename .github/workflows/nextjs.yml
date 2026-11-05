@@ -1,18 +1,13 @@
 name: Build
 
+# No path filters: `build`, `codecov/project` and `codecov/patch` are required
+# checks, and a skipped run would leave them pending forever. Codecov reports
+# only for a commit that uploaded coverage, which this workflow always does.
 on:
   push:
     branches: ["main", "staging"]
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE.txt'
-      - '.github/dependabot.yml'
 
   pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE.txt'
-      - '.github/dependabot.yml'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -54,20 +49,31 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --progress=false
 
+      # Also records raw V8 coverage, turned into a report over every source
+      # file (see .github/scripts/coverage-report.mjs).
       - name: Run unit tests with coverage
         run: npm run test:coverage
+        env:
+          NODE_V8_COVERAGE: coverage/raw/unit
+
+      # The build script, as the Docker image and the e2e tests build it (webpack).
+      - name: Build with Next.js
+        run: npm run build
+
+      # Last, so a Codecov problem never skips the build.
+      - name: Build the unit coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs unit coverage/raw/unit
 
       - name: Upload coverage reports to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./lcov.info
+          files: ./coverage/unit/codecov.json
+          disable_search: true
           flags: unit
-          fail_ci_if_error: false
-
-      - name: Build with Next.js
-        run: npx next build
+          fail_ci_if_error: true
 
   smoke-tests:
     runs-on: ubuntu-latest
@@ -103,6 +109,19 @@ jobs:
         env:
           FALKORDB_SMOKE: "1"
           FALKORDB_URL: redis://localhost:6379
+          NODE_V8_COVERAGE: coverage/raw/smoke
+      - name: Build the smoke coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs smoke coverage/raw/smoke
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/smoke/codecov.json
+          disable_search: true
+          flags: smoke
+          fail_ci_if_error: true
 
   security-scan:
     runs-on: ubuntu-latest

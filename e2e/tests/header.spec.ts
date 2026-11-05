@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import NavBarComponent from "../logic/POM/headerComponent";
