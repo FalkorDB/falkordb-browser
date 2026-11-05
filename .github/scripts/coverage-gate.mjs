@@ -232,19 +232,35 @@ async function main() {
     return;
   }
 
-  const post = (context, { state, description }) => (process.env.DRY_RUN
-    ? console.log(`would post ${context}: ${state}, ${description}`)
-    : gh(`statuses/${sha}`, {
-    method: 'POST',
-    body: {
-      context,
-      state,
-      description,
-      target_url: `https://app.codecov.io/gh/${repo}/${pr ? `pull/${pr.number}` : `commit/${sha}`}`,
-    },
-  }));
+  const post = async (context, { state, description }) => {
+    if (process.env.DRY_RUN) {
+      console.log(`would post ${context}: ${state}, ${description}`);
+      return;
+    }
+    await gh(`statuses/${sha}`, {
+      method: 'POST',
+      body: {
+        context,
+        state,
+        description,
+        target_url: `https://app.codecov.io/gh/${repo}/${pr ? `pull/${pr.number}` : `commit/${sha}`}`,
+      },
+    });
+  };
   const contexts = pr ? ['coverage/project', 'coverage/patch'] : ['coverage/project'];
 
+  try {
+    await gate({ gh, post, contexts, pr, sha, repo, target });
+  } catch (error) {
+    // Say so on the statuses, rather than leave an earlier run's pending.
+    const description = `The coverage gate failed: ${error.message}`.slice(0, 140);
+    for (const context of contexts) await post(context, { state: 'error', description }).catch(() => {});
+    throw error;
+  }
+}
+
+/** Decides the gate of `sha` and posts it, or posts it as pending. */
+async function gate({ gh, post, contexts, pr, sha, repo, target }) {
   // The workflows this commit triggers, as their path filters decide.
   // The files the trigger changed: a pull request's whole diff, or the pushed
   // commit's own changes (for a merge commit, all that the merge brought).
@@ -292,16 +308,18 @@ async function main() {
   }
 
   // Every upload is in once its workflow finished; wait for Codecov to
-  // process them (up to 15 minutes).
+  // process them (up to 15 minutes), riding out its passing errors.
   const codecov = `${CODECOV}/${repo.split('/')[0]}/repos/${repo.split('/')[1]}`;
   let uploads;
   for (let attempt = 0; ; attempt += 1) {
-    ({ results: uploads } = await api(`${codecov}/commits/${sha}/uploads/?page_size=100`));
-    if (uploads.length && codecovSettled(uploads)) break;
-    if (attempt >= 45) {
-      for (const context of contexts) await post(context, { state: 'error', description: 'Codecov did not process the coverage in time' });
-      throw new Error('Codecov did not process every upload in 15 minutes');
+    try {
+      ({ results: uploads } = await api(`${codecov}/commits/${sha}/uploads/?page_size=100`));
+      if (uploads.length && codecovSettled(uploads)) break;
+    } catch (error) {
+      if (error.status && error.status < 500 && error.status !== 429) throw error;
+      console.log(`Codecov: ${error.message}`);
     }
+    if (attempt >= 45) throw new Error('Codecov did not process every upload in 15 minutes');
     await new Promise((resolve) => { setTimeout(resolve, 20_000); });
   }
 
@@ -313,6 +331,7 @@ async function main() {
   }
 
   const commit = await api(`${codecov}/commits/${sha}/`);
+  if (typeof commit.totals?.coverage !== 'number') throw new Error('Codecov has no coverage total for the commit');
   const project = verdict(commit.totals.coverage, target);
   console.log(`coverage/project: ${project.description}`);
   await post('coverage/project', project);
@@ -324,6 +343,8 @@ async function main() {
       console.log(`The pull request moved on to ${compare.head_commit}: its own gate will post`);
       return;
     }
+    // No patch total is not a pass.
+    if (!compare.totals?.patch) throw new Error('Codecov has no patch total for the pull request');
     const patch = patchVerdict(compare.totals.patch, target);
     console.log(`coverage/patch: ${patch.description}`);
     await post('coverage/patch', patch);
