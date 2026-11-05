@@ -16,7 +16,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       const graphName = getRandomString("aiQueryCards");
       const query = "RETURN 4242 AS unsent_draft";
       const invalidQuery = "MATCH (n) RETsURN n";
-      const suggestion = "WITH 4242 AS unsent_draft\nWITH unsent_draft\nRETURN unsent_draft";
+      const suggestion = feature === "fix"
+        ? `WITH 4242 AS unsent_draft\n${"WITH unsent_draft\n".repeat(40)}RETURN unsent_draft`
+        : "WITH 4242 AS unsent_draft\nWITH unsent_draft\nRETURN unsent_draft";
       let providerPrompt = "";
       let queryRequests = 0;
       const server = createServer((request, response) => {
@@ -106,6 +108,10 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             await expect(page.getByTestId("aiFixCopy")).toHaveText("Copied!");
             expect(await page.evaluate(() => sessionStorage.getItem("copiedQuery"))).toBe(suggestion);
             await expect(editor).toHaveAttribute("data-value", invalidQuery);
+            await page.getByTestId("aiFixInsert").scrollIntoViewIfNeeded();
+            await expect(page.getByTestId("aiFixInsert")).toBeInViewport();
+            const card = page.getByTestId("aiFixInsert").locator("xpath=ancestor::section");
+            expect(await card.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
             await page.getByTestId("aiFixInsert").click();
           } else {
             await page.getByTestId("chatToggleButton").click();

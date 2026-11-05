@@ -69,7 +69,7 @@ export default function SuggestedQuery({
     };
 
     return (
-        <section className="w-full min-w-0 overflow-hidden rounded-lg border border-border" data-testid="suggestedQuery">
+        <section className="w-full min-w-0 shrink-0 overflow-hidden rounded-lg border border-border" data-testid="suggestedQuery">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-4 py-2 mobile:px-3">
                 <h3 className="flex items-center gap-2 text-sm font-semibold">
                     <FileCode2 size={16} className="shrink-0 text-primary" />
