@@ -211,27 +211,9 @@ async function main() {
   const target = Number(process.env.TARGET ?? 95);
   const gh = (path, options) => api(`${GITHUB}/repos/${repo}/${path}`, { token, ...options });
 
-  // The pull request, for a pull_request run: one whose head is still this
-  // commit (else a newer commit's gate decides) and that targets a protected
-  // branch. GitHub names it only for one from this repository, so look one
-  // from a fork up by its head branch.
+  // A pull request's gate posts both statuses, a push's coverage/project.
+  const contexts = event === 'pull_request' ? ['coverage/project', 'coverage/patch'] : ['coverage/project'];
   let pr;
-  if (event === 'pull_request') {
-    const candidates = process.env.PR
-      ? [await gh(`pulls/${process.env.PR}`)]
-      : await gh(`pulls?state=open&per_page=100&head=${encodeURIComponent(`${process.env.HEAD_OWNER}:${branch}`)}`);
-    pr = candidates.find((p) => p.head.sha === sha && PROTECTED.includes(p.base.ref));
-    if (!pr) {
-      console.log(`No open pull request into ${PROTECTED.join(' or ')} has ${sha} as its head`);
-      return;
-    }
-  }
-  const base = pr ? pr.base.ref : branch;
-  if (!PROTECTED.includes(base)) {
-    console.log(`${base} is not a protected branch: no gate`);
-    return;
-  }
-
   const post = async (context, { state, description }) => {
     if (process.env.DRY_RUN) {
       console.log(`would post ${context}: ${state}, ${description}`);
@@ -247,9 +229,25 @@ async function main() {
       },
     });
   };
-  const contexts = pr ? ['coverage/project', 'coverage/patch'] : ['coverage/project'];
 
   try {
+    // The pull request, for a pull_request run: one whose head is still this
+    // commit (else a newer commit's gate decides) and that targets a
+    // protected branch. GitHub names it only for one from this repository,
+    // so look one from a fork up by its head branch.
+    if (event === 'pull_request') {
+      const candidates = process.env.PR
+        ? [await gh(`pulls/${process.env.PR}`)]
+        : await gh(`pulls?state=open&per_page=100&head=${encodeURIComponent(`${process.env.HEAD_OWNER}:${branch}`)}`);
+      pr = candidates.find((p) => p.head.sha === sha && PROTECTED.includes(p.base.ref));
+      if (!pr) {
+        console.log(`No open pull request into ${PROTECTED.join(' or ')} has ${sha} as its head`);
+        return;
+      }
+    } else if (!PROTECTED.includes(branch)) {
+      console.log(`${branch} is not a protected branch: no gate`);
+      return;
+    }
     await gate({ gh, post, contexts, pr, sha, repo, target });
   } catch (error) {
     // Say so on the statuses, rather than leave an earlier run's pending.
