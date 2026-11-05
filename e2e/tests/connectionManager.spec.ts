@@ -37,7 +37,15 @@ test.describe("Connection Manager Tests", () => {
       const primary = page.getByTestId(/^connection-item-/).filter({ hasText: "default@" });
       await expect(secondary.locator("svg.text-primary")).toHaveCount(1);
       await expect(secondary).toContainText("Read-Write");
+      const session = await page.request.get(new URL("/api/auth/session", page.url()).href);
+      expect(session.ok()).toBe(true);
+      expect((await session.json()).user.role).toBe("Read-Write");
+      const sessionUpdate = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === "/api/auth/session" && response.request().method() === "POST");
       await primary.click();
+      const updatedSession = await sessionUpdate;
+      expect(updatedSession.ok()).toBe(true);
+      expect((await updatedSession.json()).user.role).toBe("Admin");
       await page.getByTestId("connections-dropdown-trigger").click();
       await expect(primary.locator("svg.text-primary")).toHaveCount(1);
       await secondary.getByRole("button", { name: /Sign out of connection/ }).click();
