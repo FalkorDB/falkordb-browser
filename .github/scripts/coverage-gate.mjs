@@ -122,10 +122,13 @@ export function runsFor(filters, files) {
 /**
  * The runs a trigger made: a commit pushed to staging and at the head of a
  * pull request into main has both push and pull_request runs, and the gate
- * of each trigger judges its own.
+ * of each trigger judges its own; for a pull request, its own runs.
  */
-export function runsOf(event, runs) {
-  return runs.filter((run) => run.event === event);
+export function runsOf(event, runs, prNumber) {
+  return runs.filter((run) => run.event === event
+    // A commit at the head of two pull requests has runs for each; GitHub
+    // names a run's pull requests (none for one from a fork).
+    && (prNumber === undefined || !run.pull_requests?.length || run.pull_requests.some((p) => p.number === prNumber)));
 }
 
 /** Each workflow's latest run (a re-run is the run that counts). */
@@ -466,7 +469,7 @@ export async function gate({
   const runs = runsOf(trigger, await allPages(
     (page) => gh(`actions/runs?head_sha=${sha}&per_page=100&page=${page}`),
     (page) => page.workflow_runs,
-  )).filter((run) => run.name in COVERAGE_WORKFLOWS);
+  ), pr?.number).filter((run) => run.name in COVERAGE_WORKFLOWS);
   // Expected: every coverage workflow the trigger started, and every one
   // whose path filters take these files. GitHub starts all of a trigger's
   // runs at once, so a push of several commits, whose earlier commits the

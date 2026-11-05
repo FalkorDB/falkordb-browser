@@ -109,6 +109,17 @@ test("judges a trigger's own runs: a push run does not hide a pull request run",
   ])), ['Build']);
 });
 
+test("judges a pull request's own runs: another pull request's on the same commit do not count", () => {
+  const own = { id: 1, name: 'Build', event: 'pull_request', status: 'completed', conclusion: 'failure', pull_requests: [{ number: 7 }] };
+  const other = { id: 2, name: 'Build', event: 'pull_request', status: 'completed', conclusion: 'success', pull_requests: [{ number: 8 }] };
+  // A fork's run names no pull request: it is kept.
+  const fork = { id: 3, name: 'Playwright Tests', event: 'pull_request', status: 'completed', conclusion: 'success', pull_requests: [] };
+  assert.deepEqual(runsOf('pull_request', [own, other, fork], 7).map((r) => r.id), [1, 3]);
+  assert.deepEqual(unsuccessful(['Build'], runsOf('pull_request', [own, other], 7)), ['Build']);
+  // A push's gate has no pull request to keep to.
+  assert.deepEqual(runsOf('pull_request', [own, other]).map((r) => r.id), [1, 2]);
+});
+
 test('counts a finished workflow that did not succeed as incomplete coverage', () => {
   const runs = [
     { id: 1, name: 'Build', status: 'completed', conclusion: 'success' },
