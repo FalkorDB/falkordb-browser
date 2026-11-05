@@ -35,6 +35,8 @@ test.describe("Connection Manager Tests", () => {
       await page.getByTestId("connections-dropdown-trigger").click();
       const secondary = page.getByTestId(/^connection-item-/).filter({ hasText: "readwriteuser@" });
       const primary = page.getByTestId(/^connection-item-/).filter({ hasText: "default@" });
+      const primaryId = (await primary.getAttribute("data-testid"))?.replace("connection-item-", "");
+      expect(primaryId).toBeTruthy();
       await expect(secondary.locator("svg.text-primary")).toHaveCount(1);
       await expect(secondary).toContainText("Read-Write");
       const session = await page.request.get(new URL("/api/auth/session", page.url()).href);
@@ -45,7 +47,7 @@ test.describe("Connection Manager Tests", () => {
       await primary.click();
       const updatedSession = await sessionUpdate;
       expect(updatedSession.ok()).toBe(true);
-      expect((await updatedSession.json()).user.role).toBe("Admin");
+      expect(await updatedSession.json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
       await page.getByTestId("connections-dropdown-trigger").click();
       await expect(primary.locator("svg.text-primary")).toHaveCount(1);
       await secondary.getByRole("button", { name: /Sign out of connection/ }).click();
@@ -55,7 +57,12 @@ test.describe("Connection Manager Tests", () => {
       await expect(page.getByTestId(/^connection-item-/)).toHaveCount(1);
       await expect(primary.locator("svg.text-primary")).toHaveCount(1);
       await page.keyboard.press("Escape");
+      const restoredSession = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === "/api/auth/session" && response.request().method() === "POST");
       await page.reload();
+      const restored = await restoredSession;
+      expect(restored.ok()).toBe(true);
+      expect(await restored.json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
       await page.getByTestId("connections-dropdown-trigger").click();
       await expect(page.getByTestId(/^connection-item-/)).toHaveCount(1);
       await expect(primary).toContainText("Admin");
@@ -89,6 +96,11 @@ test.describe("Connection Manager Tests", () => {
       await expect(page.getByTestId(/^connection-item-/)).toHaveCount(1);
       const primary = page.getByTestId(/^connection-item-/).filter({ hasText: "default@" });
       await expect(primary.locator("svg.text-primary")).toHaveCount(1);
+      const primaryId = (await primary.getAttribute("data-testid"))?.replace("connection-item-", "");
+      expect(primaryId).toBeTruthy();
+      const session = await page.request.get(new URL("/api/auth/session", page.url()).href);
+      expect(session.ok()).toBe(true);
+      expect(await session.json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
       expect(attempts).toBe(2);
     });
   });
@@ -142,34 +154,48 @@ test.describe("Connection Manager Tests", () => {
     await expect(page.getByTestId(/^connection-item-/)).toHaveCount(1);
   });
 
-  test("@admin a rejected additional connection keeps the form editable for retry", async () => {
-    const manager = await browser.createNewPage(ConnectionManagerComponent, urls.graphUrl);
-    const page = await browser.getPage();
-    const attempts: Record<string, unknown>[] = [];
-    await page.route("**/api/connections", async (route) => {
-      if (route.request().method() !== "POST") {
-        await route.continue();
-        return;
-      }
-      attempts.push(route.request().postDataJSON());
-      await route.fulfill({ status: 400, json: { message: "Authentication failed: wrong password." } });
+  test.describe("Rejected additional connections", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test("@admin a rejected additional connection keeps the form editable for retry", async ({ page }) => {
+      await page.addInitScript(initializeLocalStorage("localhost", 6379));
+      const login = new LoginPage(page);
+      await page.goto(urls.loginUrl);
+      await login.clickOnConnect();
+      await login.handleSkipTutorial();
+      const manager = new ConnectionManagerComponent(page);
+      const attempts: Record<string, unknown>[] = [];
+      await page.route("**/api/connections", async (route) => {
+        if (route.request().method() !== "POST") {
+          await route.continue();
+          return;
+        }
+        attempts.push(route.request().postDataJSON());
+        if (attempts.length === 1) {
+          await route.fulfill({ status: 400, json: { message: "Authentication failed: wrong password." } });
+        } else {
+          await route.continue();
+        }
+      });
+      await manager.openDropdown();
+      await page.getByRole("menuitem", { name: "Add Connection" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.locator("#Username").fill("readwriteuser");
+      await dialog.locator("#Password").fill("first-attempt");
+      await dialog.getByRole("button", { name: "Add Connection", exact: true }).click();
+      await expect(dialog.getByRole("button", { name: "Add Connection", exact: true })).toBeDisabled();
+      await expect(page.getByText("Authentication failed: wrong password.", { exact: true })).toBeVisible();
+      await dialog.locator("#Password").fill(user.password);
+      await expect(dialog.getByRole("button", { name: "Add Connection", exact: true })).toBeEnabled();
+      await dialog.getByRole("button", { name: "Add Connection", exact: true }).click();
+      await expect.poll(() => attempts.length).toBe(2);
+      expect(attempts.map(({ password }) => password)).toEqual(["first-attempt", user.password]);
+      await expect(dialog).toBeHidden();
+      await manager.openDropdown();
+      await expect(page.getByTestId(/^connection-item-/)).toHaveCount(2);
+      const added = page.getByTestId(/^connection-item-/).filter({ hasText: "readwriteuser@" });
+      await expect(added).toContainText("Read-Write");
+      await expect(added.locator("svg.text-primary")).toHaveCount(1);
     });
-    await manager.openDropdown();
-    await page.getByRole("menuitem", { name: "Add Connection" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.locator("#Username").fill("connection-test");
-    await dialog.locator("#Password").fill("first-attempt");
-    await dialog.getByRole("button", { name: "Add Connection", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "Add Connection", exact: true })).toBeDisabled();
-    await expect(page.getByText("Authentication failed: wrong password.", { exact: true })).toBeVisible();
-    await dialog.locator("#Password").fill("second-attempt");
-    await expect(dialog.getByRole("button", { name: "Add Connection", exact: true })).toBeEnabled();
-    await dialog.getByRole("button", { name: "Add Connection", exact: true }).click();
-    await expect.poll(() => attempts.length).toBe(2);
-    expect(attempts.map(({ password }) => password)).toEqual(["first-attempt", "second-attempt"]);
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "Close", exact: true }).click();
-    await manager.openDropdown();
-    await expect(page.getByTestId(/^connection-item-/)).toHaveCount(1);
   });
 });
