@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
-  transient, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
-  verdict, waitingFor,
+  transient, missingFlags, missingUploads, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  verdict, waitingFor, workflowUploads,
 } from './coverage-gate.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -147,6 +147,27 @@ test("finds the commit's uploads Codecov could not process", () => {
   assert.deepEqual(missingFlags(['Playwright Tests'], uploads), []);
 });
 
+test('requires every E2E job upload, not just an e2e flag from one shard', () => {
+  const workflow = readFileSync(`${ROOT}.github/workflows/playwright.yml`, 'utf8');
+  const names = workflowUploads(workflow);
+  assert.equal(names.length, 10);
+  assert.match(workflow, /shard: \[1, 2, 3, 4, 5, 6\]/);
+  for (const name of names.filter((name) => !name.startsWith('e2e-shard-'))) {
+    assert.ok(workflow.includes(`name: ${name}`), name);
+  }
+  const uploads = names.map((name) => ({ name, flags: ['e2e'], upload_type: 'uploaded', state: 'merged' }));
+  assert.deepEqual(missingUploads(names, uploads), []);
+  assert.deepEqual(missingUploads(names, uploads.slice(1)), ['e2e-shard-1']);
+  assert.deepEqual(missingUploads(names, [
+    ...uploads.slice(1), { ...uploads[0], upload_type: 'carriedforward' },
+  ]), ['e2e-shard-1']);
+  assert.deepEqual(missingUploads([], []), []);
+  assert.deepEqual(workflowUploads('name: old workflow\n  name: e2e-tls\n'), ['e2e-tls']);
+  assert.deepEqual(workflowUploads('  shard: [1, 2]\n  name: e2e-shard-${{ matrix.shard }}\n'), ['e2e-shard-1', 'e2e-shard-2']);
+  assert.throws(() => workflowUploads('  name: e2e-${{ matrix.unknown }}\n'), /Unknown coverage upload expression/);
+  assert.throws(() => workflowUploads('  name: e2e-shard-${{ matrix.shard }}\n'), /No shard matrix/);
+});
+
 test('waits until Codecov has processed every upload', () => {
   const upload = (name, state) => ({ name, flags: ['unit'], upload_type: 'uploaded', state });
   assert.ok(codecovSettled([upload('unit', 'merged'), { name: 'CF[1]', flags: ['e2e'], upload_type: 'carriedforward', state: 'complete' }]));
@@ -195,7 +216,11 @@ test("follows Codecov's next links, over https, to the last page", async () => {
 const SHA = 'c0ffee';
 const run = (name, conclusion = 'success', status = 'completed', event = 'pull_request') => ({ id: Math.random(), name, event, status, conclusion });
 const fresh = (name, flags) => ({ name, flags, upload_type: 'uploaded', state: 'merged', created_at: '2026-11-05T12:00:00Z' });
-const FRESH = [fresh('build', ['unit']), fresh('smoke', ['smoke']), fresh('e2e-shard-1', ['e2e']), fresh('desktop', ['desktop'])];
+const FRESH = [
+  fresh('build', ['unit']), fresh('smoke', ['smoke']),
+  ...workflowUploads(readFileSync(`${ROOT}.github/workflows/playwright.yml`, 'utf8')).map((name) => fresh(name, ['e2e'])),
+  fresh('desktop', ['desktop']),
+];
 
 function world({
   pr = { number: 7 }, files = ['app/graph/page.tsx'], runs, uploads = [FRESH], coverage = 96,
@@ -278,16 +303,23 @@ test('gate: a workflow that did not succeed fails both statuses', async () => {
 test("gate: a flag with only an earlier commit's coverage fails", async () => {
   const carried = { name: 'CF[1]', flags: ['e2e'], upload_type: 'carriedforward', state: 'complete' };
   const stale = world({ runs: ALL_DONE, uploads: [[fresh('build', ['unit']), fresh('smoke', ['smoke']), carried, fresh('desktop', ['desktop'])]] });
-  assert.equal(await gate(stale.args), false);
-  assert.deepEqual(stale.posted, [
-    'coverage/project failure: No e2e coverage was uploaded for this commit',
-    'coverage/patch failure: No e2e coverage was uploaded for this commit',
-  ]);
+  await assert.rejects(gate(stale.args), /missing: e2e, e2e-shard-1/);
+  assert.deepEqual(stale.posted, []);
+});
+
+test('gate: waits for a missing shard to become visible in Codecov', async () => {
+  const partial = FRESH.filter((upload) => upload.name !== 'e2e-shard-3');
+  const delayed = world({ runs: ALL_DONE, uploads: [partial, FRESH] });
+  assert.equal(await gate(delayed.args), true);
+  assert.deepEqual(delayed.sleeps, [20_000]);
+  const lost = world({ runs: ALL_DONE, uploads: [partial] });
+  await assert.rejects(gate(lost.args), /missing: e2e-shard-3/);
+  assert.deepEqual(lost.posted, []);
 });
 
 test('gate: waits out Codecov processing and its passing errors', async () => {
   const busy = Object.assign(new Error('503'), { status: 503 });
-  const processing = [...FRESH.slice(0, 3), { ...fresh('desktop', ['desktop']), state: 'uploaded' }];
+  const processing = FRESH.map((upload) => upload.name === 'desktop' ? { ...upload, state: 'uploaded' } : upload);
   const slow = world({ runs: ALL_DONE, uploads: [busy, processing, FRESH] });
   assert.equal(await gate(slow.args), true);
   assert.deepEqual(slow.sleeps, [20_000, 20_000]);

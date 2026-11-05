@@ -21,6 +21,16 @@ const recording = new Map<Page, Promise<void>>();
 
 // The chunk URLs whose source this worker has saved.
 const savedSources = new Set<string>();
+const trackedContexts = new WeakSet<BrowserContext>();
+
+function recordFailure(error: unknown) {
+    console.error("Browser coverage collection failed:", error);
+    if (!dir) throw new Error("Coverage directory is not configured");
+    mkdirSync(dir, { recursive: true });
+    writeWhole(path.join(dir, `browser-error-${randomUUID()}.json`), JSON.stringify({
+        message: error instanceof Error ? error.message : String(error),
+    }));
+}
 
 /**
  * Writes `data` whole under a temporary name and only then gives it its real
@@ -66,17 +76,24 @@ async function save(page: Page) {
 /** Records `page`'s coverage until it closes (or its context does). */
 function track(page: Page) {
     if (recording.has(page)) return;
-    recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch(() => {}));
+    recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch(recordFailure));
     const close = page.close.bind(page);
     page.close = async (options) => {
-        await save(page).catch(() => {});
-        return close(options);
+        try {
+            await save(page);
+        } catch (error) {
+            recordFailure(error);
+        } finally {
+            await close(options);
+        }
     };
 }
 
 /** Records coverage for every page opened in `context`. A no-op unless collecting. */
 export function trackContext<T extends BrowserContext>(context: T): T {
     if (!dir || context.browser()?.browserType().name() !== 'chromium') return context;
+    if (trackedContexts.has(context)) return context;
+    trackedContexts.add(context);
     context.pages().forEach(track);
     context.on('page', track);
     // A page the test opens is recording before the test can navigate it.
@@ -90,8 +107,11 @@ export function trackContext<T extends BrowserContext>(context: T): T {
     };
     const close = context.close.bind(context);
     context.close = async (options) => {
-        await Promise.all(context.pages().map((page) => save(page).catch(() => {})));
-        return close(options);
+        try {
+            await Promise.all(context.pages().map((page) => save(page).catch(recordFailure)));
+        } finally {
+            await close(options);
+        }
     };
     return context;
 }
