@@ -54,6 +54,138 @@ test.describe('@browser Browser Settings tests', () => {
         await browser.closeBrowser();
     });
 
+    test.describe("Mocked AI settings recovery", () => {
+        async function openLocalSettings() {
+            const settings = await browser.createNewPage(SettingsBrowserPage);
+            const page = await browser.getPage();
+            await page.addInitScript(() => {
+                localStorage.setItem("chatModelSource", "local");
+                localStorage.setItem("localLlmProvider", "ollama");
+                localStorage.setItem("localLlmEndpoint", "http://localhost:11434");
+                localStorage.removeItem("model");
+                localStorage.removeItem("perSourceModels");
+            });
+            await page.goto(urls.settingsUrl);
+            await settings.expandChatSection();
+            return page;
+        }
+
+        test("@readwrite AI settings retries a rejected local model request with the configured endpoint", async () => {
+            await browser.createNewPage(SettingsBrowserPage);
+            const page = await browser.getPage();
+            const requests: Record<string, string>[] = [];
+            await page.route("**/api/chat/models", async (route) => {
+                requests.push(route.request().postDataJSON());
+                await route.fulfill({
+                    status: requests.length === 1 ? 503 : 200,
+                    json: requests.length === 1
+                        ? { error: "Local model server unavailable" }
+                        : { models: ["llama3.2"] },
+                });
+            });
+            await openLocalSettings();
+            await expect(page.getByText("Local model server unavailable", { exact: true })).toBeVisible();
+            await expect(page.getByTestId("noModelsFoundMessage")).toBeVisible();
+
+            await page.getByTestId("localLlmEndpointInput").fill("http://localhost:11435");
+            await expect(page.getByText("1 local Ollama models loaded.", { exact: true })).toBeVisible();
+            expect(requests).toEqual([
+                { source: "local", localProvider: "ollama", endpoint: "http://localhost:11434" },
+                { source: "local", localProvider: "ollama", endpoint: "http://localhost:11435" },
+            ]);
+            await expect(page.getByTestId("selectModelllama3.2")).toBeVisible();
+            await expect.poll(() => page.evaluate(() => localStorage.getItem("model"))).toBe("llama3.2");
+        });
+
+        test("@readwrite AI settings recovers from malformed model JSON using reload", async () => {
+            await browser.createNewPage(SettingsBrowserPage);
+            const page = await browser.getPage();
+            let requests = 0;
+            await page.route("**/api/chat/models", async (route) => {
+                requests += 1;
+                await route.fulfill(requests === 1
+                    ? { status: 200, contentType: "application/json", body: '{"models":' }
+                    : { status: 200, json: { models: ["llama3.2"] } });
+            });
+            await openLocalSettings();
+            await expect(page.getByText("Could not connect to local server. Check the URL and click reload.", { exact: true })).toBeVisible();
+            await expect(page.getByTestId("modelSearch")).toBeEnabled();
+            await page.getByTestId("localLlmLoadButton").click();
+
+            await expect(page.getByText("1 local Ollama models loaded.", { exact: true })).toBeVisible();
+            await expect(page.getByTestId("selectModelllama3.2")).toBeVisible();
+            expect(requests).toBe(2);
+        });
+
+        test("@readwrite AI settings reloads an empty model list when models become available", async () => {
+            await browser.createNewPage(SettingsBrowserPage);
+            const page = await browser.getPage();
+            const requests: Record<string, string>[] = [];
+            await page.route("**/api/chat/models", async (route) => {
+                requests.push(route.request().postDataJSON());
+                await route.fulfill({
+                    json: { models: requests.length === 1 ? [] : ["qwen2.5"] },
+                });
+            });
+            await openLocalSettings();
+            await expect(page.getByText("No local Ollama models were returned.", { exact: true })).toBeVisible();
+            await expect(page.getByTestId("noModelsFoundMessage")).toBeVisible();
+            await page.getByTestId("localLlmLoadButton").click();
+
+            await expect(page.getByText("1 local Ollama models loaded.", { exact: true })).toBeVisible();
+            await expect(page.getByTestId("noModelsFoundMessage")).toHaveCount(0);
+            expect(requests.at(-1)).toEqual({
+                source: "local", localProvider: "ollama", endpoint: "http://localhost:11434",
+            });
+            expect(requests).toHaveLength(2);
+            await expect.poll(() => page.evaluate(() => localStorage.getItem("model"))).toBe("qwen2.5");
+        });
+
+        test("@readwrite AI settings retains an API key after encryption failure and allows retry", async () => {
+            const settings = await browser.createNewPage(SettingsBrowserPage);
+            const page = await browser.getPage();
+            await page.addInitScript(() => {
+                localStorage.setItem("chatModelSource", "api-key");
+                localStorage.removeItem("secretKey");
+                for (const key of Object.keys(localStorage)) {
+                    if (key.endsWith("chatApiKeys") || key.endsWith("selectedChatApiKeyId")) {
+                        localStorage.removeItem(key);
+                    }
+                }
+            });
+            let encryptAttempts = 0;
+            await page.route("**/api/encrypt", async (route) => {
+                if (route.request().postDataJSON().action !== "encrypt") {
+                    await route.fallback();
+                    return;
+                }
+                encryptAttempts += 1;
+                if (encryptAttempts === 1) {
+                    await route.fulfill({ status: 500, json: { error: "Encryption unavailable" } });
+                } else {
+                    await route.fallback();
+                }
+            });
+            await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: ["gpt-4o-mini"] } }));
+            await page.goto(urls.settingsUrl);
+            await page.waitForLoadState("networkidle");
+            await settings.expandChatSection();
+            await settings.fillChatApiKey("sk-e2e-retry-not-a-real-key");
+            await page.getByTestId("addChatApiKeyButton").click();
+
+            await expect(page.getByText("Could not encrypt API keys. Please try again.", { exact: true })).toBeVisible();
+            await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(0);
+            await expect(page.getByTestId("chatApiKeyInput")).toHaveValue("sk-e2e-retry-not-a-real-key");
+            await expect(page.getByTestId("addChatApiKeyButton")).toBeEnabled();
+            await page.getByTestId("addChatApiKeyButton").click();
+
+            await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
+            await expect(page.getByTestId("chatApiKeyInput")).toBeEmpty();
+            await expect(page.getByText("1 live models loaded for OpenAI.", { exact: true })).toBeVisible();
+            expect(encryptAttempts).toBe(2);
+        });
+    });
+
     test('@readwrite Verify user can select a model and API key then save settings', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
