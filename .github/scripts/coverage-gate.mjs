@@ -148,17 +148,28 @@ export function unsuccessful(expected, runs) {
 }
 
 /**
- * The commit's own uploads that Codecov could not process, each the latest
- * of its job (a re-run's upload, named after the same job, replaces it).
+ * The uploads that count: of the commit's own, the latest of each job (a
+ * re-run's upload, named after the same job, replaces an earlier attempt's);
+ * and the carried-forward ones.
  */
-export function failedUploads(uploads) {
+export function currentUploads(uploads) {
   const latest = new Map();
-  for (const upload of uploads.filter((u) => u.upload_type !== 'carriedforward')) {
+  const carried = [];
+  for (const upload of uploads) {
+    if (upload.upload_type === 'carriedforward') {
+      carried.push(upload);
+      continue;
+    }
     const job = upload.name || upload.flags.join(',');
     const seen = latest.get(job);
     if (!seen || upload.created_at > seen.created_at) latest.set(job, upload);
   }
-  return [...latest.values()].filter((u) => u.state === 'error');
+  return [...latest.values(), ...carried];
+}
+
+/** The commit's own current uploads that Codecov could not process. */
+export function failedUploads(uploads) {
+  return currentUploads(uploads).filter((u) => u.upload_type !== 'carriedforward' && u.state === 'error');
 }
 
 /**
@@ -172,9 +183,12 @@ export function missingFlags(expected, uploads) {
   return expected.flatMap((name) => COVERAGE_WORKFLOWS[name].flags).filter((flag) => !uploaded.has(flag));
 }
 
-/** Whether Codecov has processed every upload of the commit. */
+/**
+ * Whether Codecov has processed every current upload of the commit (an
+ * earlier attempt's upload, stuck part way, does not hold the gate).
+ */
 export function codecovSettled(uploads) {
-  return uploads.every((u) => ['merged', 'complete', 'error'].includes(u.state));
+  return currentUploads(uploads).every((u) => ['merged', 'complete', 'error'].includes(u.state));
 }
 
 /** A coverage status for `pct` against `target`. */

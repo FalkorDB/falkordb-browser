@@ -147,10 +147,16 @@ test("finds the commit's uploads Codecov could not process", () => {
 });
 
 test('waits until Codecov has processed every upload', () => {
-  assert.ok(codecovSettled([{ state: 'merged' }, { state: 'complete' }]));
-  assert.ok(!codecovSettled([{ state: 'merged' }, { state: 'uploaded' }]));
-  assert.ok(!codecovSettled([{ state: 'started' }]));
-  assert.ok(!codecovSettled([{ state: 'processed' }]));
+  const upload = (name, state) => ({ name, flags: ['unit'], upload_type: 'uploaded', state });
+  assert.ok(codecovSettled([upload('unit', 'merged'), { name: 'CF[1]', flags: ['e2e'], upload_type: 'carriedforward', state: 'complete' }]));
+  assert.ok(!codecovSettled([upload('unit', 'merged'), upload('smoke', 'uploaded')]));
+  assert.ok(!codecovSettled([upload('unit', 'started')]));
+  assert.ok(!codecovSettled([upload('unit', 'processed')]));
+  // An earlier attempt's upload, stuck part way, gave way to a re-run's.
+  assert.ok(codecovSettled([
+    { name: 'e2e-shard-2', flags: ['e2e'], upload_type: 'uploaded', state: 'started', created_at: '2026-11-05T12:00:00Z' },
+    { name: 'e2e-shard-2', flags: ['e2e'], upload_type: 'uploaded', state: 'merged', created_at: '2026-11-05T12:30:00Z' },
+  ]));
 });
 
 test('passes coverage at the target or above, rounding down', () => {
