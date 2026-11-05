@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import urls from "../config/urls.json";
 import userConfig from "../config/user.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
@@ -17,6 +17,112 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
 
   test.afterEach(async () => {
     await browser.closeBrowser();
+  });
+
+  test("@admin Custom token expiration rejects missing and past dates before sending a request", async () => {
+    const settingsTokensPage = await browser.createNewPage(SettingsTokensPage);
+    const page = await browser.getPage();
+    let mutations = 0;
+    await page.route("**/api/auth/tokens", async route => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ json: { tokens: [], role: "Admin" } });
+      } else {
+        mutations += 1;
+        await route.fulfill({ status: 400, json: { message: "Unexpected mutation" } });
+      }
+    });
+    await browser.navigateTo(urls.settingsUrl);
+    await settingsTokensPage.navigateToTokensTab();
+    await settingsTokensPage.clickGenerateTokenButton();
+    await settingsTokensPage.fillTokenNameInput("mock-custom-expiration");
+    await settingsTokensPage.clickExpirationSelect();
+    await settingsTokensPage.clickExpirationOption("Custom");
+    await settingsTokensPage.clickGenerateTokenConfirmButton();
+    await expect(page.getByText("Please select a custom expiration date", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Generate token", exact: true })).toBeEnabled();
+    await page.locator("#custom-date").fill("2000-01-01");
+    await settingsTokensPage.clickGenerateTokenConfirmButton();
+    await expect(page.getByText("Expiration date must be in the future", { exact: true })).toBeVisible();
+    await expect(page.locator("#token-name")).toHaveValue("mock-custom-expiration");
+    await expect(page.getByRole("button", { name: "Generate token", exact: true })).toBeEnabled();
+    expect(mutations).toBe(0);
+  });
+
+  test("@admin Failed token generation preserves custom expiration and can be retried", async () => {
+    const settingsTokensPage = await browser.createNewPage(SettingsTokensPage);
+    const page = await browser.getPage();
+    const name = "mock-generate-retry";
+    const submissions: { name: string; expiresAt: string; ttlSeconds: number }[] = [];
+    const future = new Date();
+    future.setDate(future.getDate() + 10);
+    const date = future.toISOString().slice(0, 10);
+    await page.route("**/api/auth/tokens", async route => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ json: { tokens: [], role: "Admin" } });
+      } else {
+        expect(route.request().method()).toBe("POST");
+        submissions.push(route.request().postDataJSON() as typeof submissions[number]);
+        await route.fulfill(submissions.length === 1
+          ? { status: 400, json: { message: "Token generation rejected" } }
+          : { json: { token: "mock-token-not-a-real-credential" } });
+      }
+    });
+    await browser.navigateTo(urls.settingsUrl);
+    await settingsTokensPage.navigateToTokensTab();
+    await settingsTokensPage.clickGenerateTokenButton();
+    await settingsTokensPage.fillTokenNameInput(name);
+    await settingsTokensPage.clickExpirationSelect();
+    await settingsTokensPage.clickExpirationOption("Custom");
+    await page.locator("#custom-date").fill(date);
+    await settingsTokensPage.clickGenerateTokenConfirmButton();
+    await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
+    await expect(page.locator("#token-name")).toHaveValue(name);
+    await expect(page.locator("#custom-date")).toHaveValue(date);
+    await expect(page.getByRole("button", { name: "Generate token", exact: true })).toBeEnabled();
+    await settingsTokensPage.clickGenerateTokenConfirmButton();
+    await expect(page.locator("input[readonly]")).toHaveValue("mock-token-not-a-real-credential");
+    expect(submissions).toHaveLength(2);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    for (const submission of submissions) {
+      expect(submission).toMatchObject({ name, expiresAt: endOfDay.toISOString() });
+      expect(submission.ttlSeconds).toBeGreaterThan(0);
+      expect(submission.ttlSeconds).toBeLessThanOrEqual(11 * 24 * 60 * 60);
+    }
+  });
+
+  test("@admin Failed token revocation retains the row and confirmation for retry", async () => {
+    const settingsTokensPage = await browser.createNewPage(SettingsTokensPage);
+    const page = await browser.getPage();
+    const name = "mock-revoke-retry";
+    let attempts = 0;
+    await page.route("**/api/auth/tokens", route => route.fulfill({
+      json: { role: "Admin", tokens: [{
+        token_id: "mock-token-id", name, username: "mock-user", role: "Read-Only",
+        created_at: "2026-01-01T00:00:00Z", last_used: null, expires_at: null,
+      }] },
+    }));
+    await page.route("**/api/auth/tokens/mock-token-id", async route => {
+      expect(route.request().method()).toBe("DELETE");
+      attempts += 1;
+      await route.fulfill(attempts === 1
+        ? { status: 403, json: { message: "Token revocation denied" } }
+        : { json: {} });
+    });
+    await browser.navigateTo(urls.settingsUrl);
+    await settingsTokensPage.navigateToTokensTab();
+    await settingsTokensPage.clickRevokeButtonByName(name);
+    await settingsTokensPage.clickRevokeConfirmButton();
+    await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
+    // The modal hides the underlying table from the accessibility tree.
+    await expect(page.getByRole("row", { includeHidden: true }).filter({ hasText: name })).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Revoke token", exact: true })).toBeEnabled();
+    await settingsTokensPage.clickRevokeConfirmButton();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(settingsTokensPage.getRowByText(name)).toHaveCount(0);
+    await expect(page.getByText("No active tokens. Generate one to get started.")).toBeVisible();
+    expect(attempts).toBe(2);
   });
 
   test.describe("Token Generation - Admin User", () => {
