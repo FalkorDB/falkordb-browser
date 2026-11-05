@@ -1,8 +1,26 @@
 {
   "all": true,
-  "src": ["app", "lib", "components"],
-  "include": ["app/**", "lib/**", "components/**"],
-  "exclude": ["**/*.test.ts", "**/*.smoke.ts", "lib/falkordb-cypher/generated/**"],
-  "extension": [".ts", ".tsx"],
-  "reporter": ["lcov", "text-summary"]
+  "src": [
+    "."
+  ],
+  "include": [
+    "app/**",
+    "lib/**",
+    "components/**",
+    "auth.ts",
+    "proxy.ts"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.smoke.ts",
+    "lib/falkordb-cypher/generated/**"
+  ],
+  "extension": [
+    ".ts",
+    ".tsx"
+  ],
+  "reporter": [
+    "lcov",
+    "text-summary"
+  ]
 }
