@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, globToRegExp, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, globToRegExp, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
@@ -170,4 +170,21 @@ test('passes a pull request that changes no measured line', () => {
   assert.equal(patchVerdict({ hits: 19, misses: 1, partials: 0 }, 95).state, 'success');
   // A partially covered line is not covered.
   assert.equal(patchVerdict({ hits: 19, misses: 0, partials: 2 }, 95).state, 'failure');
+});
+
+test("follows Codecov's next links, over https, to the last page", async () => {
+  const pages = {
+    'https://codecov.test/uploads/?page_size=2': { results: [1, 2], next: 'http://codecov.test/uploads/?page=2&page_size=2' },
+    'https://codecov.test/uploads/?page=2&page_size=2': { results: [3, 4], next: 'http://codecov.test/uploads/?page=3&page_size=2' },
+    'https://codecov.test/uploads/?page=3&page_size=2': { results: [5], next: null },
+  };
+  const asked = [];
+  const get = async (url) => {
+    asked.push(url);
+    if (!pages[url]) throw new Error(`unexpected ${url}`);
+    return pages[url];
+  };
+  assert.deepEqual(await followPages('https://codecov.test/uploads/?page_size=2', get), [1, 2, 3, 4, 5]);
+  assert.deepEqual(asked, Object.keys(pages));
+  assert.deepEqual(await followPages('https://codecov.test/one', async () => ({ results: [], next: null })), []);
 });

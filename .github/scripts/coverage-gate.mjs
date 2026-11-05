@@ -224,7 +224,21 @@ async function api(url, { token, method = 'GET', body } = {}) {
   return res.json();
 }
 
-/** Every page of a GitHub list, `pick` taking the items out of each response. */
+/**
+ * Every result of a Codecov list, following each page's `next` link (which
+ * Codecov gives over http) until there is none. `get` fetches one page.
+ */
+export async function followPages(url, get) {
+  const results = [];
+  for (let next = url; next;) {
+    const page = await get(next);
+    results.push(...page.results);
+    next = page.next?.replace(/^http:/, 'https:');
+  }
+  return results;
+}
+
+/** Every page of a GitHub list, `pick` taking the items out of each response. GitHub pages by number. */
 async function allPages(fetchPage, pick = (page) => page) {
   const items = [];
   for (let page = 1; ; page += 1) {
@@ -339,13 +353,7 @@ async function gate({ gh, post, contexts, pr, sha, repo, target }) {
   let uploads;
   for (let attempt = 0; ; attempt += 1) {
     try {
-      uploads = [];
-      for (let url = `${codecov}/commits/${sha}/uploads/?page_size=100`; url;) {
-        const page = await api(url);
-        uploads.push(...page.results);
-        // Codecov links the next page over http.
-        url = page.next?.replace(/^http:/, 'https:');
-      }
+      uploads = await followPages(`${codecov}/commits/${sha}/uploads/?page_size=100`, (url) => api(url));
       if (uploads.length && codecovSettled(uploads)) break;
     } catch (error) {
       if (error.status && error.status < 500 && error.status !== 429) throw error;
