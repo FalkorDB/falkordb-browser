@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   isTutorialDemoGraphName,
+  protectTutorialGraphRead,
   getTutorialDemoReclaimableNames,
   completeTutorialDemoGraphSetup,
   isTutorialDemoOwnershipExpired,
@@ -15,6 +16,16 @@ import {
 const USER_GRAPHS = ["social-demo", "social-demo-test", "tutorial-social", "tutorial-social-demo", "my-graph"];
 
 describe("tutorial demo graph names (#2202)", () => {
+  it("uses non-creating queries for tutorial reads but permits explicit setup", () => {
+    const url = "/api/graph/tutorial-social-demo-owned?query=RETURN%201";
+    assert.equal(new URL(protectTutorialGraphRead(url), "http://localhost").searchParams.get("readOnly"), "true");
+    assert.equal(protectTutorialGraphRead(url, true), url);
+    assert.equal(protectTutorialGraphRead("/api/graph/social-demo?query=RETURN%201"), "/api/graph/social-demo?query=RETURN%201");
+    assert.equal(new URL(protectTutorialGraphRead(`${url}&readOnly=false`), "http://localhost").searchParams.get("readOnly"), "true");
+    for (const suffix of ["/count", "/count/nodes", "/count/edges"]) {
+      assert.equal(protectTutorialGraphRead(`/api/graph/tutorial-social-demo-owned${suffix}`), `/api/graph/tutorial-social-demo-owned${suffix}?readOnly=true`);
+    }
+  });
   it("never picks a user's fixed social-demo graph names", () => {
     let n = 0;
     const [demo, test] = pickTutorialDemoGraphNames(() => `s${n += 1}`, () => false);

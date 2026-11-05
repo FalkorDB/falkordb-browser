@@ -1774,6 +1774,11 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
     // changes the graph list — which gives it a new identity and re-runs the
     // effect below while the first load is still in flight.
     const demoLoadStartedRef = useRef(false);
+    const mountedRef = useRef(false);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
     const { handleSetGraphName, runQuery, setCurrentTab, setGraph } = useContext(GraphContext);
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
     const { setLayout, setDirection, canvasRef } = useContext(ForceGraphContext);
@@ -1799,6 +1804,7 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
             if (onLoadDemoGraphs) {
                 onLoadDemoGraphs()
                     .then(outcome => {
+                        if (!mountedRef.current) return;
                         // A connection switch cancels the load without publishing the
                         // demo graphs; advancing then walks the user into steps that
                         // query a dataset that was never loaded.
@@ -1816,6 +1822,7 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
                         setStep(1);
                     })
                     .catch(() => {
+                        if (!mountedRef.current) return;
                         onClose();
                     });
             } else {

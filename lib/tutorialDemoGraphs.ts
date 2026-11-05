@@ -18,6 +18,16 @@ export function isTutorialDemoGraphName(name: unknown): name is string {
   return typeof name === "string" && new RegExp(`^${escapedPrefix}(?:demo|test)-[a-zA-Z0-9-]+$`).test(name);
 }
 
+export function protectTutorialGraphRead(url: string, allowCreation = false): string {
+  const parsed = new URL(url, "http://localhost");
+  const match = /^\/api\/graph\/([^/]+)(?:\/|$)/.exec(parsed.pathname);
+  if (!allowCreation && match && isTutorialDemoGraphName(decodeURIComponent(match[1]))) {
+    parsed.searchParams.set("readOnly", "true");
+    return `${parsed.pathname}${parsed.search}`;
+  }
+  return url;
+}
+
 export function isTutorialDemoOwnerId(ownerId: string): boolean {
   return /^[a-zA-Z0-9-]+$/.test(ownerId);
 }

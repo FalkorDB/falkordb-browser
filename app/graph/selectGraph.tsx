@@ -59,11 +59,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     // GRAPH.LIST omits offloaded graphs, so merge the stubs back in — otherwise
     // an offloaded graph disappears from the UI instead of showing as offloaded.
     const safeOptions = useMemo(() => {
+        if (!recoveryReady) return [];
         const opts = options ?? [];
         const missing = tutorialOpen ? [] : offloadedGraphs.filter((name) => !opts.includes(name));
 
         return missing.length ? [...opts, ...missing].sort((a, b) => a.localeCompare(b)) : opts;
-    }, [options, offloadedGraphs, tutorialOpen]);
+    }, [options, offloadedGraphs, tutorialOpen, recoveryReady]);
     const canRefreshRef = useRef(false);
     canRefreshRef.current = recoveryReady && !tutorialOpen;
 
@@ -340,9 +341,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     }, [status, indicator, refreshInterval, getOptions, recoveryReady, tutorialOpen]);
 
     const handleOpenChange = async (o: boolean) => {
-        setOpen(o);
+        setOpen(o && recoveryReady);
 
-        if (!o || tutorialOpen) return;
+        if (!o || !recoveryReady || tutorialOpen) return;
 
         try {
             setIsLoading(true);
@@ -353,6 +354,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     };
 
     const handleClick = (value: string) => {
+        if (!recoveryReady) return;
         setSelectedValue(value);
         setOpen(false);
     };

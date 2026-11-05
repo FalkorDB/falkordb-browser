@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { quoteCypherIdentifier } from "@/lib/cypher";
+import { isTutorialDemoGraphName } from "@/lib/tutorialDemoGraphs";
 import {
   createGraphElement,
   deleteGraphElement,
@@ -25,7 +26,7 @@ export async function GET(
     const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
-    const isReadOnly = resolveReadOnly(request, user.role);
+    const isReadOnly = isTutorialDemoGraphName(graphId) || resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(graphId);

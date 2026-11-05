@@ -512,6 +512,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const viewportResolved = useViewportResolved();
   const isMobile = useIsMobile();
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const tutorialActivationRef = useRef({ open: tutorialOpen });
+  if (tutorialActivationRef.current.open !== tutorialOpen) tutorialActivationRef.current = { open: tutorialOpen };
   // Set once the settings effect has decided whether the tour runs, so other
   // first-visit popups can wait for that answer instead of racing it.
   const [tutorialDecided, setTutorialDecided] = useState(false);
@@ -2187,7 +2189,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         // The timeout query param is in seconds (the API multiplies by 1000), so TIMEOUT_MAX (ms) is converted to seconds below.
         let fallback = 60;
         try {
-          const configRes = await fetch("/api/graph/config", { method: "GET" });
+          const configRes = await fetch("/api/graph/config", { method: "GET", signal: AbortSignal.timeout(STUBS_PROBE_TIMEOUT) });
           if (configRes.ok) {
             const { configs } = await configRes.json();
             const typedConfigs: [string, string | number][] = Array.isArray(configs)
@@ -2953,7 +2955,19 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           if (!isCurrent()) return;
           if (!tutorialOpen) {
             const pendingSetup = tutorialDemoLoadsRef.current.get(JSON.stringify([scope, ownerId]));
-            if (pendingSetup) await pendingSetup;
+            if (pendingSetup) {
+              let timer: number | undefined;
+              try {
+                await Promise.race([
+                  pendingSetup,
+                  new Promise<never>((_, reject) => {
+                    timer = window.setTimeout(() => reject(new Error("Tutorial setup is still pending; retaining its ownership for later recovery")), TUTORIAL_CONNECTION_TIMEOUT_MS);
+                  }),
+                ]);
+              } finally {
+                window.clearTimeout(timer);
+              }
+            }
             if (!isCurrent()) return;
           }
           const ownership = readTutorialDemoOwnership(scope, ownerId);
@@ -3021,6 +3035,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [status, prefixReady, switchPending, activeConnectionId, prefixConnectionId, tutorialRecoveryKey, tutorialOpen, tutorialRecoveryReady, readTutorialConnection, toast]);
 
   const handleLoadDemoGraphs = useCallback(async (): Promise<DemoLoadOutcome> => {
+    const activation = tutorialActivationRef.current;
     const { cid, scope } = await waitForTutorialConnection(true, true).catch(error => {
       console.error("Could not verify the tutorial connection", error);
       toast({
@@ -3031,7 +3046,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       throw error;
     });
     const startEpoch = getConnectionEpoch();
-    const isCurrent = () => isTutorialConnectionCurrent({ cid, scope }, startEpoch);
+    const isCurrent = () => activation.open && tutorialActivationRef.current === activation && isTutorialConnectionCurrent({ cid, scope }, startEpoch);
     const ownerId = await getTutorialDemoOwnerId();
     if (!isCurrent()) return { status: "cancelled" };
     const loadKey = JSON.stringify([scope, ownerId]);
@@ -3173,8 +3188,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // The demo queries are internal setup, so silence the SSE parse detail and
       // report the failure once below.
       const loads = await Promise.allSettled([
-        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[0])}?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid }),
-        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[1])}?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid })
+        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[0])}?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid, allowTutorialCreation: true }),
+        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[1])}?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid, allowTutorialCreation: true })
       ]);
 
       const failedLoad = loads.find((load): load is PromiseRejectedResult => load.status === "rejected");

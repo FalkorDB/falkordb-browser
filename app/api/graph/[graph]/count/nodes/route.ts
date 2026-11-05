@@ -1,6 +1,7 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
+import { isTutorialDemoGraphName } from "@/lib/tutorialDemoGraphs";
 
 /**
  * Stream the node count for a graph as Server-Sent Events.
@@ -35,7 +36,7 @@ export async function GET(
 
     const { client, user } = session;
     const { graph: graphId } = await params;
-    const isReadOnly = resolveReadOnly(request, user.role);
+    const isReadOnly = isTutorialDemoGraphName(graphId) || resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(graphId);

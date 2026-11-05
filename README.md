@@ -68,6 +68,12 @@ visits also reclaim completed samples owned by the current tab when no tutorial
 will run. Confirmed setup results stay with their original validated ownership
 record after a connection switch. Closing the tutorial restores only graphs
 still present in a freshly verified list, never a reclaimed sample.
+Graph selection, including offloaded options, is unavailable during recovery.
+Configuration initialization and waiting for in-flight setup are bounded; a
+timed-out setup retains its pending ownership rather than assuming it completed.
+Closing on mobile discards the tutorial's step state and ignores late setup
+results, so Replay starts fresh. Background reads of generated samples use
+non-creating read-only queries even if cleanup has already deleted the graph.
 
 ### Quick start
 

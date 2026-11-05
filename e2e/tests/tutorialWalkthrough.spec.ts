@@ -8,6 +8,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import { delay, getRandomString } from "../infra/utils";
 import { parseTutorialDemoOwnership, tutorialDemoOwnershipKey } from "../../lib/tutorialDemoGraphs";
 import { createTab, forStorage, TABS_STORAGE_KEY } from "../../lib/graphTabs";
+import { GRAPH_OFFLOAD_VERSION_THRESHOLD } from "../../app/utils";
 
 async function mockTutorialConnectionSwitches(page: Page) {
     const sessionResponse = await page.request.get(`${urls.localHost}/api/auth/session`);
@@ -349,12 +350,18 @@ test.describe("Tutorial", () => {
 
     test("@admin returning to a recovered connection waits for its new cleanup activation", async () => {
         test.setTimeout(60_000);
+        await apiCall.runQuery(userGraph, "CREATE (:Mine)");
         await browser.createNewPage(TutorialPanel);
         const page = await browser.getPage();
         const connections = await mockTutorialConnectionSwitches(page);
         const suffix = getRandomString("activation").replaceAll("_", "-");
         const firstName = `tutorial-social-demo-${suffix}`;
         const secondName = `tutorial-social-test-${suffix}`;
+        const stubName = `offloaded-${suffix}`;
+        await page.route("**/api/DBVersion", route => route.fulfill({ json: {
+            result: ["graph", GRAPH_OFFLOAD_VERSION_THRESHOLD], enterprise: true,
+        } }));
+        await page.route("**/api/graph/stubs", route => route.fulfill({ json: { stubs: [stubName] } }));
         const firstOwner = `first-${suffix}`;
         const secondOwner = `second-${suffix}`;
         const firstScope = `${connections.first.host}:${connections.first.port}:${connections.first.username || "default"}:`;
@@ -371,7 +378,7 @@ test.describe("Tutorial", () => {
         let deleted = false;
         let returning = false;
         await page.route(url => url.pathname === "/api/graph", route => route.fulfill({ json: {
-            opts: deleted ? [] : route.request().headers()["x-connection-id"] === connections.second.id ? [secondName] : returning ? [firstName] : [],
+            opts: deleted ? [] : route.request().headers()["x-connection-id"] === connections.second.id ? [secondName] : returning ? [firstName] : [userGraph],
         } }));
         await page.route(url => [firstName, secondName].some(name => url.pathname === `/api/graph/${name}` || url.pathname.startsWith(`/api/graph/${name}/`)), async route => {
             const name = decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]);
@@ -392,13 +399,21 @@ test.describe("Tutorial", () => {
         try {
             await page.goto(urls.graphUrl);
             await expect(page.getByRole("button", { name: "New tab", exact: true }).last()).toBeEnabled();
+            await page.getByTestId("selectGraph").click();
+            await expect(page.getByTestId(`selectGraph${userGraph}Button`)).toBeVisible();
+            await expect(page.getByTestId(`selectGraph${stubName}Button`)).toBeVisible();
+            await page.keyboard.press("Escape");
             await page.evaluate(({ scope, ownerId, name }) => {
                 localStorage.setItem(`${scope}tutorialDemoGraphOwnership:${ownerId}`, JSON.stringify({
                     scope, ownerId, names: [name], pendingNames: [], lastActiveAt: 1,
                 }));
             }, { scope: secondScope, ownerId: secondOwner, name: secondName });
             await connections.switchTo(connections.second);
+            await expect.poll(() => routes.length, { timeout: 15000 }).toBe(1);
             await secondDeletion;
+            await expect(page.getByTestId("selectGraph")).toBeDisabled();
+            await expect(page.getByTestId(`selectGraph${userGraph}Button`)).toHaveCount(0);
+            await expect(page.getByTestId(`selectGraph${stubName}Button`)).toHaveCount(0);
             await page.evaluate(({ scope, ownerId, name, tab, tabsKey }) => {
                 localStorage.setItem(`${scope}tutorialDemoGraphOwnership:${ownerId}`, JSON.stringify({
                     scope, ownerId, names: [name], pendingNames: [], lastActiveAt: 1,
@@ -407,13 +422,15 @@ test.describe("Tutorial", () => {
             }, { scope: firstScope, ownerId: firstOwner, name: firstName, tab: forStorage({ ...createTab(), graphName: firstName }), tabsKey: TABS_STORAGE_KEY });
             returning = true;
             await connections.switchTo(connections.first);
+            await expect.poll(() => routes.length, { timeout: 15000 }).toBe(2);
             await firstDeletion;
+            await expect(page.getByTestId("selectGraph")).toBeDisabled();
             await page.clock.install();
             await page.clock.runFor(2000);
             expect(queries).toEqual([]);
             release();
             await Promise.all(routes);
-            await expect(page.getByRole("tab", { name: "No Graph Selected", exact: true })).toBeVisible();
+            await expect(page.getByTestId("selectGraph")).toHaveText("Select Graph");
             expect(queries).toEqual([]);
         } finally {
             release();
@@ -421,6 +438,119 @@ test.describe("Tutorial", () => {
             await browser.closeBrowser();
             const { message } = await apiCall.removeGraph(firstName, "admin");
             expect(message).toMatch(/deleted|empty key/);
+        }
+    });
+
+    test("@admin stalled config initialization releases recovery and saved tabs", async ({ page }) => {
+        test.setTimeout(60_000);
+        await apiCall.runQuery(userGraph, "CREATE (:Mine)");
+        const tab = forStorage({ ...createTab(), graphName: userGraph });
+        await page.addInitScript(({ tab, key }) => {
+            localStorage.removeItem("timeout");
+            localStorage.setItem("tutorial", "false");
+            localStorage.setItem("appDownloadPrompt", "false");
+            localStorage.setItem(`localhost:6379:default:${key}`, JSON.stringify({ tabs: [tab], activeTabId: tab.id }));
+        }, { tab, key: TABS_STORAGE_KEY });
+        let configRequests = 0;
+        await page.route("**/api/graph/config", () => { configRequests += 1; });
+        try {
+            await page.goto(urls.graphUrl);
+            await expect.poll(() => configRequests, { timeout: 30000 }).toBeGreaterThan(0);
+            await expect(page.getByTestId("selectGraph")).toBeEnabled({ timeout: 30000 });
+            await expect(page.getByRole("button", { name: `Rename ${userGraph}`, exact: true })).toBeVisible();
+        } finally {
+            await page.close();
+        }
+    });
+
+    test("@admin mobile suppression resets loaded tutorial state before Replay", async () => {
+        test.setTimeout(90_000);
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
+        await page.goto(urls.graphUrl);
+        await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+        const readNames = () => page.evaluate(() => {
+            const owner = sessionStorage.getItem("tutorialDemoOwnerId");
+            const key = Object.keys(localStorage).find(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
+            return key ? (JSON.parse(localStorage.getItem(key)!) as { names: string[] }).names : [];
+        });
+        const oldNames = await readNames();
+        expect(oldNames).toHaveLength(2);
+        await tutorial.clickNextButton();
+        await page.setViewportSize({ width: 900, height: 900 });
+        await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+        await expect.poll(readNames, { timeout: 30000 }).toEqual([]);
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.getByTestId("settings").click();
+        await expect(page).toHaveURL(/\/settings/, { timeout: 30000 });
+        await page.getByTestId("settingsTabBrowser").click();
+        await page.getByTestId("replayTutorial").click();
+        await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+        const newNames = await readNames();
+        expect(newNames).toHaveLength(2);
+        expect(newNames.every(name => !oldNames.includes(name))).toBe(true);
+        expect((await apiCall.getGraphs()).opts.filter(name => oldNames.includes(name))).toEqual([]);
+    });
+
+    test("@admin stalled setup cannot block mobile recovery or publish a late tutorial", async () => {
+        test.setTimeout(90_000);
+        await apiCall.runQuery(userGraph, "CREATE (:Mine)");
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        const routes: Promise<void>[] = [];
+        const names: string[] = [];
+        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+            names.push(decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]));
+            const pending = gate.then(() => route.fulfill({ contentType: "text/event-stream", body: "event: result\ndata: {}\n\n" }));
+            routes.push(pending);
+            return pending;
+        });
+        await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
+        try {
+            await page.goto(urls.graphUrl);
+            await expect.poll(() => names.length, { timeout: 30000 }).toBe(2);
+            await page.setViewportSize({ width: 900, height: 900 });
+            await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+            await expect(page.getByText("Tutorial cleanup failed", { exact: true })).toBeVisible({ timeout: 40000 });
+            await expect(page.getByTestId("selectGraph")).toBeEnabled({ timeout: 10000 });
+            const pendingNames = await page.evaluate(() => {
+                const owner = sessionStorage.getItem("tutorialDemoOwnerId");
+                const key = Object.keys(localStorage).find(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
+                return key ? (JSON.parse(localStorage.getItem(key)!) as { pendingNames: string[] }).pendingNames : [];
+            });
+            expect(pendingNames.sort()).toEqual([...names].sort());
+            release();
+            await Promise.all(routes);
+            await expect.poll(() => page.evaluate(() => {
+                const owner = sessionStorage.getItem("tutorialDemoOwnerId");
+                return Object.keys(localStorage).some(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
+            }), { timeout: 30000 }).toBe(false);
+            await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+            await page.setViewportSize({ width: 1440, height: 900 });
+            await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+        } finally {
+            release();
+            await Promise.all(routes);
+            await browser.closeBrowser();
+        }
+    });
+
+    test("@admin late tutorial background reads cannot recreate a deleted sample", async ({ page }) => {
+        const name = `tutorial-social-demo-${getRandomString("late-read").replaceAll("_", "-")}`;
+        await apiCall.runQuery(name, "CREATE (:Mine)");
+        const removed = await page.request.delete(`${urls.api.graphUrl}${name}`);
+        expect(removed.ok()).toBe(true);
+        for (const suffix of ["/info?type=(label)", "/info?type=(property%20key)", "/0", "/count", "/count/nodes", "/count/edges", "?query=RETURN%201&readOnly=true"]) {
+            const response = await page.request.get(`${urls.api.graphUrl}${name}${suffix}`);
+            if (suffix.startsWith("?") || suffix.startsWith("/count")) {
+                expect(await response.text()).toContain("event: error");
+            } else {
+                expect(response.status()).toBe(400);
+            }
+            expect((await apiCall.getGraphs()).opts).not.toContain(name);
         }
     });
 
@@ -777,6 +907,23 @@ test.describe("Tutorial", () => {
 
         const userGraphs = ["social-demo", "social-demo-test"];
         const { opts: existingGraphs } = await apiCall.getGraphs();
+        await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        const versionResponse = await page.request.get(`${urls.localHost}/api/DBVersion`);
+        expect(versionResponse.ok(), "Verify offload capabilities before touching fixed graph names").toBe(true);
+        const version: { result?: unknown; enterprise?: unknown } = await versionResponse.json();
+        if (!Array.isArray(version.result) || version.result[0] !== "graph" || typeof version.result[1] !== "number" || typeof version.enterprise !== "boolean") {
+            throw new Error("Cannot verify fixed-name fixture safety without graph capabilities");
+        }
+        if (version.enterprise && version.result[1] >= GRAPH_OFFLOAD_VERSION_THRESHOLD) {
+            const stubsResponse = await page.request.get(`${urls.localHost}/api/graph/stubs`);
+            expect(stubsResponse.ok(), "Verify offloaded graphs before touching fixed graph names").toBe(true);
+            const { stubs }: { stubs?: unknown } = await stubsResponse.json();
+            if (!Array.isArray(stubs) || !stubs.every((name): name is string => typeof name === "string")) {
+                throw new Error("Cannot verify fixed-name fixture safety without a valid offloaded graph list");
+            }
+            existingGraphs.push(...stubs);
+        }
         test.skip(
             userGraphs.some(name => existingGraphs.includes(name)),
             "A real graph already uses a fixed demo name; leave it alone"

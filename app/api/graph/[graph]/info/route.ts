@@ -1,6 +1,7 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders, resolveReadOnly } from "../../../utils";
+import { isTutorialDemoGraphName } from "@/lib/tutorialDemoGraphs";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -22,7 +23,7 @@ export async function GET(
       | "(label)"
       | "(relationship type)"
       | undefined;
-    const isReadOnly = resolveReadOnly(request, user.role);
+    const isReadOnly = isTutorialDemoGraphName(graphId) || resolveReadOnly(request, user.role);
 
     try {
       const getQuery = () => {
