@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-plusplus */
 /* eslint-disable no-await-in-loop */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
@@ -20,6 +20,65 @@ test.describe('Canvas Tests', () => {
 
     test.afterEach(async () => {
         await browser.closeBrowser();
+    });
+
+    test("@admin canvas search keyboard navigation wraps and selects the highlighted node", async () => {
+        const graphName = getRandomString("canvasKeyboard");
+        await apicalls.addGraph(graphName);
+        try {
+            await apicalls.runQuery(graphName, "CREATE (:Keyboard {name: 'keyboard-alpha'}), (:Keyboard {name: 'keyboard-beta'})");
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            const page = await browser.getPage();
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH (n) RETURN n ORDER BY n.name");
+            await graph.clickRunQuery();
+            await graph.fillElementCanvasSearch("keyboard-");
+            await expect(graph.elementCanvasSuggestionList.locator("li")).toHaveCount(2);
+            await graph.elementCanvasSearch.press("ArrowUp");
+            await graph.elementCanvasSearch.press("Enter");
+            await expect(page.getByTestId("DataPanelAttributekeyboard-beta")).toBeVisible();
+            await expect(graph.elementCanvasSearch).toHaveValue("");
+            await expect(graph.elementCanvasSuggestionList).toBeHidden();
+            await graph.fillElementCanvasSearch("keyboard-");
+            await expect(graph.elementCanvasSuggestionList.locator("li")).toHaveCount(2);
+            await graph.elementCanvasSearch.press("ArrowDown");
+            await expect(graph.elementCanvasSuggestionList.getByRole("option", { selected: true })).toContainText("keyboard-beta");
+            await graph.elementCanvasSearch.press("ArrowDown");
+            await expect(graph.elementCanvasSuggestionList.getByRole("option", { selected: true })).toContainText("keyboard-alpha");
+            await graph.elementCanvasSearch.press("Enter");
+            await expect(page.getByTestId("DataPanelAttributekeyboard-alpha")).toBeVisible();
+        } finally {
+            await browser.closeBrowser();
+            await apicalls.removeGraph(graphName, "admin");
+        }
+    });
+
+    test("@admin unmatched canvas search does not select data and Escape clears the query", async () => {
+        const graphName = getRandomString("canvasNoMatch");
+        await apicalls.addGraph(graphName);
+        try {
+            await apicalls.runQuery(graphName, "CREATE (:Search {name: 'existing-search-node'})");
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            const page = await browser.getPage();
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH (n) RETURN n");
+            await graph.clickRunQuery();
+            await graph.fillElementCanvasSearch("existing-search-node");
+            await expect(graph.elementCanvasSuggestionList.locator("li")).toHaveCount(1);
+            await graph.fillElementCanvasSearch("no-such-canvas-value");
+            await expect(graph.elementCanvasSuggestionList).toBeHidden();
+            await graph.elementCanvasSearch.press("Enter");
+            await expect(page.getByTestId("DataPanel")).toBeHidden();
+            await expect(graph.elementCanvasSearch).toHaveValue("no-such-canvas-value");
+            await graph.elementCanvasSearch.press("Escape");
+            await expect(graph.elementCanvasSearch).toHaveValue("");
+            await graph.fillElementCanvasSearch("existing-search-node");
+            await expect(graph.elementCanvasSuggestionList.locator("li")).toHaveCount(1);
+        } finally {
+            await browser.closeBrowser();
+            await apicalls.removeGraph(graphName, "admin");
+        }
     });
 
     const testNodes = [1, 5, 10];
