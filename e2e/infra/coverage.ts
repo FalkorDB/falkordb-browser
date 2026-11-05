@@ -65,6 +65,7 @@ async function save(page: Page) {
 
 /** Records `page`'s coverage until it closes (or its context does). */
 function track(page: Page) {
+    if (recording.has(page)) return;
     recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch(() => {}));
     const close = page.close.bind(page);
     page.close = async (options) => {
@@ -78,6 +79,15 @@ export function trackContext<T extends BrowserContext>(context: T): T {
     if (!dir || context.browser()?.browserType().name() !== 'chromium') return context;
     context.pages().forEach(track);
     context.on('page', track);
+    // A page the test opens is recording before the test can navigate it.
+    // (Pages the app opens itself, like popups, start recording a moment late.)
+    const newPage = context.newPage.bind(context);
+    context.newPage = async () => {
+        const page = await newPage();
+        track(page);
+        await recording.get(page);
+        return page;
+    };
     const close = context.close.bind(context);
     context.close = async (options) => {
         await Promise.all(context.pages().map((page) => save(page).catch(() => {})));
