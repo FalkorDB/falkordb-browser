@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   BUDGET_MS, COVERAGE_WORKFLOWS, changedLines, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
-  transient, missingFlags, notStarted, patchTotals, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  transient, missingFlags, movedSince, notStarted, patchTotals, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
@@ -193,13 +193,15 @@ test("follows Codecov's next links, over https, to the last page", async () => {
 // gate() end to end, against fake GitHub and Codecov APIs that serve this
 // repository's own workflow files.
 const SHA = 'c0ffee';
-const run = (name, conclusion = 'success', status = 'completed', event = 'pull_request') => ({ id: Math.random(), name, event, status, conclusion });
+const run = (name, conclusion = 'success', status = 'completed', event = 'pull_request', created_at = '2026-11-05T10:00:00Z') => ({
+  id: Math.random(), name, event, status, conclusion, created_at,
+});
 const fresh = (name, flags) => ({ name, flags, upload_type: 'uploaded', state: 'merged', created_at: '2026-11-05T12:00:00Z' });
 const FRESH = [fresh('build', ['unit']), fresh('smoke', ['smoke']), fresh('e2e-shard-1', ['e2e']), fresh('desktop', ['desktop'])];
 
 function world({
   pr = { number: 7 }, files = ['app/graph/page.tsx'], runs, uploads = [FRESH], coverage = 96,
-  patch = { hits: 19, misses: 1, partials: 0 }, reportErrors = [], githubHead = SHA,
+  patch = { hits: 19, misses: 1, partials: 0 }, reportErrors = [], githubHead = SHA, timeline = [],
 } = {}) {
   const posted = [];
   const sleeps = [];
@@ -214,6 +216,7 @@ function world({
   const reportFiles = [{ name: 'app/graph/page.tsx', line_coverage: [...states.map((state, i) => [i + 1, state]), [100, 0]] }];
   const gh = async (path) => {
     if (path === `pulls/${pr?.number}`) return { head: { sha: githubHead } };
+    if (path.startsWith(`issues/${pr?.number}/timeline`)) return /[?&]page=1(&|$)/.test(path) ? timeline : [];
     if (path.startsWith(`pulls/${pr?.number}/files`)) return /[?&]page=1(&|$)/.test(path) ? changes : [];
     if (path.startsWith(`commits/${SHA}`)) return { files: /[?&]page=1(&|$)/.test(path) ? files.map((filename) => ({ filename })) : [] };
     if (path.startsWith('actions/runs')) return { workflow_runs: /[?&]page=1(&|$)/.test(path) ? runs : [] };
@@ -245,7 +248,7 @@ function world({
     now: () => clock,
     post: async (context, { state, description }) => { posted.push(`${context} ${state}: ${description}`); },
     contexts: pr ? ['coverage/project', 'coverage/patch'] : ['coverage/project (push)'],
-    pr: pr ?? undefined,
+    pr: pr ? { base: { ref: 'staging' }, ...pr } : undefined,
     sha: SHA,
     repo: 'FalkorDB/falkordb-browser',
     target: 95,
@@ -463,3 +466,34 @@ test('gate: fails a workflow that never ran once every run has finished, rather 
   assert.deepEqual(notStarted(['Build', 'Playwright Tests'], [run('Build'), run('Playwright Tests', null, 'in_progress')]), []);
 });
 
+
+test('gate: fails a pull request moved to another base until it is tested against it', async () => {
+  const moved = { event: 'base_ref_changed', created_at: '2026-11-05T11:00:00Z' };
+  // Every run finished and passed, but was made against the old base (a
+  // re-run of it would be too).
+  const stale = world({ runs: ALL_DONE, timeline: [{ event: 'labeled', created_at: '2026-11-05T12:00:00Z' }, moved] });
+  assert.equal(await gate(stale.args), false);
+  const description = 'Moved to staging: its coverage was measured against the old base. Push a commit or reopen the pull request';
+  assert.deepEqual(stale.posted, [`coverage/project failure: ${description}`, `coverage/patch failure: ${description}`]);
+  // A push (or reopen) since the move made new runs: gated as usual.
+  const later = '2026-11-05T11:30:00Z';
+  const retested = world({
+    runs: [run('Build', 'success', 'completed', 'pull_request', later), run('Playwright Tests', 'success', 'completed', 'pull_request', later),
+      run('Desktop app', 'success', 'completed', 'pull_request', later)],
+    // A label added since is not a move.
+    timeline: [moved, { event: 'labeled', created_at: '2026-11-05T12:00:00Z' }],
+  });
+  assert.equal(await gate(retested.args), true);
+  assert.equal(retested.posted[0], 'coverage/project success: 96.00% (target 95%)');
+});
+
+
+test('finds a move to another base after the coverage runs were made', () => {
+  const runs = [run('Build', 'success', 'completed', 'pull_request', '2026-11-05T10:00:00Z')];
+  const moved = (at) => [{ event: 'base_ref_changed', created_at: at }];
+  assert.equal(movedSince(moved('2026-11-05T11:00:00Z'), runs, ['Build']), '2026-11-05T11:00:00Z');
+  assert.equal(movedSince(moved('2026-11-05T09:00:00Z'), runs, ['Build']), undefined);
+  assert.equal(movedSince([], runs, ['Build']), undefined);
+  // Moved, then moved again after the runs: the last move counts.
+  assert.equal(movedSince([...moved('2026-11-05T09:00:00Z'), ...moved('2026-11-05T11:00:00Z')], runs, ['Build']), '2026-11-05T11:00:00Z');
+});

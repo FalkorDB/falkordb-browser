@@ -10,8 +10,10 @@ name: Coverage status
 # Once the gate has posted, it tells Codecov to post its pull request comment
 # (codecov.yml: notify.manual_trigger).
 #
-# A pull request moved to another base changes what its patch is but starts
-# no workflow, so the gate also runs on that (pull_request_target, edited).
+# A pull request's workflows test it merged into its base, so once it moves
+# to another base its coverage is stale, and no workflow reruns by itself:
+# the gate then fails both statuses until a push or a reopen tests it again
+# (pull_request_target, edited).
 #
 # Both events run this file in the repository's own context, with a token
 # that can post statuses, for pull requests from forks and Dependabot too.
@@ -33,6 +35,8 @@ permissions:
   contents: read
   actions: read
   pull-requests: read
+  # A pull request's timeline, for when it last moved to another base.
+  issues: read
   statuses: write
 
 concurrency:

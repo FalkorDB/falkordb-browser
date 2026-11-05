@@ -150,6 +150,18 @@ export function waitingFor(expected, runs) {
   });
 }
 
+/**
+ * When a pull request last moved to another base, if that was after any
+ * expected workflow's latest run was made (its coverage is the old base's).
+ */
+export function movedSince(timeline, runs, expected) {
+  const moves = timeline.filter((e) => e.event === 'base_ref_changed').map((e) => e.created_at).sort();
+  const movedAt = moves.at(-1);
+  if (!movedAt) return undefined;
+  const latest = latestRuns(runs);
+  return expected.some((name) => latest.get(name) && latest.get(name).created_at < movedAt) ? movedAt : undefined;
+}
+
 /** The expected workflows with no run at all for the trigger. */
 export function notStarted(expected, runs) {
   const started = new Set(runs.map((run) => run.name));
@@ -470,6 +482,20 @@ export async function gate({
     const workflow = Buffer.from(content.content, 'base64').toString('utf8');
     if (!expected.includes(name) && filtersApply(files) && runsFor(pathFilters(workflow, trigger), files)) expected.push(name);
   }
+  // A pull request's workflows test it merged into its base: a run made
+  // before it last moved to another base measured the old one (a re-run
+  // too, which keeps its run's base). Only a push or a reopen tests it anew.
+  if (pr) {
+    const timeline = await allPages((page) => gh(`issues/${pr.number}/timeline?per_page=100&page=${page}`));
+    const movedAt = movedSince(timeline, runs, expected);
+    if (movedAt) {
+      const description = `Moved to ${pr.base.ref}: its coverage was measured against the old base. Push a commit or reopen the pull request`.slice(0, 140);
+      console.log(`Moved at ${movedAt}, after the coverage runs`);
+      for (const context of contexts) await post(context, { state: 'failure', description });
+      return false;
+    }
+  }
+
   // GitHub starts all of a trigger's runs at once: once every run there is
   // has finished, an expected workflow with none will not start by itself
   // (a pull request moved to another base starts no workflow at all).
