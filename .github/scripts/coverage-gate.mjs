@@ -206,6 +206,24 @@ export function patchVerdict(patch, target) {
   return verdict((100 * patch.hits) / lines, target);
 }
 
+/** Whether an API error may pass on its own: a server error, rate limiting, or no response. */
+export function transient(error) {
+  return !error.status || error.status >= 500 || error.status === 429;
+}
+
+/** `call`, tried again after a transient error, up to `attempts` times in all. */
+export async function retry(call, sleep, attempts = 5) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await call();
+    } catch (error) {
+      if (!transient(error) || attempt >= attempts) throw error;
+      console.log(`Retrying after: ${error.message}`);
+      await sleep(20_000);
+    }
+  }
+}
+
 /** A JSON API call. The token goes to GitHub's API only, whatever the caller passes. */
 async function api(url, { token, method = 'GET', body } = {}) {
   const github = new URL(url).origin === GITHUB;
@@ -256,7 +274,10 @@ async function main() {
   // A pull request's gate posts both statuses, a push's coverage/project.
   const contexts = event === 'pull_request' ? ['coverage/project', 'coverage/patch'] : ['coverage/project'];
   let pr;
+  // The statuses this run gave a verdict, which a later failure leaves alone.
+  const decided = new Set();
   const post = async (context, { state, description }) => {
+    if (state !== 'pending') decided.add(context);
     if (process.env.DRY_RUN) {
       console.log(`would post ${context}: ${state}, ${description}`);
       return;
@@ -290,13 +311,15 @@ async function main() {
       console.log(`${branch} is not a protected branch: no gate`);
       return;
     }
-    const decided = await gate({ gh, post, contexts, pr, sha, repo, target });
+    const done = await gate({ gh, post, contexts, pr, sha, repo, target });
     // The workflow tells Codecov to post its comment once the gate decided.
-    if (decided && process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, 'decided=true\n');
+    if (done && process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, 'decided=true\n');
   } catch (error) {
     // Say so on the statuses, rather than leave an earlier run's pending.
     const description = `The coverage gate failed: ${error.message}`.slice(0, 140);
-    for (const context of contexts) await post(context, { state: 'error', description }).catch(() => {});
+    for (const context of contexts.filter((c) => !decided.has(c))) {
+      await post(context, { state: 'error', description }).catch(() => {});
+    }
     throw error;
   }
 }
@@ -365,7 +388,7 @@ export async function gate({
       uploads = await followPages(`${base}/commits/${sha}/uploads/?page_size=100`, codecov);
       if (uploads.length && codecovSettled(uploads)) break;
     } catch (error) {
-      if (error.status && error.status < 500 && error.status !== 429) throw error;
+      if (!transient(error)) throw error;
       console.log(`Codecov: ${error.message}`);
     }
     if (attempt >= 45) throw new Error('Codecov did not process every upload in 15 minutes');
@@ -388,13 +411,13 @@ export async function gate({
     return false;
   }
 
-  const commit = await codecov(`${base}/commits/${sha}/`);
+  const commit = await retry(() => codecov(`${base}/commits/${sha}/`), sleep);
   if (typeof commit.totals?.coverage !== 'number') throw new Error('Codecov has no coverage total for the commit');
   const project = verdict(commit.totals.coverage, target);
   console.log(`coverage/project: ${project.description}`);
   await post('coverage/project', project);
   if (pr) {
-    const compare = await codecov(`${base}/compare/?pullid=${pr.number}`);
+    const compare = await retry(() => codecov(`${base}/compare/?pullid=${pr.number}`), sleep);
     if (compare.head_commit !== sha) {
       console.log(`The pull request moved on to ${compare.head_commit}: its own gate will post`);
       return true;

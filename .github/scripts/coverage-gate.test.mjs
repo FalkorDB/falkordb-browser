@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, gate, globToRegExp, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, gate, globToRegExp, retry, transient, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
@@ -198,7 +198,7 @@ const FRESH = [fresh('build', ['unit']), fresh('smoke', ['smoke']), fresh('e2e-s
 
 function world({
   pr = { number: 7 }, files = ['app/graph/page.tsx'], runs, uploads = [FRESH], coverage = 96,
-  patch = { hits: 19, misses: 1, partials: 0 }, head = SHA,
+  patch = { hits: 19, misses: 1, partials: 0 }, head = SHA, compareErrors = [],
 } = {}) {
   const posted = [];
   const sleeps = [];
@@ -220,7 +220,10 @@ function world({
       return { results: next, next: null };
     }
     if (url.endsWith(`/commits/${SHA}/`)) return { totals: coverage === null ? null : { coverage } };
-    if (url.includes('/compare/')) return { head_commit: head, totals: { patch } };
+    if (url.includes('/compare/')) {
+      if (compareErrors.length) throw compareErrors.shift();
+      return { head_commit: head, totals: { patch } };
+    }
     throw new Error(`unexpected Codecov call ${url}`);
   };
   const args = {
@@ -302,4 +305,26 @@ test('gate: leaves the patch to a newer head, and gates a push on the project on
   const push = world({ pr: null, files: ['README.md'], runs: [run('Build', 'success', 'completed', 'push')], uploads: [FRESH.slice(0, 2)] });
   assert.equal(await gate(push.args), true);
   assert.deepEqual(push.posted, ['coverage/project success: 96.00% (target 95%)']);
+});
+
+test('gate: retries a passing Codecov error on the compare call', async () => {
+  const flaky = world({ runs: ALL_DONE, compareErrors: [Object.assign(new Error('503'), { status: 503 })] });
+  assert.equal(await gate(flaky.args), true);
+  assert.deepEqual(flaky.posted, [
+    'coverage/project success: 96.00% (target 95%)',
+    'coverage/patch success: 95.00% (target 95%)',
+  ]);
+  assert.deepEqual(flaky.sleeps, [20_000]);
+});
+
+test('retries only what may pass on its own, a bounded number of times', async () => {
+  const errors = (status) => Object.assign(new Error(String(status)), { status });
+  assert.ok(transient(errors(503)) && transient(errors(429)) && transient(new Error('fetch failed')));
+  assert.ok(!transient(errors(404)) && !transient(errors(401)));
+  let calls = 0;
+  await assert.rejects(retry(async () => { calls += 1; throw errors(404); }, async () => {}), /404/);
+  assert.equal(calls, 1);
+  calls = 0;
+  await assert.rejects(retry(async () => { calls += 1; throw errors(502); }, async () => {}, 3), /502/);
+  assert.equal(calls, 3);
 });
