@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, globToRegExp, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, gate, globToRegExp, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
@@ -187,4 +187,119 @@ test("follows Codecov's next links, over https, to the last page", async () => {
   assert.deepEqual(await followPages('https://codecov.test/uploads/?page_size=2', get), [1, 2, 3, 4, 5]);
   assert.deepEqual(asked, Object.keys(pages));
   assert.deepEqual(await followPages('https://codecov.test/one', async () => ({ results: [], next: null })), []);
+});
+
+// gate() end to end, against fake GitHub and Codecov APIs that serve this
+// repository's own workflow files.
+const SHA = 'c0ffee';
+const run = (name, conclusion = 'success', status = 'completed', event = 'pull_request') => ({ id: Math.random(), name, event, status, conclusion });
+const fresh = (name, flags) => ({ name, flags, upload_type: 'uploaded', state: 'merged', created_at: '2026-11-05T12:00:00Z' });
+const FRESH = [fresh('build', ['unit']), fresh('smoke', ['smoke']), fresh('e2e-shard-1', ['e2e']), fresh('desktop', ['desktop'])];
+
+function world({
+  pr = { number: 7 }, files = ['app/graph/page.tsx'], runs, uploads = [FRESH], coverage = 96,
+  patch = { hits: 19, misses: 1, partials: 0 }, head = SHA,
+} = {}) {
+  const posted = [];
+  const sleeps = [];
+  const pages = [...uploads];
+  const gh = async (path) => {
+    if (path.startsWith(`pulls/${pr?.number}/files`)) return path.includes('page=1') ? files.map((filename) => ({ filename })) : [];
+    if (path.startsWith(`commits/${SHA}`)) return { files: path.includes('page=1') ? files.map((filename) => ({ filename })) : [] };
+    if (path.startsWith('actions/runs')) return { workflow_runs: path.includes('page=1') ? runs : [] };
+    if (path.startsWith('contents/')) {
+      const file = path.slice('contents/'.length).split('?')[0];
+      return { content: readFileSync(`${ROOT}${file}`).toString('base64') };
+    }
+    throw new Error(`unexpected GitHub call ${path}`);
+  };
+  const codecov = async (url) => {
+    if (url.includes('/uploads/')) {
+      const next = pages.length > 1 ? pages.shift() : pages[0];
+      if (next instanceof Error) throw next;
+      return { results: next, next: null };
+    }
+    if (url.endsWith(`/commits/${SHA}/`)) return { totals: coverage === null ? null : { coverage } };
+    if (url.includes('/compare/')) return { head_commit: head, totals: { patch } };
+    throw new Error(`unexpected Codecov call ${url}`);
+  };
+  const args = {
+    gh,
+    codecov,
+    sleep: async (ms) => { sleeps.push(ms); },
+    post: async (context, { state, description }) => { posted.push(`${context} ${state}: ${description}`); },
+    contexts: pr ? ['coverage/project', 'coverage/patch'] : ['coverage/project'],
+    pr: pr ?? undefined,
+    sha: SHA,
+    repo: 'FalkorDB/falkordb-browser',
+    target: 95,
+  };
+  return { args, posted, sleeps };
+}
+const ALL_DONE = [run('Build'), run('Playwright Tests'), run('Desktop app')];
+
+test('gate: pending while a workflow the change triggers is running or not started', async () => {
+  const running = world({ runs: [run('Build'), run('Playwright Tests', null, 'in_progress')] });
+  assert.equal(await gate(running.args), false);
+  assert.deepEqual(running.posted, [
+    'coverage/project pending: Waiting for Playwright Tests, Desktop app',
+    'coverage/patch pending: Waiting for Playwright Tests, Desktop app',
+  ]);
+});
+
+test('gate: passes or fails each status against the target once the coverage is complete', async () => {
+  const good = world({ runs: ALL_DONE });
+  assert.equal(await gate(good.args), true);
+  assert.deepEqual(good.posted, [
+    'coverage/project success: 96.00% (target 95%)',
+    'coverage/patch success: 95.00% (target 95%)',
+  ]);
+  const low = world({ runs: ALL_DONE, coverage: 40, patch: { hits: 1, misses: 1, partials: 0 } });
+  await gate(low.args);
+  assert.deepEqual(low.posted, [
+    'coverage/project failure: 40.00%, below the 95% target',
+    'coverage/patch failure: 50.00%, below the 95% target',
+  ]);
+});
+
+test('gate: a workflow that did not succeed fails both statuses', async () => {
+  const cancelled = world({ runs: [run('Build'), run('Playwright Tests', 'cancelled'), run('Desktop app')] });
+  assert.equal(await gate(cancelled.args), false);
+  assert.deepEqual(cancelled.posted, [
+    'coverage/project failure: Playwright Tests did not succeed: the coverage is incomplete',
+    'coverage/patch failure: Playwright Tests did not succeed: the coverage is incomplete',
+  ]);
+});
+
+test("gate: a flag with only an earlier commit's coverage fails", async () => {
+  const carried = { name: 'CF[1]', flags: ['e2e'], upload_type: 'carriedforward', state: 'complete' };
+  const stale = world({ runs: ALL_DONE, uploads: [[fresh('build', ['unit']), fresh('smoke', ['smoke']), carried, fresh('desktop', ['desktop'])]] });
+  assert.equal(await gate(stale.args), false);
+  assert.deepEqual(stale.posted, [
+    'coverage/project failure: No e2e coverage was uploaded for this commit',
+    'coverage/patch failure: No e2e coverage was uploaded for this commit',
+  ]);
+});
+
+test('gate: waits out Codecov processing and its passing errors', async () => {
+  const busy = Object.assign(new Error('503'), { status: 503 });
+  const processing = [...FRESH.slice(0, 3), { ...fresh('desktop', ['desktop']), state: 'uploaded' }];
+  const slow = world({ runs: ALL_DONE, uploads: [busy, processing, FRESH] });
+  assert.equal(await gate(slow.args), true);
+  assert.deepEqual(slow.sleeps, [20_000, 20_000]);
+  assert.equal(slow.posted[0], 'coverage/project success: 96.00% (target 95%)');
+});
+
+test('gate: a missing total is an error, not a pass', async () => {
+  await assert.rejects(gate(world({ runs: ALL_DONE, coverage: null }).args), /no coverage total/);
+  await assert.rejects(gate(world({ runs: ALL_DONE, patch: null }).args), /no patch total/);
+});
+
+test('gate: leaves the patch to a newer head, and gates a push on the project only', async () => {
+  const moved = world({ runs: ALL_DONE, head: 'newer' });
+  assert.equal(await gate(moved.args), true);
+  assert.deepEqual(moved.posted, ['coverage/project success: 96.00% (target 95%)']);
+  const push = world({ pr: null, files: ['README.md'], runs: [run('Build', 'success', 'completed', 'push')], uploads: [FRESH.slice(0, 2)] });
+  assert.equal(await gate(push.args), true);
+  assert.deepEqual(push.posted, ['coverage/project success: 96.00% (target 95%)']);
 });
