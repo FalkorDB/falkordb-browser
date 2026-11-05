@@ -156,6 +156,7 @@ test("syncRouteUrlParams writes the params of the route it is given", () => {
 });
 
 test("syncRouteUrlParams leaves unregistered routes alone", () => {
+    location.pathname = "/schema";
     syncRouteUrlParams("/schema", { tab: "abc" });
     assert.deepEqual(replaceStateCalls, []);
 });
