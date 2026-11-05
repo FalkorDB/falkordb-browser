@@ -35,6 +35,7 @@ test.describe('@config Settings config tests', () => {
             const session = await context.request.get(new URL("/api/auth/session", urls.settingsUrl).href);
             expect(session.ok()).toBe(true);
             expect((await session.json()).user.role).toBe("Read-Write");
+            await expect(page).toHaveURL(url => !url.searchParams.has("tab"));
             await expect(page.getByTestId("settingsCurrentTab")).toHaveText("> Browser");
             await expect(page.getByTestId("settingsTabTokens")).toBeVisible();
             await expect(page.getByTestId("settingsTabConfigurations")).toHaveCount(0);
