@@ -558,7 +558,7 @@ test.describe("@admin Graph tabs", () => {
         await expect(graph.stripTab(graphOne)).toBeVisible();
     });
 
-    test("The mobile portalled toolbar waits for timeout restoration", async () => {
+    test("The mobile toolbar keeps panels usable while tab actions wait for timeout restoration", async () => {
         browser = new BrowserWrapper({ seedTimeout: false });
         await browser.createNewPage(GraphPage);
         const page = await browser.getPage();
@@ -570,17 +570,33 @@ test.describe("@admin Graph tabs", () => {
             await gate;
             await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
         });
+        await page.route("**/api/graph", route => route.fulfill({ json: { opts: [graphOne] } }));
         await page.addInitScript(() => {
             const timeout = AbortSignal.timeout.bind(AbortSignal);
             AbortSignal.timeout = milliseconds => timeout(milliseconds === 5000 ? 60000 : milliseconds);
         });
         try {
             await page.goto(urls.graphUrl);
-            await expect(page.getByTestId("mobileSelectorToolbar")).toHaveAttribute("inert", "", { timeout: 15000 });
+            await expect(page.getByTestId("mobileSelectorToolbar")).toHaveAttribute("aria-busy", "true", { timeout: 15000 });
             await expect(page.getByTestId("selectorMore")).toBeDisabled();
+            const info = page.getByTestId("graphInfoToggle");
+            await info.focus();
+            await expect(info).toBeFocused();
+            await page.keyboard.press("Enter");
+            await expect(page.getByTestId("graphInfoPanel")).toBeVisible();
+            await expect(info).toHaveAttribute("aria-pressed", "true");
+            await page.keyboard.press("Escape");
+            const chat = page.getByTestId("chatToggleButton");
+            await expect(chat).toBeEnabled();
+            await chat.click();
+            await expect(page.getByTestId("chatPanel")).toBeVisible();
+            await expect(chat).toHaveAttribute("aria-pressed", "true");
+            await expect(page.getByTestId("mobileSelectorToolbar")).toHaveAttribute("aria-busy", "true");
+            await expect(page.getByTestId("selectorMore")).toBeDisabled();
+            await chat.click();
             release();
             await expect(page.getByTestId("selectorMore")).toBeEnabled({ timeout: 15000 });
-            await expect(page.getByTestId("mobileSelectorToolbar")).not.toHaveAttribute("inert");
+            await expect(page.getByTestId("mobileSelectorToolbar")).toHaveAttribute("aria-busy", "false");
             await page.getByTestId("selectorMore").click();
             await expect(page.getByTestId("uploadGraphToolbarTrigger")).toBeVisible();
         } finally {

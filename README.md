@@ -261,6 +261,8 @@ Graph-list initialization retries after a failed connection synchronization,
 when connectivity returns, or after leaving the tutorial.
 Discovering the connection already identified by the session preserves loaded
 graphs and restored tabs instead of replaying their queries.
+On mobile, graph information and Chat remain available during restoration;
+tab-dependent overflow actions stay disabled until initialization finishes.
 
 ### Error help
 

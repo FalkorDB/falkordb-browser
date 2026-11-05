@@ -217,7 +217,7 @@ export default function Selector({
         // rest of the desktop bar folds into the overflow so the tab name keeps
         // the width it needs to be readable.
         const toolbar = (
-            <div className="contents" data-testid="mobileSelectorToolbar" aria-busy={!tabsReady} inert={tabsReady ? undefined : true}>
+            <div className="contents" data-testid="mobileSelectorToolbar" aria-busy={!tabsReady}>
                 {graphInfoButton}
                 <DropdownMenu open={tabsReady && actionsOpen} onOpenChange={setActionsOpen}>
                     <DropdownMenuTrigger asChild>
