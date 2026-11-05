@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  COVERAGE_WORKFLOWS, codecovSettled, globToRegExp, missingFlags, patchVerdict, pathFilters, runsFor, unsuccessful, verdict,
-  waitingFor,
+  COVERAGE_WORKFLOWS, codecovSettled, globToRegExp, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  verdict, waitingFor,
 } from './coverage-gate.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -92,6 +92,20 @@ test('waits for an expected workflow until its latest run has completed', () => 
     { id: 1, name: 'Build', status: 'completed', conclusion: 'success' },
     { id: 2, name: 'CodeQL', status: 'in_progress', conclusion: null },
   ]), []);
+});
+
+test("judges a trigger's own runs: a push run does not hide a pull request run", () => {
+  // A staging commit at the head of a pull request into main.
+  const runs = [
+    { id: 1, name: 'Build', event: 'pull_request', status: 'in_progress', conclusion: null },
+    { id: 2, name: 'Build', event: 'push', status: 'completed', conclusion: 'success' },
+  ];
+  assert.deepEqual(waitingFor(['Build'], runsOf('pull_request', runs)), ['Build']);
+  assert.deepEqual(waitingFor(['Build'], runsOf('push', runs)), []);
+  assert.deepEqual(unsuccessful(['Build'], runsOf('pull_request', [
+    { id: 1, name: 'Build', event: 'pull_request', status: 'completed', conclusion: 'failure' },
+    { id: 2, name: 'Build', event: 'push', status: 'completed', conclusion: 'success' },
+  ])), ['Build']);
 });
 
 test('counts a finished workflow that did not succeed as incomplete coverage', () => {

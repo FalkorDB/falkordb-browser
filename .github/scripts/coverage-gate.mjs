@@ -106,6 +106,15 @@ export function runsFor(filters, files) {
   return true;
 }
 
+/**
+ * The runs a trigger made: a commit pushed to staging and at the head of a
+ * pull request into main has both push and pull_request runs, and the gate
+ * of each trigger judges its own.
+ */
+export function runsOf(event, runs) {
+  return runs.filter((run) => run.event === event);
+}
+
 /** Each workflow's latest run (a re-run is the run that counts). */
 function latestRuns(runs) {
   const latest = new Map();
@@ -180,8 +189,20 @@ async function api(url, { token, method = 'GET', body } = {}) {
     },
     body: body && JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`${method} ${url}: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    throw Object.assign(new Error(`${method} ${url}: ${res.status} ${await res.text()}`), { status: res.status });
+  }
   return res.json();
+}
+
+/** Every page of a GitHub list, `pick` taking the items out of each response. */
+async function allPages(fetchPage, pick = (page) => page) {
+  const items = [];
+  for (let page = 1; ; page += 1) {
+    const batch = pick(await fetchPage(page));
+    items.push(...batch);
+    if (batch.length < 100) return items;
+  }
 }
 
 async function main() {
@@ -220,25 +241,37 @@ async function main() {
   const contexts = pr ? ['coverage/project', 'coverage/patch'] : ['coverage/project'];
 
   // The workflows this commit triggers, as their path filters decide.
-  const files = [];
-  if (pr) {
-    for (let page = 1; ; page += 1) {
-      const batch = await gh(`pulls/${pr.number}/files?per_page=100&page=${page}`);
-      files.push(...batch.map((f) => f.filename));
-      if (batch.length < 100) break;
-    }
-  } else {
-    files.push(...(await gh(`commits/${sha}`)).files.map((f) => f.filename));
-  }
-  const expected = [];
-  for (const [name, { file }] of Object.entries(COVERAGE_WORKFLOWS)) {
-    const content = await gh(`contents/${file}?ref=${sha}`).catch(() => undefined);
-    if (!content) continue;
-    const workflow = Buffer.from(content.content, 'base64').toString('utf8');
-    if (runsFor(pathFilters(workflow, pr ? 'pull_request' : 'push'), files)) expected.push(name);
-  }
+  // The files the trigger changed: a pull request's whole diff, or the pushed
+  // commit's own changes (for a merge commit, all that the merge brought).
+  const files = (pr
+    ? await allPages((page) => gh(`pulls/${pr.number}/files?per_page=100&page=${page}`))
+    : await allPages((page) => gh(`commits/${sha}?per_page=100&page=${page}`), (page) => page.files ?? [])
+  ).map((f) => f.filename);
 
-  const { workflow_runs: runs } = await gh(`actions/runs?head_sha=${sha}&per_page=100`);
+  const trigger = pr ? 'pull_request' : 'push';
+  const runs = runsOf(trigger, await allPages(
+    (page) => gh(`actions/runs?head_sha=${sha}&per_page=100&page=${page}`),
+    (page) => page.workflow_runs,
+  ));
+  // Expected: every coverage workflow the trigger started, and every one
+  // whose path filters take these files. GitHub starts all of a trigger's
+  // runs at once, so a push of several commits, whose earlier commits the
+  // files above leave out, still has a run of each workflow it triggered;
+  // and a workflow its files call for is waited for even before it shows.
+  const expected = [...new Set(runs.map((run) => run.name).filter((name) => name in COVERAGE_WORKFLOWS))];
+  for (const [name, { file }] of Object.entries(COVERAGE_WORKFLOWS)) {
+    let content;
+    try {
+      content = await gh(`contents/${file}?ref=${sha}`);
+    } catch (error) {
+      // A commit without the workflow does not run it; any other failure
+      // stops the gate rather than leave the workflow out.
+      if (error.status === 404) continue;
+      throw error;
+    }
+    const workflow = Buffer.from(content.content, 'base64').toString('utf8');
+    if (!expected.includes(name) && runsFor(pathFilters(workflow, trigger), files)) expected.push(name);
+  }
   const waiting = waitingFor(expected, runs);
   if (waiting.length) {
     console.log(`Waiting for ${waiting.join(', ')}`);
