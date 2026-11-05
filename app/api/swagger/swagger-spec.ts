@@ -968,7 +968,9 @@ const swaggerSpec = {
                   type: "object",
                   properties: {
                     result: {
-                      description: "Duplication operation result"
+                      type: "string",
+                      description: "Name of the new graph",
+                      example: "social (copy)"
                     }
                   }
                 }

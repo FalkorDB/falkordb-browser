@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
-import { normalizeLocalEndpoint, type LocalProvider } from "@/lib/local-llm-utils";
+import { normalizeLocalEndpoint } from "@/lib/local-llm-utils";
 import { UDF_VERSION_THRESHOLD } from "@/app/utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
-import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
+import { buildFalkorDBConnection, getCorsHeaders, corsPreflight } from "../utils";
 
-export async function OPTIONS(request: NextRequest) {
-    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
-
-const LOCAL_PROVIDER_DEFAULT_ENDPOINTS: Record<LocalProvider, string> = {
-    ollama: "http://localhost:11434",
-    lmstudio: "http://localhost:1234/v1",
-};
+export const OPTIONS = corsPreflight;
 
 /**
  * Create user-friendly error message

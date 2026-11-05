@@ -265,6 +265,11 @@ export function getCorsHeaders(request?: Request): Record<string, string> {
     return headers;
 }
 
+/** Shared `OPTIONS` handler: answers a CORS preflight with no body. */
+export async function corsPreflight(request: Request): Promise<NextResponse> {
+    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
+
 export function rejectUntrustedOrigin(request: Request): NextResponse<{ message: string }> {
     return NextResponse.json(
         { message: UNTRUSTED_REQUEST_ORIGIN_MESSAGE },
