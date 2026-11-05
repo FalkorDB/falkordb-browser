@@ -473,7 +473,7 @@ export async function gate({
   const never = retarget ? notStarted(expected, runs) : [];
   if (never.length) {
     console.log(`Never ran for this commit: ${never.join(', ')}`);
-    const description = `${never.join(', ')} never ran for this commit: push a commit to run it`.slice(0, 140);
+    const description = `${never.join(', ')} never ran for this commit: push a commit or reopen the pull request`.slice(0, 140);
     for (const context of contexts) await post(context, { state: 'failure', description });
     return false;
   }

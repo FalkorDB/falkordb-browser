@@ -451,8 +451,8 @@ test('gate: a pull request moved to another base fails a workflow that never ran
   const moved = world({ runs });
   assert.equal(await gate({ ...moved.args, retarget: true }), false);
   assert.deepEqual(moved.posted, [
-    'coverage/project failure: Playwright Tests never ran for this commit: push a commit to run it',
-    'coverage/patch failure: Playwright Tests never ran for this commit: push a commit to run it',
+    'coverage/project failure: Playwright Tests never ran for this commit: push a commit or reopen the pull request',
+    'coverage/patch failure: Playwright Tests never ran for this commit: push a commit or reopen the pull request',
   ]);
   // Outside a move, a workflow not started yet is only waited for.
   const fresh = world({ runs });
