@@ -1,5 +1,4 @@
-import { expect } from "@playwright/test";
-import test from "playwright/test";
+import { expect, test } from "../infra/coverage";
 import { getDefaultQuery } from "@/lib/utils";
 import ApiCalls from "../logic/api/apiCalls";
 import BrowserWrapper from "../infra/ui/browserWrapper";
@@ -18,6 +17,44 @@ test.describe.serial("Query Settings", () => {
 
   test.afterEach(async () => {
     await browser.closeBrowser();
+  });
+
+  test("@admin cancelling query settings restores saved values and survives reload", async () => {
+    const settings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
+    const page = await browser.getPage();
+    await settings.expandQueryExecutionSection();
+    const savedLimit = await settings.getLimit();
+    const savedTimeout = await settings.getTimeout();
+    await settings.fillLimit(17);
+    await settings.fillTimeout(23);
+    await settings.clickCancelQuerySettingsBtn();
+    await expect(page.locator("#limitInput")).toHaveValue(savedLimit);
+    await expect(page.locator("#timeoutInput")).toHaveValue(savedTimeout);
+    await expect(page.locator("#saveQuerySettingsBtn")).toBeHidden();
+    await settings.refreshPage();
+    await settings.expandQueryExecutionSection();
+    await expect(page.locator("#limitInput")).toHaveValue(savedLimit);
+    await expect(page.locator("#timeoutInput")).toHaveValue(savedTimeout);
+  });
+
+  test("@admin query limit and timeout zero round-trip as infinity", async () => {
+    const settings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
+    const page = await browser.getPage();
+    await settings.expandQueryExecutionSection();
+    await settings.fillLimit(0);
+    await settings.fillTimeout(0);
+    await settings.clickSaveQuerySettingsBtn();
+    await settings.refreshPage();
+    await settings.expandQueryExecutionSection();
+    await expect(page.locator("#limitInput")).toHaveValue("∞");
+    await expect(page.locator("#timeoutInput")).toHaveValue("∞");
+    await settings.fillLimit(1);
+    await settings.fillTimeout(1);
+    await settings.clickSaveQuerySettingsBtn();
+    await settings.refreshPage();
+    await settings.expandQueryExecutionSection();
+    await expect(page.locator("#limitInput")).toHaveValue("1");
+    await expect(page.locator("#timeoutInput")).toHaveValue("1 seconds");
   });
 
   test(`@admin Validate that running a query with timeout returns an error`, async () => {
