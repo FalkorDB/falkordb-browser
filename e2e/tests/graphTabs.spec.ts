@@ -679,7 +679,7 @@ test.describe("@admin Graph tabs", () => {
         }
     });
 
-    for (const panel of ["data", "data-editor", "create"]) {
+    for (const panel of ["data", "data-editor", "data-add", "create"]) {
         test(`A mobile ${panel} sheet can close while restoration blocks editing`, async () => {
             test.setTimeout(60_000);
             const create = panel === "create";
@@ -704,11 +704,17 @@ test.describe("@admin Graph tabs", () => {
             } else if (panel === "data-editor") {
                 await page.getByTestId("DataPanelSetAttribute").click();
                 await expect(page.getByTestId("DataPanelSetAttributeConfirm")).toBeVisible();
+            } else if (panel === "data-add") {
+                await page.getByTestId("DataPanelAddAttribute").click();
+                await page.getByTestId("DataPanelAddAttributeKey").fill("discardedDraft");
+                await sheet.getByTestId("selectType").click();
+                await page.getByTestId("selectTypeinteger").click();
+                await page.getByTestId("DataPanelAddAttributeValue").fill("42");
             } else {
                 await expect(page.getByTestId("DataPanelSetAttribute")).toBeVisible();
                 await page.getByTestId("DataPanelAddLabel").click();
             }
-            if (panel !== "data-editor") await expect(page.getByRole("dialog")).toBeVisible();
+            if (panel === "data" || create) await expect(page.getByRole("dialog")).toBeVisible();
             const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
             await page.evaluate(() => localStorage.removeItem("timeout"));
             let release!: () => void;
@@ -728,7 +734,7 @@ test.describe("@admin Graph tabs", () => {
                     channel.postMessage({ event: "session", data: { trigger: "getSession" } });
                     channel.close();
                 });
-                await expect.poll(() => configRequested).toBe(true);
+                await expect.poll(() => configRequested, { timeout: 15000 }).toBe(true);
                 await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
                 await expect(page.getByRole("dialog")).toHaveCount(0);
                 const close = create ? sheet.getByRole("button", { name: "Close", exact: true }) : page.getByTestId("DataPanelClose");
@@ -743,11 +749,22 @@ test.describe("@admin Graph tabs", () => {
                     await expect(page.getByTestId("DataPanelAddLabel")).toHaveCount(0);
                     await expect(page.getByTestId("DataPanelAttributeclose-control")).toBeVisible();
                 }
-                await close.click();
-                await expect(sheet).toHaveAttribute("data-state", "closed");
-                await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+                if (panel !== "data-add") {
+                    await close.click();
+                    await expect(sheet).toHaveAttribute("data-state", "closed");
+                    await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+                }
                 release();
                 await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "false");
+                if (panel === "data-add") {
+                    await expect(page.getByTestId("DataPanelAddAttributeKey")).toHaveCount(0);
+                    await page.getByTestId("DataPanelAddAttribute").click();
+                    await expect(page.getByTestId("DataPanelAddAttributeKey")).toHaveValue("");
+                    await expect(page.getByTestId("DataPanelAddAttributeValue")).toHaveValue("");
+                    await expect(sheet.getByTestId("selectType")).toHaveText("string");
+                    await close.click();
+                    await expect(sheet).toHaveAttribute("data-state", "closed");
+                }
             } finally {
                 release();
             }

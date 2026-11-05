@@ -265,6 +265,7 @@ On mobile, graph information and Chat remain available during restoration;
 their close controls, metadata browsing, and Chat drafts stay interactive.
 Element data and creation sheets also remain dismissible; only their editing
 controls are gated, and open mutation dialogs close when readiness is lost.
+Interrupted property editors discard their draft key, value, and type.
 Graph selection, queries, editing, and overflow actions stay disabled until
 initialization finishes. An open overflow menu closes when readiness is lost
 and does not reopen until requested again.

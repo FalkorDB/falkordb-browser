@@ -140,6 +140,9 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
         if (isReadOnly) {
             setEditable("");
             setIsAddValue(false);
+            setNewKey("");
+            setNewVal("");
+            setNewType("string");
         }
     }, [isReadOnly]);
 
