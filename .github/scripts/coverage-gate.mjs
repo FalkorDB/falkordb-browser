@@ -168,12 +168,14 @@ export function patchVerdict(patch, target) {
   return verdict((100 * patch.hits) / lines, target);
 }
 
+/** A JSON API call. The token goes to GitHub's API only, whatever the caller passes. */
 async function api(url, { token, method = 'GET', body } = {}) {
+  const github = new URL(url).origin === GITHUB;
   const res = await fetch(url, {
     method,
     headers: {
-      accept: url.startsWith(GITHUB) ? 'application/vnd.github+json' : 'application/json',
-      ...(token && { authorization: `Bearer ${token}` }),
+      accept: github ? 'application/vnd.github+json' : 'application/json',
+      ...(github && token && { authorization: `Bearer ${token}` }),
       ...(body && { 'content-type': 'application/json' }),
     },
     body: body && JSON.stringify(body),
