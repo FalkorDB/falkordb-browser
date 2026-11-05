@@ -64,8 +64,9 @@ Cross-origin callers (including other localhost ports) must be explicitly listed
 in `ALLOWED_ORIGINS`. This is a caller-origin list, not an API-host allowlist: a
 separate frontend origin can be listed without listing the API server's origin.
 Without that setting, browser callers must match the request's own origin.
-Origin-less API reads remain supported and still require authentication; the
-allowlist is not a trusted-host list or a replacement for authorization.
+Origin-less API reads remain supported. Protected reads still require
+authentication; public endpoints remain public. The allowlist is not a
+trusted-host list or a replacement for authorization.
 
 URL login uses the authentication attempt itself to detect missing or invalid
 credentials and reveal the credential fields when needed. Connection failures
@@ -78,8 +79,9 @@ Session connections must have an active stored connection record. Removing the
 last connection requires a fresh login; old sessions without a connection ID
 must also sign in again instead of reconnecting from cookie fields.
 The compatibility session-migration endpoint only returns an existing usable
-active connection; it never reconstructs missing records or opens database
-clients. The UI signs out when no stored connections remain.
+active connection; it never reconstructs missing records or opens a client to
+the user's database. Reading the record may open a token-store database client.
+The UI signs out when no stored connections remain.
 
 File-backed token storage uses atomic replacements and an exclusive
 `<token-file>.lock` directory (the full configured token path with `.lock`

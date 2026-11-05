@@ -41,8 +41,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
         const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
         try {
-            const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
-            const result = await securedFetch(`/api/graph/${query.graphName}/profile${readOnlyParam}`, {
+            const result = await securedFetch(`/api/graph/${query.graphName}/profile`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query: query.text }),

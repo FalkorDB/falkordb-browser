@@ -26,19 +26,6 @@ test("token database URL rejects unsupported options without retaining credentia
     else process.env.API_TOKEN_FALKORDB_URL = previous;
   });
 
-  test("token database URL uses Redis default ports without changing legacy FalkorDB defaults", (t) => {
-    const previous = process.env.API_TOKEN_FALKORDB_URL;
-    t.after(() => {
-      if (previous === undefined) delete process.env.API_TOKEN_FALKORDB_URL;
-      else process.env.API_TOKEN_FALKORDB_URL = previous;
-    });
-    for (const scheme of ["redis", "rediss", "falkor", "falkordb", "falkors"]) {
-      process.env.API_TOKEN_FALKORDB_URL = `${scheme}://localhost`;
-      assert.equal(parseFalkorDBUrl().port, scheme.startsWith("redis") ? 6379 : 6380);
-      process.env.API_TOKEN_FALKORDB_URL = `${scheme}://localhost:6381`;
-      assert.equal(parseFalkorDBUrl().port, 6381);
-    }
-  });
   for (const value of [
     "redis://user:private-secret@host:invalid", "http://user:private-secret@host",
     "redis://user:private-secret@host/1", "redis://user:private-secret@host/?tls=false",
@@ -51,5 +38,19 @@ test("token database URL rejects unsupported options without retaining credentia
       assert.equal(error.cause, undefined);
       return true;
     });
+  }
+});
+
+test("token database URL uses Redis default ports without changing legacy FalkorDB defaults", (t) => {
+  const previous = process.env.API_TOKEN_FALKORDB_URL;
+  t.after(() => {
+    if (previous === undefined) delete process.env.API_TOKEN_FALKORDB_URL;
+    else process.env.API_TOKEN_FALKORDB_URL = previous;
+  });
+  for (const scheme of ["redis", "rediss", "falkor", "falkordb", "falkors"]) {
+    process.env.API_TOKEN_FALKORDB_URL = `${scheme}://localhost`;
+    assert.equal(parseFalkorDBUrl().port, scheme.startsWith("redis") ? 6379 : 6380);
+    process.env.API_TOKEN_FALKORDB_URL = `${scheme}://localhost:6381`;
+    assert.equal(parseFalkorDBUrl().port, 6381);
   }
 });

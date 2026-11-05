@@ -147,6 +147,11 @@ test("lock-release failure is logged without replacing a committed result or ori
     const lockPath = `${file}.lock`;
     const rmdir = fs.rmdir;
     t.after(async () => {
+        try {
+            await rmdir(lockPath);
+        } catch (error) {
+            if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+        }
         await fs.unlink(file);
         await rmdir(dir);
     });
@@ -165,5 +170,4 @@ test("lock-release failure is logged without replacing a committed result or ori
     t.mock.method(fs, "rename", async () => { throw new Error("write failed"); });
     await assert.rejects(storage.createToken(token("new")), /Failed to save tokens/);
     assert.equal(await storage.fetchTokenById("new"), null);
-    await rmdir(lockPath);
 });
