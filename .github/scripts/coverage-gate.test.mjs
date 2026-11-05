@@ -449,7 +449,8 @@ test("totals the changed lines the commit's coverage counts", () => {
 test('gate: fails a workflow that never ran once every run has finished, rather than wait for it', async () => {
   // Every run of the trigger finished and Playwright never started (a pull
   // request moved to staging, say): no event will start it.
-  const done = world({ runs: [run('Build'), run('Desktop app')] });
+  // (CodeQL, still running, is not a coverage workflow: it does not count.)
+  const done = world({ runs: [run('Build'), run('Desktop app'), run('CodeQL', null, 'in_progress')] });
   assert.equal(await gate(done.args), false);
   assert.deepEqual(done.posted, [
     'coverage/project failure: Playwright Tests never ran for this commit: push a commit or reopen the pull request',

@@ -444,16 +444,19 @@ export async function gate({
   const files = changes.map((f) => f.filename);
 
   const trigger = pr ? 'pull_request' : 'push';
+  // Only the coverage workflows' runs: the gate runs when one of those
+  // starts or ends, never another (CodeQL, say), so another still running
+  // must not hold it.
   const runs = runsOf(trigger, await allPages(
     (page) => gh(`actions/runs?head_sha=${sha}&per_page=100&page=${page}`),
     (page) => page.workflow_runs,
-  ));
+  )).filter((run) => run.name in COVERAGE_WORKFLOWS);
   // Expected: every coverage workflow the trigger started, and every one
   // whose path filters take these files. GitHub starts all of a trigger's
   // runs at once, so a push of several commits, whose earlier commits the
   // files above leave out, still has a run of each workflow it triggered;
   // and a workflow its files call for is waited for even before it shows.
-  const expected = [...new Set(runs.map((run) => run.name).filter((name) => name in COVERAGE_WORKFLOWS))];
+  const expected = [...new Set(runs.map((run) => run.name))];
   for (const [name, { file }] of Object.entries(COVERAGE_WORKFLOWS)) {
     let content;
     try {
