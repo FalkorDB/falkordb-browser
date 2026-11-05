@@ -137,6 +137,11 @@ test("finds the commit's uploads Codecov could not process", () => {
     { name: 'CF[1]', flags: ['mobile'], upload_type: 'carriedforward', state: 'error' },
   ];
   assert.deepEqual(failedUploads(uploads).map((u) => u.name), ['e2e-shard-2']);
+  // A re-run of that shard uploaded it again: the later upload counts.
+  assert.deepEqual(failedUploads([
+    { name: 'e2e-shard-2', flags: ['e2e'], upload_type: 'uploaded', state: 'error', created_at: '2026-11-05T12:00:00Z' },
+    { name: 'e2e-shard-2', flags: ['e2e'], upload_type: 'uploaded', state: 'merged', created_at: '2026-11-05T12:30:00Z' },
+  ]), []);
   // The flag still has another shard's upload: only failedUploads catches it.
   assert.deepEqual(missingFlags(['Playwright Tests'], uploads), []);
 });

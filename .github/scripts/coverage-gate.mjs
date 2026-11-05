@@ -147,9 +147,18 @@ export function unsuccessful(expected, runs) {
   return expected.filter((name) => latest.get(name)?.conclusion !== 'success');
 }
 
-/** The commit's own uploads that Codecov could not process. */
+/**
+ * The commit's own uploads that Codecov could not process, each the latest
+ * of its job (a re-run's upload, named after the same job, replaces it).
+ */
 export function failedUploads(uploads) {
-  return uploads.filter((u) => u.upload_type !== 'carriedforward' && u.state === 'error');
+  const latest = new Map();
+  for (const upload of uploads.filter((u) => u.upload_type !== 'carriedforward')) {
+    const job = upload.name || upload.flags.join(',');
+    const seen = latest.get(job);
+    if (!seen || upload.created_at > seen.created_at) latest.set(job, upload);
+  }
+  return [...latest.values()].filter((u) => u.state === 'error');
 }
 
 /**

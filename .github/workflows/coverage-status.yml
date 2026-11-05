@@ -15,9 +15,10 @@ name: Coverage status
 on:
   workflow_run:
     workflows: ["Build", "Playwright Tests", "Desktop app", "Mobile app"]
-    # requested: a new run or a re-run puts the gate back to pending at once,
-    # rather than leave an earlier verdict up until the run is done.
-    types: [requested, completed]
+    # requested and in_progress (a re-run sends no requested): a new run or
+    # a re-run puts the gate back to pending at once, rather than leave an
+    # earlier verdict up until the run is done.
+    types: [requested, in_progress, completed]
 
 permissions:
   contents: read
