@@ -94,7 +94,24 @@ jobs:
         env:
           NODE_V8_COVERAGE: ${{ github.workspace }}/coverage/raw/mobile
 
-      # The coverage report runs on the web app's dependencies.
+      - name: Add or sync the Android project
+        run: |
+          if [ -d android ]; then npx cap sync android; else npx cap add android; fi
+
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: falkordb-browser-android-debug
+          path: mobile/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # Last, so a Codecov problem never skips the APK. The report runs on
+      # the web app's dependencies.
       - name: Install web dependencies
         if: ${{ !cancelled() }}
         working-directory: .
@@ -115,26 +132,11 @@ jobs:
           flags: mobile
           fail_ci_if_error: true
 
-      - name: Add or sync the Android project
-        run: |
-          if [ -d android ]; then npx cap sync android; else npx cap add android; fi
-
-      - name: Build debug APK
-        working-directory: mobile/android
-        run: ./gradlew assembleDebug --no-daemon
-
-      - name: Upload APK
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: falkordb-browser-android-debug
-          path: mobile/android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
-
   # A release is built and signed in two jobs, so no dependency code ever runs
   # where the signing key or a write token is reachable: this one installs and
   # builds with read-only rights and no secrets, the next one only signs and
   # uploads the APK it produced.
+
   android-release-build:
     if: github.event_name == 'release' || inputs.release_tag
     runs-on: ubuntu-latest

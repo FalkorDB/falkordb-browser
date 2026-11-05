@@ -151,6 +151,24 @@ async function transpile(entry) {
   entry.sourceMap = { ...JSON.parse(out.sourceMapText), sources: [entry.url] };
 }
 
+/**
+ * One page's coverage as e2e/infra/coverage.ts saved it, each entry given back
+ * the chunk source saved beside it. An entry whose source was never saved is
+ * dropped: without it the coverage cannot be mapped.
+ */
+export function browserEntries(dir, name) {
+  return JSON.parse(readFileSync(path.join(dir, name), 'utf8')).filter((entry) => {
+    const sourceFile = path.join(dir, `browser-source-${createHash('sha1').update(entry.url).digest('hex')}.js`);
+    try {
+      entry.source = readFileSync(sourceFile, 'utf8');
+      return true;
+    } catch (error) {
+      if (error.code === 'ENOENT') return false;
+      throw error;
+    }
+  });
+}
+
 function entryFilter(entry) {
   if (entry.url.startsWith('file:')) {
     const rel = toSourcePath(entry.url);
@@ -201,12 +219,8 @@ async function main([flag, ...dirs]) {
     // Browser pages: what e2e/infra/coverage.ts saves, each page's coverage
     // apart from the chunk sources it ran.
     for (const name of names.filter((n) => /^browser-[^.]+\.json$/.test(n))) {
-      const entries = JSON.parse(readFileSync(path.join(dir, name), 'utf8'));
-      for (const entry of entries) {
-        const sourceFile = path.join(dir, `browser-source-${createHash('sha1').update(entry.url).digest('hex')}.js`);
-        entry.source = readFileSync(sourceFile, 'utf8');
-      }
-      await report.add(entries);
+      const entries = browserEntries(dir, name);
+      if (entries.length) await report.add(entries);
     }
   }
   await report.generate();

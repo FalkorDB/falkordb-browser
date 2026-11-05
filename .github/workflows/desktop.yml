@@ -104,20 +104,6 @@ jobs:
         env:
           NODE_V8_COVERAGE: ${{ github.workspace }}/coverage/raw/desktop
 
-      - name: Build the desktop coverage report
-        if: ${{ !cancelled() && runner.os == 'Linux' }}
-        run: node .github/scripts/coverage-report.mjs desktop coverage/raw/desktop
-
-      - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() && runner.os == 'Linux' }}
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/desktop/codecov.json
-          disable_search: true
-          flags: desktop
-          fail_ci_if_error: true
-
       # Stamp the app with the release's version (v2.6.1 -> 2.6.1), not the
       # one last written into desktop/package.json. File names carry no
       # version, so the browser's latest/download links keep working.
@@ -146,6 +132,21 @@ jobs:
             desktop/dist/*.exe
           if-no-files-found: error
           retention-days: 14
+
+      # Last, so a Codecov problem never skips the installers.
+      - name: Build the desktop coverage report
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: node .github/scripts/coverage-report.mjs desktop coverage/raw/desktop
+
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/desktop/codecov.json
+          disable_search: true
+          flags: desktop
+          fail_ci_if_error: true
 
   attach-to-release:
     if: github.event_name == 'release'

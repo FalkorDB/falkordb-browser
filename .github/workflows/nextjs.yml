@@ -56,6 +56,10 @@ jobs:
         env:
           NODE_V8_COVERAGE: coverage/raw/unit
 
+      - name: Build with Next.js
+        run: npx next build
+
+      # Last, so a Codecov problem never skips the build.
       - name: Build the unit coverage report
         if: ${{ !cancelled() }}
         run: node .github/scripts/coverage-report.mjs unit coverage/raw/unit
@@ -69,9 +73,6 @@ jobs:
           disable_search: true
           flags: unit
           fail_ci_if_error: true
-
-      - name: Build with Next.js
-        run: npx next build
 
   smoke-tests:
     runs-on: ubuntu-latest

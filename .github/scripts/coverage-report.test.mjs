@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isSourceFile, localSourceMap, mappedLines, toSourcePath } from './coverage-report.mjs';
+import { browserEntries, isSourceFile, localSourceMap, mappedLines, toSourcePath } from './coverage-report.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -65,4 +68,19 @@ test('reads the source lines a source map points into', () => {
   assert.deepEqual([...mappedLines('')], []);
   // Multi-digit VLQ values: 16 lines down.
   assert.deepEqual([...mappedLines('AAgBA')], [17]);
+});
+
+test('gives each browser entry its saved source, and drops one saved without it', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'coverage-report-'));
+  const saved = 'http://localhost:3000/_next/static/chunks/a.js';
+  const unsaved = 'http://localhost:3000/_next/static/chunks/b.js';
+  const sha1 = (url) => createHash('sha1').update(url).digest('hex');
+  writeFileSync(path.join(dir, `browser-source-${sha1(saved)}.js`), 'run();');
+  writeFileSync(path.join(dir, 'browser-1.json'), JSON.stringify([
+    { url: saved, scriptId: '1', functions: [] },
+    { url: unsaved, scriptId: '2', functions: [] },
+  ]));
+  assert.deepEqual(browserEntries(dir, 'browser-1.json'), [
+    { url: saved, scriptId: '1', functions: [], source: 'run();' },
+  ]);
 });
