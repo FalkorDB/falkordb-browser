@@ -1,4 +1,4 @@
-import test, { expect } from "playwright/test";
+import { test, expect } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import SchemaView from "../logic/POM/schemaView";
 import urls from "../config/urls.json";
@@ -60,8 +60,69 @@ test.describe("Schema View Tests", () => {
         // Close the page first: the graph page polls for graph info while a graph
         // is selected, and that poll re-creates a graph deleted out from under it.
         await browser.closeBrowser();
-        await apiCalls.removeGraph(GRAPH_NAME);
-        if (extraGraphName) await apiCalls.removeGraph(extraGraphName);
+        await apiCalls.removeGraph(GRAPH_NAME, "admin");
+        if (extraGraphName) await apiCalls.removeGraph(extraGraphName, "admin");
+    });
+
+    test("@admin schema discovery recovers after a rejected request when reopened", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        const page = await browser.getPage();
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        let attempts = 0;
+        await page.route(`**/api/graph/${GRAPH_NAME}?*`, async (route) => {
+            const query = new URL(route.request().url()).searchParams.get("query") ?? "";
+            if (!query.includes("RETURN DISTINCT source, type(e)")) {
+                await route.continue();
+                return;
+            }
+            attempts += 1;
+            if (attempts === 1) {
+                await route.fulfill({
+                    contentType: "text/event-stream",
+                    body: `event: error\ndata: ${JSON.stringify({ status: 400, message: "Invalid input: schema discovery rejected" })}\n\n`,
+                });
+            } else {
+                await route.continue();
+            }
+        });
+        await schemaView.clickSchemaTab();
+        await expect(page.getByText("Invalid input: schema discovery rejected", { exact: true })).toBeVisible();
+        await schemaView.waitForSchemaTripleCount(0);
+        await schemaView.clickGraphTab();
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+        expect(await schemaView.getSchemaTripleStrings()).toEqual(EXPECTED_TRIPLES);
+        expect(attempts).toBe(2);
+    });
+
+    test("@admin schema discovery ignores malformed and duplicate placement rows", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        const page = await browser.getPage();
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        let intercepted = 0;
+        await page.route(`**/api/graph/${GRAPH_NAME}?*`, async (route) => {
+            const query = new URL(route.request().url()).searchParams.get("query") ?? "";
+            if (!query.includes("RETURN DISTINCT source, type(e)")) {
+                await route.continue();
+                return;
+            }
+            intercepted += 1;
+            const placement = { source: "Person", relationship: "KNOWS", target: "Person" };
+            await route.fulfill({
+                contentType: "text/event-stream",
+                body: `event: result\ndata: ${JSON.stringify({ data: [
+                    placement, placement, null, [], "invalid", { source: 42, relationship: "BAD", target: "Person" },
+                    { source: "Person", target: "Company" },
+                ] })}\n\n`,
+            });
+        });
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(1);
+        expect(await schemaView.getSchemaTripleStrings()).toEqual(["Person-[KNOWS]->Person"]);
+        expect(await schemaView.getSchemaLabels()).toEqual(["City", "Company", "Employee", "Person"]);
+        expect(intercepted).toBe(1);
     });
 
     test("@admin check schema view tab is disabled when no graph is selected", async () => {
