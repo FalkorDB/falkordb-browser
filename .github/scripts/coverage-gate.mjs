@@ -211,7 +211,51 @@ export function verdict(pct, target) {
     : { state: 'failure', description: `${shown}, below the ${target}% target` };
 }
 
-/** The coverage/patch status from Codecov's patch totals for a pull request. */
+/**
+ * The head's line numbers a unified diff adds or changes; every line when
+ * GitHub gave no diff (too large), since then it cannot say which.
+ */
+export function changedLines(patch) {
+  if (patch === undefined) return 'all';
+  const lines = new Set();
+  let line = 0;
+  for (const text of patch.split('\n')) {
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text);
+    if (hunk) {
+      line = Number(hunk[1]);
+    } else if (text.startsWith('+')) {
+      lines.add(line);
+      line += 1;
+    } else if (!text.startsWith('-') && !text.startsWith('\\')) {
+      line += 1;
+    }
+  }
+  return lines;
+}
+
+/**
+ * Patch totals: of the lines a pull request changes (`changes`, GitHub's
+ * changed files with their diffs), those the commit's Codecov report counts
+ * (its `line_coverage`: 0 hit, 1 missed, 2 partial).
+ */
+export function patchTotals(changes, reportFiles) {
+  const coverage = new Map(reportFiles.map((f) => [f.name, f.line_coverage]));
+  const totals = { hits: 0, misses: 0, partials: 0 };
+  for (const change of changes) {
+    const lines = coverage.get(change.filename);
+    if (change.status === 'removed' || !lines) continue;
+    const changed = changedLines(change.patch);
+    for (const [line, state] of lines) {
+      if (changed !== 'all' && !changed.has(line)) continue;
+      if (state === 0) totals.hits += 1;
+      else if (state === 1) totals.misses += 1;
+      else totals.partials += 1;
+    }
+  }
+  return totals;
+}
+
+/** The coverage/patch status from patch totals. */
 export function patchVerdict(patch, target) {
   const lines = patch.hits + patch.misses + patch.partials;
   if (lines === 0) return { state: 'success', description: 'No changed lines to cover' };
@@ -223,9 +267,13 @@ function wait(ms) {
   return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
 
-/** Whether an API error may pass on its own: a server error, rate limiting, or no response. */
+/**
+ * Whether an API error may pass on its own: a server error, rate limiting
+ * (a 429, or a 403 that says so, as GitHub's and Codecov's do), or no response.
+ */
 export function transient(error) {
-  return !error.status || error.status >= 500 || error.status === 429;
+  if (!error.status || error.status >= 500 || error.status === 429) return true;
+  return error.status === 403 && /rate limit/i.test(error.message);
 }
 
 // How long a gate may take: its job stops at 30 minutes, which would leave
@@ -384,10 +432,10 @@ export async function gate({
   // The workflows this commit triggers, as their path filters decide.
   // The files the trigger changed: a pull request's whole diff, or the pushed
   // commit's own changes (for a merge commit, all that the merge brought).
-  const files = (pr
+  const changes = pr
     ? await allPages((page) => gh(`pulls/${pr.number}/files?per_page=100&page=${page}`))
-    : await allPages((page) => gh(`commits/${sha}?per_page=100&page=${page}`), (page) => page.files ?? [])
-  ).map((f) => f.filename);
+    : await allPages((page) => gh(`commits/${sha}?per_page=100&page=${page}`), (page) => page.files ?? []);
+  const files = changes.map((f) => f.filename);
 
   const trigger = pr ? 'pull_request' : 'push';
   const runs = runsOf(trigger, await allPages(
@@ -465,24 +513,19 @@ export async function gate({
   console.log(`${contexts[0]}: ${project.description}`);
   await post(contexts[0], project);
   if (pr) {
-    // Codecov's record of the pull request can lag behind GitHub's: wait
-    // until it compares this commit, unless the pull request did move on.
-    let compare;
-    for (let attempt = 0; ; attempt += 1) {
-      compare = await again(() => codecov(`${base}/compare/?pullid=${pr.number}`));
-      if (compare.head_commit === sha) break;
-      const { head } = await again(() => gh(`pulls/${pr.number}`));
-      if (head.sha !== sha) {
-        console.log(`The pull request moved on to ${head.sha}: its own gate will post`);
-        return true;
-      }
-      if (attempt >= 15 || timeLeft() < 20_000) throw new Error(`Codecov still compares ${compare.head_commit}, not this commit`);
-      console.log(`Codecov compares ${compare.head_commit} still; waiting for it to catch up`);
-      await sleep(20_000);
+    // The pull request's diff is its head's: if it moved on, the diff read
+    // above may be the newer head's, whose own gate decides.
+    const { head } = await again(() => gh(`pulls/${pr.number}`));
+    if (head.sha !== sha) {
+      console.log(`The pull request moved on to ${head.sha}: its own gate will post`);
+      return true;
     }
-    // No patch total is not a pass.
-    if (!compare.totals?.patch) throw new Error('Codecov has no patch total for the pull request');
-    const patch = patchVerdict(compare.totals.patch, target);
+    // The lines it changes against what the commit's coverage says of them.
+    // (Codecov's comparison endpoint would do this, but it fails on Codecov's
+    // own GitHub rate limit; its report of the commit does not.)
+    const report = await again(() => codecov(`${base}/report/?sha=${sha}`));
+    if (!Array.isArray(report.files)) throw new Error('Codecov has no report of the commit');
+    const patch = patchVerdict(patchTotals(changes, report.files), target);
     console.log(`${contexts[1]}: ${patch.description}`);
     await post(contexts[1], patch);
   }

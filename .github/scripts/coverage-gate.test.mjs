@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  BUDGET_MS, COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
-  transient, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  BUDGET_MS, COVERAGE_WORKFLOWS, changedLines, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
+  transient, missingFlags, patchTotals, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
@@ -199,16 +199,22 @@ const FRESH = [fresh('build', ['unit']), fresh('smoke', ['smoke']), fresh('e2e-s
 
 function world({
   pr = { number: 7 }, files = ['app/graph/page.tsx'], runs, uploads = [FRESH], coverage = 96,
-  patch = { hits: 19, misses: 1, partials: 0 }, head = SHA, compareErrors = [], githubHead = SHA,
+  patch = { hits: 19, misses: 1, partials: 0 }, reportErrors = [], githubHead = SHA,
 } = {}) {
   const posted = [];
   const sleeps = [];
   let clock = 0;
   const pages = [...uploads];
-  const heads = [head].flat();
+  // The pull request changes lines 1..n of app/graph/page.tsx, which the
+  // report covers as `patch` says; line 100, covered too, is not changed.
+  const n = patch ? patch.hits + patch.misses + patch.partials : 0;
+  const states = patch ? [...Array(patch.hits).fill(0), ...Array(patch.misses).fill(1), ...Array(patch.partials).fill(2)] : [];
+  const diff = `@@ -1,0 +1,${n} @@\n${states.map((_, i) => `+line ${i + 1}`).join('\n')}`;
+  const changes = files.map((filename) => (filename === 'app/graph/page.tsx' ? { filename, status: 'modified', patch: diff } : { filename, status: 'modified', patch: '' }));
+  const reportFiles = [{ name: 'app/graph/page.tsx', line_coverage: [...states.map((state, i) => [i + 1, state]), [100, 0]] }];
   const gh = async (path) => {
     if (path === `pulls/${pr?.number}`) return { head: { sha: githubHead } };
-    if (path.startsWith(`pulls/${pr?.number}/files`)) return /[?&]page=1(&|$)/.test(path) ? files.map((filename) => ({ filename })) : [];
+    if (path.startsWith(`pulls/${pr?.number}/files`)) return /[?&]page=1(&|$)/.test(path) ? changes : [];
     if (path.startsWith(`commits/${SHA}`)) return { files: /[?&]page=1(&|$)/.test(path) ? files.map((filename) => ({ filename })) : [] };
     if (path.startsWith('actions/runs')) return { workflow_runs: /[?&]page=1(&|$)/.test(path) ? runs : [] };
     if (path.startsWith('contents/')) {
@@ -224,9 +230,9 @@ function world({
       return { results: next, next: null };
     }
     if (url.endsWith(`/commits/${SHA}/`)) return { totals: coverage === null ? null : { coverage } };
-    if (url.includes('/compare/')) {
-      if (compareErrors.length) throw compareErrors.shift();
-      return { head_commit: heads.length > 1 ? heads.shift() : heads[0], totals: { patch } };
+    if (url.includes('/report/')) {
+      if (reportErrors.length) throw reportErrors.shift();
+      return patch === null ? {} : { files: reportFiles };
     }
     throw new Error(`unexpected Codecov call ${url}`);
   };
@@ -300,11 +306,11 @@ test('gate: waits out Codecov processing and its passing errors', async () => {
 
 test('gate: a missing total is an error, not a pass', async () => {
   await assert.rejects(gate(world({ runs: ALL_DONE, coverage: null }).args), /no coverage total/);
-  await assert.rejects(gate(world({ runs: ALL_DONE, patch: null }).args), /no patch total/);
+  await assert.rejects(gate(world({ runs: ALL_DONE, patch: null }).args), /no report of the commit/);
 });
 
 test('gate: leaves the patch to a newer head, and gates a push on the project only', async () => {
-  const moved = world({ runs: ALL_DONE, head: 'newer', githubHead: 'newer' });
+  const moved = world({ runs: ALL_DONE, githubHead: 'newer' });
   assert.equal(await gate(moved.args), true);
   assert.deepEqual(moved.posted, ['coverage/project success: 96.00% (target 95%)']);
   const push = world({ pr: null, files: ['README.md'], runs: [run('Build', 'success', 'completed', 'push')], uploads: [FRESH.slice(0, 2)] });
@@ -312,8 +318,8 @@ test('gate: leaves the patch to a newer head, and gates a push on the project on
   assert.deepEqual(push.posted, ['coverage/project (push) success: 96.00% (target 95%)']);
 });
 
-test('gate: retries a passing Codecov error on the compare call', async () => {
-  const flaky = world({ runs: ALL_DONE, compareErrors: [Object.assign(new Error('503'), { status: 503 })] });
+test('gate: retries a passing Codecov error on the report call', async () => {
+  const flaky = world({ runs: ALL_DONE, reportErrors: [Object.assign(new Error('503'), { status: 503 })] });
   assert.equal(await gate(flaky.args), true);
   assert.deepEqual(flaky.posted, [
     'coverage/project success: 96.00% (target 95%)',
@@ -325,7 +331,10 @@ test('gate: retries a passing Codecov error on the compare call', async () => {
 test('retries only what may pass on its own, a bounded number of times', async () => {
   const errors = (status) => Object.assign(new Error(String(status)), { status });
   assert.ok(transient(errors(503)) && transient(errors(429)) && transient(new Error('fetch failed')));
-  assert.ok(!transient(errors(404)) && !transient(errors(401)));
+  assert.ok(!transient(errors(404)) && !transient(errors(401)) && !transient(errors(403)));
+  // Codecov's own GitHub quota, as its API reports it.
+  const limited = Object.assign(new Error('GET https://api.codecov.io/x: 403 {"detail":"Github API rate limit error: Forbidden"}'), { status: 403 });
+  assert.ok(transient(limited));
   let calls = 0;
   await assert.rejects(retry(async () => { calls += 1; throw errors(404); }, async () => {}), /404/);
   assert.equal(calls, 1);
@@ -371,18 +380,6 @@ test('marks error on the statuses a failed gate gave no verdict, keeping those i
   assert.deepEqual(posted, ['coverage/patch error: The coverage gate failed: Codecov is down']);
 });
 
-test("gate: waits for Codecov's record of the pull request to catch up, then posts the patch", async () => {
-  const lagging = world({ runs: ALL_DONE, head: ['older', 'older', SHA] });
-  assert.equal(await gate(lagging.args), true);
-  assert.deepEqual(lagging.posted, [
-    'coverage/project success: 96.00% (target 95%)',
-    'coverage/patch success: 95.00% (target 95%)',
-  ]);
-  assert.deepEqual(lagging.sleeps, [20_000, 20_000]);
-  // Never catching up is an error, not a pending check left forever.
-  await assert.rejects(gate(world({ runs: ALL_DONE, head: 'older' }).args), /still compares older/);
-});
-
 test('gate: every wait shares one deadline, inside the job timeout', async () => {
   assert.ok(BUDGET_MS < 30 * 60_000, 'the Coverage status job stops at 30 minutes');
   // Codecov failing every call: retries stop at the deadline, not after
@@ -391,10 +388,6 @@ test('gate: every wait shares one deadline, inside the job timeout', async () =>
   const outage = world({ runs: ALL_DONE, uploads: Array(200).fill(down) });
   await assert.rejects(gate({ ...outage.args, deadline: 3 * 60_000 }), /in time/);
   assert.ok(outage.sleeps.reduce((a, b) => a + b, 0) <= 3 * 60_000);
-  // Codecov's record of the pull request never catching up.
-  const lagging = world({ runs: ALL_DONE, head: 'older' });
-  await assert.rejects(gate({ ...lagging.args, deadline: 60_000 }), /still compares older/);
-  assert.ok(lagging.sleeps.reduce((a, b) => a + b, 0) <= 60_000);
   // A retry gives up when the time left has no room for another wait.
   let left = 50_000;
   let calls = 0;
@@ -410,4 +403,43 @@ test('gate: past 300 changed files, trusts the runs GitHub started', async () =>
   const big = world({ files, runs: [run('Build')], uploads: [FRESH.slice(0, 2)] });
   assert.equal(await gate(big.args), true);
   assert.equal(big.posted[0], 'coverage/project success: 96.00% (target 95%)');
+});
+
+test("reads the head's changed lines from a unified diff", () => {
+  const patch = [
+    '@@ -1,3 +1,4 @@',
+    ' keep 1',
+    '-gone',
+    '+new 2',
+    '+new 3',
+    ' keep 4',
+    '@@ -10,2 +11,3 @@ function x() {',
+    ' keep 11',
+    '-old last line',
+    '\\ No newline at end of file',
+    '+changed 12',
+    '+added 13',
+  ].join('\n');
+  assert.deepEqual([...changedLines(patch)], [2, 3, 12, 13]);
+  assert.deepEqual([...changedLines('')], []);
+  // No diff (GitHub leaves out a too-large one): every line counts.
+  assert.equal(changedLines(undefined), 'all');
+});
+
+test("totals the changed lines the commit's coverage counts", () => {
+  const report = [
+    { name: 'lib/a.ts', line_coverage: [[1, 0], [2, 1], [3, 2], [9, 1]] },
+    { name: 'lib/big.ts', line_coverage: [[1, 0], [2, 1]] },
+    { name: 'lib/gone.ts', line_coverage: [[1, 1]] },
+  ];
+  assert.deepEqual(patchTotals([
+    // Changes lines 1-3 and a comment on 4 (which coverage does not count).
+    { filename: 'lib/a.ts', status: 'modified', patch: '@@ -0,0 +1,4 @@\n+a\n+b\n+c\n+// d' },
+    // A diff too large for GitHub to send: every coverable line.
+    { filename: 'lib/big.ts', status: 'modified' },
+    // Removed: GitHub may send no diff, which would otherwise mean every line.
+    { filename: 'lib/gone.ts', status: 'removed' },
+    // Not source the coverage counts.
+    { filename: 'README.md', status: 'modified', patch: '@@ -1 +1 @@\n-a\n+b' },
+  ], report), { hits: 2, misses: 2, partials: 1 });
 });
