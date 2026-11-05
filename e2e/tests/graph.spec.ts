@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-plusplus */
 /* eslint-disable no-await-in-loop */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import fs from "fs";
 import {
   getRandomString,
@@ -25,6 +25,81 @@ test.describe("Graph Tests", () => {
 
   test.afterEach(async () => {
     await browser.closeBrowser();
+  });
+
+  test("@admin rejected graph creation keeps its name and allows a successful retry", async () => {
+    const graphName = getRandomString("createRetry");
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    let attempts = 0;
+    await page.route(`**/api/graph/${graphName}`, async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      attempts += 1;
+      if (attempts === 1) {
+        await route.fulfill({ status: 400, json: { message: "Invalid graph name: retry this operation" } });
+      } else {
+        await route.continue();
+      }
+    });
+    try {
+      await graph.clickCreateGraph();
+      await graph.fillCreateGraphInput(graphName);
+      await graph.clickConfirmCreateGraph();
+      await expect(page.getByText("Invalid graph name: retry this operation", { exact: true })).toBeVisible();
+      await expect(page.getByTestId("createGraphInput")).toHaveValue(graphName);
+      await expect(page.getByTestId("createGraphConfirm")).toBeEnabled();
+      await graph.clickConfirmCreateGraph();
+      await expect(page.getByTestId("createGraphInput")).toBeHidden();
+      await expect(page.getByTestId("editorContainer")).toBeVisible();
+      expect(attempts).toBe(2);
+      expect((await apiCall.getGraphs()).opts).toContain(graphName);
+    } finally {
+      await browser.closeBrowser();
+      await apiCall.removeGraph(graphName, "admin");
+    }
+  });
+
+  test("@admin rejected graph deletion preserves the graph until retry succeeds", async () => {
+    const graphName = getRandomString("deleteRetry");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      let attempts = 0;
+      await page.route(`**/api/graph/${graphName}`, async (route) => {
+        if (route.request().method() !== "DELETE") {
+          await route.continue();
+          return;
+        }
+        attempts += 1;
+        if (attempts === 1) {
+          await route.fulfill({ status: 400, json: { message: "Invalid input: deletion rejected" } });
+        } else {
+          await route.continue();
+        }
+      });
+      await graph.clickSelect();
+      await graph.clickManage();
+      await graph.clickTableCheckboxByName(graphName);
+      await graph.clickDelete();
+      await graph.clickDeleteConfirm();
+      await expect(page.getByTestId("deleteGraphConfirm")).toBeHidden();
+      await expect(page.getByText("Invalid input: deletion rejected", { exact: true })).toBeVisible();
+      expect((await apiCall.getGraphs()).opts).toContain(graphName);
+      await expect(page.getByText("Graph deleted successfully", { exact: true })).toHaveCount(0);
+      await graph.clickTableCheckboxByName(graphName);
+      await graph.clickDelete();
+      await graph.clickDeleteConfirm();
+      await expect(page.getByTestId("deleteGraphConfirm")).toBeHidden();
+      await expect.poll(async () => (await apiCall.getGraphs()).opts).not.toContain(graphName);
+      expect(attempts).toBe(2);
+    } finally {
+      await browser.closeBrowser();
+      await apiCall.removeGraph(graphName, "admin");
+    }
   });
 
   test(`@admin Add graph via API -> verify graph exists via UI`, async () => {
