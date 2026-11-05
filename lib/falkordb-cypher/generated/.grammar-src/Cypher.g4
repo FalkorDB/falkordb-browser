@@ -28,7 +28,10 @@
 grammar Cypher;
 
 oC_Cypher
-      :  SP? ( CYPHER SP oC_ParameterHeader ( SP oC_ParameterHeader )* SP )? oC_Statement ( SP? ';' )? SP? EOF ;
+      :  SP? ( CYPHER ( SP oC_ParameterHeader )* SP? )* oC_Statement ( SP? ';' )? SP? EOF ;
+
+oC_ParameterHeader
+                  :  oC_SchemaName SP? '=' SP? oC_Expression ;
 
 oC_Statement
          :  oC_Query ;
@@ -777,9 +780,6 @@ oC_SymbolicName
 FILTER : ( 'F' | 'f' ) ( 'I' | 'i' ) ( 'L' | 'l' ) ( 'T' | 't' ) ( 'E' | 'e' ) ( 'R' | 'r' ) ;
 
 EXTRACT : ( 'E' | 'e' ) ( 'X' | 'x' ) ( 'T' | 't' ) ( 'R' | 'r' ) ( 'A' | 'a' ) ( 'C' | 'c' ) ( 'T' | 't' ) ;
-
-oC_ParameterHeader
-                  :  oC_SchemaName SP? '=' SP? oC_Expression ;
 
 CYPHER : ( 'C' | 'c' ) ( 'Y' | 'y' ) ( 'P' | 'p' ) ( 'H' | 'h' ) ( 'E' | 'e' ) ( 'R' | 'r' ) ;
 
