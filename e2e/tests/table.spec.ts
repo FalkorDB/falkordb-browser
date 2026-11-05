@@ -1,4 +1,5 @@
-import test, { expect } from "@playwright/test";
+import { test, expect } from "../infra/coverage";
+import { readFile } from "fs/promises";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import urls from '../config/urls.json';
 import ApiCalls from "../logic/api/apiCalls";
@@ -96,6 +97,57 @@ test.describe('Table View Tests', () => {
             expect(await tableView.firstCellContains('edges')).toBe(true);
         } finally {
             await apiCalls.removeGraph(graphName);
+        }
+    });
+
+    test('@admin exports null, nested and quoted result values as exact CSV', async () => {
+        const graphName = getRandomString('table-export');
+        await apiCalls.addGraph(graphName);
+        try {
+            const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+            const page = await browser.getPage();
+            await page.evaluate(() => { Reflect.deleteProperty(window, 'showSaveFilePicker'); });
+            await tableView.selectGraphByName(graphName);
+            await tableView.insertQuery(`RETURN null AS missing, 'Alice, "Bob"' AS quoted, {nested: [1, 2]} AS object, true AS enabled`);
+            await tableView.clickRunQuery(false);
+            await tableView.clickTableTab();
+            const downloadPromise = page.waitForEvent('download');
+            await tableView.clickExportButton();
+            const download = await downloadPromise;
+            expect(download.suggestedFilename()).toBe(`${graphName}_table_export.csv`);
+            const file = await download.path();
+            expect(file).not.toBeNull();
+            expect(await readFile(file!, 'utf8')).toBe(
+                '"missing","quoted","object","enabled"\n"","Alice, ""Bob""","{""nested"":[1,2]}","true"'
+            );
+        } finally {
+            await browser.closeBrowser();
+            await apiCalls.removeGraph(graphName, "admin");
+        }
+    });
+
+    test('@admin a new query replaces old table columns and rows', async () => {
+        const graphName = getRandomString('table-replace');
+        await apiCalls.addGraph(graphName);
+        try {
+            const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+            const page = await browser.getPage();
+            await tableView.selectGraphByName(graphName);
+            await tableView.insertQuery("UNWIND [1, 2, 3] AS previous RETURN previous");
+            await tableView.clickRunQuery(false);
+            await tableView.clickTableTab();
+            const panel = page.getByRole('tabpanel', { name: 'Table', exact: true });
+            await expect(panel.locator('tbody tr')).toHaveCount(3);
+            await tableView.insertQuery("RETURN 'replacement-value' AS replacement");
+            await tableView.clickRunQuery(false);
+            await tableView.clickTableTab();
+            await expect(panel.locator('tbody tr')).toHaveCount(1);
+            await expect(panel).toContainText('replacement-value');
+            await expect(panel.getByRole('columnheader').filter({ hasText: /^previous/ })).toHaveCount(0);
+            await expect(panel.getByRole('columnheader').filter({ hasText: /^replacement/ })).toBeVisible();
+        } finally {
+            await browser.closeBrowser();
+            await apiCalls.removeGraph(graphName, "admin");
         }
     });
 });
