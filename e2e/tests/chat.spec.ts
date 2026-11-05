@@ -95,7 +95,8 @@ test.describe("Chat Feature Tests", () => {
         await page.getByRole("button", { name: "Go to Settings" }).click();
         await expect(page).toHaveURL(/\/settings(?:\?|$)/);
       } finally {
-        await apiCall.removeGraph(graphName);
+        await browser.closeBrowser();
+        await apiCall.removeGraph(graphName, "admin");
       }
     });
 
@@ -147,7 +148,8 @@ test.describe("Chat Feature Tests", () => {
             { role: "user", content: question },
           ]);
         } finally {
-          await apiCall.removeGraph(graphName);
+          await browser.closeBrowser();
+          await apiCall.removeGraph(graphName, "admin");
         }
       });
     }
@@ -195,7 +197,8 @@ test.describe("Chat Feature Tests", () => {
         ]);
       } finally {
         releaseResponse();
-        await apiCall.removeGraph(graphName);
+        await browser.closeBrowser();
+        await apiCall.removeGraph(graphName, "admin");
       }
     });
   });
