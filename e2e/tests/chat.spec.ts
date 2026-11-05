@@ -66,6 +66,8 @@ test.describe("Chat Feature Tests", () => {
       }, { selectedModel: model });
       await page.goto(urls.graphUrl);
       await chat.selectGraphByName(graphName);
+      await expect(page).toHaveURL((url) =>
+        url.searchParams.get("graph") === graphName && url.searchParams.has("view") && url.searchParams.has("layout"));
       await chat.openChat();
       await chat.waitForChatPanel();
       return { chat, page };
