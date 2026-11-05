@@ -339,7 +339,13 @@ async function gate({ gh, post, contexts, pr, sha, repo, target }) {
   let uploads;
   for (let attempt = 0; ; attempt += 1) {
     try {
-      ({ results: uploads } = await api(`${codecov}/commits/${sha}/uploads/?page_size=100`));
+      uploads = [];
+      for (let url = `${codecov}/commits/${sha}/uploads/?page_size=100`; url;) {
+        const page = await api(url);
+        uploads.push(...page.results);
+        // Codecov links the next page over http.
+        url = page.next?.replace(/^http:/, 'https:');
+      }
       if (uploads.length && codecovSettled(uploads)) break;
     } catch (error) {
       if (error.status && error.status < 500 && error.status !== 429) throw error;
