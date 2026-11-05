@@ -8,7 +8,8 @@ import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, 
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, buildConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import switchSessionConnection from "@/lib/connection-switch";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { settleQueryUpdate, withQuery } from "@/lib/editorEchoes";
 import { syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
