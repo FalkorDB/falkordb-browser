@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   BUDGET_MS, COVERAGE_WORKFLOWS, changedLines, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
-  transient, missingFlags, movedSince, notStarted, patchTotals, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  transient, missingFlags, absentFlags, movedSince, notStarted, patchTotals, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
@@ -117,7 +117,7 @@ test("judges a pull request's own runs: another pull request's on the same commi
   assert.deepEqual(runsOf('pull_request', [own, other, fork], 7).map((r) => r.id), [1, 3]);
   assert.deepEqual(unsuccessful(['Build'], runsOf('pull_request', [own, other], 7)), ['Build']);
   // A push's gate has no pull request to keep to.
-  assert.deepEqual(runsOf('pull_request', [own, other]).map((r) => r.id), [1, 2]);
+  assert.deepEqual(runsOf('push', [{ ...own, event: 'push' }, { ...other, event: 'push' }]).map((r) => r.id), [1, 2]);
 });
 
 test('counts a finished workflow that did not succeed as incomplete coverage', () => {
@@ -208,7 +208,10 @@ const run = (name, conclusion = 'success', status = 'completed', event = 'pull_r
   id: Math.random(), name, event, status, conclusion, created_at,
 });
 const fresh = (name, flags) => ({ name, flags, upload_type: 'uploaded', state: 'merged', created_at: '2026-11-05T12:00:00Z' });
-const FRESH = [fresh('build', ['unit']), fresh('smoke', ['smoke']), fresh('e2e-shard-1', ['e2e']), fresh('desktop', ['desktop'])];
+// Mobile is not triggered by these changes: its coverage is carried forward.
+const carried = (flag) => ({ name: `CF[${flag}]`, flags: [flag], upload_type: 'carriedforward', state: 'complete' });
+const MOBILE = carried('mobile');
+const FRESH = [fresh('build', ['unit']), fresh('smoke', ['smoke']), fresh('e2e-shard-1', ['e2e']), fresh('desktop', ['desktop']), MOBILE];
 
 function world({
   pr = { number: 7 }, files = ['app/graph/page.tsx'], runs, uploads = [FRESH], coverage = 96,
@@ -302,8 +305,8 @@ test('gate: a workflow that did not succeed fails both statuses', async () => {
 });
 
 test("gate: a flag with only an earlier commit's coverage fails", async () => {
-  const carried = { name: 'CF[1]', flags: ['e2e'], upload_type: 'carriedforward', state: 'complete' };
-  const stale = world({ runs: ALL_DONE, uploads: [[fresh('build', ['unit']), fresh('smoke', ['smoke']), carried, fresh('desktop', ['desktop'])]] });
+  const carriedE2e = carried('e2e');
+  const stale = world({ runs: ALL_DONE, uploads: [[fresh('build', ['unit']), fresh('smoke', ['smoke']), carriedE2e, fresh('desktop', ['desktop']), MOBILE]] });
   assert.equal(await gate(stale.args), false);
   assert.deepEqual(stale.posted, [
     'coverage/project failure: No e2e coverage was uploaded for this commit',
@@ -329,7 +332,7 @@ test('gate: leaves the patch to a newer head, and gates a push on the project on
   const moved = world({ runs: ALL_DONE, githubHead: 'newer' });
   assert.equal(await gate(moved.args), true);
   assert.deepEqual(moved.posted, ['coverage/project success: 96.00% (target 95%)']);
-  const push = world({ pr: null, files: ['README.md'], runs: [run('Build', 'success', 'completed', 'push')], uploads: [FRESH.slice(0, 2)] });
+  const push = world({ pr: null, files: ['README.md'], runs: [run('Build', 'success', 'completed', 'push')], uploads: [[...FRESH.slice(0, 2), carried('e2e'), carried('desktop'), MOBILE]] });
   assert.equal(await gate(push.args), true);
   assert.deepEqual(push.posted, ['coverage/project (push) success: 96.00% (target 95%)']);
 });
@@ -416,7 +419,7 @@ test('gate: past 300 changed files, trusts the runs GitHub started', async () =>
   // GitHub filters on the first 300 files only, so it may not have started
   // Playwright for this change: the gate must not wait for it forever.
   const files = [...Array(300).fill('docs/a.md').map((f, i) => `docs/${i}.md`), 'app/graph/page.tsx'];
-  const big = world({ files, runs: [run('Build')], uploads: [FRESH.slice(0, 2)] });
+  const big = world({ files, runs: [run('Build')], uploads: [[...FRESH.slice(0, 2), carried('e2e'), carried('desktop'), MOBILE]] });
   assert.equal(await gate(big.args), true);
   assert.equal(big.posted[0], 'coverage/project success: 96.00% (target 95%)');
 });
@@ -509,4 +512,17 @@ test('finds a move to another base after the coverage runs were made', () => {
   assert.equal(movedSince([{ event: 'automatic_base_change_succeeded', created_at: '2026-11-05T11:00:00Z' }], runs, ['Build']), '2026-11-05T11:00:00Z');
   // Moved, then moved again after the runs: the last move counts.
   assert.equal(movedSince([...moved('2026-11-05T09:00:00Z'), ...moved('2026-11-05T11:00:00Z')], runs, ['Build']), '2026-11-05T11:00:00Z');
+});
+
+test("gate: fails a flag with no coverage at all, so its code is not left out of the total", async () => {
+  // Mobile was not triggered, and no earlier commit has its coverage to carry.
+  const none = world({ runs: ALL_DONE, uploads: [FRESH.filter((u) => u !== MOBILE)] });
+  assert.equal(await gate(none.args), false);
+  assert.deepEqual(none.posted, [
+    'coverage/project failure: No mobile coverage for this commit, uploaded or carried forward',
+    'coverage/patch failure: No mobile coverage for this commit, uploaded or carried forward',
+  ]);
+  assert.deepEqual(absentFlags(FRESH), []);
+  // An upload Codecov could not process is no coverage.
+  assert.deepEqual(absentFlags([...FRESH.slice(0, 4), { ...MOBILE, state: 'error' }]), ['mobile']);
 });

@@ -228,6 +228,15 @@ export function codecovSettled(uploads) {
   return currentUploads(uploads).every((u) => ['merged', 'complete', 'error'].includes(u.state));
 }
 
+/**
+ * The flags with no coverage at all for the commit, neither an upload of its
+ * own nor one carried forward: their code would be left out of the total.
+ */
+export function absentFlags(uploads) {
+  const present = new Set(currentUploads(uploads).filter((u) => u.state !== 'error').flatMap((u) => u.flags));
+  return Object.values(COVERAGE_WORKFLOWS).flatMap((w) => w.flags).filter((flag) => !present.has(flag));
+}
+
 /** A coverage status for `pct` against `target`. */
 export function verdict(pct, target) {
   const shown = `${(Math.floor(pct * 100) / 100).toFixed(2)}%`;
@@ -550,6 +559,15 @@ export async function gate({
     const names = broken.map((u) => u.name || u.flags.join(',')).join(', ');
     console.log(`Codecov could not process: ${names}`);
     for (const context of contexts) await post(context, { state: 'failure', description: `Codecov could not process ${broken.length} upload(s): ${names}`.slice(0, 140) });
+    return false;
+  }
+
+  // A workflow the commit did not trigger counts through its flag carried
+  // forward from an earlier commit; with none to carry, its code is missing.
+  const absent = absentFlags(uploads);
+  if (absent.length) {
+    console.log(`No coverage at all of ${absent.join(', ')}`);
+    for (const context of contexts) await post(context, { state: 'failure', description: `No ${absent.join(', ')} coverage for this commit, uploaded or carried forward` });
     return false;
   }
 
