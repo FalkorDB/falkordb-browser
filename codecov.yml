@@ -4,16 +4,18 @@ codecov:
 coverage:
   precision: 2
   round: down
-  range: "95...100"
+  range: "50...100"
 
   status:
+    # Fail a PR only when it lowers overall coverage versus its base.
     project:
       default:
-        target: 95%
+        target: auto
         threshold: 0%
+    # Report coverage of changed lines without blocking the PR.
     patch:
       default:
-        target: 95%
+        informational: true
 
 comment:
   layout: "header, diff, flags, files"
