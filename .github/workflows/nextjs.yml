@@ -57,6 +57,15 @@ jobs:
       - name: Run unit tests with coverage
         run: npm run test:coverage
 
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./lcov.info
+          flags: unit
+          fail_ci_if_error: false
+
       - name: Build with Next.js
         run: npx next build
 
