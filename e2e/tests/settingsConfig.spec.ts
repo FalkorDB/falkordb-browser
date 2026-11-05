@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import urls from '../config/urls.json';
 import { roles } from '../config/roles.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
@@ -18,6 +18,65 @@ test.describe('@config Settings config tests', () => {
 
     test.afterEach(async () => {
         await browser.closeBrowser();
+    });
+
+    test("@admin Load-time configuration cannot be edited while runtime configuration remains editable", async () => {
+        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage);
+        const page = await browser.getPage();
+        let mutations = 0;
+        await page.route(/\/api\/graph\/config(?:\/.*)?$/, async route => {
+            if (route.request().method() === "GET") {
+                await route.fulfill({ json: { configs: [["THREAD_COUNT", 4], ["MAX_QUEUED_QUERIES", 25]] } });
+            } else {
+                mutations += 1;
+                await route.fulfill({ status: 400, json: { message: "Unexpected mutation" } });
+            }
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsConfigPage.navigateToDBConfigurationTab();
+        const readonlyRow = page.getByTestId("tableRowConfigsTHREAD_COUNT");
+        await expect(readonlyRow).toBeVisible();
+        await readonlyRow.hover();
+        await expect(readonlyRow.getByTestId("editButtonConfigs")).toHaveCount(0);
+        await settingsConfigPage.hoverOnRoleContentValue("MAX_QUEUED_QUERIES");
+        await settingsConfigPage.clickEditRoleButton();
+        await settingsConfigPage.fillRoleValueInput("99");
+        await page.getByTestId("cancelButtonConfigs").click();
+        await expect(page.getByTestId("inputConfigs")).toHaveCount(0);
+        await expect(page.getByTestId("contentConfigsMAX_QUEUED_QUERIESValue")).toHaveText("25");
+        expect(mutations).toBe(0);
+    });
+
+    test("@admin Failed configuration save preserves the pending value for retry", async () => {
+        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage);
+        const page = await browser.getPage();
+        const submissions: { value: string }[] = [];
+        await page.route(/\/api\/graph\/config(?:\/.*)?$/, async route => {
+            if (route.request().method() === "GET") {
+                await route.fulfill({ json: { configs: [["MAX_QUEUED_QUERIES", 25]] } });
+            } else {
+                expect(route.request().method()).toBe("POST");
+                expect(new URL(route.request().url()).pathname).toBe("/api/graph/config/MAX_QUEUED_QUERIES");
+                submissions.push(route.request().postDataJSON() as { value: string });
+                await route.fulfill(submissions.length === 1
+                    ? { status: 400, json: { message: "Configuration update rejected" } }
+                    : { json: {} });
+            }
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsConfigPage.navigateToDBConfigurationTab();
+        await settingsConfigPage.hoverOnRoleContentValue("MAX_QUEUED_QUERIES");
+        await settingsConfigPage.clickEditRoleButton();
+        await settingsConfigPage.fillRoleValueInput("42");
+        await settingsConfigPage.clickConfirmValueInputBtn();
+        await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
+        await expect(page.getByTestId("inputConfigs")).toHaveValue("42");
+        await expect(page.getByTestId("saveButtonConfigs")).toBeEnabled();
+
+        await settingsConfigPage.clickConfirmValueInputBtn();
+        await expect(page.getByTestId("inputConfigs")).toHaveCount(0);
+        await expect(page.getByTestId("contentConfigsMAX_QUEUED_QUERIESValue")).toHaveText("42");
+        expect(submissions).toEqual([{ value: "42" }, { value: "42" }]);
     });
 
     Data.inputDataRejectsZero.forEach(({ input, description, expected }, index) => {
