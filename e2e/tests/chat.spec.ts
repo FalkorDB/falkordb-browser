@@ -128,7 +128,7 @@ test.describe("Chat Feature Tests", () => {
           } else if (failure === "malformed JSON") {
             await expect(error).toContainText("Failed to parse server response");
           } else {
-            await expect(error).not.toBeEmpty();
+            await expect(error).toContainText("Error: An unexpected error occurred. Please try again.");
           }
           await expect(page.getByTestId("chatInput")).toHaveValue(question);
           await expect(page.getByTestId("chatSendButton")).toBeEnabled();
@@ -170,6 +170,8 @@ test.describe("Chat Feature Tests", () => {
         await chat.fillChatInput("My next question");
         await expect(page.getByTestId("chatSendButton")).toBeDisabled();
         await page.getByTestId("chatInput").press("Enter");
+        await expect(page.getByTestId("chatInput")).toHaveValue("My next question");
+        await expect(page.getByTestId("chatUserMessage")).toHaveCount(1);
         expect(requests).toHaveLength(1);
 
         releaseResponse();
