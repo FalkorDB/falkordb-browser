@@ -111,6 +111,7 @@ export function mappedLines(mappings) {
   return lines;
 }
 
+/** Compiles TypeScript the way the app's tsconfig does, with a source map. */
 async function compile(file, source) {
   const { default: ts } = await import('typescript');
   return ts.transpileModule(source, {
@@ -137,7 +138,10 @@ async function codeLines(relPath) {
   return mappedLines(JSON.parse(out.sourceMapText).mappings);
 }
 
-// Stripping blanks the types out in place, so the code keeps its offsets.
+/**
+ * TypeScript as the JavaScript Node runs, or undefined when Node cannot strip
+ * it. Stripping blanks the types out in place, so the code keeps its offsets.
+ */
 function stripTypes(source) {
   try {
     return stripTypeScriptTypes(source);
@@ -146,7 +150,7 @@ function stripTypes(source) {
   }
 }
 
-// A file no test loaded, made JavaScript so Monocart can parse it.
+/** A TypeScript file no test loaded, made JavaScript so Monocart can parse it. */
 async function transpile(entry) {
   const file = fileURLToPath(entry.url);
   if (!/\.tsx?$/.test(file)) return;
@@ -179,6 +183,7 @@ export function browserEntries(dir, name) {
   });
 }
 
+/** Writes coverage/<flag>/ from the raw coverage in `dirs`. */
 async function main([flag, ...dirs]) {
   if (!flag || !dirs.length) {
     console.error('usage: coverage-report.mjs <flag> <raw dir>...');

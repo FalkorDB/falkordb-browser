@@ -56,8 +56,9 @@ jobs:
         env:
           NODE_V8_COVERAGE: coverage/raw/unit
 
+      # The build script, as the Docker image and the e2e tests build it (webpack).
       - name: Build with Next.js
-        run: npx next build
+        run: npm run build
 
       # Last, so a Codecov problem never skips the build.
       - name: Build the unit coverage report

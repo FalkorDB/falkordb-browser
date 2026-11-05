@@ -22,14 +22,17 @@ const recording = new Map<Page, Promise<void>>();
 // The chunk URLs whose source this worker has saved.
 const savedSources = new Set<string>();
 
-// Each file is written whole under a temporary name and only then given its
-// real one, so the report never reads a file a crashed write left half done.
+/**
+ * Writes `data` whole under a temporary name and only then gives it its real
+ * one, so the report never reads a file a crashed write left half done.
+ */
 function writeWhole(file: string, data: string) {
     const tmp = `${file}.${randomUUID()}.tmp`;
     writeFileSync(tmp, data);
     renameSync(tmp, file);
 }
 
+/** Stops recording `page` and saves its coverage of the app's chunks. */
 async function save(page: Page) {
     const started = recording.get(page);
     if (!started || page.isClosed()) return;
@@ -60,6 +63,7 @@ async function save(page: Page) {
     writeWhole(path.join(dir, `browser-${randomUUID()}.json`), JSON.stringify(data));
 }
 
+/** Records `page`'s coverage until it closes (or its context does). */
 function track(page: Page) {
     recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch(() => {}));
     const close = page.close.bind(page);
