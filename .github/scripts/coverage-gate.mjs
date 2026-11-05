@@ -206,6 +206,11 @@ export function patchVerdict(patch, target) {
   return verdict((100 * patch.hits) / lines, target);
 }
 
+/** Resolves after `ms` milliseconds. */
+function wait(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
 /** Whether an API error may pass on its own: a server error, rate limiting, or no response. */
 export function transient(error) {
   return !error.status || error.status >= 500 || error.status === 429;
@@ -277,20 +282,21 @@ async function main() {
   // The statuses this run gave a verdict, which a later failure leaves alone.
   const decided = new Set();
   const post = async (context, { state, description }) => {
-    if (state !== 'pending') decided.add(context);
     if (process.env.DRY_RUN) {
       console.log(`would post ${context}: ${state}, ${description}`);
-      return;
+    } else {
+      await retry(() => gh(`statuses/${sha}`, {
+        method: 'POST',
+        body: {
+          context,
+          state,
+          description,
+          target_url: `https://app.codecov.io/gh/${repo}/${pr ? `pull/${pr.number}` : `commit/${sha}`}`,
+        },
+      }), wait);
     }
-    await gh(`statuses/${sha}`, {
-      method: 'POST',
-      body: {
-        context,
-        state,
-        description,
-        target_url: `https://app.codecov.io/gh/${repo}/${pr ? `pull/${pr.number}` : `commit/${sha}`}`,
-      },
-    });
+    // Only a verdict GitHub accepted: else the failure handler still marks it.
+    if (state !== 'pending') decided.add(context);
   };
 
   try {
@@ -330,7 +336,7 @@ async function main() {
  * polls of Codecov. Resolves to whether coverage/project was decided.
  */
 export async function gate({
-  gh, codecov = (url) => api(url), sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); }),
+  gh, codecov = (url) => api(url), sleep = wait,
   post, contexts, pr, sha, repo, target,
 }) {
   // The workflows this commit triggers, as their path filters decide.
