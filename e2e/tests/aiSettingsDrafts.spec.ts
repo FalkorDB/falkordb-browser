@@ -16,7 +16,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       const graphName = getRandomString("aiQueryCards");
       const query = "RETURN 4242 AS unsent_draft";
       const invalidQuery = "MATCH (n) RETsURN n";
-      const suggestion = "WITH 4242 AS unsent_draft\nWITH unsent_draft\nRETURN unsent_draft";
+      const suggestion = `WITH 4242 AS unsent_draft\n${"WITH unsent_draft\n".repeat(feature === "chat" ? 30 : 1)}RETURN unsent_draft`;
       let providerPrompt = "";
       let queryRequests = 0;
       const server = createServer((request, response) => {
@@ -111,9 +111,21 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             await page.getByTestId("chatToggleButton").click();
             await page.getByTestId("chatInput").fill("Suggest a query");
             await page.getByTestId("chatSendButton").click();
-            await page.getByRole("button", { name: "Collapse query", exact: true }).click();
-            await expect(page.getByRole("button", { name: "Expand query", exact: true })).toHaveAttribute("aria-expanded", "false");
-            await page.getByRole("button", { name: "Expand query", exact: true }).click();
+            await expect(page.getByTestId("chatSuggestedQuery")).toHaveText(suggestion);
+            await expect(page.getByRole("group", { name: "Suggested query", exact: true })).toHaveText(suggestion);
+            await expect(page.getByTestId("chatSuggestedQuery")).toHaveCSS("word-break", "normal");
+            await expect(page.getByTestId("chatSuggestedQuery")).toHaveCSS("overflow-wrap", "break-word");
+            expect(await page.getByTestId("chatSuggestedQuery").evaluate(element =>
+              parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(12);
+            expect(await page.getByTestId("chatSuggestedQuery").evaluate(element =>
+              element.scrollWidth <= element.clientWidth)).toBe(true);
+            await expect(page.getByTestId("chatSuggestedQuery")).toHaveAttribute("tabindex", "0");
+            expect(await page.getByTestId("chatSuggestedQuery").evaluate(element =>
+              element.scrollHeight > element.clientHeight && element.clientHeight <= 192)).toBe(true);
+            await page.getByTestId("chatSuggestedQuery").focus();
+            await page.keyboard.press("End");
+            await expect.poll(() => page.getByTestId("chatSuggestedQuery").evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+            await expect(page.getByRole("button", { name: /^(Collapse|Expand) query$/ })).toHaveCount(0);
             await page.getByTestId("chatCopyQueryButton").click();
             expect(await page.evaluate(() => sessionStorage.getItem("copiedQuery"))).toBe(suggestion);
             await expect(editor).toHaveAttribute("data-value", query);
