@@ -142,7 +142,7 @@ for (const { feature, scenario } of cases) {
   test(`@admin ${feature} preserves drafts through ${scenario} Settings navigation`, async ({ page }) => {
     test.setTimeout(60_000);
     const graphName = getRandomString("aiSettingsDraft");
-    const query = feature === "fix" ? "MATCH (n) RETsURN n" : "RETURN 4242 AS unsent_draft";
+    let query = feature === "fix" ? "MATCH (n) RETsURN n" : "RETURN 4242 AS unsent_draft";
     const chatDraft = "Find the person with the largest order";
     let aiRequests = 0;
 
@@ -184,6 +184,18 @@ for (const { feature, scenario } of cases) {
         await graph.clickRunQuery(false);
         await page.getByTestId("fix-with-ai").click();
       } else {
+        if (scenario === "missing-key") {
+          await expect.poll(() => new URL(page.url()).searchParams.get("tab")).not.toBeNull();
+          // Fire the pending draft debounce while the Settings response is held.
+          await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+          await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
+          query += "\n";
+          await graph.insertQuery(query);
+          await page.route(url => url.pathname === "/settings", async route => {
+            await page.clock.runFor(350);
+            await route.continue();
+          });
+        }
         await page.getByTestId("editorOptimize").click();
       }
 
@@ -202,6 +214,7 @@ for (const { feature, scenario } of cases) {
         await errorContainer.getByRole("link", { name: "Go to Settings", exact: true }).click();
       }
       await expect(page).toHaveURL(/\/settings/, { timeout: 30_000 });
+      if (feature === "optimize" && scenario === "missing-key") await page.clock.resume();
       if (scenario === "missing-key") {
         await page.getByTestId("chatSectionHeader").click();
         await page.getByTestId("chatApiKeyInput").fill(TEST_KEY);

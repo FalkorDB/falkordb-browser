@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext } from "react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { Sparkles } from "lucide-react";
 import { AiFixContext, BrowserSettingsContext } from "./provider";
 import { detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";

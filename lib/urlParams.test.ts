@@ -20,7 +20,7 @@ Object.assign(globalThis, {
     },
 });
 
-const { buildGraphUrlParams, buildSettingsUrlParams, setUrlParam, syncRouteUrlParams } = await import("./urlParams.ts");
+const { beginUrlNavigation, buildGraphUrlParams, buildSettingsUrlParams, setUrlParam, syncRouteUrlParams } = await import("./urlParams.ts");
 
 beforeEach(() => {
     location.pathname = "/graph";
@@ -60,6 +60,42 @@ test("syncing the graph route clears share params the active tab does not have",
     location.search = "?graph=movies&query=MATCH%20(n)%20RETURN%20n&view=Table&layout=tree&direction=lr";
     syncRouteUrlParams("/graph", { tab: "abc" });
     assert.deepEqual(replaceStateCalls, ["/graph?tab=abc"]);
+});
+
+test("URL synchronization cannot replace an in-flight route navigation", () => {
+    const release = beginUrlNavigation();
+    syncRouteUrlParams("/graph", { tab: "abc", share: { query: "RETURN 1" } });
+    assert.deepEqual(replaceStateCalls, []);
+    location.pathname = "/settings";
+    release();
+    assert.deepEqual(replaceStateCalls, []);
+    setUrlParam({ tab: "browser" });
+    assert.deepEqual(replaceStateCalls, ["/settings?tab=browser"]);
+});
+
+test("an interrupted navigation applies the latest deferred parameters", () => {
+    const release = beginUrlNavigation();
+    setUrlParam({ tab: "old", graph: "movies" });
+    setUrlParam({ tab: "new", query: "RETURN 1" });
+    release();
+    release();
+    assert.deepEqual(replaceStateCalls, ["/graph?tab=new&graph=movies&query=RETURN+1"]);
+});
+
+test("overlapping transitions defer writes until both finish", () => {
+    const first = beginUrlNavigation();
+    const second = beginUrlNavigation();
+    setUrlParam({ tab: "abc" });
+    first();
+    assert.deepEqual(replaceStateCalls, []);
+    second();
+    assert.deepEqual(replaceStateCalls, ["/graph?tab=abc"]);
+});
+
+test("stale route synchronization cannot write parameters into another route", () => {
+    location.pathname = "/settings";
+    syncRouteUrlParams("/graph", { tab: "abc" });
+    assert.deepEqual(replaceStateCalls, []);
 });
 
 test("setUrlParam adds a param to a bare URL", () => {
