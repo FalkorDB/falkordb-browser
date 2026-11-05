@@ -60,6 +60,83 @@ docker run -p 3000:3000 -e "NEXTAUTH_URL=https://www.yoururl.com" -p 6379:6379 -
 
 For reverse-proxy deployments using `NEXTAUTH_URL=auto`, set `TRUST_PROXY_HEADERS=true` only when the proxy strips or overwrites incoming `X-Forwarded-Host` and `X-Forwarded-Proto` headers.
 
+Cross-origin callers (including other localhost ports) must be explicitly listed
+in `ALLOWED_ORIGINS`. This is a caller-origin list, not an API-host allowlist: a
+separate frontend origin can be listed without listing the API server's origin.
+Without that setting, browser callers must match the request's own origin.
+Origin-less API reads remain supported. Protected reads still require
+authentication; public endpoints remain public. The allowlist is not a
+trusted-host list or a replacement for authorization.
+
+URL login uses the authentication attempt itself to detect missing or invalid
+credentials and reveal the credential fields when needed. Connection failures
+show a separate error; no preliminary database probe is made. The former
+`/api/validate-url` endpoint and its `URL_VALIDATION_ALLOWED_DATABASES` setting
+have been removed. Normal login still accepts user-supplied database addresses,
+so deployments should restrict outbound network access as appropriate.
+
+Session connections must have an active stored connection record. Removing the
+last connection requires a fresh login; old sessions without a connection ID
+must also sign in again instead of reconnecting from cookie fields.
+The compatibility session-migration endpoint only returns an existing usable
+active connection; it never reconstructs missing records or opens a client to
+the user's database. Reading the record may open a token-store database client.
+The UI signs out when no stored connections remain.
+
+File-backed token storage uses atomic replacements and an exclusive
+`<token-file>.lock` directory (the full configured token path with `.lock`
+appended; by default `.data/api_tokens.json.lock`) to serialize
+writers. A writer waits up to 10 seconds for the lock, then fails explicitly.
+Locks are never automatically stolen. After a process crash, stop **all** writers
+before removing that token file's abandoned lock directory and restarting. Use FalkorDB-backed
+token storage for distributed deployments rather than sharing files across
+machines.
+
+`API_TOKEN_FALKORDB_URL` accepts `falkor://`, the legacy `falkordb://` alias,
+`redis://`, and the TLS schemes `falkors://` / `rediss://`. Only database 0 is
+supported; query strings and fragments are rejected. For a private/self-signed
+token-database certificate, mount the issuing CA PEM and set
+`NODE_EXTRA_CA_CERTS=/path/to/ca.pem` **before starting Node**. This extends trust
+for the token store and other Node TLS connections without disabling certificate
+or hostname verification.
+
+Redis URL schemes default to port 6379; the FalkorDB URL aliases and legacy
+`PAT_FALKORDB_*` fallback retain their existing port 6380 default.
+
+Replacing a user's role also clears existing ACL selectors, so selectors cannot
+retain permissions outside the replacement role and key patterns.
+
+Legacy browser-storage migration leaves connection-shaped keys untouched rather
+than guessing ownership, including hostnames beginning with `chat-` or another
+legacy prefix. Desktop secret regeneration atomically replaces the secrets file
+inside an owner-only directory, flushing the temporary file before renaming it
+and flushing the parent directory afterward on POSIX. Windows sharing failures
+are retried a bounded number of times without a non-atomic fallback.
+Ambiguous legacy graph keys that could belong to another connection are left
+untouched rather than copied across scopes; this can require manual recovery.
+
+HTTP CSV header validation inspects and retains at most 8 KiB, then cancels the
+response. A stream chunk and the underlying network transfer may exceed 8 KiB
+when storage ignores Range. The optional precheck has a 10-second deadline.
+If Next.js cannot fetch the URL, it logs an unavailable precheck and lets
+FalkorDB perform the authoritative fetch: the URL may target a network reachable
+only by the database. A successfully inspected empty/binary header still rejects
+the import; database fetch/query failures remain explicit import errors.
+File-URI imports remain validated during upload.
+
+Schema-discovery placement limits, timeouts, and limit-reached UI behavior are
+tracked separately in [#2228](https://github.com/FalkorDB/falkordb-browser/issues/2228);
+no schema limit or sampling change is introduced here.
+
+Aborting a graph-query request stops its SSE output, but does not cancel an
+already-running database query: the current driver has no per-query cancellation
+API. Existing query timeouts still apply; shared database connections are not
+closed to cancel an individual request.
+
+Query-stream infrastructure failures return a generic server-error message;
+raw backend details remain in server logs. Query/input errors retain their
+actionable messages.
+
 > Note: the image ships no default `AUTH_SECRET`. If you do not supply one, a
 > random secret is generated per container, which means every session is
 > invalidated when the container is recreated. For anything long-lived, set your
@@ -328,5 +405,3 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
-

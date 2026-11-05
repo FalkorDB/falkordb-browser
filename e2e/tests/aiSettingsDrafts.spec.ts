@@ -60,7 +60,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             value: { writeText: async (value: string) => { sessionStorage.setItem("copiedQuery", value); } },
           });
         });
-        const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
+        const created = await page.request.post(`${urls.api.graphUrl}${graphName}`, {
+          headers: { Origin: new URL(baseUrl).origin },
+        });
         expect(created.ok()).toBe(true);
         try {
           await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=${encodeURIComponent(query)}`);
@@ -71,8 +73,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
           if (viewport.width < 1100) await expect(page.getByTestId("editorMore")).toBeVisible();
           page.on("request", request => {
             const url = new URL(request.url());
-            const executedQuery = url.searchParams.get("query") ?? "";
-            if (request.method() === "GET"
+            if (decodeURIComponent(url.pathname) !== `/api/graph/${graphName}`) return;
+            const executedQuery = request.method() === "POST" && request.postData()
+              ? (request.postDataJSON() as { query?: string } | null)?.query ?? ""
+              : url.searchParams.get("query") ?? "";
+            if (["GET", "POST"].includes(request.method())
               && decodeURIComponent(url.pathname) === `/api/graph/${graphName}`
               && [query, suggestion, invalidQuery].some(testedQuery => executedQuery.includes(testedQuery))) queryRequests += 1;
           });
@@ -123,7 +128,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
           await expect(editor).toHaveAttribute("data-value", suggestion);
           expect(queryRequests).toBe(0);
         } finally {
-          const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`);
+          const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`, {
+            headers: { Origin: new URL(baseUrl).origin },
+          });
           expect(removed.ok()).toBe(true);
         }
       } finally {
@@ -168,7 +175,9 @@ for (const { feature, scenario } of cases) {
       await route.fulfill({ json: { error: "Unable to reach the AI provider. Please try again." }, status: 422 });
     });
 
-    const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
+    const created = await page.request.post(`${urls.api.graphUrl}${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    });
     expect(created.ok()).toBe(true);
     try {
       await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=${encodeURIComponent(query)}`);
@@ -219,7 +228,9 @@ for (const { feature, scenario } of cases) {
       }
       expect(aiRequests).toBe(scenario === "missing-key" ? 0 : 1);
     } finally {
-      const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`);
+      const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`, {
+        headers: { Origin: new URL(baseUrl).origin },
+      });
       expect(removed.ok()).toBe(true);
     }
   });

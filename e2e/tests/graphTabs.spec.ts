@@ -295,10 +295,13 @@ test.describe("@admin Graph tabs", () => {
         // The share link's own page load (and every reload) carries the query
         // too — only a query request to the graph API counts as running it.
         page.on("request", (request) => {
-            if (request.method() !== "GET") return;
+            if (!["GET", "POST"].includes(request.method())) return;
             const url = new URL(request.url());
             if (!url.pathname.startsWith("/api/graph/")) return;
-            if (url.searchParams.get("query")?.includes(marker)) runs.push(request.url());
+            const query = request.method() === "POST" && request.postData()
+                ? (request.postDataJSON() as { query?: string } | null)?.query
+                : url.searchParams.get("query");
+            if (query?.includes(marker)) runs.push(request.url());
         });
 
         await browser.navigateTo(shareLink(graphOne, query));

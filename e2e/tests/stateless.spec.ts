@@ -95,14 +95,19 @@ test.describe("Stateless server (SERVER_STATE=stateless)", () => {
 
     // A streamed (SSE) response: the client must outlive the handler's return
     // and stay open until the stream ends, or the query can't finish.
-    const create = await request.get(`${urls.api.graphUrl}${graph}?query=${encodeURIComponent("CREATE (:Stateless {n: 1})")}`);
+    const create = await request.post(`${urls.api.graphUrl}${graph}`, {
+      data: { query: "CREATE (:Stateless {n: 1})" },
+      headers: { Origin: new URL(urls.localHost).origin },
+    });
     expect(create.status()).toBe(200);
     expect(await create.text()).toContain("event: result");
 
     const read = await request.get(`${urls.api.graphUrl}${graph}?query=${encodeURIComponent("MATCH (n:Stateless) RETURN n.n AS n")}`);
     expect(await read.text()).toMatch(/event: result[\s\S]*"n":1/);
 
-    const remove = await request.delete(`${urls.api.graphUrl}${graph}`);
+    const remove = await request.delete(`${urls.api.graphUrl}${graph}`, {
+      headers: { Origin: new URL(urls.localHost).origin },
+    });
     expect(remove.status()).toBe(200);
 
     expect(await connectionsReceived() - before).toBeGreaterThanOrEqual(requests);
@@ -135,19 +140,16 @@ test.describe("Stateless server (SERVER_STATE=stateless)", () => {
     await expectServerClients();
   });
 
-  // Not specific to stateless mode: the route never caches its probe client.
-  // Compared with the clients held before it, so it checks this route alone.
-  test("@stateless Validating a URL closes its probe connection", async ({ request }) => {
+  test("@stateless Removed URL validation endpoint opens no connection", async ({ request }) => {
     const held = await serverClients();
     const before = await connectionsReceived();
 
     const response = await request.post(`${urls.localHost}/api/validate-url`, {
       data: { url: `falkor://${DB.host}:${DB.port}` },
+      headers: { Origin: new URL(urls.localHost).origin },
     });
-    expect(response.status()).toBe(200);
-    expect(await response.json()).toEqual({ result: false });
-
-    expect(await connectionsReceived()).toBeGreaterThan(before);
+    expect(response.status()).toBe(404);
+    expect(await connectionsReceived()).toBe(before);
     await expectServerClients(held);
   });
 });

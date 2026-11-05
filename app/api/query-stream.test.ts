@@ -1,0 +1,84 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { SimpleError } from "@redis/client";
+import { QueryInputError, queryStream, queryStreamError } from "./query-stream.ts";
+
+test("query stream emits a result and closes once even after a later abort", async () => {
+  const controller = new AbortController();
+  const response = queryStream(controller.signal, async () => ({ data: [{ n: 1 }] }), {});
+  assert.equal(await response.text(), 'event: result\ndata: {"data":[{"n":1}]}\n\n');
+  controller.abort();
+});
+
+test("abort stops output while an in-flight database promise settles safely", async () => {
+  const controller = new AbortController();
+  const pending = Promise.withResolvers<unknown>();
+  const response = queryStream(controller.signal, () => pending.promise, {});
+  controller.abort();
+  assert.equal(await response.text(), "");
+  pending.reject(new Error("late backend failure"));
+  await new Promise(resolve => setImmediate(resolve));
+});
+
+test("consumer cancellation does not enqueue to a cancelled controller", async (t) => {
+  const log = t.mock.method(console, "error", () => {});
+  const controller = new AbortController();
+  const pending = Promise.withResolvers<unknown>();
+  const response = queryStream(controller.signal, () => pending.promise, {});
+  const reader = response.body!.getReader();
+  await reader.cancel();
+  pending.resolve({ data: [] });
+  controller.abort();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(await reader.read(), { done: true, value: undefined });
+  assert.equal(log.mock.callCount(), 0);
+});
+
+test("already aborted queries never start", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let called = false;
+  const response = queryStream(controller.signal, async () => { called = true; }, {});
+  assert.equal(await response.text(), "");
+  assert.equal(called, false);
+});
+
+test("query rejection emits one error event", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const response = queryStream(new AbortController().signal, async () => { throw new SimpleError("syntax error"); }, {});
+  assert.equal(await response.text(), 'event: error\ndata: {"message":"syntax error","status":400}\n\n');
+});
+
+test("query input failures stay 400 while backend and connection failures report 500", async (t) => {
+  const log = t.mock.method(console, "error", () => {});
+  for (const [error, status] of [
+    [new QueryInputError("Missing parameter query"), 400],
+    [new SimpleError("NOPERM permission denied"), 400],
+    [new Error("Socket closed unexpectedly"), 500],
+    [new Error("connect ECONNREFUSED localhost:6379"), 500],
+    [new SimpleError("OOM command not allowed"), 500],
+    [new SimpleError("CLUSTERDOWN cluster is down"), 500],
+    [new SimpleError("LOADING Redis is loading the dataset"), 500],
+    [new SimpleError("MASTERDOWN Link with MASTER is down"), 500],
+    [new SimpleError("TRYAGAIN Multiple keys request during rehashing of slot"), 500],
+    [new SimpleError("READONLY You can't write against a read only replica"), 500],
+    [new SimpleError("MISCONF Redis is configured to save RDB snapshots"), 500],
+    [new SimpleError("NOREPLICAS Not enough good replicas to write"), 500],
+  ] as const) {
+    const response = queryStream(new AbortController().signal, async () => { throw error; }, {});
+    assert.deepEqual(JSON.parse((await response.text()).split("data: ")[1]), {
+      message: status === 500 ? "Internal server error" : error.message, status,
+    });
+    assert.deepEqual(log.mock.calls.at(-1)?.arguments, ["Graph query failed:", error]);
+  }
+});
+
+test("authentication errors preserve status and connection error code in SSE", async () => {
+  const response = await queryStreamError(Response.json(
+    { message: "Connection expired", code: "CONNECTION_EXPIRED" }, { status: 401 },
+  ), { "Content-Type": "text/event-stream" });
+  assert.equal(response.headers.get("content-type"), "text/event-stream");
+  assert.deepEqual(JSON.parse((await response.text()).split("data: ")[1]), {
+    message: "Connection expired", code: "CONNECTION_EXPIRED", status: 401,
+  });
+});

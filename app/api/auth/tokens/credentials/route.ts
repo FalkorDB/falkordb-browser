@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { SignJWT } from "jose";
 import crypto from "crypto";
-import { newClient, generateTimeUUID, PAT_BINDING_VERSION } from "../../[...nextauth]/options";
+import { newClient, closeCachedConnection, generateTimeUUID, PAT_BINDING_VERSION } from "../../[...nextauth]/options";
 import { storeEncryptedCredential, getAuthSecret } from "../../tokenUtils";
 import { login, validateBody } from "../../../validate-body";
 
@@ -95,9 +95,9 @@ export async function POST(request: NextRequest) {
     // 3. Authenticate user with provided credentials
     let authenticatedUser;
     let userPassword;
+    const userId = crypto.randomUUID();
     try {
       // Generate random UUID for JWT token
-      const userId = crypto.randomUUID();
       userPassword = password || "";
 
       const { role } = await newClient(
@@ -128,6 +128,8 @@ export async function POST(request: NextRequest) {
         { message: "Invalid credentials or connection failed" },
         { status: 401 }
       );
+    } finally {
+      await closeCachedConnection(userId);
     }
 
     // 4. Validate expiration parameters

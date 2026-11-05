@@ -47,7 +47,7 @@ export async function PATCH(
 
       const finalRole = getRoleWithKeys(role, keys);
       if (password) {
-        finalRole.push(`>${password}`);
+        finalRole.push("resetpass", `>${password}`);
       }
       await connection.aclSetUser(username, finalRole);
       return NextResponse.json({ message: "User role updated" }, { status: 200, headers: getCorsHeaders(request) });

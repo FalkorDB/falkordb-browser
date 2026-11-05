@@ -45,6 +45,23 @@ test("loadSecrets generates two 32-byte hex secrets once and keeps them", () => 
     }
 });
 
+test("loadSecrets keeps readable, stable secrets under a restrictive umask", (t) => {
+    if (process.platform === "win32") return t.skip("POSIX file modes");
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    const previousUmask = process.umask(0o477);
+    try {
+        const first = loadSecrets(dir);
+        assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+        assert.deepEqual(loadSecrets(dir), first);
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+    } finally {
+        process.umask(previousUmask);
+        if (fs.existsSync(file)) fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
 test("loadSecrets makes a replaced secrets file owner-only, whatever its old mode", (t) => {
     if (process.platform === "win32") return t.skip("POSIX file modes");
     const dir = tempDir();
@@ -66,6 +83,29 @@ test("loadSecrets makes a kept secrets file owner-only too", (t) => {
     assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 });
 
+test("regeneration replaces the inode so an old descriptor cannot read new secrets", (t) => {
+    if (process.platform === "win32") return t.skip("POSIX open-file replacement");
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    fs.writeFileSync(file, "invalid old secrets", { mode: 0o644 });
+    const fd = fs.openSync(file, "r");
+    try {
+        const oldInode = fs.fstatSync(fd).ino;
+        const secrets = loadSecrets(dir);
+        assert.notEqual(fs.statSync(file).ino, oldInode);
+        const oldContents = fs.readFileSync(fd, "utf8");
+        assert.equal(oldContents, "invalid old secrets");
+        assert.equal(oldContents.includes(secrets.authSecret), false);
+        assert.equal(oldContents.includes(secrets.encryptionKey), false);
+        assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+    } finally {
+        fs.closeSync(fd);
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
 test("ensurePrivateDir creates owner-only folders and tightens existing ones", (t) => {
     if (process.platform === "win32") return t.skip("POSIX file modes");
     const root = tempDir();
@@ -78,6 +118,108 @@ test("ensurePrivateDir creates owner-only folders and tightens existing ones", (
     fs.chmodSync(old, 0o775);
     ensurePrivateDir(old);
     assert.equal(fs.statSync(old).mode & 0o777, 0o700);
+});
+
+test("secret replacement flushes file contents before renaming", (t) => {
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    const calls = [];
+    const fsync = fs.fsyncSync;
+    const rename = fs.renameSync;
+    t.mock.method(fs, "fsyncSync", fd => { fsync(fd); calls.push("flush"); });
+    t.mock.method(fs, "renameSync", (from, to) => { calls.push("rename"); rename(from, to); });
+    try {
+        loadSecrets(dir);
+        assert.deepEqual(calls, process.platform === "win32" ? ["flush", "rename"] : ["flush", "rename", "flush"]);
+    } finally {
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
+test("a failed secret flush preserves the previous file and removes the temporary file", (t) => {
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    fs.writeFileSync(file, "old damaged contents");
+    t.mock.method(fs, "fsyncSync", () => { throw new Error("flush failed"); });
+    try {
+        assert.throws(() => loadSecrets(dir), /flush failed/);
+        assert.equal(fs.readFileSync(file, "utf8"), "old damaged contents");
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+    } finally {
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
+test("a failed close is not retried and temporary-file cleanup still runs", (t) => {
+    const dir = tempDir();
+    const close = fs.closeSync;
+    const calls = [];
+    t.mock.method(fs, "closeSync", fd => {
+        calls.push(fd);
+        close(fd);
+        throw new Error("close failed");
+    });
+    try {
+        assert.throws(() => loadSecrets(dir), /close failed/);
+        assert.equal(calls.length, 1);
+        assert.deepEqual(fs.readdirSync(dir), []);
+    } finally {
+        fs.rmdirSync(dir);
+    }
+});
+
+test("Windows replacement retries transient sharing failures but remains bounded", (t) => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "win32" });
+    t.after(() => Object.defineProperty(process, "platform", platform));
+    const rename = fs.renameSync;
+    let attempts = 0;
+    t.mock.method(Atomics, "wait", () => "timed-out");
+    const mock = t.mock.method(fs, "renameSync", (from, to) => {
+        attempts += 1;
+        if (attempts < 3) throw Object.assign(new Error("sharing violation"), { code: "EPERM" });
+        rename(from, to);
+    });
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    try {
+        loadSecrets(dir);
+        assert.equal(attempts, 3);
+        mock.mock.mockImplementation(() => {
+            attempts += 1;
+            throw Object.assign(new Error("sharing violation"), { code: "EPERM" });
+        });
+        fs.writeFileSync(file, "old damaged contents");
+        attempts = 0;
+        assert.throws(() => loadSecrets(dir), /sharing violation/);
+        assert.equal(attempts, 5);
+        assert.equal(fs.readFileSync(file, "utf8"), "old damaged contents");
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+    } finally {
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
+});
+
+test("directory flush errors are surfaced after an atomic replacement", (t) => {
+    if (process.platform === "win32") return t.skip("POSIX directory flush");
+    const dir = tempDir();
+    const file = path.join(dir, "secrets.json");
+    const fsync = fs.fsyncSync;
+    t.mock.method(fs, "fsyncSync", fd => {
+        if (fs.fstatSync(fd).isDirectory()) throw new Error("directory flush failed");
+        fsync(fd);
+    });
+    try {
+        assert.throws(() => loadSecrets(dir), /directory flush failed/);
+        assert.deepEqual(fs.readdirSync(dir), ["secrets.json"]);
+        assert.match(JSON.parse(fs.readFileSync(file, "utf8")).encryptionKey, /^[0-9a-f]{64}$/);
+    } finally {
+        fs.unlinkSync(file);
+        fs.rmdirSync(dir);
+    }
 });
 
 test("loadSecrets replaces a damaged or weak secrets file", () => {

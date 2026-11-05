@@ -1,4 +1,4 @@
-import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, prepareArg, securedFetch, Query } from "@/lib/utils";
+import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, securedFetch, Query } from "@/lib/utils";
 import { getStatsLines } from "@/lib/queryStats";
 import { JSONTree } from "react-json-tree";
 import { useContext, useMemo, useState } from "react";
@@ -36,13 +36,15 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
 
 
     const handleProfile = async () => {
+        if (isReadOnly) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
         try {
-            const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
-            const result = await securedFetch(`/api/graph/${query.graphName}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
-                method: "GET",
+            const result = await securedFetch(`/api/graph/${query.graphName}/profile`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: query.text }),
             }, toast, setIndicator, cid);
 
             if (getConnectionEpoch() !== startEpoch) return;
@@ -74,6 +76,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
                     label="Profile"
                     onClick={handleProfile}
                     isLoading={isLoading}
+                    disabled={isReadOnly}
                 />
                 <Button
                     className="cursor-default"

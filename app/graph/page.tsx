@@ -286,7 +286,7 @@ export default function Page() {
                 `/api/graph/${prepareArg(graphName)}?query=${prepareArg(query)}${readOnlyParam}`,
                 toast,
                 setIndicator,
-                { signal: options?.signal, connectionId: options?.connectionId },
+                { signal: options?.signal, connectionId: options?.connectionId, method: "POST" },
             ) as { data?: Array<{ info?: unknown }> };
 
             if (!sse || !Array.isArray(sse.data)) return [];

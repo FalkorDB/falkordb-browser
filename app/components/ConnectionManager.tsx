@@ -12,6 +12,7 @@ import switchSessionConnection from "@/lib/connection-switch";
 import { ConnectionContext, IndicatorContext, SessionConnection } from "./provider";
 import Button from "./ui/Button";
 import LoginForm, { LoginFormCredentials } from "../login/LoginForm";
+import { connectionResponseError } from "@/lib/login-errors";
 import { Tooltip } from "@radix-ui/react-tooltip";
 import { TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -193,7 +194,7 @@ export default function ConnectionManager() {
       toast({ title: `Connection added for ${credentials.username}` });
       setDialogOpen(false);
     } else {
-      throw new Error("Failed to add connection");
+      throw await connectionResponseError(result);
     }
   }, [toast, setAdditionalConnections, setIndicator, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch, activeConnectionId]);
 

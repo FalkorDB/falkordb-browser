@@ -1,15 +1,42 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
+import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
+import { LoginError } from "./login-errors.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
+
+it("preserves predefined login messages through the toast error sanitizer", () => {
+  for (const code of ["credentials_required", "invalid_credentials", "connection_failed"]) {
+    const message = new LoginError(code).message;
+    assert.equal(toUserFriendlyMessage(message, 400).description, message);
+  }
+});
 
 afterEach(() => {
   setActiveConnectionIdGlobal(null);
 });
 
 describe("API URL normalization", () => {
+  it("preserves error response bodies for callers to inspect", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json(
+      { message: "Authentication failed", code: "credentials_required" },
+      { status: 400 },
+    );
+
+    try {
+      const response = await securedFetch("/api/connections", {}, noopToast, noopIndicator);
+      assert.equal(response.ok, false);
+      assert.deepEqual(await response.json(), {
+        message: "Authentication failed",
+        code: "credentials_required",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("normalizes relative securedFetch URLs to root-relative paths", async () => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
@@ -79,9 +106,128 @@ describe("API URL normalization", () => {
       setActiveConnectionIdGlobal(null);
     }
   });
+
+  it("posts query parameters as JSON while preserving connection routing", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { location: { href: "http://localhost/graph" } },
+    });
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init });
+      return new Response(
+        "event: result\ndata: {\"data\":[\ndata: {\"n\":1}\ndata: ]}\n\n",
+        { status: 200, headers: { "Content-Type": "text/event-stream" } },
+      );
+    }) as typeof fetch;
+
+    try {
+      const result = await getSSEGraphResult(
+        "api/graph/demo?query=RETURN%201&timeout=30&readOnly=true",
+        noopToast,
+        noopIndicator,
+        { connectionId: "conn-789", method: "POST" },
+      );
+
+      assert.deepEqual(result, { data: [{ n: 1 }] });
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].init?.method, "POST");
+      assert.equal(calls[0].init?.credentials, "same-origin");
+      assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
+        query: "RETURN 1",
+        timeout: "30",
+      });
+      const requestUrl = new URL(String(calls[0].input));
+      assert.equal(requestUrl.pathname, "/api/graph/demo");
+      assert.equal(requestUrl.searchParams.get("query"), null);
+      assert.equal(requestUrl.searchParams.get("timeout"), null);
+      assert.equal(requestUrl.searchParams.get("connectionId"), "conn-789");
+      assert.equal(requestUrl.searchParams.get("readOnly"), "true");
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalWindow) {
+        Object.defineProperty(globalThis, "window", originalWindow);
+      } else {
+        Reflect.deleteProperty(globalThis, "window");
+      }
+    }
+  });
 });
 
 type MockToast = { title?: unknown; description?: unknown; variant?: unknown };
+
+it("ignores POST response side effects when abort wins the body-read continuation race", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  let windowReads = 0;
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    get: () => { windowReads += 1; return { location: { href: "http://localhost/graph" } }; },
+  });
+  try {
+    for (const [body, status] of [
+      ['event: result\ndata: {"data":[]}\n\n', 200],
+      ['event: error\ndata: {"message":"Backend failed","status":500}\n\n', 200],
+      ['{"message":"Expired","code":"SESSION_INVALID"}', 401],
+    ] as const) {
+      const controller = new AbortController();
+      const response = new Response(body, { status });
+      response.text = () => {
+        const text = Promise.resolve(body);
+        text.then(() => controller.abort());
+        return text;
+      };
+      globalThis.fetch = async () => response;
+      const toasts: MockToast[] = [];
+      const indicators: string[] = [];
+      const result = getSSEGraphResult(
+        "/api/graph/demo?query=RETURN%201",
+        toast => { toasts.push(toast); },
+        state => { indicators.push(state); },
+        { method: "POST", signal: controller.signal },
+      );
+      await assert.rejects(result, isAbortError);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(toasts, []);
+      assert.deepEqual(indicators, []);
+    }
+    assert.equal(windowReads, 3, "stale session errors must not initiate sign-out");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});
+
+it("reports an empty successful POST stream instead of silently rejecting", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", {
+    configurable: true, value: { location: { href: "http://localhost/graph" } },
+  });
+  globalThis.fetch = async () => new Response("", {
+    status: 200, headers: { "Content-Type": "text/event-stream" },
+  });
+  const toasts: MockToast[] = [];
+  const indicators: string[] = [];
+  try {
+    await assert.rejects(getSSEGraphResult(
+      "/api/graph/demo?query=RETURN%201",
+      toast => { toasts.push(toast); },
+      state => { indicators.push(state); },
+      { method: "POST" },
+    ), /Invalid server response/);
+    assert.equal(toasts.length, 1);
+    assert.ok(toasts[0].description);
+    assert.equal(indicators.at(-1), "offline");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});
 
 type MockEventSourceInstance = {
   url: string;
