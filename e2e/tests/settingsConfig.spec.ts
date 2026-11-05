@@ -5,6 +5,7 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import SettingsConfigPage from "../logic/POM/settingsConfigPage";
 import ApiCalls from "../logic/api/apiCalls";
 import Data from '../config/settingsConfigData.json';
+import { initializeLocalStorage } from "../infra/utils";
 
 test.describe.configure({ mode: 'serial' });
 test.describe('@config Settings config tests', () => {
@@ -18,6 +19,30 @@ test.describe('@config Settings config tests', () => {
 
     test.afterEach(async () => {
         await browser.closeBrowser();
+    });
+
+    test("@admin Non-admin settings deep links do not expose configurations or load their data", async ({ browser: playwrightBrowser }) => {
+        const context = await playwrightBrowser.newContext({ storageState: "playwright/.auth/readwriteuser.json" });
+        try {
+            const page = await context.newPage();
+            await page.addInitScript(initializeLocalStorage("localhost", 6379));
+            let configRequests = 0;
+            await page.route(/\/api\/graph\/config(?:\/.*)?$/, async route => {
+                configRequests += 1;
+                await route.continue();
+            });
+            await page.goto(`${urls.settingsUrl}?tab=Configurations`);
+            const session = await context.request.get(new URL("/api/auth/session", urls.settingsUrl).href);
+            expect(session.ok()).toBe(true);
+            expect((await session.json()).user.role).toBe("Read-Write");
+            await expect(page.getByTestId("settingsCurrentTab")).toHaveText("> Browser");
+            await expect(page.getByTestId("settingsTabTokens")).toBeVisible();
+            await expect(page.getByTestId("settingsTabConfigurations")).toHaveCount(0);
+            await expect(page.getByTestId("tableRowConfigsTHREAD_COUNT")).toHaveCount(0);
+            expect(configRequests).toBe(0);
+        } finally {
+            await context.close();
+        }
     });
 
     test("@admin Load-time configuration cannot be edited while runtime configuration remains editable", async () => {
