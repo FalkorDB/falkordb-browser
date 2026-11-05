@@ -321,7 +321,9 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   Each CI job records raw V8 coverage and turns it into a report with
   `.github/scripts/coverage-report.mjs`; Codecov merges the reports per commit and requires
   **95%** of the whole codebase (`codecov/project`, on every commit to `main` and
-  `staging` and on PRs) and of the lines a PR changes (`codecov/patch`). Locally:
+  `staging` and on PRs) and of the lines a PR changes (`codecov/patch`). Codecov posts both
+  only once every workflow that uploads coverage has finished for the commit (the **Coverage
+  status** workflow tells it to). Locally:
   ```bash
   rm -rf coverage
   NODE_V8_COVERAGE=coverage/raw/unit npm run test:coverage

@@ -10,8 +10,10 @@
 codecov:
   require_ci_to_pass: yes
   notify:
-    # Report once every workflow has finished, never on a partial merge.
-    wait_for_ci: yes
+    # Post the statuses only when the Coverage status workflow says every
+    # upload of the commit is in, never from a partial merge. (wait_for_ci
+    # does not do this: it does not wait for GitHub Actions jobs.)
+    manual_trigger: true
 
 coverage:
   precision: 2
