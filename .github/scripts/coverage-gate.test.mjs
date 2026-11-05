@@ -229,10 +229,12 @@ function world({
       if (next instanceof Error) throw next;
       return { results: next, next: null };
     }
-    if (url.endsWith(`/commits/${SHA}/`)) return { totals: coverage === null ? null : { coverage } };
     if (url.includes('/report/')) {
       if (reportErrors.length) throw reportErrors.shift();
-      return patch === null ? {} : { files: reportFiles };
+      return {
+        totals: coverage === null ? null : { coverage },
+        ...(patch === null ? {} : { files: reportFiles }),
+      };
     }
     throw new Error(`unexpected Codecov call ${url}`);
   };

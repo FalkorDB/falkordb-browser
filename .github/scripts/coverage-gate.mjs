@@ -524,9 +524,12 @@ export async function gate({
     return false;
   }
 
-  const commit = await again(() => codecov(`${base}/commits/${sha}/`));
-  if (typeof commit.totals?.coverage !== 'number') throw new Error('Codecov has no coverage total for the commit');
-  const project = verdict(commit.totals.coverage, target);
+  // The commit's report, not its summary (commits/<sha>/): the summary's
+  // totals can still be an earlier merge's after every upload is processed.
+  const report = await again(() => codecov(`${base}/report/?sha=${sha}`));
+  if (typeof report.totals?.coverage !== 'number') throw new Error('Codecov has no coverage total for the commit');
+  if (!Array.isArray(report.files)) throw new Error('Codecov has no report of the commit');
+  const project = verdict(report.totals.coverage, target);
   console.log(`${contexts[0]}: ${project.description}`);
   await post(contexts[0], project);
   if (pr) {
@@ -537,11 +540,9 @@ export async function gate({
       console.log(`The pull request moved on to ${head.sha}: its own gate will post`);
       return true;
     }
-    // The lines it changes against what the commit's coverage says of them.
+    // The lines it changes against what the commit's report says of them.
     // (Codecov's comparison endpoint would do this, but it fails on Codecov's
     // own GitHub rate limit; its report of the commit does not.)
-    const report = await again(() => codecov(`${base}/report/?sha=${sha}`));
-    if (!Array.isArray(report.files)) throw new Error('Codecov has no report of the commit');
     const patch = patchVerdict(patchTotals(changes, report.files), target);
     console.log(`${contexts[1]}: ${patch.description}`);
     await post(contexts[1], patch);
