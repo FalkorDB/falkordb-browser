@@ -1,5 +1,17 @@
+# Coverage is measured over every source file (.github/scripts/coverage-report.mjs
+# decides which), by every kind of test, each uploaded under its own flag:
+#   unit     node --test unit tests              (Build workflow)
+#   smoke    node --test smoke tests vs FalkorDB (Build workflow)
+#   e2e      Playwright, browser and server side (Playwright Tests workflow)
+#   desktop  Electron shell tests                (Desktop app workflow)
+#   mobile   Capacitor shell tests               (Mobile app workflow)
+# Codecov merges them per commit: a line any test runs is covered.
+
 codecov:
   require_ci_to_pass: yes
+  notify:
+    # Report once every workflow has finished, never on a partial merge.
+    wait_for_ci: yes
 
 coverage:
   precision: 2
@@ -7,13 +19,22 @@ coverage:
   range: "95...100"
 
   status:
+    # The whole codebase, on every commit: pushes to main and staging, and PRs.
     project:
       default:
         target: 95%
         threshold: 0%
+    # The lines a PR adds or changes.
     patch:
       default:
         target: 95%
+        threshold: 0%
+
+flag_management:
+  default_rules:
+    # A workflow a commit does not trigger (Desktop and Mobile run only for
+    # their own paths) keeps its flag's last coverage.
+    carryforward: true
 
 comment:
   layout: "header, diff, flags, files"

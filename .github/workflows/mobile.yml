@@ -70,7 +70,9 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
 
       - name: Setup Java
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -89,6 +91,29 @@ jobs:
 
       - name: Run tests
         run: npm test
+        env:
+          NODE_V8_COVERAGE: ${{ github.workspace }}/coverage/raw/mobile
+
+      # The coverage report runs on the web app's dependencies.
+      - name: Install web dependencies
+        if: ${{ !cancelled() }}
+        working-directory: .
+        run: npm ci --no-audit --progress=false --ignore-scripts
+
+      - name: Build the mobile coverage report
+        if: ${{ !cancelled() }}
+        working-directory: .
+        run: node .github/scripts/coverage-report.mjs mobile coverage/raw/mobile
+
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/mobile/codecov.json
+          disable_search: true
+          flags: mobile
+          fail_ci_if_error: true
 
       - name: Add or sync the Android project
         run: |

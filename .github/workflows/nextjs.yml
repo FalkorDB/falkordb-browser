@@ -54,17 +54,26 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --progress=false
 
+      # Also records raw V8 coverage, turned into a report over every source
+      # file (see .github/scripts/coverage-report.mjs).
       - name: Run unit tests with coverage
         run: npm run test:coverage
+        env:
+          NODE_V8_COVERAGE: coverage/raw/unit
+
+      - name: Build the unit coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs unit coverage/raw/unit
 
       - name: Upload coverage reports to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./lcov.info
+          files: ./coverage/unit/codecov.json
+          disable_search: true
           flags: unit
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
       - name: Build with Next.js
         run: npx next build
@@ -103,6 +112,19 @@ jobs:
         env:
           FALKORDB_SMOKE: "1"
           FALKORDB_URL: redis://localhost:6379
+          NODE_V8_COVERAGE: coverage/raw/smoke
+      - name: Build the smoke coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs smoke coverage/raw/smoke
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/smoke/codecov.json
+          disable_search: true
+          flags: smoke
+          fail_ci_if_error: true
 
   security-scan:
     runs-on: ubuntu-latest
