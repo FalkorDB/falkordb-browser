@@ -271,6 +271,39 @@ async function allPages(fetchPage, pick = (page) => page) {
   }
 }
 
+/**
+ * Posts statuses to `sha`, retrying GitHub's passing errors, and remembers in
+ * `decided` the contexts given a verdict (not pending) that GitHub accepted.
+ */
+export function statusPoster({ gh, sha, targetUrl, dryRun = false, sleep = wait }) {
+  const decided = new Set();
+  const post = async (context, { state, description }) => {
+    if (dryRun) {
+      console.log(`would post ${context}: ${state}, ${description}`);
+    } else {
+      await retry(() => gh(`statuses/${sha}`, {
+        method: 'POST',
+        body: { context, state, description, target_url: targetUrl() },
+      }), sleep);
+    }
+    // Only a verdict GitHub accepted: else the failure handler still marks it.
+    if (state !== 'pending') decided.add(context);
+  };
+  return { post, decided };
+}
+
+/**
+ * After the gate failed: marks `error` on each status this run gave no
+ * verdict, rather than leave an earlier run's pending; a verdict it posted
+ * stays.
+ */
+export async function postFailure({ post, decided, contexts, error }) {
+  const description = `The coverage gate failed: ${error.message}`.slice(0, 140);
+  for (const context of contexts.filter((c) => !decided.has(c))) {
+    await post(context, { state: 'error', description }).catch(() => {});
+  }
+}
+
 async function main() {
   const { GITHUB_REPOSITORY: repo, GH_TOKEN: token, SHA: sha, EVENT: event, BRANCH: branch } = process.env;
   const target = Number(process.env.TARGET ?? 95);
@@ -279,25 +312,12 @@ async function main() {
   // A pull request's gate posts both statuses, a push's coverage/project.
   const contexts = event === 'pull_request' ? ['coverage/project', 'coverage/patch'] : ['coverage/project'];
   let pr;
-  // The statuses this run gave a verdict, which a later failure leaves alone.
-  const decided = new Set();
-  const post = async (context, { state, description }) => {
-    if (process.env.DRY_RUN) {
-      console.log(`would post ${context}: ${state}, ${description}`);
-    } else {
-      await retry(() => gh(`statuses/${sha}`, {
-        method: 'POST',
-        body: {
-          context,
-          state,
-          description,
-          target_url: `https://app.codecov.io/gh/${repo}/${pr ? `pull/${pr.number}` : `commit/${sha}`}`,
-        },
-      }), wait);
-    }
-    // Only a verdict GitHub accepted: else the failure handler still marks it.
-    if (state !== 'pending') decided.add(context);
-  };
+  const { post, decided } = statusPoster({
+    gh,
+    sha,
+    targetUrl: () => `https://app.codecov.io/gh/${repo}/${pr ? `pull/${pr.number}` : `commit/${sha}`}`,
+    dryRun: Boolean(process.env.DRY_RUN),
+  });
 
   try {
     // The pull request, for a pull_request run: one whose head is still this
@@ -321,11 +341,7 @@ async function main() {
     // The workflow tells Codecov to post its comment once the gate decided.
     if (done && process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, 'decided=true\n');
   } catch (error) {
-    // Say so on the statuses, rather than leave an earlier run's pending.
-    const description = `The coverage gate failed: ${error.message}`.slice(0, 140);
-    for (const context of contexts.filter((c) => !decided.has(c))) {
-      await post(context, { state: 'error', description }).catch(() => {});
-    }
+    await postFailure({ post, decided, contexts, error });
     throw error;
   }
 }

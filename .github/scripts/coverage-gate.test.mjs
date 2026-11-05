@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, gate, globToRegExp, retry, transient, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  COVERAGE_WORKFLOWS, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
+  transient, missingFlags, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
@@ -327,4 +328,41 @@ test('retries only what may pass on its own, a bounded number of times', async (
   calls = 0;
   await assert.rejects(retry(async () => { calls += 1; throw errors(502); }, async () => {}, 3), /502/);
   assert.equal(calls, 3);
+});
+
+test('posts statuses, counting a verdict only once GitHub accepted it', async () => {
+  const error = (status) => Object.assign(new Error(String(status)), { status });
+  const sent = [];
+  const answers = [error(503), undefined, error(403)];
+  const gh = async (path, { body }) => {
+    const answer = answers.shift();
+    if (answer) throw answer;
+    sent.push(`${path} ${body.context} ${body.state} ${body.target_url}`);
+    return {};
+  };
+  const sleeps = [];
+  const { post, decided } = statusPoster({ gh, sha: SHA, targetUrl: () => 'https://codecov.test/x', sleep: async (ms) => { sleeps.push(ms); } });
+
+  // A passing error is retried, and the accepted verdict counts.
+  await post('coverage/project', { state: 'success', description: 'ok' });
+  assert.deepEqual(sent, [`statuses/${SHA} coverage/project success https://codecov.test/x`]);
+  assert.deepEqual(sleeps, [20_000]);
+  // A refused verdict does not count.
+  await assert.rejects(post('coverage/patch', { state: 'failure', description: 'low' }), /403/);
+  assert.deepEqual([...decided], ['coverage/project']);
+  // Pending is not a verdict.
+  await post('coverage/patch', { state: 'pending', description: 'waiting' });
+  assert.deepEqual([...decided], ['coverage/project']);
+});
+
+test('marks error on the statuses a failed gate gave no verdict, keeping those it did', async () => {
+  const posted = [];
+  const post = async (context, { state, description }) => {
+    posted.push(`${context} ${state}: ${description}`);
+    if (context === 'coverage/patch') throw new Error('posting failed too');
+  };
+  await postFailure({
+    post, decided: new Set(['coverage/project']), contexts: ['coverage/project', 'coverage/patch'], error: new Error('Codecov is down'),
+  });
+  assert.deepEqual(posted, ['coverage/patch error: The coverage gate failed: Codecov is down']);
 });
