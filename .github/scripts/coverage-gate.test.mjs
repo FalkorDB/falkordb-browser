@@ -232,7 +232,7 @@ function world({
     codecov,
     sleep: async (ms) => { sleeps.push(ms); },
     post: async (context, { state, description }) => { posted.push(`${context} ${state}: ${description}`); },
-    contexts: pr ? ['coverage/project', 'coverage/patch'] : ['coverage/project'],
+    contexts: pr ? ['coverage/project', 'coverage/patch'] : ['coverage/project (push)'],
     pr: pr ?? undefined,
     sha: SHA,
     repo: 'FalkorDB/falkordb-browser',
@@ -305,7 +305,7 @@ test('gate: leaves the patch to a newer head, and gates a push on the project on
   assert.deepEqual(moved.posted, ['coverage/project success: 96.00% (target 95%)']);
   const push = world({ pr: null, files: ['README.md'], runs: [run('Build', 'success', 'completed', 'push')], uploads: [FRESH.slice(0, 2)] });
   assert.equal(await gate(push.args), true);
-  assert.deepEqual(push.posted, ['coverage/project success: 96.00% (target 95%)']);
+  assert.deepEqual(push.posted, ['coverage/project (push) success: 96.00% (target 95%)']);
 });
 
 test('gate: retries a passing Codecov error on the compare call', async () => {

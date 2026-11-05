@@ -1,10 +1,12 @@
 name: Coverage status
 
 # The coverage gate. Each time a workflow that uploads coverage starts or
-# finishes, this posts coverage/project and coverage/patch to its commit (branch protection
-# requires both): pending until every coverage workflow the commit triggers
-# has finished and Codecov has processed their uploads, then a pass or a
-# fail against the target. .github/scripts/coverage-gate.mjs has the details.
+# finishes, this posts coverage/project and coverage/patch to its pull
+# request's head commit (branch protection requires both), or
+# coverage/project (push) to a commit pushed to main or staging: pending
+# until every coverage workflow the commit triggers has finished and Codecov
+# has processed their uploads, then a pass or a fail against the target.
+# .github/scripts/coverage-gate.mjs has the details.
 # Once the gate has posted, it tells Codecov to post its pull request comment
 # (codecov.yml: notify.manual_trigger).
 #

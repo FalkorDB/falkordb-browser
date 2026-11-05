@@ -309,8 +309,11 @@ async function main() {
   const target = Number(process.env.TARGET ?? 95);
   const gh = (path, options) => api(`${GITHUB}/repos/${repo}/${path}`, { token, ...options });
 
-  // A pull request's gate posts both statuses, a push's coverage/project.
-  const contexts = event === 'pull_request' ? ['coverage/project', 'coverage/patch'] : ['coverage/project'];
+  // A pull request's gate posts coverage/project and coverage/patch (which
+  // branch protection requires); a push's posts its project verdict under a
+  // name of its own, so that on a commit both pushed to staging and at the
+  // head of a pull request into main it cannot overwrite the pull request's.
+  const contexts = event === 'pull_request' ? ['coverage/project', 'coverage/patch'] : ['coverage/project (push)'];
   let pr;
   const { post, decided } = statusPoster({
     gh,
@@ -436,8 +439,8 @@ export async function gate({
   const commit = await retry(() => codecov(`${base}/commits/${sha}/`), sleep);
   if (typeof commit.totals?.coverage !== 'number') throw new Error('Codecov has no coverage total for the commit');
   const project = verdict(commit.totals.coverage, target);
-  console.log(`coverage/project: ${project.description}`);
-  await post('coverage/project', project);
+  console.log(`${contexts[0]}: ${project.description}`);
+  await post(contexts[0], project);
   if (pr) {
     const compare = await retry(() => codecov(`${base}/compare/?pullid=${pr.number}`), sleep);
     if (compare.head_commit !== sha) {
@@ -447,8 +450,8 @@ export async function gate({
     // No patch total is not a pass.
     if (!compare.totals?.patch) throw new Error('Codecov has no patch total for the pull request');
     const patch = patchVerdict(compare.totals.patch, target);
-    console.log(`coverage/patch: ${patch.description}`);
-    await post('coverage/patch', patch);
+    console.log(`${contexts[1]}: ${patch.description}`);
+    await post(contexts[1], patch);
   }
   return true;
 }

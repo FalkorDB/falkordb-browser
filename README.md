@@ -322,8 +322,8 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `.github/scripts/coverage-report.mjs`, and Codecov merges the reports per commit. The
   **Coverage status** workflow is the gate: once every coverage workflow a commit triggers
   has finished, and Codecov has processed their uploads, it requires **95%** of the whole
-  codebase (`coverage/project`, on every commit to `main` and `staging` and on PRs) and of
-  the lines a PR changes (`coverage/patch`). A coverage workflow that fails or is cancelled
+  codebase (`coverage/project` on PRs, `coverage/project (push)` on commits pushed to `main`
+  and `staging`) and of the lines a PR changes (`coverage/patch`). A coverage workflow that fails or is cancelled
   fails the gate, since its coverage is incomplete (`.github/scripts/coverage-gate.mjs`).
   Locally:
   ```bash
