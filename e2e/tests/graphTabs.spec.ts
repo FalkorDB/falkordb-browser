@@ -5,6 +5,7 @@ import GraphPage from "../logic/POM/graphPage";
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
+import { INITIAL_TAB_ID, tabScopedKey } from "../../lib/graphTabs";
 
 // The tab strip in the /graph sub-header. Each tab is an independent working
 // context (graph, query, view, canvas state), so these tests assert both the
@@ -571,6 +572,15 @@ test.describe("@admin Graph tabs", () => {
             await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
         });
         await page.route("**/api/graph", route => route.fulfill({ json: { opts: [graphOne] } }));
+        await page.addInitScript(key => {
+            localStorage.setItem(key, JSON.stringify({
+                version: 2,
+                messages: [
+                    { role: "user", type: "Text", content: "Show one result" },
+                    { role: "assistant", type: "CypherQuery", content: "RETURN 1" },
+                ],
+            }));
+        }, `localhost:6379:default:${tabScopedKey(INITIAL_TAB_ID, `chat-${graphOne}`)}`);
         await page.addInitScript(() => {
             const timeout = AbortSignal.timeout.bind(AbortSignal);
             AbortSignal.timeout = milliseconds => timeout(milliseconds === 5000 ? 60000 : milliseconds);
@@ -585,15 +595,25 @@ test.describe("@admin Graph tabs", () => {
             await page.keyboard.press("Enter");
             await expect(page.getByTestId("graphInfoPanel")).toBeVisible();
             await expect(info).toHaveAttribute("aria-pressed", "true");
-            await page.keyboard.press("Escape");
+            await expect(page.getByTestId("graphInfoAllNodes")).toBeDisabled();
+            await expect(page.getByTestId("createGraph")).toBeDisabled();
+            await page.getByTestId("graphInfoPanel").getByRole("button", { name: "Close", exact: true }).click();
+            await expect(page.getByTestId("mobileGraphInfoSheet")).toHaveAttribute("data-state", "closed");
             const chat = page.getByTestId("chatToggleButton");
             await expect(chat).toBeEnabled();
             await chat.click();
             await expect(page.getByTestId("chatPanel")).toBeVisible();
             await expect(chat).toHaveAttribute("aria-pressed", "true");
+            await expect(page.getByTestId("chatRunQueryButton")).toBeDisabled();
+            await expect(page.getByTestId("chatCopyQueryButton")).toBeEnabled();
+            await page.getByTestId("chatInput").fill("Draft during restoration");
+            await expect(page.getByTestId("chatInput")).toHaveValue("Draft during restoration");
+            await page.getByTestId("cypherOnlySwitch").click();
+            await expect(page.getByTestId("cypherOnlySwitch")).toHaveAttribute("aria-pressed", "true");
             await expect(page.getByTestId("mobileSelectorToolbar")).toHaveAttribute("aria-busy", "true");
             await expect(page.getByTestId("selectorMore")).toBeDisabled();
-            await chat.click();
+            await page.getByTestId("chatCloseButton").click();
+            await expect(page.getByTestId("mobileChatSheet")).toHaveAttribute("data-state", "closed");
             release();
             await expect(page.getByTestId("selectorMore")).toBeEnabled({ timeout: 15000 });
             await expect(page.getByTestId("mobileSelectorToolbar")).toHaveAttribute("aria-busy", "false");
@@ -601,6 +621,61 @@ test.describe("@admin Graph tabs", () => {
             await expect(page.getByTestId("uploadGraphToolbarTrigger")).toBeVisible();
         } finally {
             release();
+        }
+    });
+
+    test("A mobile overflow menu stays closed after connection readiness returns", async () => {
+        test.setTimeout(60_000);
+        await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        await page.setViewportSize({ width: 900, height: 900 });
+        const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
+        const { connections } = await (await page.request.get(`${urls.localHost}/api/connections`)).json();
+        expect(connections[0]?.id).toBeTruthy();
+        let releaseDiscovery!: () => void;
+        const discoveryGate = new Promise<void>(resolve => { releaseDiscovery = resolve; });
+        let releaseLists!: () => void;
+        const listGate = new Promise<void>(resolve => { releaseLists = resolve; });
+        let discovered = false;
+        let syncCompleted = false;
+        let replacementLists = 0;
+        await page.route("**/api/connections", async route => {
+            await discoveryGate;
+            discovered = true;
+            await route.fulfill({ json: { connections: [connections[0]] } });
+        });
+        await page.route("**/api/auth/session", async route => {
+            if (route.request().method() === "POST") syncCompleted = true;
+            await route.fulfill({
+                json: { ...session, activeConnectionId: syncCompleted ? connections[0].id : "other-session-connection" },
+            });
+        });
+        await page.route("**/api/graph", async route => {
+            if (discovered) {
+                replacementLists += 1;
+                await listGate;
+            }
+            await route.fulfill({ json: { opts: [graphOne, graphTwo] } });
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await expect(page.getByTestId("selectorMore")).toBeEnabled({ timeout: 15000 });
+            await page.getByTestId("selectorMore").click();
+            await expect(page.getByTestId("uploadGraphToolbarTrigger")).toBeVisible();
+            releaseDiscovery();
+            await expect.poll(() => syncCompleted, { timeout: 15000 }).toBe(true);
+            await expect.poll(() => replacementLists, { timeout: 15000 }).toBeGreaterThan(0);
+            await expect(page.getByTestId("selectorMore")).toBeDisabled();
+            await expect(page.getByTestId("uploadGraphToolbarTrigger")).toBeHidden();
+            releaseLists();
+            await expect(page.getByTestId("selectorMore")).toBeEnabled({ timeout: 15000 });
+            await expect(page.getByTestId("selectorMore")).toHaveAttribute("aria-expanded", "false");
+            await expect(page.getByTestId("uploadGraphToolbarTrigger")).toBeHidden();
+            await page.getByTestId("selectorMore").click();
+            await expect(page.getByTestId("uploadGraphToolbarTrigger")).toBeVisible();
+        } finally {
+            releaseDiscovery();
+            releaseLists();
         }
     });
 

@@ -825,7 +825,7 @@ export default function Page() {
 
     if (isMobile) {
         return (
-            <div className="h-full w-full flex flex-col min-h-0" data-testid="graphPage" data-graph-names-ready={graphNamesReady} aria-busy={!tabsReady} inert={tabsReady ? undefined : true}>
+            <div className="h-full w-full flex flex-col min-h-0" data-testid="graphPage" data-graph-names-ready={graphNamesReady} aria-busy={!tabsReady}>
                 <GraphSubHeader />
                 <div className="h-1 grow min-h-0 flex flex-col gap-1 p-1">
                     {selectorNode}
@@ -833,7 +833,9 @@ export default function Page() {
                         graph — the header and navigation above stay visible, which is
                         what makes the data read as nested inside the graph context. */}
                     <div className="h-1 grow min-h-0 relative overflow-hidden">
-                        {graphViewNode}
+                        <div className="h-full w-full" inert={tabsReady ? undefined : true}>
+                            {graphViewNode}
+                        </div>
                         {/* No sheet title: the info panel renders its own header and
                             close button, and it needs the height for its grid rows. */}
                         <BottomSheet
@@ -857,7 +859,9 @@ export default function Page() {
                             height="full"
                             data-testid="mobileDataSheet"
                         >
-                            {getCurrentPanel()}
+                            <div className="h-full w-full" inert={tabsReady ? undefined : true}>
+                                {getCurrentPanel()}
+                            </div>
                         </BottomSheet>
                         {/* No sheet title: Chat renders its own header and close button. */}
                         <BottomSheet

@@ -77,7 +77,7 @@ export default function Chat({ onClose }: Props) {
     // A generated query is arbitrary text the user never typed, so it gets the same
     // pre-flight gate as the editor before it can reach the server.
     const checkPreflight = useQueryPreflight();
-    const { activeTabId } = useContext(GraphTabsContext);
+    const { activeTabId, tabsReady } = useContext(GraphTabsContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
@@ -479,6 +479,7 @@ export default function Chat({ onClose }: Props) {
                         <div className="flex flex-col gap-2">
                             <Button
                                 data-testid="chatRunQueryButton"
+                                disabled={!tabsReady}
                                 title="Run Query"
                                 onClick={() => {
                                     if (checkPreflight(message.content)) return;

@@ -262,7 +262,10 @@ when connectivity returns, or after leaving the tutorial.
 Discovering the connection already identified by the session preserves loaded
 graphs and restored tabs instead of replaying their queries.
 On mobile, graph information and Chat remain available during restoration;
-tab-dependent overflow actions stay disabled until initialization finishes.
+their close controls, metadata browsing, and Chat drafts stay interactive.
+Graph selection, queries, editing, and overflow actions stay disabled until
+initialization finishes. An open overflow menu closes when readiness is lost
+and does not reopen until requested again.
 
 ### Error help
 

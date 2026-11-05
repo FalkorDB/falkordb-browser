@@ -190,7 +190,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const updateSessionRef = useRef(updateSession);
   useEffect(() => { updateSessionRef.current = updateSession; }, [updateSession]);
   const sessionConnectionIdRef = useRef(sessionData?.activeConnectionId);
-  sessionConnectionIdRef.current = sessionData?.activeConnectionId;
+  useEffect(() => {
+    sessionConnectionIdRef.current = sessionData?.activeConnectionId;
+  }, [sessionData?.activeConnectionId]);
 
   // Set connection prefix for scoped localStorage
   const [prefixReady, setPrefixReady] = useState(false);

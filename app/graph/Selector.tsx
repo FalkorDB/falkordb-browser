@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useCallback, useContext, Dispatch, SetStateAction } from "react";
+import { useState, useCallback, useContext, useEffect, Dispatch, SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { cn, formatName, HistoryQuery } from "@/lib/utils";
 import { History, Info, MoreHorizontal, Network, Sparkles, Upload } from "lucide-react";
@@ -74,6 +74,9 @@ export default function Selector({
 
     const [maximize, setMaximize] = useState(false);
     const [actionsOpen, setActionsOpen] = useState(false);
+    useEffect(() => {
+        if (!tabsReady) setActionsOpen(false);
+    }, [tabsReady]);
     const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
         setCypherLanguageConfig(config);
     }, [setCypherLanguageConfig]);
@@ -270,7 +273,7 @@ export default function Selector({
             <div className="z-20 w-full flex flex-col gap-2">
                 {mobileToolbarSlot && createPortal(toolbar, mobileToolbarSlot)}
                 {uploadDialog}
-                <div className="w-full h-[44px] flex flex-row items-center">
+                <div className="w-full h-[44px] flex flex-row items-center" inert={tabsReady ? undefined : true}>
                     {editorNode}
                 </div>
                 {/* Inset like every other mobile dialog rather than edge-to-edge, but with a

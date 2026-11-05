@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/compone
 import { cn, formatName, CustomizingItem, CustomizingRef } from "@/lib/utils";
 import { quoteCypherIdentifier } from "@/lib/cypher";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, ConnectionContext, GraphContext, GraphInfoContext, QueryLoadingContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, GraphContext, GraphInfoContext, GraphTabsContext, QueryLoadingContext } from "../components/provider";
 import Input from "../components/ui/Input";
 import SelectGraph from "./selectGraph";
 import { Graph } from "../api/graph/model";
@@ -23,6 +23,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const { graphInfoVersion, nodesCount, edgesCount } = useContext(GraphInfoContext);
     const { Labels, Relationships, PropertyKeys, MemoryUsage } = graph.GraphInfo;
     const { isQueryLoading } = useContext(QueryLoadingContext);
+    const { tabsReady } = useContext(GraphTabsContext);
     const { settings: { graphInfo: { showMemoryUsage, maxItemsForSearch } } } = useContext(BrowserSettingsContext);
     const { isReadOnly, supersedeGraphRefreshes } = useContext(ConnectionContext);
 
@@ -73,6 +74,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
         setPropertyKeysSearch("");
     }, [graphName, maxItemsForSearch]);
 
+    useEffect(() => {
+        if (!tabsReady) setCustomizingLabel(null);
+    }, [tabsReady, setCustomizingLabel]);
+
     // Stable callbacks so SelectGraph's handleSetRows useCallback is not
     // invalidated on every GraphInfoContext poll update, which would trigger
     // its useEffect([options, handleSetRows]) and reset checked rows.
@@ -116,7 +121,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <h1 className="text-lg font-semibold">Graph Info</h1>
                             <Network size={20} className="text-foreground/50" />
                         </div>
-                        <div className="w-full flex gap-2 items-center overflow-hidden">
+                        <fieldset disabled={!tabsReady} className="w-full min-w-0 flex gap-2 items-center overflow-hidden" inert={tabsReady ? undefined : true}>
                             <SelectGraph
                                 options={graphNames}
                                 setOptions={handleSetOptions}
@@ -141,7 +146,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     }
                                 />
                             }
-                        </div>
+                        </fieldset>
                         {
                             showMemoryUsage &&
                             <div className="w-full flex items-center gap-2">
@@ -213,7 +218,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         label="*"
                                         title="All labels"
                                         onClick={() => runQuery(`MATCH (n) RETURN n`)}
-                                        disabled={isQueryLoading}
+                                        disabled={!tabsReady || isQueryLoading}
                                     />
                                 </li>
                                 {Array.from(Labels.values()).filter(label => label.name.toLowerCase().includes(nodesSearch.toLowerCase())).sort((a, b) => b.count - a.count).map((label) => {
@@ -258,7 +263,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                             data-testid={`runLabel${name}`}
                                                             title={isEmptyLabel ? "Nodes without a label cannot be matched by label" : undefined}
                                                             onClick={() => runQuery(`MATCH (n:${quoteCypherIdentifier(name)}) RETURN n`)}
-                                                            disabled={isQueryLoading || isEmptyLabel}
+                                                            disabled={!tabsReady || isQueryLoading || isEmptyLabel}
                                                         >
                                                             <Play size={12} />
                                                             Run
@@ -268,6 +273,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
                                                             data-testid={`customizeStyle${name}`}
+                                                            disabled={!tabsReady}
                                                             onClick={() => setCustomizingLabel({ kind: "node", name: label.name })}
                                                         >
                                                             <Palette size={12} />
@@ -331,7 +337,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         label="*"
                                         title="All relationships"
                                         onClick={() => runQuery(`MATCH p=()-[]-() RETURN p`)}
-                                        disabled={isQueryLoading}
+                                        disabled={!tabsReady || isQueryLoading}
                                     />
                                 </li>
                                 {Array.from(Relationships.values()).filter(relationship => relationship.name.toLowerCase().includes(edgesSearch.toLowerCase())).sort((a, b) => b.count - a.count).map((relationship) => {
@@ -370,7 +376,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                             data-testid={`runRelationship${relationship.name}`}
                                                             title={`MATCH p=()-[:${quoteCypherIdentifier(relationship.name)}]-() RETURN p`}
                                                             onClick={() => runQuery(`MATCH p=()-[:${quoteCypherIdentifier(relationship.name)}]-() RETURN p`)}
-                                                            disabled={isQueryLoading}
+                                                            disabled={!tabsReady || isQueryLoading}
                                                         >
                                                             <Play size={12} />
                                                             Run
@@ -380,6 +386,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
                                                             data-testid={`customizeRelationshipStyle${relationship.name}`}
+                                                            disabled={!tabsReady}
                                                             onClick={() => setCustomizingLabel({ kind: "edge", name: relationship.name })}
                                                         >
                                                             <Palette size={12} />
@@ -446,7 +453,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                     onClick={() => runQuery(
                                                         `MATCH (e) WHERE e.${quoteCypherIdentifier(key)} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${quoteCypherIdentifier(key)} IS NOT NULL RETURN e`
                                                     )}
-                                                    disabled={isQueryLoading}
+                                                    disabled={!tabsReady || isQueryLoading}
                                                     label={index < arr.length - 1 ? `${key}, ` : key}
                                                 />
                                             </li>
