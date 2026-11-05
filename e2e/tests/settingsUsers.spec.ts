@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
+import type { CreateUser } from "@/app/api/user/model";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
@@ -17,6 +18,88 @@ test.describe('@Config Settings users tests', () => {
 
     test.afterEach(async () => {
         await browser.closeBrowser();
+    });
+
+    test("@admin Failed user creation preserves the form and retries without adding a phantom row", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const page = await browser.getPage();
+        const username = "mock-create-retry";
+        const submissions: (CreateUser & { keys: string[] })[] = [];
+        let saves = 0;
+        await page.route(/\/api\/user(?:\/.*)?$/, async route => {
+            if (route.request().method() === "GET") {
+                await route.fulfill({ json: { result: [] } });
+            } else if (route.request().url().endsWith("/save")) {
+                saves += 1;
+                await route.fulfill({ json: {} });
+            } else {
+                expect(route.request().method()).toBe("POST");
+                submissions.push(route.request().postDataJSON() as CreateUser & { keys: string[] });
+                await route.fulfill(submissions.length === 1
+                    ? { status: 409, json: { message: "User creation temporarily rejected" } }
+                    : { json: {} });
+            }
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
+        await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
+        await expect(page.locator("input[id='Username']")).toHaveValue(username);
+        await expect(page.locator("input[id='Password']")).toHaveValue(user.password);
+        await expect(page.getByTestId(`tableRowUsers${username}`)).toHaveCount(0);
+        expect(saves).toBe(0);
+
+        await settingsUsersPage.clickOnSubmitUserAddition();
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+        await expect(page.getByTestId(`tableRowUsers${username}`)).toHaveCount(1);
+        await expect.poll(() => saves).toBe(1);
+        expect(submissions).toEqual([
+            { username, role: user.ReadWrite, password: user.password, keys: ["*"] },
+            { username, role: user.ReadWrite, password: user.password, keys: ["*"] },
+        ]);
+    });
+
+    test("@admin Failed user edit retains original permissions and retries without changing the password", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const page = await browser.getPage();
+        const username = "mock-edit-retry";
+        const submissions: { role: string; keys: string[]; password?: string }[] = [];
+        let saves = 0;
+        await page.route(/\/api\/user(?:\/.*)?$/, async route => {
+            if (route.request().method() === "GET") {
+                await route.fulfill({ json: { result: [{ username, role: user.ReadWrite, keys: ["reports:*"] }] } });
+            } else if (route.request().url().endsWith("/save")) {
+                saves += 1;
+                await route.fulfill({ json: {} });
+            } else {
+                expect(route.request().method()).toBe("PATCH");
+                submissions.push(route.request().postDataJSON() as typeof submissions[number]);
+                await route.fulfill(submissions.length === 1
+                    ? { status: 403, json: { message: "User update denied" } }
+                    : { json: {} });
+            }
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.clickUserCheckboxBtn(username);
+        await page.locator("#edit-user").click();
+        await expect(page.locator("input[id='Username']")).toBeDisabled();
+        await settingsUsersPage.clickOnSelectRoleBtnInAddUser();
+        await settingsUsersPage.clickOnSelectUserRole(user.ReadOnly);
+        await page.getByRole("button", { name: "Save", exact: true }).click();
+        await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
+        await expect(page.getByTestId(`contentUsers${username}Role`)).toHaveText(user.ReadWrite);
+        await expect(page.getByRole("dialog")).toBeVisible();
+        expect(saves).toBe(0);
+
+        await page.getByRole("button", { name: "Save", exact: true }).click();
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+        await expect(page.getByTestId(`contentUsers${username}Role`)).toHaveText(user.ReadOnly);
+        await expect.poll(() => saves).toBe(1);
+        expect(submissions).toEqual([
+            { role: user.ReadOnly, keys: ["reports:*"] },
+            { role: user.ReadOnly, keys: ["reports:*"] },
+        ]);
     });
 
     test("@admin Add one new user -> validating user exists in the users list", async () => {
