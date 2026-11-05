@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   BUDGET_MS, COVERAGE_WORKFLOWS, changedLines, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
-  transient, missingFlags, patchTotals, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  transient, missingFlags, notStarted, patchTotals, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
@@ -442,4 +442,22 @@ test("totals the changed lines the commit's coverage counts", () => {
     // Not source the coverage counts.
     { filename: 'README.md', status: 'modified', patch: '@@ -1 +1 @@\n-a\n+b' },
   ], report), { hits: 2, misses: 2, partials: 1 });
+});
+
+test('gate: a pull request moved to another base fails a workflow that never ran, rather than wait for it', async () => {
+  // Moved to staging: Playwright now applies but never ran for this commit,
+  // and no event will start it.
+  const runs = [run('Build'), run('Desktop app')];
+  const moved = world({ runs });
+  assert.equal(await gate({ ...moved.args, retarget: true }), false);
+  assert.deepEqual(moved.posted, [
+    'coverage/project failure: Playwright Tests never ran for this commit: push a commit to run it',
+    'coverage/patch failure: Playwright Tests never ran for this commit: push a commit to run it',
+  ]);
+  // Outside a move, a workflow not started yet is only waited for.
+  const fresh = world({ runs });
+  await gate(fresh.args);
+  assert.match(fresh.posted[0], /pending: Waiting for Playwright Tests/);
+  // A running one is waited for, moved or not.
+  assert.deepEqual(notStarted(['Build', 'Playwright Tests'], [run('Build'), run('Playwright Tests', null, 'in_progress')]), []);
 });

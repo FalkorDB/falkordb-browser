@@ -13,7 +13,8 @@
 // branch. Environment: GITHUB_REPOSITORY, GH_TOKEN, SHA, EVENT (push or
 // pull_request), BRANCH (the pushed branch, or the pull request's head
 // branch), HEAD_OWNER (the owner of the repository that branch is in), PR
-// (the pull request's number, when GitHub gives it), TARGET (95 by default).
+// (the pull request's number, when GitHub gives it), TARGET (95 by default),
+// RETARGET (1 when the pull request just moved to another base).
 // DRY_RUN prints the statuses instead of posting them.
 
 import { appendFileSync } from 'node:fs';
@@ -148,6 +149,12 @@ export function waitingFor(expected, runs) {
     const run = latest.get(name);
     return !run || run.status !== 'completed' || run.conclusion === 'action_required';
   });
+}
+
+/** The expected workflows with no run at all for the trigger. */
+export function notStarted(expected, runs) {
+  const started = new Set(runs.map((run) => run.name));
+  return expected.filter((name) => !started.has(name));
 }
 
 /**
@@ -407,7 +414,7 @@ async function main() {
       console.log(`${branch} is not a protected branch: no gate`);
       return;
     }
-    const done = await gate({ gh, post, contexts, pr, sha, repo, target });
+    const done = await gate({ gh, post, contexts, pr, sha, repo, target, retarget: process.env.RETARGET === '1' });
     // The workflow tells Codecov to post its comment once the gate decided.
     if (done && process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, 'decided=true\n');
   } catch (error) {
@@ -423,7 +430,7 @@ async function main() {
  */
 export async function gate({
   gh, codecov = (url) => api(url), sleep = wait, now = Date.now, deadline = now() + BUDGET_MS,
-  post, contexts, pr, sha, repo, target,
+  post, contexts, pr, sha, repo, target, retarget = false,
 }) {
   // Every wait below shares one deadline, so the gate decides, or fails and
   // says so, before its job is stopped.
@@ -461,6 +468,16 @@ export async function gate({
     const workflow = Buffer.from(content.content, 'base64').toString('utf8');
     if (!expected.includes(name) && filtersApply(files) && runsFor(pathFilters(workflow, trigger), files)) expected.push(name);
   }
+  // A pull request moved to another base starts no workflow: one its new
+  // base calls for that never ran for this commit will not start by itself.
+  const never = retarget ? notStarted(expected, runs) : [];
+  if (never.length) {
+    console.log(`Never ran for this commit: ${never.join(', ')}`);
+    const description = `${never.join(', ')} never ran for this commit: push a commit to run it`.slice(0, 140);
+    for (const context of contexts) await post(context, { state: 'failure', description });
+    return false;
+  }
+
   const waiting = waitingFor(expected, runs);
   if (waiting.length) {
     console.log(`Waiting for ${waiting.join(', ')}`);

@@ -70,6 +70,7 @@ jobs:
           HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login || github.event.pull_request.head.repo.owner.login }}
           PR: ${{ github.event.workflow_run.pull_requests[0].number || github.event.pull_request.number }}
           TARGET: "95"
+          RETARGET: ${{ github.event_name == 'pull_request_target' && '1' || '' }}
 
       - name: Tell Codecov to post its comment
         if: steps.gate.outputs.decided == 'true'
