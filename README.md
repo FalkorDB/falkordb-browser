@@ -259,6 +259,8 @@ if that configuration does not respond within five seconds, restoration uses
 the 60-second fallback.
 Graph-list initialization retries after a failed connection synchronization,
 when connectivity returns, or after leaving the tutorial.
+Discovering the connection already identified by the session preserves loaded
+graphs and restored tabs instead of replaying their queries.
 
 ### Error help
 

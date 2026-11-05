@@ -189,6 +189,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // re-trigger when the function identity changes on session refresh.
   const updateSessionRef = useRef(updateSession);
   useEffect(() => { updateSessionRef.current = updateSession; }, [updateSession]);
+  const sessionConnectionIdRef = useRef(sessionData?.activeConnectionId);
+  sessionConnectionIdRef.current = sessionData?.activeConnectionId;
 
   // Set connection prefix for scoped localStorage
   const [prefixReady, setPrefixReady] = useState(false);
@@ -410,6 +412,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [customizingLabel, setCustomizingLabel] = useState<CustomizingRef | null>(null);
   const sessionSyncedRef = useRef(false);
   const prevActiveConnectionIdRef = useRef<string | null>(null);
+  const sameConnectionBootstrapRef = useRef<{ id: string; epoch: number } | null>(null);
 
   // ── Graph-operation ownership guards (see docs/design/idea-6-connection-epoch-pinning-plan.md) ──────────────────────
   // contextGen: "what connection + graph the UI represents" — bumped on a
@@ -1661,7 +1664,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // been dropped would make FalkorDB re-create it — wait for the list. It
     // must also wait for the saved timeout, or the rebuild runs with timeout=0.
     canRestore: tabsReady,
-    connectionKey: activeConnectionId,
+    connectionKey: activeConnectionId ?? prefixConnectionId,
     // The tutorial gets a strip of its own; the user's tabs come back with it.
     tutorialOpen,
     initialTabId: initialTabIdRef.current,
@@ -1698,6 +1701,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   useEffect(() => {
     if (pendingSwitchesRef.current > 0) return;
+    const bootstrap = sameConnectionBootstrapRef.current;
+    // A previous null-state commit can flush after discovery has pinned the
+    // session's connection but before React commits that id.
+    if (activeConnectionId === null && bootstrap?.id === getActiveConnectionIdGlobal()
+      && bootstrap.epoch === getConnectionEpoch()) return;
     setActiveConnectionIdGlobal(activeConnectionId);
   });
 
@@ -1873,9 +1881,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // the server declined the switch, so the prefix still describes the other
     // connection.
     const pinAndSync = async (id: string) => {
+      const sameConnection = getActiveConnectionIdGlobal() === null
+        && sessionConnectionIdRef.current === id;
       setActiveConnectionId(id);
       setActiveConnectionIdGlobal(id);
       const pinnedEpoch = getConnectionEpoch();
+      // Capture the JWT identity before updateSession can adopt a different id.
+      sameConnectionBootstrapRef.current = sameConnection ? { id, epoch: pinnedEpoch } : null;
       try {
         await switchSessionConnection(updateSessionRef.current, id);
       } catch (error) {
@@ -2468,6 +2480,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const prev = prevActiveConnectionIdRef.current;
     prevActiveConnectionIdRef.current = activeConnectionId;
     if (prev === activeConnectionId) return;
+    const bootstrap = sameConnectionBootstrapRef.current;
+    sameConnectionBootstrapRef.current = null;
+    if (prev === null && activeConnectionId === bootstrap?.id && getConnectionEpoch() === bootstrap.epoch) return;
     setGraphNamesLoaded(false);
     graphNamesLoadedRef.current = false;
     setGraphNames(undefined);
