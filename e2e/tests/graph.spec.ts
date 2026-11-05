@@ -89,11 +89,12 @@ test.describe("Graph Tests", () => {
       await expect(page.getByTestId("deleteGraphConfirm")).toBeHidden();
       await expect(page.getByText("Invalid input: deletion rejected", { exact: true })).toBeVisible();
       expect((await apiCall.getGraphs()).opts).toContain(graphName);
-      await expect(page.getByText("Graph deleted successfully", { exact: true })).toHaveCount(0);
+      await expect(page.getByText("Graph(s) deleted successfully", { exact: true })).toHaveCount(0);
       await graph.clickTableCheckboxByName(graphName);
       await graph.clickDelete();
       await graph.clickDeleteConfirm();
       await expect(page.getByTestId("deleteGraphConfirm")).toBeHidden();
+      await expect(page.getByText("Graph(s) deleted successfully", { exact: true })).toBeVisible();
       await expect.poll(async () => (await apiCall.getGraphs()).opts).not.toContain(graphName);
       expect(attempts).toBe(2);
     } finally {
