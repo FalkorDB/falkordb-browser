@@ -12,12 +12,23 @@
 
 import { test as base, type BrowserContext, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'crypto';
-import { mkdirSync, writeFileSync } from 'fs';
+import { linkSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import path from 'path';
 
 const dir = process.env.E2E_COVERAGE_DIR;
 
 const recording = new Map<Page, Promise<void>>();
+
+// The chunk URLs whose source this worker has saved.
+const savedSources = new Set<string>();
+
+// Each file is written whole under a temporary name and only then given its
+// real one, so the report never reads a file a crashed write left half done.
+function writeWhole(file: string, data: string) {
+    const tmp = `${file}.${randomUUID()}.tmp`;
+    writeFileSync(tmp, data);
+    renameSync(tmp, file);
+}
 
 async function save(page: Page) {
     const started = recording.get(page);
@@ -29,18 +40,24 @@ async function save(page: Page) {
     if (!dir || !entries.length) return;
     mkdirSync(dir, { recursive: true });
     // The chunks are content-hashed, so a URL always serves the same source:
-    // save each source once, not once per page. `wx` creates the file only if
-    // no page (in any worker) has saved it yet.
+    // save each source once, not once per page. Linking the complete file into
+    // place fails if another worker already saved it, and never replaces it.
     for (const { url, source } of entries) {
+        if (source === undefined || savedSources.has(url)) continue;
         const file = path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
+        const tmp = `${file}.${randomUUID()}.tmp`;
+        writeFileSync(tmp, source);
         try {
-            if (source !== undefined) writeFileSync(file, source, { flag: 'wx' });
+            linkSync(tmp, file);
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        } finally {
+            unlinkSync(tmp);
         }
+        savedSources.add(url);
     }
     const data = entries.map(({ url, scriptId, functions }) => ({ url, scriptId, functions }));
-    writeFileSync(path.join(dir, `browser-${randomUUID()}.json`), JSON.stringify(data));
+    writeWhole(path.join(dir, `browser-${randomUUID()}.json`), JSON.stringify(data));
 }
 
 function track(page: Page) {

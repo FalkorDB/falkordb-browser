@@ -133,13 +133,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # Last, so a Codecov problem never skips the installers.
+      # Last, so a Codecov problem never skips the installers; and never for a
+      # release, whose attach-to-release job needs this one to pass (its commit
+      # was measured when it was pushed).
       - name: Build the desktop coverage report
-        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name != 'release' }}
         run: node .github/scripts/coverage-report.mjs desktop coverage/raw/desktop
 
       - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name != 'release' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

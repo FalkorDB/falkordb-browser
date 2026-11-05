@@ -33,7 +33,10 @@ coverage:
 flag_management:
   default_rules:
     # A workflow a commit does not trigger (Desktop and Mobile run only for
-    # their own paths) keeps its flag's last coverage.
+    # their own paths) keeps its flag's last coverage. That is safe because
+    # each flag reports only the code its workflow tests (desktop: desktop/,
+    # mobile: mobile/, the others: the web app), and the workflow runs
+    # whenever that code changes.
     carryforward: true
 
 comment:

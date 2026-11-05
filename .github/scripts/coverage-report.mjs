@@ -1,6 +1,6 @@
-// Turns raw V8 coverage into a Codecov report over every source file in the
-// repository: a file that no test loads is reported at 0% instead of being
-// left out, so the total is the coverage of the whole codebase.
+// Turns raw V8 coverage into a Codecov report over every source file its flag
+// covers: a file that no test loads is reported at 0% instead of being left
+// out, so the total is the coverage of the whole codebase.
 //
 //   node .github/scripts/coverage-report.mjs <flag> <raw dir>...
 //
@@ -8,6 +8,8 @@
 // tests, the Next.js server under e2e) or the browser coverage that
 // e2e/infra/coverage.ts saves from Playwright pages. The report is written to
 // coverage/<flag>/ (codecov.json for the upload, index.html to browse).
+//
+// COVERAGE_ROOT points it at another checkout (the tests use a scratch one).
 
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,7 +17,9 @@ import { stripTypeScriptTypes } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+const ROOT = process.env.COVERAGE_ROOT
+  ? path.resolve(process.env.COVERAGE_ROOT) + path.sep
+  : fileURLToPath(new URL('../..', import.meta.url));
 
 // The source code the coverage is measured over. Everything else (tests,
 // generated code, config, tooling) is out of scope.
@@ -38,20 +42,32 @@ export function isSourceFile(relPath) {
   return SOURCES.some((re) => re.test(relPath)) && !NOT_SOURCES.some((re) => re.test(relPath));
 }
 
+// Each flag reports only on the code its workflow tests, and that workflow
+// runs whenever that code changes. Codecov carries a flag forward from an
+// earlier commit when its workflow did not run, so its lines must never
+// belong to a file the commit changed.
+const APPS = { desktop: /^desktop\//, mobile: /^mobile\// };
+
+/** Whether `flag`'s report covers `relPath`: the desktop and mobile shells, or the web app. */
+export function isFlagSource(flag, relPath) {
+  if (!isSourceFile(relPath)) return false;
+  const app = APPS[flag];
+  return app ? app.test(relPath) : !Object.values(APPS).some((re) => re.test(relPath));
+}
+
 /**
  * The repository-relative path of a source the coverage names: a path under
  * the root, or a webpack source-map URL (`webpack://falkordb-browser/./app/page.tsx`,
  * `webpack://_N_E/./app/page.tsx?1a2b`), so the server, browser and Node
  * coverage of one file merge into one entry.
  */
-export function toSourcePath(filePath) {
-  let p = filePath.replace(/\\/g, '/');
+export function toSourcePath(url) {
+  let p = url.replace(/\\/g, '/');
   if (p.startsWith('file://')) p = fileURLToPath(p).replace(/\\/g, '/');
   const root = ROOT.replace(/\\/g, '/');
   if (p.startsWith(root)) p = p.slice(root.length);
   return p
     .replace(/^webpack:\/\/[^/]*\//, '')
-    .replace(/^(falkordb-browser|_N_E)\//, '')
     .replace(/^\.\//, '')
     .replace(/[?#].*$/, '');
 }
@@ -63,12 +79,6 @@ export function toSourcePath(filePath) {
 export function localSourceMap(url) {
   const m = /^https?:\/\/[^/]+\/_next\/(static\/[^?#]+)/.exec(url);
   return m ? path.join(ROOT, '.next', decodeURIComponent(m[1])) : undefined;
-}
-
-/** A source file of this checkout (source maps also name files of dependencies). */
-function inScope(sourcePath) {
-  const rel = toSourcePath(sourcePath);
-  return isSourceFile(rel) && existsSync(path.join(ROOT, rel));
 }
 
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -127,8 +137,7 @@ async function codeLines(relPath) {
   return mappedLines(JSON.parse(out.sourceMapText).mappings);
 }
 
-// V8 counts the type-stripped code Node ran; its offsets line up with the
-// original because stripping blanks the types out in place.
+// Stripping blanks the types out in place, so the code keeps its offsets.
 function stripTypes(source) {
   try {
     return stripTypeScriptTypes(source);
@@ -137,6 +146,7 @@ function stripTypes(source) {
   }
 }
 
+// A file no test loaded, made JavaScript so Monocart can parse it.
 async function transpile(entry) {
   const file = fileURLToPath(entry.url);
   if (!/\.tsx?$/.test(file)) return;
@@ -169,37 +179,37 @@ export function browserEntries(dir, name) {
   });
 }
 
-function entryFilter(entry) {
-  if (entry.url.startsWith('file:')) {
-    const rel = toSourcePath(entry.url);
-    return rel.startsWith('.next/server/') || inScope(rel);
-  }
-  return localSourceMap(entry.url) !== undefined;
-}
-
 async function main([flag, ...dirs]) {
   if (!flag || !dirs.length) {
     console.error('usage: coverage-report.mjs <flag> <raw dir>...');
     process.exit(2);
   }
+  // A source file of this checkout that the flag covers (source maps also
+  // name files of dependencies).
+  const inScope = (sourcePath) => {
+    const rel = toSourcePath(sourcePath);
+    return isFlagSource(flag, rel) && existsSync(path.join(ROOT, rel));
+  };
+  const outputDir = path.join(ROOT, 'coverage', flag);
   const { CoverageReport } = await import('monocart-coverage-reports');
   const report = new CoverageReport({
     name: `${flag} coverage`,
-    outputDir: path.join(ROOT, 'coverage', flag),
+    outputDir,
     baseDir: ROOT,
     reports: [['codecov'], ['v8']],
-    entryFilter,
+    entryFilter: (entry) => {
+      if (!entry.url.startsWith('file:')) return localSourceMap(entry.url) !== undefined;
+      const rel = toSourcePath(entry.url);
+      return rel.startsWith('.next/server/') || inScope(rel);
+    },
     sourceFilter: inScope,
-    sourcePath: (sourcePath) => toSourcePath(sourcePath),
+    // Monocart rewrites a URL into a path before this, turning a webpack
+    // `?query` into part of the file name; `info.url` is the URL as written.
+    sourcePath: (sourcePath, info) => toSourcePath(info?.url ?? sourcePath),
     sourceMapResolver: async (url, defaultResolver) => {
       const local = localSourceMap(url);
       if (!local) return defaultResolver(url);
       return existsSync(local) ? readFileSync(local, 'utf8') : undefined;
-    },
-    onEntry: async (entry) => {
-      if (entry.url.startsWith('file:') && /\.[cm]?ts$/.test(entry.url) && !entry.sourceMap) {
-        entry.source = stripTypes(entry.source) ?? entry.source;
-      }
     },
     all: {
       dir: ROOT,
@@ -224,7 +234,7 @@ async function main([flag, ...dirs]) {
     }
   }
   await report.generate();
-  await normalize(flag, path.join(ROOT, 'coverage', flag, 'codecov.json'));
+  await normalize(flag, path.join(outputDir, 'codecov.json'));
 }
 
 /**
@@ -249,7 +259,7 @@ async function normalize(flag, reportFile) {
   }
   writeFileSync(reportFile, JSON.stringify(report));
   const files = Object.keys(report.coverage).length;
-  const summary = `${flag}: ${((100 * hits) / lines).toFixed(2)}% of lines (${hits}/${lines} in ${files} files)`;
+  const summary = `${flag}: ${lines ? ((100 * hits) / lines).toFixed(2) : '0.00'}% of lines (${hits}/${lines} in ${files} files)`;
   console.log(summary);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Coverage\n\n${summary}\n`);
 }

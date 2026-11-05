@@ -200,9 +200,10 @@ jobs:
       - name: Stop the server
         if: ${{ !cancelled() }}
         run: |
-          # The server writes its V8 coverage as it exits.
-          pkill -TERM -f "[n]ext-server" || true
-          timeout 60s bash -c 'while pgrep -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          pkill -TERM -u "$(id -u)" -f "[n]ext-server" || true
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
       - name: Build the e2e coverage report
         if: ${{ !cancelled() }}
         run: node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
@@ -304,9 +305,10 @@ jobs:
       - name: Stop the server
         if: ${{ !cancelled() }}
         run: |
-          # The server writes its V8 coverage as it exits.
-          pkill -TERM -f "[n]ext-server" || true
-          timeout 60s bash -c 'while pgrep -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          pkill -TERM -u "$(id -u)" -f "[n]ext-server" || true
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
       - name: Build the e2e coverage report
         if: ${{ !cancelled() }}
         run: node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
@@ -472,9 +474,10 @@ jobs:
       - name: Stop the server
         if: ${{ !cancelled() }}
         run: |
-          # The server writes its V8 coverage as it exits.
-          pkill -TERM -f "[n]ext-server" || true
-          timeout 60s bash -c 'while pgrep -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          pkill -TERM -u "$(id -u)" -f "[n]ext-server" || true
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
       - name: Build the e2e coverage report
         if: ${{ !cancelled() }}
         run: node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
@@ -631,9 +634,10 @@ jobs:
       - name: Stop the server
         if: ${{ !cancelled() }}
         run: |
-          # The server writes its V8 coverage as it exits.
-          pkill -TERM -f "[n]ext-server" || true
-          timeout 60s bash -c 'while pgrep -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          pkill -TERM -u "$(id -u)" -f "[n]ext-server" || true
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
       - name: Build the e2e coverage report
         if: ${{ !cancelled() }}
         run: node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
