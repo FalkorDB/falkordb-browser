@@ -344,6 +344,8 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   fixtures imports `test` from `e2e/infra/coverage.ts` so its pages are recorded too.
   Browser-running CI jobs use `REQUIRE_BROWSER_COVERAGE=1` when generating the report:
   missing recordings or recorder errors fail collection, even when server coverage exists.
+  Original script responses are captured in case Chromium loses a source during
+  navigation; a source missing from both the recording and its response fails collection.
   Server-only test jobs do not require or launch a browser. The gate waits for all six
   shard uploads plus the TLS, cluster, stateless and Docker E2E uploads, not just an
   `e2e` flag from one job. It waits up to 15 minutes for required uploads to appear
