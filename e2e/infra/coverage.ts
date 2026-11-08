@@ -18,6 +18,8 @@ import path from 'path';
 const dir = process.env.E2E_COVERAGE_DIR;
 
 const recording = new Map<Page, Promise<void>>();
+type CapturedSource = { source: string } | { error: unknown };
+const sources = new WeakMap<Page, Map<string, Promise<CapturedSource>>>();
 
 // The chunk URLs whose source this worker has saved.
 const savedSources = new Set<string>();
@@ -50,13 +52,26 @@ async function save(page: Page) {
     await started;
     const entries = (await page.coverage.stopJSCoverage())
         .filter(({ url }) => url.includes('/_next/static/'));
+    const capturedSources = sources.get(page);
+    sources.delete(page);
     if (!dir || !entries.length) return;
     mkdirSync(dir, { recursive: true });
     // The chunks are content-hashed, so a URL always serves the same source:
     // save each source once, not once per page. Linking the complete file into
     // place fails if another worker already saved it, and never replaces it.
-    for (const { url, source } of entries) {
-        if (source === undefined || savedSources.has(url)) continue;
+    for (const entry of entries) {
+        const { url } = entry;
+        if (savedSources.has(url)) continue;
+        let source = entry.source;
+        if (source === undefined) {
+            const captured = await capturedSources?.get(url);
+            if (!captured || 'error' in captured) {
+                throw new Error(`No source available for browser chunk ${url}`, {
+                    cause: captured && 'error' in captured ? captured.error : undefined,
+                });
+            }
+            source = captured.source;
+        }
         const file = path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
         const tmp = `${file}.${randomUUID()}.tmp`;
         writeFileSync(tmp, source);
@@ -76,6 +91,19 @@ async function save(page: Page) {
 /** Records `page`'s coverage until it closes (or its context does). */
 function track(page: Page) {
     if (recording.has(page)) return;
+    // Chromium can lose Debugger.getScriptSource during navigation. Preserve
+    // the actual response, not a later fetch that could serve a different build.
+    const capturedSources = new Map<string, Promise<CapturedSource>>();
+    sources.set(page, capturedSources);
+    page.on('response', (response) => {
+        const url = response.url();
+        if (!url.includes('/_next/static/') || response.request().resourceType() !== 'script'
+            || !response.ok() || savedSources.has(url)) return;
+        capturedSources.set(url, response.text().then(
+            (source): CapturedSource => ({ source }),
+            (error: unknown): CapturedSource => ({ error }),
+        ));
+    });
     recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch(recordFailure));
     const close = page.close.bind(page);
     page.close = async (options) => {

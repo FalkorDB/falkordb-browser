@@ -19,11 +19,11 @@ beforeEach(() => {
   for (const name of readdirSync(dir)) unlinkSync(path.join(dir, name));
 });
 
-function context({ browser = 'chromium', startError, stopError } = {}) {
+function context({ browser = 'chromium', startError, stopError, missingSource = false } = {}) {
   const pages = [];
   const url = `http://localhost:3000/_next/static/chunks/${randomUUID()}.js`;
   let closed = false;
-  const page = {
+  const page = Object.assign(new EventEmitter(), {
     coverage: {
       async startJSCoverage() { if (startError) throw startError; },
       async stopJSCoverage() {
@@ -31,14 +31,14 @@ function context({ browser = 'chromium', startError, stopError } = {}) {
         return [{
           url,
           scriptId: '1',
-          source: 'window.proof = true;',
+          source: missingSource ? undefined : 'window.proof = true;',
           functions: [],
         }];
       },
     },
     isClosed: () => closed,
     async close() { closed = true; },
-  };
+  });
   const result = Object.assign(new EventEmitter(), {
     browser: () => ({ browserType: () => ({ name: () => browser }) }),
     pages: () => pages,
@@ -49,7 +49,7 @@ function context({ browser = 'chromium', startError, stopError } = {}) {
     },
     async close() { closed = true; },
   });
-  return { context: result, page };
+  return { context: result, page, url };
 }
 
 test('records once when a context is tracked twice and closes its page', async () => {
@@ -69,6 +69,51 @@ test('saves pages on context close without a separate page close', async () => {
   await fixture.context.newPage();
   await fixture.context.close();
   assert.ok(fixture.page.isClosed());
+  validateBrowserCoverage([dir]);
+});
+
+test('preserves the original script response when Chromium omits a recorded source', async () => {
+  const fixture = context({ missingSource: true });
+  trackContext(fixture.context);
+  const page = await fixture.context.newPage();
+  let complete;
+  const body = new Promise((resolve) => { complete = resolve; });
+  page.emit('response', {
+    url: () => fixture.url,
+    ok: () => true,
+    request: () => ({ resourceType: () => 'script' }),
+    text: () => body,
+  });
+  const closing = page.close();
+  complete('window.originalResponse = true;');
+  await closing;
+  await fixture.context.close();
+  validateBrowserCoverage([dir]);
+  const source = readdirSync(dir).find((name) => name.startsWith('browser-source-'));
+  assert.equal(readFileSync(path.join(dir, source), 'utf8'), 'window.originalResponse = true;');
+});
+
+test('missing source without a captured response fails explicitly and still closes the page', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const fixture = context({ missingSource: true });
+  trackContext(fixture.context);
+  const page = await fixture.context.newPage();
+  await page.close();
+  assert.ok(page.isClosed());
+  assert.throws(() => validateBrowserCoverage([dir]), /Browser coverage collection failed.*source/);
+});
+
+test('a failed response-body capture does not discard a source Chromium supplied', async () => {
+  const fixture = context();
+  trackContext(fixture.context);
+  const page = await fixture.context.newPage();
+  page.emit('response', {
+    url: () => fixture.url,
+    ok: () => true,
+    request: () => ({ resourceType: () => 'script' }),
+    text: async () => { throw new Error('response was evicted'); },
+  });
+  await page.close();
   validateBrowserCoverage([dir]);
 });
 
