@@ -121,7 +121,7 @@ test.describe("Schema View Tests", () => {
         await schemaView.clickSchemaTab();
         await schemaView.waitForSchemaTripleCount(1);
         expect(await schemaView.getSchemaTripleStrings()).toEqual(["Person-[KNOWS]->Person"]);
-        expect(await schemaView.getSchemaLabels()).toEqual(["City", "Company", "Employee", "Person"]);
+        await expect.poll(() => schemaView.getSchemaLabels()).toEqual(["City", "Company", "Employee", "Person"]);
         expect(intercepted).toBe(1);
     });
 
