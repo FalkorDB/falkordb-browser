@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   BUDGET_MS, COVERAGE_WORKFLOWS, changedLines, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
@@ -203,23 +203,65 @@ function jobBlocks(workflow) {
 const namePattern = (name) => new RegExp(`^${name.trim().replace(/^['"]|['"]$/g, '').split(/\$\{\{[^}]*\}\}/)
   .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.+')}$`);
 
+/** Whether a job block is the job GitHub names `jobName`: by its `name:`, else by its id (with its matrix values). */
+function namesJob({ id, text }, jobName) {
+  const own = /^    name: (.+)$/m.exec(text);
+  if (own) return namePattern(own[1]).test(jobName);
+  return jobName === id || (text.includes('matrix:') && namePattern(id + ' (${{ matrix }})').test(jobName));
+}
+
+/** A job block's steps that use the Codecov action. */
+const codecovSteps = (block) => block.text.split(/^      - /m).filter((s) => s.includes('codecov/codecov-action'));
+
+/** The Codecov steps that upload coverage (rather than, say, `run_command: send-notifications`). */
+const uploadSteps = (block) => codecovSteps(block).filter((s) => {
+  const command = /^ {10}run_command: (.+)$/m.exec(s);
+  return !command || command[1].trim() === 'upload-coverage';
+});
+
+/** The name a Codecov upload step uploads as: its `name:`, else its flags (as the gate's uploadName does). */
+const uploadStepName = (step) => (/^ {10}name: (.+)$/m.exec(step) ?? /^ {10}flags: (.+)$/m.exec(step))?.[1] ?? '';
+
+/**
+ * The Codecov uploads in a workflow file that the gate does not check: a
+ * workflow not in COVERAGE_WORKFLOWS, or a job (or upload) not in its `jobs`.
+ */
+function uncheckedUploads(file, workflow) {
+  const workflowName = /^name: (.+)$/m.exec(workflow)?.[1].trim();
+  const configured = Object.values(COVERAGE_WORKFLOWS).find((w) => w.file === file);
+  const blocks = jobBlocks(workflow);
+  const unchecked = [];
+  // Every use of the action is in a step of a job the parsing found: fail closed on a layout it does not read.
+  const found = blocks.reduce((n, block) => n + codecovSteps(block).length, 0);
+  const uses = workflow.match(/^\s*(?:-\s+)?uses:\s*['"]?codecov\/codecov-action\b/gm)?.length ?? 0;
+  if (found !== uses) unchecked.push(`${file}: ${uses - found} Codecov step(s) outside the jobs' steps`);
+  for (const block of blocks) {
+    for (const step of uploadSteps(block)) {
+      const upload = uploadStepName(step);
+      if (!configured || COVERAGE_WORKFLOWS[workflowName] !== configured) {
+        unchecked.push(`${file}: ${block.id} uploads ${upload} from workflow ${workflowName}, not in COVERAGE_WORKFLOWS`);
+        continue;
+      }
+      const checked = Object.entries(configured.jobs)
+        .some(([jobName, job]) => namesJob(block, jobName) && namePattern(upload).test(job.upload));
+      if (!checked) unchecked.push(`${file}: ${block.id} uploads ${upload}, not in COVERAGE_WORKFLOWS['${workflowName}'].jobs`);
+    }
+  }
+  return unchecked;
+}
+
 test('names only coverage jobs, steps and uploads the workflow files have', () => {
   for (const [workflowName, { file, flags, jobs }] of Object.entries(COVERAGE_WORKFLOWS)) {
     const workflow = readFileSync(`${ROOT}${file}`, 'utf8');
     assert.equal(/^name: (.+)$/m.exec(workflow)[1].trim(), workflowName);
     const blocks = jobBlocks(workflow);
     for (const [jobName, { upload, steps }] of Object.entries(jobs)) {
-      // A job is named by its `name:`, else by its id (with its matrix values).
-      const block = blocks.find(({ id, text }) => {
-        const own = /^    name: (.+)$/m.exec(text);
-        if (own) return namePattern(own[1]).test(jobName);
-        return jobName === id || (text.includes('matrix:') && namePattern(`${id} (\${{ matrix }})`).test(jobName));
-      });
+      const block = blocks.find((b) => namesJob(b, jobName));
       assert.ok(block, `${file} has no job ${jobName}`);
       const stepNames = [...block.text.matchAll(/^      - name: (.+)$/gm)].map((m) => namePattern(m[1]));
       for (const step of steps) assert.ok(stepNames.some((re) => re.test(step)), `${file}: ${jobName} has no step ${step}`);
       // Its upload, named and flagged as the gate expects.
-      const uploadStep = block.text.split(/^      - /m).find((s) => s.includes('codecov/codecov-action'));
+      const uploadStep = uploadSteps(block)[0];
       assert.ok(uploadStep, `${file}: ${jobName} uploads no coverage`);
       assert.ok(namePattern(/^ {10}name: (.+)$/m.exec(uploadStep)[1]).test(upload), `${file}: ${jobName} does not upload ${upload}`);
       assert.ok(flags.includes(/^ {10}flags: (.+)$/m.exec(uploadStep)[1].trim()), `${file}: ${jobName} uploads another flag`);
@@ -228,6 +270,25 @@ test('names only coverage jobs, steps and uploads the workflow files have', () =
   // The matrices the job names count on.
   assert.match(readFileSync(`${ROOT}.github/workflows/playwright.yml`, 'utf8'), /shard: \[1, 2, 3, 4, 5, 6\]/);
   assert.match(readFileSync(`${ROOT}.github/workflows/desktop.yml`, 'utf8'), /os: \[ubuntu-latest,/);
+});
+
+test('checks every coverage upload the workflow files make', () => {
+  const dir = `${ROOT}.github/workflows/`;
+  const files = readdirSync(dir).filter((f) => /\.ya?ml$/.test(f));
+  assert.ok(files.length > 0);
+  for (const f of files) assert.deepEqual(uncheckedUploads(`.github/workflows/${f}`, readFileSync(`${dir}${f}`, 'utf8')), []);
+  // An upload the gate does not know of is caught: a new job, a renamed upload, a new workflow.
+  const file = COVERAGE_WORKFLOWS.Build.file;
+  const build = readFileSync(`${ROOT}${file}`, 'utf8');
+  const upload = (name) => `    steps:\n      - name: Upload\n        uses: codecov/codecov-action@v7\n        with:\n          flags: unit\n          name: ${name}\n`;
+  const withJob = (text, job) => text.replace(/^jobs:\n/m, `jobs:\n  ${job}:\n    runs-on: ubuntu-latest\n${upload('lint')}`);
+  assert.deepEqual(uncheckedUploads(file, withJob(build, 'lint')), [`${file}: lint uploads lint, not in COVERAGE_WORKFLOWS['Build'].jobs`]);
+  assert.deepEqual(uncheckedUploads(file, build.replace(/^ {10}name: unit$/m, '          name: unit-renamed')),
+    [`${file}: build uploads unit-renamed, not in COVERAGE_WORKFLOWS['Build'].jobs`]);
+  assert.deepEqual(uncheckedUploads('.github/workflows/other.yml', withJob('name: Other\non: push\njobs:\n', 'lint')),
+    ['.github/workflows/other.yml: lint uploads lint from workflow Other, not in COVERAGE_WORKFLOWS']);
+  // A step the parsing cannot place is not let through.
+  assert.equal(uncheckedUploads(file, `${build}\n# moved\n      - uses: codecov/codecov-action@v7\n`).length, 1);
 });
 
 test("finds the flags a commit's workflows uploaded no coverage of", () => {
