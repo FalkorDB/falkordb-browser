@@ -210,6 +210,33 @@ test.describe("Data panel Tests", () => {
     await apicalls.removeGraph(graphName);
   });
 
+  test("@admin editing a relationship property with a reserved URL character updates only that property", async () => {
+    test.setTimeout(60_000);
+    const graphName = getRandomString("relationshipProperty");
+    await apicalls.addGraph(graphName);
+    try {
+      await apicalls.runQuery(graphName, "CREATE (:Person {name: 'Alice'})-[:KNOWS {`a?b`: 1, a: 2}]->(:Person {name: 'Bob'})");
+      const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+      await browser.setPageToFullScreen();
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery("MATCH (a)-[r:KNOWS]->(b) RETURN a, r, b");
+      await graph.clickRunQuery();
+      await graph.waitForCanvasAnimationToEnd();
+      await graph.clickCenterControl();
+      await graph.waitForScaleToStabilize();
+      const links = await graph.getLinksScreenPositions();
+      expect(links).toHaveLength(1);
+      await graph.clickCanvasElement(links[0].midX, links[0].midY);
+      await graph.setAttribute("a?b", "70", "integer");
+      await expect.poll(async () => {
+        const response = await apicalls.runQuery(graphName, "MATCH ()-[r:KNOWS]->() RETURN r");
+        return response.data[0].r.properties;
+      }, { timeout: 10000 }).toEqual({ "a?b": 70, a: 2 });
+    } finally {
+      await apicalls.removeGraph(graphName);
+    }
+  });
+
   for (const key of ["a?b", "c#d", "e/f", "g%h"]) {
     test(`@readwrite Validate modifying attribute with reserved URL character key "${key}" updates that key only`, async () => {
       const graphName = getRandomString("datapanel");
