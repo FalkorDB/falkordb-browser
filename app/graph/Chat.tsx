@@ -5,7 +5,7 @@ import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { ChevronDown, ChevronRight, Share2, Loader2, Search, X, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Share2, Loader2, Search, X, Sparkles, Copy, FileCode2 } from "lucide-react";
 import { Chat as ChatPanel, ChatAvatar, ChatFooter, ChatHeader, ChatInput, ChatInputField, ChatMessage, ChatMessages, ChatSendButton, ChatTitle } from "@falkordb/ui";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
@@ -22,7 +22,7 @@ import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConfidenceStyle, normalizeConfidence } from "./confidence";
 import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
 import { stripCypherFenceTag } from "./cypherDisplay";
-import SuggestedQuery from "../components/SuggestedQuery";
+import { copyText } from "@/lib/clipboard";
 import { chatDraftKey, isUnchangedChatDraft, isChatConfigurationError } from "./chatDraft";
 
 const mdInstance = new MarkdownIt({
@@ -410,12 +410,42 @@ export default function Chat({ onClose }: Props) {
                 );
             case "CypherQuery":
                 return (
-                    <SuggestedQuery
-                        query={message.content}
-                        onInsert={query => setHistoryQuery(prev => withQuery(prev, query))}
-                        collapsible
-                        testIds={{ query: "chatSuggestedQuery", copy: "chatCopyQueryButton", insert: "chatInsertQueryButton" }}
-                    />
+                    <div className="flex min-w-0 flex-col gap-1">
+                        <pre data-testid="chatSuggestedQuery" role="group" tabIndex={0} aria-label="Suggested query" className="max-h-48 min-w-0 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
+                            {message.content}
+                        </pre>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                data-testid="chatInsertQueryButton"
+                                title="Insert into editor"
+                                className="p-1"
+                                onClick={() => setHistoryQuery(prev => withQuery(prev, message.content))}
+                            >
+                                <FileCode2 size={16} />
+                            </Button>
+                            <Button
+                                data-testid="chatCopyQueryButton"
+                                title="Copy Query"
+                                className="p-1"
+                                onClick={async () => {
+                                    if (!await copyText(navigator.clipboard?.writeText?.bind(navigator.clipboard), message.content)) {
+                                        toast({
+                                            title: "Couldn't copy query",
+                                            description: "Clipboard access is unavailable. Select and copy the query manually.",
+                                            variant: "destructive",
+                                        });
+                                        return;
+                                    }
+                                    toast({
+                                        title: "Copied to clipboard",
+                                        description: "The query has been copied to your clipboard",
+                                    });
+                                }}
+                            >
+                                <Copy size={16} />
+                            </Button>
+                        </div>
+                    </div>
                 );
             // case "CypherResult":
             //     return (

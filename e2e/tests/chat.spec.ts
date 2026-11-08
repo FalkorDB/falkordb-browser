@@ -63,9 +63,13 @@ test.describe("Chat Feature Tests", () => {
         if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
       }
     });
+    // A single real graph is auto-selected, so isolate the empty-list case
+    // from graphs created or removed by other workers.
+    await page.route("**/api/graph", route => route.fulfill({ json: { opts: [] } }));
     await page.goto(urls.graphUrl);
     await browser.setPageToFullScreen();
     
+    await expect(page.getByTestId("selectGraph")).toHaveText("Select Graph");
     await expect(page.getByTestId("chatToggleButton")).toBeVisible();
     await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
   });
@@ -85,6 +89,30 @@ test.describe("Chat Feature Tests", () => {
     expect(isChatButtonVisible).toBe(true);
     
     await apiCall.removeGraph(graphName);
+  });
+
+  test("@readwrite A single available graph is auto-selected and enables chat", async () => {
+    const graphName = getRandomString("chat-auto-select");
+    await apiCall.addGraph(graphName);
+    try {
+      await browser.createNewPage(ChatComponent);
+      const page = await browser.getPage();
+      await page.addInitScript(() => {
+        for (const key of Object.keys(localStorage)) {
+          if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
+        }
+      });
+      await page.route("**/api/graph", route => route.fulfill({ json: { opts: [graphName] } }));
+      await page.goto(urls.graphUrl);
+      await browser.setPageToFullScreen();
+
+      await expect(page.getByTestId("selectGraph")).toHaveText(graphName);
+      await expect(page.getByTestId("chatToggleButton")).toBeEnabled();
+      await page.getByTestId("chatToggleButton").click();
+      await expect(page.getByTestId("chatPanel")).toBeVisible();
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
   });
 
   test(`@readwrite Verify attempting to send a question without API key shows error`, async () => {
@@ -628,11 +656,27 @@ test.describe("Chat Feature Tests", () => {
       const displayedQuery = await chat.getLastAssistantMessageContent("CypherQuery");
       expect(displayedQuery?.trim().startsWith("CYPHER sourceCode='TLV'")).toBe(true);
 
+      const queryMessage = page.getByTestId("chatAssistantMessage-CypherQuery").last();
+      const queryText = queryMessage.locator("pre");
+      await expect(queryText).toHaveText(cypherQuery);
+      await expect(queryText).toHaveCSS("font-size", "12px");
+      await expect(queryMessage.getByRole("button")).toHaveCount(2);
+      await expect(queryMessage.getByTestId("chatInsertQueryButton")).toBeVisible();
+      await expect(queryMessage.getByTestId("chatCopyQueryButton")).toBeVisible();
+      expect(await queryText.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+      let queryRequests = 0;
+      page.on("request", request => {
+        const url = new URL(request.url());
+        if (url.pathname === `/api/graph/${graphName}` && url.searchParams.has("query")) queryRequests++;
+      });
       await chat.clickChatInsertQueryButton();
 
       await expect.poll(() => chat.getEditorInput(), { timeout: 10000 })
         .toMatch(/^CYPHER sourceCode='TLV'/);
+      expect(queryRequests).toBe(0);
       await chat.clickRunQuery();
+      await expect.poll(() => queryRequests).toBeGreaterThan(0);
       await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
       expect(await chat.getNotificationErrorToast()).toBe(false);
     } finally {

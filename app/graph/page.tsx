@@ -1,6 +1,6 @@
 'use client';
 
-import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cn, convertToCanvasData, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, parsePanelSizePercent, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
@@ -17,6 +17,8 @@ import { useResizableSize } from "@/lib/useResizableSize";
 import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import GraphSubHeader from "./GraphSubHeader";
+import { setCanvasGraphData } from "@/lib/graph3DResources";
+import { ownsCanvasSession } from "@/lib/canvasSession";
 
 const GraphInfoPanel = dynamicImport(() => import("./graphInfo"), {
     ssr: false,
@@ -78,7 +80,7 @@ export default function Page() {
     const { panel, setPanel, panelOpen, onTogglePanel, infoPanelRef, onInfoPanelResize, customizingLabel, setCustomizingLabel } = useContext(PanelContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
-    const { canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
+    const { canvasRef, data, setData, graphData, setViewport } = useContext(ForceGraphContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const { tabs, activeTabId } = useContext(GraphTabsContext);
     const isReadOnlyRef = useRef(isReadOnly);
@@ -106,6 +108,10 @@ export default function Page() {
         chatOpen,
         setChatOpen,
     } = useContext(GraphContext);
+    const graphOwnerRef = useRef({ graph, data, graphName, activeTabId });
+    useLayoutEffect(() => {
+        graphOwnerRef.current = { graph, data, graphName, activeTabId };
+    }, [graph, data, graphName, activeTabId]);
     const {
         settings: {
             querySettings: { runDefaultQuery, defaultQuery },
@@ -587,6 +593,10 @@ export default function Page() {
         if (!canvasRef.current) return false;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
+        const isCurrentOwner = () => getConnectionEpoch() === startEpoch
+            && graphOwnerRef.current.graph === graph
+            && graphOwnerRef.current.graphName === graphName
+            && graphOwnerRef.current.activeTabId === activeTabId;
 
         const fakeId = "-1";
         const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
@@ -600,41 +610,58 @@ export default function Page() {
             })
         }, toast, setIndicator, cid);
 
-        if (getConnectionEpoch() !== startEpoch) return false;
         if (result.ok) {
             const json = await result.json();
-            if (getConnectionEpoch() !== startEpoch) return false;
 
             if (isAddNode) {
                 const node = await graph.extendNode(json.result.data[0].n, false, true);
 
-                if (node) {
+                if (node && isCurrentOwner()) {
                     setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
                     handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
                 }
             } else {
                 const link = await graph.extendEdge(json.result.data[0].e, false, true);
 
-                if (link) {
+                if (link && isCurrentOwner()) {
                     setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
                     handleSetIsAdd(setIsAddEdge, setIsAddNode)(false);
                 }
             }
 
-            fetchCount(graphName);
-
-            setSelectedElements([]);
+            if (isCurrentOwner()) {
+                fetchCount(graphName);
+                setSelectedElements([]);
+            }
         }
 
-        canvasRef.current?.setGraphData(convertToCanvasData(graph.Elements));
+        const canvas = canvasRef.current;
+        const mayRepaint = () => isCurrentOwner() && canvasRef.current === canvas && !!canvas
+            && ownsCanvasSession(canvas, { graph, data: graphOwnerRef.current.data, tabId: activeTabId, epoch: startEpoch });
+        let repaintSkipped = false;
+        if (result.ok && canvas && mayRepaint()) {
+            repaintSkipped = !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), mayRepaint) && isCurrentOwner();
+        } else if (result.ok && isCurrentOwner()) {
+            // Restart a pending restore with the model that includes this mutation.
+            setData({ ...graph.Elements });
+        }
+        if (result.ok) toast({
+            title: repaintSkipped ? `${isAddNode ? "Node" : "Edge"} created; repaint skipped` : "Success",
+            description: `${isAddNode ? "Node" : "Edge"} created in graph ${graph.Id}.${repaintSkipped ? " The canvas repaint was skipped. Run the query again to refresh the view." : ""}`,
+            variant: repaintSkipped ? "destructive" : "default",
+        });
 
         return result.ok;
-    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
+    }, [fetchCount, graph, graphName, activeTabId, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setData, setIndicator, setLabels, setRelationships, toast]);
 
     const handleDeleteElement = useCallback(async () => {
         if (!canvasRef.current) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
+        const isCurrentOwner = () => getConnectionEpoch() === startEpoch
+            && graphOwnerRef.current.graph === graph
+            && graphOwnerRef.current.graphName === graphName
+            && graphOwnerRef.current.activeTabId === activeTabId;
 
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
             const type = !('source' in element);
@@ -677,24 +704,32 @@ export default function Page() {
             return element;
         }))).filter(e => !!e);
 
-        if (getConnectionEpoch() !== startEpoch) return;
-
         graph.removeElements(deletedElements);
+        const remainingRelationships = graph.removeLinks(deletedElements.filter(element => "labels" in element).map(element => element.id));
+        if (isCurrentOwner()) {
+            setLabels([...graph.Labels]);
+            setRelationships([...remainingRelationships]);
+            fetchCount(graphName);
+            if (panel === "data") handleSetSelectedElements();
+            else setSelectedElements([]);
+        }
+        const canvas = canvasRef.current;
+        const mayRepaint = () => isCurrentOwner() && canvasRef.current === canvas && !!canvas
+            && ownsCanvasSession(canvas, { graph, data: graphOwnerRef.current.data, tabId: activeTabId, epoch: startEpoch });
+        let repaintSkipped = false;
+        if (canvas && mayRepaint()) {
+            repaintSkipped = !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), mayRepaint) && isCurrentOwner();
+        } else if (deletedElements.length > 0 && isCurrentOwner()) {
+            setData({ ...graph.Elements });
+        }
 
-        setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
-        canvasRef.current.setGraphData(convertToCanvasData(graph.Elements));
-        fetchCount(graphName);
-        setSelectedElements([]);
-
-        if (panel === "data") handleSetSelectedElements();
-        else setSelectedElements([]);
-
-        toast({
-            title: "Success",
+        if (deletedElements.length > 0) toast({
+            title: repaintSkipped ? "Deleted; repaint skipped" : "Success",
             description: `${deletedElements.length > 1 ? "Elements" : "Element"} deleted
-            ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.`,
+            ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.${!isCurrentOwner() ? ` Graph: ${graph.Id}.` : ""}${repaintSkipped ? " The canvas repaint was skipped. Run the query again to refresh the view." : ""}`,
+            variant: repaintSkipped ? "destructive" : "default",
         });
-    }, [selectedElements, graph, graphName, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+    }, [selectedElements, graph, graphName, activeTabId, setData, setLabels, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined;
