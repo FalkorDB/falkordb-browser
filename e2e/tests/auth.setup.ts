@@ -25,6 +25,8 @@ setup("setup authentication", async () => {
         await loginPage.handleSkipTutorial();
         const context = browserWrapper.getContext();
         await context!.storageState({ path: adminAuthFile });
+        // Closing writes the pages' e2e coverage (e2e/infra/coverage.ts).
+        await browserWrapper.closeBrowser();
         const adminContext = await playwrightRequest.newContext({ storageState: adminAuthFile });
         const apiCall = new ApiCalls();
         await apiCall.createUsers({ username: 'readwriteuser', role: user.ReadWrite, password: user.password}, adminContext);
@@ -43,6 +45,7 @@ setup("setup authentication", async () => {
             await userLoginPage.handleSkipTutorial();
             const userContext = userBrowserWrapper.getContext();
             await userContext!.storageState({ path: file });
+            await userBrowserWrapper.closeBrowser();
         }
 
         // Create and authenticate dedicated sign-out users.
@@ -64,6 +67,7 @@ setup("setup authentication", async () => {
             await userLoginPage.handleSkipTutorial();
             const userContext = userBrowserWrapper.getContext();
             await userContext!.storageState({ path: file });
+            await userBrowserWrapper.closeBrowser();
         }
 
         // Authenticate using query parameters to pre-fill the login form.
@@ -81,6 +85,7 @@ setup("setup authentication", async () => {
         await queryParamsLoginPage.handleSkipTutorial();
         const queryParamsContext = queryParamsBrowserWrapper.getContext();
         await queryParamsContext!.storageState({ path: queryParamsAuthFile });
+        await queryParamsBrowserWrapper.closeBrowser();
 
     } catch (error) {
         console.error("Error during authentication setup:", error);
