@@ -23,6 +23,8 @@ on:
     secrets:
       RUN_BROWSER_TESTS:
         required: true
+      CODECOV_TOKEN:
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -89,8 +91,12 @@ jobs:
           done
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium firefox
+      # Unminified and source-mapped, so the e2e coverage maps back to the
+      # sources (see next.config.js).
       - name: Build application
         run: npm run build
+        env:
+          COVERAGE: "1"
       - name: Upload build output
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -178,7 +184,8 @@ jobs:
           export CSV_LOCAL_TEMP_DIR=/tmp/fdb-import
           export CSV_LOCAL_LOAD_URI_MODE=file
           export CSV_TEMP_SIGNING_SECRET=SECRET
-          npm start > nextjs.log 2>&1 &
+          export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
+          NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test \
             --grep-invert "@tls|@cluster" \
@@ -190,6 +197,47 @@ jobs:
             --shard=${{ matrix.shard }}/6 \
             --workers=2 \
             --reporter=dot,list
+      - name: Stop the server
+        if: ${{ !cancelled() }}
+        run: |
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
+      - name: Build the e2e coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/codecov.json
+          disable_search: true
+          flags: e2e
+          name: e2e-shard-${{ matrix.shard }}
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-shard-${{ matrix.shard }}
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -271,9 +319,51 @@ jobs:
           export PAT_FALKORDB_PORT=6380
           export PAT_FALKORDB_USERNAME=default
           export PAT_FALKORDB_GRAPH_NAME=token_management
-          npm start > nextjs.log 2>&1 &
+          export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
+          NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test --project="[Stateless] - Chromium" --workers=1 --reporter=dot,list
+      - name: Stop the server
+        if: ${{ !cancelled() }}
+        run: |
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
+      - name: Build the e2e coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/codecov.json
+          disable_search: true
+          flags: e2e
+          name: e2e-stateless
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-stateless
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -411,7 +501,8 @@ jobs:
         env:
           SKIP_SERVER_IDENTITY_CHECK: "true"
         run: |
-          NEXTAUTH_SECRET=SECRET SKIP_SERVER_IDENTITY_CHECK=true ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 & 
+          export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
+          NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" NEXTAUTH_SECRET=SECRET SKIP_SERVER_IDENTITY_CHECK=true ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
       - name: Cleanup TLS certificates
@@ -422,6 +513,47 @@ jobs:
       - name: Stop FalkorDB TLS container
         if: always()
         run: docker stop falkordb-tls || true
+      - name: Stop the server
+        if: ${{ !cancelled() }}
+        run: |
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
+      - name: Build the e2e coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/codecov.json
+          disable_search: true
+          flags: e2e
+          name: e2e-tls
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-tls
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -550,7 +682,8 @@ jobs:
           done
       - name: Run cluster tests
         run: |
-          NEXTAUTH_SECRET=SECRET ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 & 
+          export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
+          NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" NEXTAUTH_SECRET=SECRET ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test --grep "@cluster" --workers=4 --reporter=dot,list
       - name: Cleanup cluster
@@ -561,6 +694,47 @@ jobs:
             docker stop node$i || true
             docker rm node$i || true
           done
+      - name: Stop the server
+        if: ${{ !cancelled() }}
+        run: |
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
+      - name: Build the e2e coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/codecov.json
+          disable_search: true
+          flags: e2e
+          name: e2e-cluster
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-cluster
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

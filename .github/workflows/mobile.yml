@@ -70,7 +70,9 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
 
       - name: Setup Java
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -89,6 +91,8 @@ jobs:
 
       - name: Run tests
         run: npm test
+        env:
+          NODE_V8_COVERAGE: ${{ github.workspace }}/coverage/raw/mobile
 
       - name: Add or sync the Android project
         run: |
@@ -106,10 +110,47 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Last, so a Codecov problem never skips the APK. The report runs on
+      # the web app's dependencies.
+      - name: Install web dependencies
+        if: ${{ !cancelled() }}
+        working-directory: .
+        run: npm ci --no-audit --progress=false --ignore-scripts
+
+      - name: Build the mobile coverage report
+        if: ${{ !cancelled() }}
+        working-directory: .
+        run: node .github/scripts/coverage-report.mjs mobile coverage/raw/mobile
+
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/mobile/codecov.json
+          disable_search: true
+          flags: mobile
+          name: mobile
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-mobile
+          path: coverage/mobile/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
+
   # A release is built and signed in two jobs, so no dependency code ever runs
   # where the signing key or a write token is reachable: this one installs and
   # builds with read-only rights and no secrets, the next one only signs and
   # uploads the APK it produced.
+
   android-release-build:
     if: github.event_name == 'release' || inputs.release_tag
     runs-on: ubuntu-latest
