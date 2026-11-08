@@ -1605,7 +1605,7 @@ export function getQueryWithLimit(
   let existingLimit = 0;
 
   const finalReturnMatch = analysis.code.match(
-    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is
+    /\bRETURN\b(?!\s.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is
   );
   if (finalReturnMatch) {
     existingLimit = parseInt(finalReturnMatch[1], 10);

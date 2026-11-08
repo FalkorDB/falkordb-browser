@@ -1,5 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
@@ -45,6 +46,34 @@ describe("getQueryWithLimit keyword detection (#2203)", () => {
   it("keeps an existing LIMIT and reports it", () => {
     const query = "MATCH (n) RETURN n LIMIT 10";
     assert.deepEqual(getQueryWithLimit(query, 300), [query, 10]);
+  });
+
+  it("preserves LIMIT detection around CALL and whitespace", () => {
+    for (const [query, expected] of [
+      ["RETURN 1 LIMIT 10", 10],
+      ["RETURN 1\nCALL p() RETURN 2 LIMIT 20", 20],
+      ["RETURN CALL LIMIT 30", 30],
+      ["RETURN 1\n  LIMIT 40", 40],
+    ] as const) {
+      assert.deepEqual(getQueryWithLimit(query, 0), [query, expected]);
+    }
+  });
+
+  it("handles large masked projections and comments promptly", () => {
+    const script = `
+      import assert from "node:assert/strict";
+      import { getQueryWithLimit } from ${JSON.stringify(new URL("./utils.ts", import.meta.url).href)};
+      const literal = "RETURN '" + "x".repeat(400000) + "' LIMIT 17";
+      const comment = "RETURN /*" + "x".repeat(400000) + "*/ 1 LIMIT 19";
+      const noLimit = "RETURN '" + "x".repeat(400000) + "'";
+      assert.deepEqual(getQueryWithLimit(literal, 0), [literal, 17]);
+      assert.deepEqual(getQueryWithLimit(comment, 0), [comment, 19]);
+      assert.deepEqual(getQueryWithLimit(noLimit, 300), [noLimit + " LIMIT 300", 300]);
+    `;
+    execFileSync(process.execPath, ["--input-type=module", "--eval", script], {
+      timeout: 8000,
+      stdio: "pipe",
+    });
   });
 });
 
