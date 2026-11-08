@@ -130,7 +130,21 @@ jobs:
           files: ./coverage/mobile/codecov.json
           disable_search: true
           flags: mobile
-          fail_ci_if_error: true
+          name: mobile
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-mobile
+          path: coverage/mobile/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
 
   # A release is built and signed in two jobs, so no dependency code ever runs
   # where the signing key or a write token is reachable: this one installs and
