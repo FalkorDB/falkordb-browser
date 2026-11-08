@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import { createServer } from "node:http";
 import GraphPage from "../logic/POM/graphPage";
 import { getRandomString, initializeLocalStorage } from "../infra/utils";

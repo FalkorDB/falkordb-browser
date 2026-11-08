@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import urls from "../config/urls.json";
 
 // FormComponent is the browser's adapter over the design system form. These
