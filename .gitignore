@@ -8,6 +8,7 @@
 
 # testing
 /coverage
+/lcov.info
 
 # next.js
 /.next/
