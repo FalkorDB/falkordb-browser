@@ -73,7 +73,21 @@ jobs:
           files: ./coverage/unit/codecov.json
           disable_search: true
           flags: unit
-          fail_ci_if_error: true
+          name: unit
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-unit
+          path: coverage/unit/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
 
   smoke-tests:
     runs-on: ubuntu-latest
@@ -121,7 +135,21 @@ jobs:
           files: ./coverage/smoke/codecov.json
           disable_search: true
           flags: smoke
-          fail_ci_if_error: true
+          name: smoke
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-smoke
+          path: coverage/smoke/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
 
   security-scan:
     runs-on: ubuntu-latest
