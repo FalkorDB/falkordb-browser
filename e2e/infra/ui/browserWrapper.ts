@@ -118,6 +118,13 @@ export default class BrowserWrapper {
     async closeBrowser() {
         // Close the page first (which clears intervals) before closing the browser
         await this.closePage();
+
+        // Closing the context saves the coverage of any other page it opened
+        // (popups, new tabs); closing the browser alone would lose it.
+        if (this.context) {
+            await this.context.close().catch(() => {});
+            this.context = null;
+        }
         
         if (this.browser) {
             await this.browser.close();

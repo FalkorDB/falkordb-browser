@@ -4,11 +4,17 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   BUDGET_MS, COVERAGE_WORKFLOWS, changedLines, codecovSettled, failedUploads, followPages, gate, globToRegExp, postFailure, retry, statusPoster,
-  transient, missingFlags, absentFlags, movedSince, notStarted, patchTotals, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
+  transient, missingFlags, missingUploads, absentFlags, movedSince, notStarted, patchTotals, patchVerdict, pathFilters, runsFor, runsOf, unsuccessful,
   verdict, waitingFor,
 } from './coverage-gate.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+
+// A job as GitHub lists it, it and its steps each ending in `conclusion`.
+const job = (name, steps, conclusion = 'success') => ({ name, conclusion, steps: steps.map((step) => ({ name: step, conclusion })) });
+// A coverage workflow's coverage jobs, as `jobs` names them.
+const coverageJobs = (workflow, conclusion = 'success') => Object.entries(COVERAGE_WORKFLOWS[workflow].jobs)
+  .map(([name, { steps }]) => job(name, ['Checkout', ...steps], conclusion));
 
 test('matches paths as GitHub path filters do', () => {
   const md = globToRegExp('**/*.md');
@@ -103,10 +109,11 @@ test("judges a trigger's own runs: a push run does not hide a pull request run",
   ];
   assert.deepEqual(waitingFor(['Build'], runsOf('pull_request', runs)), ['Build']);
   assert.deepEqual(waitingFor(['Build'], runsOf('push', runs)), []);
+  const jobs = new Map([[1, coverageJobs('Build', 'failure')], [2, coverageJobs('Build')]]);
   assert.deepEqual(unsuccessful(['Build'], runsOf('pull_request', [
     { id: 1, name: 'Build', event: 'pull_request', status: 'completed', conclusion: 'failure' },
     { id: 2, name: 'Build', event: 'push', status: 'completed', conclusion: 'success' },
-  ])), ['Build']);
+  ]), jobs), ['Build: build', 'Build: smoke-tests']);
 });
 
 test("judges a pull request's own runs: another pull request's on the same commit do not count", () => {
@@ -115,19 +122,112 @@ test("judges a pull request's own runs: another pull request's on the same commi
   // A fork's run names no pull request: it is kept.
   const fork = { id: 3, name: 'Playwright Tests', event: 'pull_request', status: 'completed', conclusion: 'success', pull_requests: [] };
   assert.deepEqual(runsOf('pull_request', [own, other, fork], 7).map((r) => r.id), [1, 3]);
-  assert.deepEqual(unsuccessful(['Build'], runsOf('pull_request', [own, other], 7)), ['Build']);
+  const jobs = new Map([[1, coverageJobs('Build', 'failure')], [2, coverageJobs('Build')]]);
+  assert.deepEqual(unsuccessful(['Build'], runsOf('pull_request', [own, other], 7), jobs), ['Build: build', 'Build: smoke-tests']);
   // A push's gate has no pull request to keep to.
   assert.deepEqual(runsOf('push', [{ ...own, event: 'push' }, { ...other, event: 'push' }]).map((r) => r.id), [1, 2]);
 });
 
-test('counts a finished workflow that did not succeed as incomplete coverage', () => {
+test('counts a coverage job that did not produce its coverage as incomplete coverage', () => {
   const runs = [
-    { id: 1, name: 'Build', status: 'completed', conclusion: 'success' },
+    { id: 1, name: 'Build', status: 'completed', conclusion: 'failure' },
     { id: 2, name: 'Playwright Tests', status: 'completed', conclusion: 'cancelled' },
     { id: 3, name: 'Mobile app', status: 'completed', conclusion: 'failure' },
     { id: 4, name: 'Mobile app', status: 'completed', conclusion: 'success' },
+    { id: 5, name: 'Desktop app', status: 'completed', conclusion: 'failure' },
   ];
-  assert.deepEqual(unsuccessful(['Build', 'Playwright Tests', 'Mobile app'], runs), ['Playwright Tests']);
+  const [shard1, ...shards] = coverageJobs('Playwright Tests');
+  const jobs = new Map([
+    // Build failed in its security scan, a job that makes no coverage.
+    [1, [...coverageJobs('Build'), job('security-scan', ['Run Trivy vulnerability scanner'], 'failure')]],
+    // Shard 1 was cancelled before its tests ran.
+    [2, [{ ...shard1, conclusion: 'cancelled', steps: shard1.steps.map((s) => ({ ...s, conclusion: 'skipped' })) }, ...shards]],
+    // The latest run (a re-run) counts.
+    [3, coverageJobs('Mobile app', 'failure')],
+    [4, coverageJobs('Mobile app')],
+    // Packaging failed on macOS, which makes no coverage.
+    [5, [...coverageJobs('Desktop app'), job('build (macos-latest)', ['Run desktop tests', 'Build installers'], 'failure')]],
+  ]);
+  assert.deepEqual(unsuccessful(['Build', 'Playwright Tests', 'Mobile app', 'Desktop app'], runs, jobs), ['Playwright Tests: Run tests (shard 1/6)']);
+});
+
+test('judges a coverage job by the steps that make its coverage', () => {
+  const runs = [{ id: 1, name: 'Mobile app', status: 'completed', conclusion: 'failure' }];
+  const judge = (steps) => unsuccessful(['Mobile app'], runs, new Map([[1, [{ name: 'android', conclusion: 'failure', steps }]]]));
+  const step = (name, conclusion = 'success') => ({ name, conclusion });
+  // The APK failed to build (a Gradle download, say): the coverage is complete.
+  assert.deepEqual(judge([step('Run tests'), step('Build debug APK', 'failure'), step('Build the mobile coverage report')]), []);
+  // The tests failed, or never ran: the coverage may be partial.
+  assert.deepEqual(judge([step('Run tests', 'failure'), step('Build the mobile coverage report')]), ['Mobile app: android']);
+  assert.deepEqual(judge([step('Run tests', 'skipped'), step('Build the mobile coverage report')]), ['Mobile app: android']);
+  // The report failed, or a step is gone (renamed): fail closed.
+  assert.deepEqual(judge([step('Run tests'), step('Build the mobile coverage report', 'failure')]), ['Mobile app: android']);
+  assert.deepEqual(judge([step('Run tests')]), ['Mobile app: android']);
+  // The job itself is missing from the run.
+  assert.deepEqual(unsuccessful(['Mobile app'], runs, new Map([[1, []]])), ['Mobile app: android']);
+  assert.deepEqual(unsuccessful(['Mobile app'], runs, new Map()), ['Mobile app: android']);
+});
+
+test("finds a coverage job's upload missing though its flag was uploaded", () => {
+  const uploads = Object.values(COVERAGE_WORKFLOWS['Playwright Tests'].jobs)
+    .filter(({ upload }) => upload !== 'e2e-shard-3')
+    .map(({ upload }) => ({ name: upload, flags: ['e2e'], upload_type: 'uploaded', state: 'merged' }));
+  assert.deepEqual(missingFlags(['Playwright Tests'], uploads), []);
+  assert.deepEqual(missingUploads(['Playwright Tests'], uploads), ['e2e-shard-3']);
+  // An upload Codecov could not process is not there either.
+  assert.deepEqual(missingUploads(['Playwright Tests'], [...uploads, { name: 'e2e-shard-3', flags: ['e2e'], upload_type: 'uploaded', state: 'error' }]), ['e2e-shard-3']);
+  assert.deepEqual(missingUploads(['Playwright Tests'], [...uploads, { name: 'e2e-shard-3', flags: ['e2e'], upload_type: 'uploaded', state: 'merged' }]), []);
+  // An upload with no name goes by its flags, as Build's did before naming them.
+  assert.deepEqual(missingUploads(['Build'], [{ flags: ['unit'], upload_type: 'uploaded', state: 'merged' }, { flags: ['smoke'], upload_type: 'uploaded', state: 'merged' }]), []);
+  // Another commit's upload, carried forward, is not this commit's.
+  assert.deepEqual(missingUploads(['Build'], [{ name: 'unit', flags: ['unit'], upload_type: 'carriedforward', state: 'complete' }, { name: 'smoke', flags: ['smoke'], upload_type: 'uploaded', state: 'merged' }]), ['unit']);
+});
+
+/** Each `jobs:` entry of a workflow file: its id, its own `name:` if any, and its text. */
+function jobBlocks(workflow) {
+  const lines = workflow.split('\n');
+  const blocks = [];
+  let inJobs = false;
+  for (const line of lines) {
+    if (/^jobs:\s*$/.test(line)) { inJobs = true; continue; }
+    if (!inJobs) continue;
+    if (/^\S/.test(line)) break;
+    const id = /^  ([\w-]+):\s*$/.exec(line);
+    if (id) blocks.push({ id: id[1], text: '' });
+    else if (blocks.length) blocks.at(-1).text += `${line}\n`;
+  }
+  return blocks;
+}
+
+/** A `name:` with `${{ ... }}` expressions as a pattern of the names GitHub makes of it. */
+const namePattern = (name) => new RegExp(`^${name.trim().replace(/^['"]|['"]$/g, '').split(/\$\{\{[^}]*\}\}/)
+  .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.+')}$`);
+
+test('names only coverage jobs, steps and uploads the workflow files have', () => {
+  for (const [workflowName, { file, flags, jobs }] of Object.entries(COVERAGE_WORKFLOWS)) {
+    const workflow = readFileSync(`${ROOT}${file}`, 'utf8');
+    assert.equal(/^name: (.+)$/m.exec(workflow)[1].trim(), workflowName);
+    const blocks = jobBlocks(workflow);
+    for (const [jobName, { upload, steps }] of Object.entries(jobs)) {
+      // A job is named by its `name:`, else by its id (with its matrix values).
+      const block = blocks.find(({ id, text }) => {
+        const own = /^    name: (.+)$/m.exec(text);
+        if (own) return namePattern(own[1]).test(jobName);
+        return jobName === id || (text.includes('matrix:') && namePattern(`${id} (\${{ matrix }})`).test(jobName));
+      });
+      assert.ok(block, `${file} has no job ${jobName}`);
+      const stepNames = [...block.text.matchAll(/^      - name: (.+)$/gm)].map((m) => namePattern(m[1]));
+      for (const step of steps) assert.ok(stepNames.some((re) => re.test(step)), `${file}: ${jobName} has no step ${step}`);
+      // Its upload, named and flagged as the gate expects.
+      const uploadStep = block.text.split(/^      - /m).find((s) => s.includes('codecov/codecov-action'));
+      assert.ok(uploadStep, `${file}: ${jobName} uploads no coverage`);
+      assert.ok(namePattern(/^ {10}name: (.+)$/m.exec(uploadStep)[1]).test(upload), `${file}: ${jobName} does not upload ${upload}`);
+      assert.ok(flags.includes(/^ {10}flags: (.+)$/m.exec(uploadStep)[1].trim()), `${file}: ${jobName} uploads another flag`);
+    }
+  }
+  // The matrices the job names count on.
+  assert.match(readFileSync(`${ROOT}.github/workflows/playwright.yml`, 'utf8'), /shard: \[1, 2, 3, 4, 5, 6\]/);
+  assert.match(readFileSync(`${ROOT}.github/workflows/desktop.yml`, 'utf8'), /os: \[ubuntu-latest,/);
 });
 
 test("finds the flags a commit's workflows uploaded no coverage of", () => {
@@ -211,11 +311,14 @@ const fresh = (name, flags) => ({ name, flags, upload_type: 'uploaded', state: '
 // Mobile is not triggered by these changes: its coverage is carried forward.
 const carried = (flag) => ({ name: `CF[${flag}]`, flags: [flag], upload_type: 'carriedforward', state: 'complete' });
 const MOBILE = carried('mobile');
-const FRESH = [fresh('build', ['unit']), fresh('smoke', ['smoke']), fresh('e2e-shard-1', ['e2e']), fresh('desktop', ['desktop']), MOBILE];
+const E2E = Object.values(COVERAGE_WORKFLOWS['Playwright Tests'].jobs).map(({ upload }) => fresh(upload, ['e2e']));
+const FRESH = [fresh('unit', ['unit']), fresh('smoke', ['smoke']), ...E2E, fresh('desktop', ['desktop']), MOBILE];
 
 function world({
   pr = { number: 7 }, files = ['app/graph/page.tsx'], runs, uploads = [FRESH], coverage = 96,
   patch = { hits: 19, misses: 1, partials: 0 }, reportErrors = [], githubHead = SHA, timeline = [],
+  // A run's jobs: by default its coverage jobs, each ending as the run did.
+  jobsOf = (r) => coverageJobs(r.name, r.conclusion),
 } = {}) {
   const posted = [];
   const sleeps = [];
@@ -233,7 +336,9 @@ function world({
     if (path.startsWith(`issues/${pr?.number}/timeline`)) return /[?&]page=1(&|$)/.test(path) ? timeline : [];
     if (path.startsWith(`pulls/${pr?.number}/files`)) return /[?&]page=1(&|$)/.test(path) ? changes : [];
     if (path.startsWith(`commits/${SHA}`)) return { files: /[?&]page=1(&|$)/.test(path) ? files.map((filename) => ({ filename })) : [] };
-    if (path.startsWith('actions/runs')) return { workflow_runs: /[?&]page=1(&|$)/.test(path) ? runs : [] };
+    const jobsPath = /^actions\/runs\/([^/?]+)\/jobs\?/.exec(path);
+    if (jobsPath) return { jobs: /[?&]page=1(&|$)/.test(path) ? jobsOf(runs.find((r) => String(r.id) === jobsPath[1])) : [] };
+    if (path.startsWith('actions/runs?')) return { workflow_runs: /[?&]page=1(&|$)/.test(path) ? runs : [] };
     if (path.startsWith('contents/')) {
       const file = path.slice('contents/'.length).split('?')[0];
       return { content: readFileSync(`${ROOT}${file}`).toString('base64') };
@@ -295,18 +400,57 @@ test('gate: passes or fails each status against the target once the coverage is 
   ]);
 });
 
-test('gate: a workflow that did not succeed fails both statuses', async () => {
+test('gate: a coverage job that did not succeed fails both statuses', async () => {
+  const runs = [run('Build'), run('Playwright Tests', 'failure'), run('Desktop app')];
+  const failed = world({
+    runs,
+    jobsOf: (r) => (r.name === 'Playwright Tests'
+      ? coverageJobs(r.name).map((j) => (j.name === 'Run TLS tests' ? job(j.name, j.steps.map((s) => s.name), 'failure') : j))
+      : coverageJobs(r.name)),
+  });
+  assert.equal(await gate(failed.args), false);
+  assert.deepEqual(failed.posted, [
+    'coverage/project failure: Playwright Tests: Run TLS tests did not succeed: the coverage is incomplete',
+    'coverage/patch failure: Playwright Tests: Run TLS tests did not succeed: the coverage is incomplete',
+  ]);
+  // A cancelled run: every coverage job, cut to GitHub's 140 characters.
   const cancelled = world({ runs: [run('Build'), run('Playwright Tests', 'cancelled'), run('Desktop app')] });
   assert.equal(await gate(cancelled.args), false);
-  assert.deepEqual(cancelled.posted, [
-    'coverage/project failure: Playwright Tests did not succeed: the coverage is incomplete',
-    'coverage/patch failure: Playwright Tests did not succeed: the coverage is incomplete',
+  assert.match(cancelled.posted[0], /^coverage\/project failure: Playwright Tests: Run tests \(shard 1\/6\), Playwright Tests: Run tests \(shard 2\/6\)/);
+  assert.equal(cancelled.posted[0].length, 'coverage/project failure: '.length + 140);
+});
+
+test('gate: a failure outside the coverage jobs leaves the coverage complete', async () => {
+  // Packaging failed on Windows (a 504 from electron-builder's download),
+  // the security scan and the docker smoke tests failed: no job of theirs
+  // makes coverage, and every coverage job succeeded.
+  const runs = [run('Build', 'failure'), run('Playwright Tests', 'failure'), run('Desktop app', 'failure')];
+  const extra = {
+    Build: job('security-scan', ['Run Trivy vulnerability scanner'], 'failure'),
+    'Playwright Tests': job('Run smoke tests against local docker build', ['Run smoke Playwright tests against local docker build'], 'failure'),
+    'Desktop app': job('build (windows-latest)', ['Run desktop tests', 'Build installers'], 'failure'),
+  };
+  const unrelated = world({ runs, jobsOf: (r) => [...coverageJobs(r.name), extra[r.name]] });
+  assert.equal(await gate(unrelated.args), true);
+  assert.deepEqual(unrelated.posted, [
+    'coverage/project success: 96.00% (target 95%)',
+    'coverage/patch success: 95.00% (target 95%)',
+  ]);
+});
+
+test("gate: one coverage job's lost upload fails, its flag uploaded by the others", async () => {
+  // Uploads no longer fail their job, so the gate is what catches one lost.
+  const lost = world({ runs: ALL_DONE, uploads: [FRESH.filter((u) => u.name !== 'e2e-cluster')] });
+  assert.equal(await gate(lost.args), false);
+  assert.deepEqual(lost.posted, [
+    'coverage/project failure: No e2e-cluster upload for this commit: the coverage is incomplete',
+    'coverage/patch failure: No e2e-cluster upload for this commit: the coverage is incomplete',
   ]);
 });
 
 test("gate: a flag with only an earlier commit's coverage fails", async () => {
   const carriedE2e = carried('e2e');
-  const stale = world({ runs: ALL_DONE, uploads: [[fresh('build', ['unit']), fresh('smoke', ['smoke']), carriedE2e, fresh('desktop', ['desktop']), MOBILE]] });
+  const stale = world({ runs: ALL_DONE, uploads: [[fresh('unit', ['unit']), fresh('smoke', ['smoke']), carriedE2e, fresh('desktop', ['desktop']), MOBILE]] });
   assert.equal(await gate(stale.args), false);
   assert.deepEqual(stale.posted, [
     'coverage/project failure: No e2e coverage was uploaded for this commit',
@@ -524,5 +668,5 @@ test("gate: fails a flag with no coverage at all, so its code is not left out of
   ]);
   assert.deepEqual(absentFlags(FRESH), []);
   // An upload Codecov could not process is no coverage.
-  assert.deepEqual(absentFlags([...FRESH.slice(0, 4), { ...MOBILE, state: 'error' }]), ['mobile']);
+  assert.deepEqual(absentFlags([...FRESH.filter((u) => u !== MOBILE), { ...MOBILE, state: 'error' }]), ['mobile']);
 });

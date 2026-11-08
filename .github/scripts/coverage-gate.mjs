@@ -22,13 +22,51 @@ import { fileURLToPath } from 'node:url';
 const GITHUB = 'https://api.github.com';
 const CODECOV = 'https://api.codecov.io/api/v2/github';
 
+// The e2e coverage steps of a Playwright job, after the step that runs its tests.
+const E2E_STEPS = ['Stop the server', 'Build the e2e coverage report'];
+
 // The workflows that upload coverage: the file that defines when each runs,
-// and the Codecov flags it uploads.
+// the Codecov flags it uploads, and the jobs that make those uploads. Each
+// job (by the name GitHub gives it) names its upload (the codecov-action
+// `name`) and the steps that produce its coverage: the tests and the report.
+// Only these count: another job or step failing (an installer, an APK, a
+// security scan) leaves the coverage complete. coverage-gate.test.mjs checks
+// these names against the workflow files.
 export const COVERAGE_WORKFLOWS = {
-  Build: { file: '.github/workflows/nextjs.yml', flags: ['unit', 'smoke'] },
-  'Playwright Tests': { file: '.github/workflows/playwright.yml', flags: ['e2e'] },
-  'Desktop app': { file: '.github/workflows/desktop.yml', flags: ['desktop'] },
-  'Mobile app': { file: '.github/workflows/mobile.yml', flags: ['mobile'] },
+  Build: {
+    file: '.github/workflows/nextjs.yml',
+    flags: ['unit', 'smoke'],
+    jobs: {
+      build: { upload: 'unit', steps: ['Run unit tests with coverage', 'Build the unit coverage report'] },
+      'smoke-tests': { upload: 'smoke', steps: ['Run smoke tests against FalkorDB', 'Build the smoke coverage report'] },
+    },
+  },
+  'Playwright Tests': {
+    file: '.github/workflows/playwright.yml',
+    flags: ['e2e'],
+    jobs: {
+      ...Object.fromEntries([1, 2, 3, 4, 5, 6].map((n) => [`Run tests (shard ${n}/6)`, {
+        upload: `e2e-shard-${n}`, steps: [`Run Playwright tests (shard ${n} of 6)`, ...E2E_STEPS],
+      }])),
+      'Run stateless tests': { upload: 'e2e-stateless', steps: ['Run stateless tests', ...E2E_STEPS] },
+      'Run TLS tests': { upload: 'e2e-tls', steps: ['Run TLS tests', ...E2E_STEPS] },
+      'Run cluster tests': { upload: 'e2e-cluster', steps: ['Run cluster tests', ...E2E_STEPS] },
+    },
+  },
+  'Desktop app': {
+    file: '.github/workflows/desktop.yml',
+    flags: ['desktop'],
+    jobs: {
+      'build (ubuntu-latest)': { upload: 'desktop', steps: ['Run desktop tests', 'Build the desktop coverage report'] },
+    },
+  },
+  'Mobile app': {
+    file: '.github/workflows/mobile.yml',
+    flags: ['mobile'],
+    jobs: {
+      android: { upload: 'mobile', steps: ['Run tests', 'Build the mobile coverage report'] },
+    },
+  },
 };
 
 // The branches the gate guards (branch protection requires it there).
@@ -176,12 +214,32 @@ export function notStarted(expected, runs) {
 }
 
 /**
- * The finished workflows that did not succeed. Their coverage is missing or
- * partial, and Codecov would fill the gap with an earlier commit's.
+ * The coverage jobs of the finished workflows that did not produce their
+ * coverage, as `Workflow: job`: a job missing from its workflow's latest run,
+ * or one whose tests or report step is missing or did not succeed (their
+ * coverage is missing or partial, and Codecov would fill the gap with an
+ * earlier commit's). `jobs` maps a run's id to its jobs, as GitHub lists them
+ * (each job's latest attempt). A failure anywhere else in a workflow (an
+ * installer, an APK, a security scan) leaves its coverage complete.
  */
-export function unsuccessful(expected, runs) {
+export function unsuccessful(expected, runs, jobs) {
   const latest = latestRuns(runs);
-  return expected.filter((name) => latest.get(name)?.conclusion !== 'success');
+  const failed = [];
+  for (const name of expected) {
+    const run = latest.get(name);
+    const ran = (run && jobs.get(run.id)) ?? [];
+    for (const [jobName, { steps }] of Object.entries(COVERAGE_WORKFLOWS[name].jobs)) {
+      const job = ran.find((j) => j.name === jobName);
+      const produced = job && steps.every((step) => job.steps?.some((s) => s.name === step && s.conclusion === 'success'));
+      if (!produced) failed.push(`${name}: ${jobName}`);
+    }
+  }
+  return failed;
+}
+
+/** The name an upload goes by: the job's upload name, or its flags when it has none. */
+function uploadName(upload) {
+  return upload.name || upload.flags.join(',');
 }
 
 /**
@@ -197,7 +255,7 @@ export function currentUploads(uploads) {
       carried.push(upload);
       continue;
     }
-    const job = upload.name || upload.flags.join(',');
+    const job = uploadName(upload);
     const seen = latest.get(job);
     if (!seen || upload.created_at > seen.created_at) latest.set(job, upload);
   }
@@ -218,6 +276,21 @@ export function missingFlags(expected, uploads) {
     .filter((u) => u.upload_type !== 'carriedforward' && u.state !== 'error')
     .flatMap((u) => u.flags));
   return expected.flatMap((name) => COVERAGE_WORKFLOWS[name].flags).filter((flag) => !uploaded.has(flag));
+}
+
+/**
+ * The uploads the expected workflows' coverage jobs make that the commit has
+ * no current upload of its own for. An upload that failed does not fail its
+ * job, so one shard's lost upload, its flag still uploaded by the others,
+ * shows only here.
+ */
+export function missingUploads(expected, uploads) {
+  const uploaded = new Set(currentUploads(uploads)
+    .filter((u) => u.upload_type !== 'carriedforward' && u.state !== 'error')
+    .map(uploadName));
+  return expected
+    .flatMap((name) => Object.values(COVERAGE_WORKFLOWS[name].jobs).map((job) => job.upload))
+    .filter((name) => !uploaded.has(name));
 }
 
 /**
@@ -530,10 +603,19 @@ export async function gate({
     return false;
   }
 
-  const failed = unsuccessful(expected, runs);
+  // Judged by the jobs that make the coverage, not the whole workflow: a
+  // failure elsewhere in it does not touch the coverage.
+  const latest = latestRuns(runs);
+  const jobs = new Map();
+  for (const name of expected) {
+    const { id } = latest.get(name);
+    jobs.set(id, await allPages((page) => gh(`actions/runs/${id}/jobs?per_page=100&page=${page}`), (page) => page.jobs));
+  }
+  const failed = unsuccessful(expected, runs, jobs);
   if (failed.length) {
-    console.log(`Did not succeed: ${failed.join(', ')}`);
-    for (const context of contexts) await post(context, { state: 'failure', description: `${failed.join(', ')} did not succeed: the coverage is incomplete` });
+    console.log(`Did not produce their coverage: ${failed.join(', ')}`);
+    const description = `${failed.join(', ')} did not succeed: the coverage is incomplete`.slice(0, 140);
+    for (const context of contexts) await post(context, { state: 'failure', description });
     return false;
   }
 
@@ -575,6 +657,13 @@ export async function gate({
   if (missing.length) {
     console.log(`No upload of ${missing.join(', ')}`);
     for (const context of contexts) await post(context, { state: 'failure', description: `No ${missing.join(', ')} coverage was uploaded for this commit` });
+    return false;
+  }
+
+  const lost = missingUploads(expected, uploads);
+  if (lost.length) {
+    console.log(`No upload named ${lost.join(', ')}`);
+    for (const context of contexts) await post(context, { state: 'failure', description: `No ${lost.join(', ')} upload for this commit: the coverage is incomplete`.slice(0, 140) });
     return false;
   }
 
