@@ -6,7 +6,11 @@
  */
 
 let pendingNavigations = 0;
-let deferredParams: { pathname: string; updates: Record<string, string | null> } | undefined;
+let deferredParams: { url: string; updates: Record<string, string | null> } | undefined;
+
+function currentUrl(): string {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
 
 export function beginUrlNavigation(): () => void {
   pendingNavigations += 1;
@@ -18,7 +22,7 @@ export function beginUrlNavigation(): () => void {
     if (pendingNavigations !== 0) return;
     const deferred = deferredParams;
     deferredParams = undefined;
-    if (deferred?.pathname === window.location.pathname) setUrlParam(deferred.updates);
+    if (deferred?.url === currentUrl()) setUrlParam(deferred.updates);
   };
 }
 
@@ -29,10 +33,10 @@ export function beginUrlNavigation(): () => void {
 export function setUrlParam(updates: Record<string, string | null>) {
   // Next's patched replaceState can supersede an in-flight router navigation.
   if (pendingNavigations > 0) {
-    const pathname = window.location.pathname;
+    const url = currentUrl();
     deferredParams = {
-      pathname,
-      updates: { ...(deferredParams?.pathname === pathname ? deferredParams.updates : {}), ...updates },
+      url,
+      updates: { ...(deferredParams?.url === url ? deferredParams.updates : {}), ...updates },
     };
     return;
   }

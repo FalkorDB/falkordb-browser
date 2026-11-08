@@ -9,6 +9,41 @@ const urls = { graphUrl: `${baseUrl}/graph`, api: { graphUrl: `${baseUrl}/api/gr
 
 const TEST_KEY = "sk-demo-not-a-real-api-key";
 
+test("@admin a retained optimization toast cannot leak URL synchronization after unmount", async ({ page }) => {
+  test.setTimeout(60_000);
+  const graphName = getRandomString("retainedToast");
+  await page.addInitScript(initializeLocalStorage());
+  await page.addInitScript(() => {
+    localStorage.setItem("chatModelSource", "local");
+    localStorage.setItem("localLlmProvider", "ollama");
+    localStorage.setItem("model", "ollama::llama3.2");
+  });
+  await page.route("**/api/chat/optimize", route => route.fulfill({
+    status: 422, json: { error: "Unable to reach the AI provider. Please try again." },
+  }));
+  const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
+  expect(created.ok()).toBe(true);
+  try {
+    await page.goto(`${urls.graphUrl}?graph=${graphName}&query=RETURN%201`);
+    await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", "RETURN 1", { timeout: 30000 });
+    await page.getByTestId("editorOptimize").click();
+    await expect(page.getByTestId("toast-title")).toHaveText("Query optimization failed");
+    await page.getByTestId("settings").click();
+    await expect(page).toHaveURL(/\/settings/, { timeout: 30000 });
+    await page.getByRole("button", { name: "Go to Settings", exact: true }).click();
+    await page.getByTestId("settingsTabConfigurations").click();
+    await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe("Configurations");
+    await page.goBack();
+    await page.goForward();
+    await expect(page).toHaveURL(/\/settings/);
+    await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe("Configurations");
+  } finally {
+    await page.close();
+    const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`);
+    expect(removed.ok()).toBe(true);
+  }
+});
+
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   for (const feature of ["chat", "fix", "optimize"] as const) {
     test(`@admin ${feature} copies and inserts without execution at ${viewport.width}px`, async ({ page }) => {
