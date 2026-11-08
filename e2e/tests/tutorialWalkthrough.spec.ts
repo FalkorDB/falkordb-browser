@@ -153,6 +153,40 @@ test.describe("Tutorial", () => {
         if (teardownError) throw teardownError;
     });
 
+    test("@admin read-only sessions do not start or replay the tutorial", async ({ page }) => {
+        test.setTimeout(60_000);
+        await page.addInitScript(() => {
+            localStorage.removeItem("tutorial");
+            localStorage.setItem("appDownloadPrompt", "false");
+            localStorage.setItem("whatsNewSeen", "v9999.0.0");
+        });
+        await page.route("**/api/auth/session", async route => {
+            const response = await route.fetch();
+            const session = await response.json() as Session;
+            await route.fulfill({ response, json: { ...session, user: { ...session.user, role: "Read-Only" } } });
+        });
+        const demoRequests: string[] = [];
+        page.on("request", request => {
+            if (request.url().includes("/api/graph/tutorial-social-")) demoRequests.push(request.url());
+        });
+        const ownershipKeys = () => page.evaluate(() =>
+            Object.keys(localStorage).filter(key => key.includes("tutorialDemoGraphOwnership:")));
+
+        await page.goto(urls.graphUrl);
+        await expect(page.getByTestId("selectGraph")).toBeVisible({ timeout: 30000 });
+        await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+        expect(await ownershipKeys()).toEqual([]);
+        await page.reload();
+        await expect(page.getByTestId("selectGraph")).toBeVisible({ timeout: 30000 });
+        await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+        await page.getByTestId("settings").click();
+        await page.getByTestId("settingsTabBrowser").click();
+        await page.getByTestId("replayTutorial").click();
+        await expect(page.getByTestId("toast-description").filter({ hasText: "The tutorial requires permission to create demo graphs." })).toBeVisible();
+        expect(await ownershipKeys()).toEqual([]);
+        expect(demoRequests).toEqual([]);
+    });
+
     test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
         test.setTimeout(120_000);
 

@@ -642,10 +642,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const isLatestSwitch = useCallback((ticket: number) => switchTicketRef.current === ticket, []);
 
   const replayTutorial = useCallback(() => {
+    if (isReadOnlyRef.current) {
+      toast({
+        title: "Tutorial unavailable",
+        description: "The tutorial requires permission to create demo graphs.",
+        variant: "destructive",
+      });
+      return;
+    }
     router.push("/graph");
     localStorage.removeItem("tutorial");
     setTutorialOpen(true);
-  }, [router]);
+  }, [router, toast]);
   const [viewport, setViewport] = useState<ViewportState>();
   const [scrollPosition, setScrollPosition] = useState(0);
   const [search, setSearch] = useState("");
@@ -961,6 +969,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // dependency arrays, which avoids cascading effect re-fires.
   const isReadOnlyRef = useRef(isReadOnly);
   isReadOnlyRef.current = isReadOnly;
+
+  useEffect(() => {
+    if (isReadOnly) setTutorialOpen(false);
+  }, [isReadOnly]);
 
   // What this deployment can do with LOAD CSV. Assume file:// works until the
   // server says otherwise, so a failed lookup never blocks a runnable query.
@@ -2241,6 +2253,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         window.innerWidth >= MOBILE_BREAKPOINT
         && localStorage.getItem("tutorial") !== "false"
         && !initialShareRef.current
+        && !isReadOnlyRef.current
       );
       setTutorialDecided(true);
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
@@ -3052,6 +3065,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [status, prefixReady, switchPending, activeConnectionId, prefixConnectionId, tutorialRecoveryKey, tutorialOpen, tutorialRecoveryReady, readTutorialConnection, toast]);
 
   const handleLoadDemoGraphs = useCallback(async (): Promise<DemoLoadOutcome> => {
+    if (isReadOnlyRef.current) return { status: "cancelled" };
     const activation = tutorialActivationRef.current;
     const { cid, scope } = await waitForTutorialConnection(true, true).catch(error => {
       console.error("Could not verify the tutorial connection", error);
@@ -3063,7 +3077,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       throw error;
     });
     const startEpoch = getConnectionEpoch();
-    const isCurrent = () => activation.open && tutorialActivationRef.current === activation && isTutorialConnectionCurrent({ cid, scope }, startEpoch);
+    const isCurrent = () => !isReadOnlyRef.current && activation.open && tutorialActivationRef.current === activation && isTutorialConnectionCurrent({ cid, scope }, startEpoch);
     const ownerId = await getTutorialDemoOwnerId();
     if (!isCurrent()) return { status: "cancelled" };
     const loadKey = JSON.stringify([scope, ownerId]);
