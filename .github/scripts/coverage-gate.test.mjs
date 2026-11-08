@@ -380,6 +380,7 @@ function world({
   patch = { hits: 19, misses: 1, partials: 0 }, reportErrors = [], githubHead = SHA, timeline = [],
   // A run's jobs: by default its coverage jobs, each ending as the run did.
   jobsOf = (r) => coverageJobs(r.name, r.conclusion),
+  workflowOf = (file) => readFileSync(`${ROOT}${file}`, 'utf8'),
 } = {}) {
   const posted = [];
   const sleeps = [];
@@ -402,7 +403,8 @@ function world({
     if (path.startsWith('actions/runs?')) return { workflow_runs: /[?&]page=1(&|$)/.test(path) ? runs : [] };
     if (path.startsWith('contents/')) {
       const file = path.slice('contents/'.length).split('?')[0];
-      return { content: readFileSync(`${ROOT}${file}`).toString('base64') };
+      assert.equal(path.split('?ref=')[1], SHA);
+      return { content: Buffer.from(workflowOf(file)).toString('base64') };
     }
     throw new Error(`unexpected GitHub call ${path}`);
   };
@@ -509,11 +511,38 @@ test("gate: one coverage job's lost upload fails, its flag uploaded by the other
 
 test('gate: missing Docker coverage is not hidden by other E2E uploads', async () => {
   const lost = world({ runs: ALL_DONE, uploads: [FRESH.filter((u) => u.name !== 'e2e-docker')] });
-  assert.equal(await gate(lost.args), false);
+  assert.equal(await gate({ ...lost.args, deadline: 40_000 }), false);
+  assert.deepEqual(lost.sleeps, [20_000, 20_000]);
   assert.deepEqual(lost.posted, [
     'coverage/project failure: No e2e-docker upload for this commit: the coverage is incomplete',
     'coverage/patch failure: No e2e-docker upload for this commit: the coverage is incomplete',
   ]);
+});
+
+test('gate: waits for a delayed required Docker upload even when visible uploads are settled', async () => {
+  const delayed = world({
+    runs: ALL_DONE,
+    uploads: [FRESH.filter((u) => u.name !== 'e2e-docker'), FRESH],
+  });
+  assert.equal(await gate(delayed.args), true);
+  assert.deepEqual(delayed.sleeps, [20_000]);
+  assert.match(delayed.posted[0], /success: 96.00%/);
+});
+
+test('gate: older workflows without Docker collection do not require its steps or upload', async () => {
+  const legacy = world({
+    runs: ALL_DONE,
+    uploads: [FRESH.filter((u) => u.name !== 'e2e-docker')],
+    workflowOf: (file) => readFileSync(`${ROOT}${file}`, 'utf8').replace(
+      /^      # Keep the shipped-image smoke check above\.[\s\S]*?(?=      - name: Collect container logs)/m, '',
+    ),
+    jobsOf: (r) => coverageJobs(r.name).map((j) => j.name === 'Run smoke tests against local docker build'
+      ? job(j.name, ['Run smoke Playwright tests against local docker build'])
+      : j),
+  });
+  assert.equal(await gate(legacy.args), true);
+  assert.deepEqual(legacy.sleeps, []);
+  assert.match(legacy.posted[0], /success: 96.00%/);
 });
 
 test('gate: failed Docker recording or mapping fails both coverage statuses', async () => {
