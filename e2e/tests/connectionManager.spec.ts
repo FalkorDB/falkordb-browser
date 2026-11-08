@@ -48,8 +48,17 @@ test.describe("Connection Manager Tests", () => {
       const updatedSession = await sessionUpdate;
       expect(updatedSession.ok()).toBe(true);
       expect(await updatedSession.json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
+      await expect.poll(() => page.evaluate(() => localStorage.getItem("lastActiveConnectionId"))).toBe(primaryId);
+      const persistedSession = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === "/api/auth/session" && response.request().method() === "POST");
+      await page.reload();
+      const persisted = await persistedSession;
+      expect(persisted.ok()).toBe(true);
+      expect(await persisted.json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
       await page.getByTestId("connections-dropdown-trigger").click();
+      await expect(page.getByTestId(/^connection-item-/)).toHaveCount(2);
       await expect(primary.locator("svg.text-primary")).toHaveCount(1);
+      await expect(secondary).toContainText("Read-Write");
       await secondary.getByRole("button", { name: /Sign out of connection/ }).click();
       await expect(page.getByTestId("connectionLogoutDialog")).toContainText("other connections will remain active");
       await page.getByTestId("connectionLogoutConfirm").click();
