@@ -347,8 +347,9 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   Original script responses are captured in case Chromium loses a source during
   navigation; a source missing from both the recording and its response fails collection.
   Server-only test jobs do not require or launch a browser. The gate waits for all six
-  shard uploads plus the TLS, cluster, stateless and Docker E2E uploads, not just an
-  `e2e` flag from one job. It waits up to 15 minutes for required uploads to appear
+  shard uploads plus the TLS, cluster and stateless uploads, and the Docker upload
+  when the workflow declares it, not just an `e2e` flag from one job.
+  It waits up to 15 minutes for required uploads to appear
   and finish processing before reporting missing names. Docker is required only
   when the measured commit's workflow declares Docker coverage; reruns of older
   workflows retain their original requirements.
