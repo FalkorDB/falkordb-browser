@@ -86,19 +86,22 @@ test.describe('@Config Settings users tests', () => {
         await expect(page.locator("input[id='Username']")).toBeDisabled();
         await settingsUsersPage.clickOnSelectRoleBtnInAddUser();
         await settingsUsersPage.clickOnSelectUserRole(user.ReadOnly);
+        await settingsUsersPage.fillEditKeysField("analytics:*");
         await page.getByRole("button", { name: "Save", exact: true }).click();
         await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
         await expect(page.getByTestId(`contentUsers${username}Role`)).toHaveText(user.ReadWrite);
+        await expect(page.getByTestId(`contentUsers${username}Key / Graph Permissions`)).toHaveText("reports:*");
         await expect(page.getByRole("dialog")).toBeVisible();
         expect(saves).toBe(0);
 
         await page.getByRole("button", { name: "Save", exact: true }).click();
         await expect(page.getByRole("dialog")).toHaveCount(0);
         await expect(page.getByTestId(`contentUsers${username}Role`)).toHaveText(user.ReadOnly);
+        await expect(page.getByTestId(`contentUsers${username}Key / Graph Permissions`)).toHaveText("analytics:*");
         await expect.poll(() => saves).toBe(1);
         expect(submissions).toEqual([
-            { role: user.ReadOnly, keys: ["reports:*"] },
-            { role: user.ReadOnly, keys: ["reports:*"] },
+            { role: user.ReadOnly, keys: ["analytics:*"] },
+            { role: user.ReadOnly, keys: ["analytics:*"] },
         ]);
     });
 
