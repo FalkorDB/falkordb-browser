@@ -190,7 +190,7 @@ export default function Selector({
     );
 
     const editorNode = (
-        <div className="h-full w-1 grow relative overflow-visible">
+        <div className="h-full w-1 grow relative overflow-visible" inert={tabsReady ? undefined : true}>
             <CypherEditor
                 graph={graph}
                 graphName={graphName}
@@ -279,10 +279,8 @@ export default function Selector({
             <div className="z-20 w-full flex flex-col gap-2">
                 {mobileToolbarSlot && createPortal(toolbar, mobileToolbarSlot)}
                 {uploadDialog}
-                <div className="w-full h-[44px] flex flex-row items-center" inert={tabsReady ? undefined : true}>
-                    <div className="h-full w-1 grow" inert={tabsReady ? undefined : true}>
-                        {editorNode}
-                    </div>
+                <div className="w-full h-[44px] flex flex-row items-center">
+                    {editorNode}
                 </div>
                 {/* Inset like every other mobile dialog rather than edge-to-edge, but with a
                     definite height so the list/editor flex chain has something to divide. */}
@@ -314,7 +312,7 @@ export default function Selector({
                     "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary"
                 )}
                 title="Upload data"
-                disabled={isReadOnly || !graphName}
+                disabled={!tabsReady || isReadOnly || !graphName}
                 onClick={() => {
                     // The quick-fix path leaves the dialog on Load CSV; the toolbar is the
                     // ordinary Cypher upload, so it has to say which tab it wants.

@@ -67,12 +67,14 @@ test.describe("@admin Graph tabs", () => {
             await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
             await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
             await expect(page.getByTestId("uploadGraphToolbarTrigger")).toBeDisabled();
+            await expect(page.getByTestId("editorContainer").locator("xpath=ancestor::*[@inert]")).toHaveCount(1);
             await page.getByTestId("graphInfoToggle").click();
             await expect(page.getByTestId("graphInfoPanel")).toBeVisible();
             await expect(page.getByTestId("createGraph")).toBeDisabled();
             await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
             release();
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
+            await expect(page.getByTestId("editorContainer").locator("xpath=ancestor::*[@inert]")).toHaveCount(0);
         } finally {
             release();
         }
