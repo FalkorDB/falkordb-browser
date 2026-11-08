@@ -99,10 +99,14 @@ function track(page: Page) {
         const url = response.url();
         if (!url.includes('/_next/static/') || response.request().resourceType() !== 'script'
             || !response.ok() || savedSources.has(url)) return;
-        capturedSources.set(url, response.text().then(
+        const captured = response.text().then(
             (source): CapturedSource => ({ source }),
             (error: unknown): CapturedSource => ({ error }),
-        ));
+        );
+        const previous = capturedSources.get(url);
+        capturedSources.set(url, previous
+            ? previous.then((result) => 'source' in result ? result : captured)
+            : captured);
     });
     recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch(recordFailure));
     const close = page.close.bind(page);
