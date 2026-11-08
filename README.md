@@ -323,8 +323,13 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   **Coverage status** workflow is the gate: once every coverage workflow a commit triggers
   has finished, and Codecov has processed their uploads, it requires **95%** of the whole
   codebase (`coverage/project` on PRs, `coverage/project (push)` on commits pushed to `main`
-  and `staging`) and of the lines a PR changes (`coverage/patch`). A coverage workflow that fails or is cancelled
-  fails the gate, since its coverage is incomplete (`.github/scripts/coverage-gate.mjs`).
+  and `staging`) and of the lines a PR changes (`coverage/patch`). A coverage job whose
+  tests or report fail, are skipped or are cancelled fails the gate, since its coverage is
+  incomplete; failures in jobs that produce no coverage (installers,
+  the security scan) do not, and a Codecov upload error never fails a test job
+  (`.github/scripts/coverage-gate.mjs`). Dependabot runs only get Dependabot secrets, so
+  `CODECOV_TOKEN` must also be set as a Dependabot secret for their coverage to upload.
+  Each job keeps its report as a `coverage-*` workflow artifact for 3 days.
   Locally:
   ```bash
   rm -rf coverage
