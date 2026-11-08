@@ -2,6 +2,7 @@
 [![Dockerhub](https://img.shields.io/docker/pulls/falkordb/falkordb-browser?label=Docker)](https://hub.docker.com/r/falkordb/falkordb-browser/)
 [![Discord](https://img.shields.io/discord/1146782921294884966?style=flat-square)](https://discord.gg/6M4QwDXn2w)
 [![Workflow](https://github.com/FalkorDB/falkordb-browser/actions/workflows/nextjs.yml/badge.svg?branch=main)](https://github.com/FalkorDB/falkordb-browser/actions/workflows/nextjs.yml)
+[![Codecov](https://codecov.io/gh/FalkorDB/falkordb-browser/branch/staging/graph/badge.svg)](https://codecov.io/gh/FalkorDB/falkordb-browser)
 
 # FalkorDB Browser
 
@@ -282,6 +283,25 @@ with the storage and URI handled for you. Whether `file://` can resolve depends 
 deployment and nothing the browser can see settles it, so it is assumed to work unless you
 set `LOAD_CSV_FILE_URI=false`.
 
+### AI query optimization and drafts
+
+The editor's **Optimize** action uses the model and provider configuration selected
+in Settings, with an API key only for hosted providers.
+It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without executing
+the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
+If index metadata is unavailable, analysis continues with an explicit warning.
+
+Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
+**Insert into editor** actions. Neither action runs the query. The card adapts to
+mobile screens, and long Chat queries can be collapsed.
+
+Missing AI configuration and provider errors offer **Go to Settings**. Returning
+to the graph preserves the editor query and unsent Chat input. Chat drafts are
+scoped to the connection, tab, and graph, and survive closing and reopening Chat.
+Submitted Chat input remains saved until the request succeeds; newer edits or an
+intentional clear take precedence over restoring a failed submission.
+Optimize failures close the dialog and show only a toast with the Settings action.
+
 ### Testing
 
 * **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
@@ -309,8 +329,5 @@ set `LOAD_CSV_FILE_URI=false`.
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
-
-
 
 
