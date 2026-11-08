@@ -55,16 +55,17 @@ test.describe('@browser Browser Settings tests', () => {
     });
 
     test.describe("Mocked AI settings recovery", () => {
-        async function openLocalSettings() {
+        async function openLocalSettings(initialModel = "") {
             const settings = await browser.createNewPage(SettingsBrowserPage);
             const page = await browser.getPage();
-            await page.addInitScript(() => {
+            await page.addInitScript((model) => {
                 localStorage.setItem("chatModelSource", "local");
                 localStorage.setItem("localLlmProvider", "ollama");
                 localStorage.setItem("localLlmEndpoint", "http://localhost:11434");
-                localStorage.removeItem("model");
+                if (model) localStorage.setItem("model", model);
+                else localStorage.removeItem("model");
                 localStorage.removeItem("perSourceModels");
-            });
+            }, initialModel);
             await page.goto(urls.settingsUrl);
             await settings.expandChatSection();
             return page;
@@ -83,12 +84,14 @@ test.describe('@browser Browser Settings tests', () => {
                         : { models: ["llama3.2"] },
                 });
             });
-            await openLocalSettings();
+            await openLocalSettings("llama3.2");
             await expect(page.getByText("Local model server unavailable", { exact: true })).toBeVisible();
             await expect(page.getByTestId("noModelsFoundMessage")).toBeVisible();
 
             await page.getByTestId("localLlmEndpointInput").fill("http://localhost:11435");
             await expect(page.getByText("1 local Ollama models loaded.", { exact: true })).toBeVisible();
+            await page.waitForLoadState("networkidle");
+            await expect(page.getByTestId("localLlmEndpointInput")).toHaveValue("http://localhost:11435");
             expect(requests).toEqual([
                 { source: "local", localProvider: "ollama", endpoint: "http://localhost:11434" },
                 { source: "local", localProvider: "ollama", endpoint: "http://localhost:11435" },
