@@ -203,8 +203,16 @@ jobs:
         run: |
           # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
           # service containers run a next-server of their own, as root.
-          pkill -TERM -u "$(id -u)" -f "[n]ext-server" || true
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
           timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
       - name: Build the e2e coverage report
         if: ${{ !cancelled() }}
         run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
@@ -217,7 +225,20 @@ jobs:
           disable_search: true
           flags: e2e
           name: e2e-shard-${{ matrix.shard }}
-          fail_ci_if_error: true
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-shard-${{ matrix.shard }}
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -308,8 +329,16 @@ jobs:
         run: |
           # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
           # service containers run a next-server of their own, as root.
-          pkill -TERM -u "$(id -u)" -f "[n]ext-server" || true
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
           timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
       - name: Build the e2e coverage report
         if: ${{ !cancelled() }}
         run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
@@ -322,7 +351,20 @@ jobs:
           disable_search: true
           flags: e2e
           name: e2e-stateless
-          fail_ci_if_error: true
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-stateless
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -477,8 +519,16 @@ jobs:
         run: |
           # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
           # service containers run a next-server of their own, as root.
-          pkill -TERM -u "$(id -u)" -f "[n]ext-server" || true
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
           timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
       - name: Build the e2e coverage report
         if: ${{ !cancelled() }}
         run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
@@ -491,7 +541,20 @@ jobs:
           disable_search: true
           flags: e2e
           name: e2e-tls
-          fail_ci_if_error: true
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-tls
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -637,8 +700,16 @@ jobs:
         run: |
           # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
           # service containers run a next-server of their own, as root.
-          pkill -TERM -u "$(id -u)" -f "[n]ext-server" || true
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
           timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
       - name: Build the e2e coverage report
         if: ${{ !cancelled() }}
         run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
@@ -651,7 +722,20 @@ jobs:
           disable_search: true
           flags: e2e
           name: e2e-cluster
-          fail_ci_if_error: true
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-cluster
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -790,7 +874,17 @@ jobs:
           disable_search: true
           flags: e2e
           name: e2e-docker
-          fail_ci_if_error: true
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-docker
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Collect container logs
         if: always()
         run: |
