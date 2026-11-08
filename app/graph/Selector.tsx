@@ -77,6 +77,12 @@ export default function Selector({
     useEffect(() => {
         if (!tabsReady) setActionsOpen(false);
     }, [tabsReady]);
+    useEffect(() => {
+        if (!tabsReady) {
+            setQueriesOpen?.(false);
+            setUploadOpen(false);
+        }
+    }, [tabsReady, setQueriesOpen, setUploadOpen]);
     const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
         setCypherLanguageConfig(config);
     }, [setCypherLanguageConfig]);
@@ -203,7 +209,7 @@ export default function Selector({
     const uploadDialog = (
         <UploadGraph
             graphName={graphName}
-            disabled={isReadOnly || !graphName}
+            disabled={!tabsReady || isReadOnly || !graphName}
             open={uploadOpen}
             onOpenChange={setUploadOpen}
             mode={uploadMode}
@@ -238,7 +244,7 @@ export default function Selector({
                         <DropdownMenuItem
                             data-testid="uploadGraphToolbarTrigger"
                             className="gap-3 rounded-lg px-3 py-2.5 text-sm cursor-pointer"
-                            disabled={isReadOnly || !graphName}
+                            disabled={!tabsReady || isReadOnly || !graphName}
                             onSelect={() => {
                                 setUploadMode("cypher");
                                 setUploadOpen(true);
@@ -274,7 +280,9 @@ export default function Selector({
                 {mobileToolbarSlot && createPortal(toolbar, mobileToolbarSlot)}
                 {uploadDialog}
                 <div className="w-full h-[44px] flex flex-row items-center" inert={tabsReady ? undefined : true}>
-                    {editorNode}
+                    <div className="h-full w-1 grow" inert={tabsReady ? undefined : true}>
+                        {editorNode}
+                    </div>
                 </div>
                 {/* Inset like every other mobile dialog rather than edge-to-edge, but with a
                     definite height so the list/editor flex chain has something to divide. */}
@@ -320,14 +328,14 @@ export default function Selector({
             {uploadDialog}
             {editorNode}
             <div className="h-full w-fit flex gap-3 items-center p-2 border border-border rounded-lg bg-background">
-                <Popover open={queriesOpen} onOpenChange={setQueriesOpen}>
+                <Popover open={tabsReady && queriesOpen} onOpenChange={setQueriesOpen}>
                     <PopoverTrigger asChild>
                         <Button
                             aria-label="Query history panel"
                             aria-pressed={queriesOpen}
                             data-testid="queryHistory"
                             className={cn(queriesOpen && "!text-primary")}
-                            disabled={historyQuery.queries.length === 0}
+                            disabled={!tabsReady || historyQuery.queries.length === 0}
                             title={historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
                         >
                             <History />

@@ -48,6 +48,36 @@ test.describe("@admin Graph tabs", () => {
         await expect(graph.stripTab("New tab")).toBeVisible();
     });
 
+    test("A stalled graph list leaves desktop information accessible without enabling edits", async () => {
+        test.setTimeout(60_000);
+        await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        await page.setViewportSize({ width: 1400, height: 900 });
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        let requested = false;
+        await page.route("**/api/graph", async route => {
+            requested = true;
+            await gate;
+            await route.fulfill({ json: { opts: [graphOne, graphTwo] } });
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await expect.poll(() => requested, { timeout: 15000 }).toBe(true);
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+            await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
+            await expect(page.getByTestId("uploadGraphToolbarTrigger")).toBeDisabled();
+            await page.getByTestId("graphInfoToggle").click();
+            await expect(page.getByTestId("graphInfoPanel")).toBeVisible();
+            await expect(page.getByTestId("createGraph")).toBeDisabled();
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+            release();
+            await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
+        } finally {
+            release();
+        }
+    });
+
     test("A rejected bootstrap sync replaces pending graph lists using the session connection", async () => {
         test.setTimeout(60_000);
         await browser.createNewPage(GraphPage);
@@ -604,7 +634,7 @@ test.describe("@admin Graph tabs", () => {
             await chat.click();
             await expect(page.getByTestId("chatPanel")).toBeVisible();
             await expect(chat).toHaveAttribute("aria-pressed", "true");
-            await expect(page.getByTestId("chatRunQueryButton")).toBeDisabled();
+            await expect(page.getByTestId("chatInsertQueryButton")).toBeDisabled();
             await expect(page.getByTestId("chatCopyQueryButton")).toBeEnabled();
             await page.getByTestId("chatInput").fill("Draft during restoration");
             await expect(page.getByTestId("chatInput")).toHaveValue("Draft during restoration");

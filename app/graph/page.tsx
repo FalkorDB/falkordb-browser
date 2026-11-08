@@ -880,7 +880,7 @@ export default function Page() {
     }
 
     return (
-        <div className="h-full w-full flex flex-col min-h-0" data-testid="graphPage" data-graph-names-ready={graphNamesReady} aria-busy={!tabsReady} inert={tabsReady ? undefined : true}>
+        <div className="h-full w-full flex flex-col min-h-0" data-testid="graphPage" data-graph-names-ready={graphNamesReady} aria-busy={!tabsReady}>
             <GraphSubHeader />
             <div className="relative h-1 grow flex">
                 <ResizablePanelGroup orientation="horizontal" className="h-full grow">
@@ -914,7 +914,9 @@ export default function Page() {
                                         collapsible
                                         minSize="30%"
                                     >
-                                        {graphViewNode}
+                                        <div className="h-full w-full" inert={tabsReady ? undefined : true}>
+                                            {graphViewNode}
+                                        </div>
                                     </ResizablePanel>
                                     <ResizableHandle
                                         withHandle
