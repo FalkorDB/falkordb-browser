@@ -49,7 +49,13 @@ function context({ browser = 'chromium', startError, stopError, missingSource = 
     },
     async close() { closed = true; },
   });
-  return { context: result, page, url };
+  const respond = (text) => page.emit('response', {
+    url: () => url,
+    ok: () => true,
+    request: () => ({ resourceType: () => 'script' }),
+    text,
+  });
+  return { context: result, page, respond };
 }
 
 test('records once when a context is tracked twice and closes its page', async () => {
@@ -78,12 +84,7 @@ test('preserves the original script response when Chromium omits a recorded sour
   const page = await fixture.context.newPage();
   let complete;
   const body = new Promise((resolve) => { complete = resolve; });
-  page.emit('response', {
-    url: () => fixture.url,
-    ok: () => true,
-    request: () => ({ resourceType: () => 'script' }),
-    text: () => body,
-  });
+  fixture.respond(() => body);
   const closing = page.close();
   complete('window.originalResponse = true;');
   await closing;
@@ -103,16 +104,27 @@ test('missing source without a captured response fails explicitly and still clos
   assert.throws(() => validateBrowserCoverage([dir]), /Browser coverage collection failed.*source/);
 });
 
+for (const firstFails of [false, true]) {
+  test(`preserves a successful source when the ${firstFails ? 'first' : 'second'} response capture fails`, async () => {
+    const fixture = context({ missingSource: true });
+    trackContext(fixture.context);
+    const page = await fixture.context.newPage();
+    const success = async () => 'window.successfulCapture = true;';
+    const failure = async () => { throw new Error('response was evicted'); };
+    fixture.respond(firstFails ? failure : success);
+    fixture.respond(firstFails ? success : failure);
+    await page.close();
+    validateBrowserCoverage([dir]);
+    const source = readdirSync(dir).find((name) => name.startsWith('browser-source-'));
+    assert.equal(readFileSync(path.join(dir, source), 'utf8'), 'window.successfulCapture = true;');
+  });
+}
+
 test('a failed response-body capture does not discard a source Chromium supplied', async () => {
   const fixture = context();
   trackContext(fixture.context);
   const page = await fixture.context.newPage();
-  page.emit('response', {
-    url: () => fixture.url,
-    ok: () => true,
-    request: () => ({ resourceType: () => 'script' }),
-    text: async () => { throw new Error('response was evicted'); },
-  });
+  fixture.respond(async () => { throw new Error('response was evicted'); });
   await page.close();
   validateBrowserCoverage([dir]);
 });
