@@ -346,7 +346,10 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   missing recordings or recorder errors fail collection, even when server coverage exists.
   Server-only test jobs do not require or launch a browser. The gate waits for all six
   shard uploads plus the TLS, cluster, stateless and Docker E2E uploads, not just an
-  `e2e` flag from one job.
+  `e2e` flag from one job. It waits up to 15 minutes for required uploads to appear
+  and finish processing before reporting missing names. Docker is required only
+  when the measured commit's workflow declares Docker coverage; reruns of older
+  workflows retain their original requirements.
 
   Docker smoke tests still check the normal production image first. They also run against
   a separate image built with `--build-arg COVERAGE=1`; its browser and server coverage
