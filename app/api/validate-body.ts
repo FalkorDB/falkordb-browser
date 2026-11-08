@@ -496,14 +496,6 @@ export const revokeToken = z.object({
     .min(1, "Token cannot be empty"),
 });
 
-export const validateUrl = z.object({
-  url: z
-    .string({
-      error: (issue) => issue.input === undefined ? "URL is required" : "Invalid URL",
-    })
-    .min(1, "URL cannot be empty"),
-});
-
 // Validation helper function
 export function validateBody<T extends z.ZodTypeAny>(
   schema: T,

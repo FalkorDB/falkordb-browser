@@ -1,9 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { FalkorDB } from "falkordb";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
-import { getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly, runQuery, corsPreflight } from "../../utils";
+import { getCorsHeaders, resolveReadOnly, runQuery, corsPreflight } from "../../utils";
+import { QueryInputError, queryStream, queryStreamError } from "../../query-stream";
 
 export const OPTIONS = corsPreflight;
+
+async function streamQuery(
+  request: NextRequest,
+  client: FalkorDB,
+  graphId: string,
+  query: string | null,
+  timeout: number,
+  isReadOnly: boolean,
+): Promise<Response> {
+  return queryStream(request.signal, async () => {
+    if (!query) throw new QueryInputError("Missing parameter query");
+    if (Number.isNaN(timeout)) throw new QueryInputError("Invalid parameter timeout");
+
+    const graph = client.selectGraph(graphId);
+    return runQuery(graph, query, isReadOnly, { TIMEOUT: timeout });
+  }, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      ...getCorsHeaders(request),
+  });
+}
 
 export async function DELETE(
   request: NextRequest,
@@ -64,6 +88,20 @@ export async function POST(
     const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
+      if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() === "application/json") {
+        const body = await request.json() as { query?: unknown; timeout?: unknown };
+        if (body && typeof body === "object" && body.query !== undefined) {
+          if (typeof body.query !== "string") {
+            return NextResponse.json(
+              { message: "Invalid parameter query" },
+              { status: 400, headers: getCorsHeaders(request) }
+            );
+          }
+          const timeout = Number(body.timeout ?? 0) * 1000;
+          return streamQuery(request, client, graphId, body.query, timeout, isReadOnly);
+        }
+      }
+
       const graph = client.selectGraph(graphId);
 
       if (isReadOnly) await graph.roQuery("RETURN 1");
@@ -141,123 +179,32 @@ export async function PATCH(
   }
 }
 
-// send a query to the graph and return the result
-// if the query is taking too long, return a timeout and save the result in the cache
+// GET is always read-only; both query transports share the same SSE lifecycle.
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
 ) {
-  const encoder = new TextEncoder();
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
+  const headers = {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    ...getCorsHeaders(request),
+  };
 
   try {
     const session = await getClient(request);
 
     if (session instanceof NextResponse) {
-      await writeGetClientErrorAsSSE(session, writer, encoder);
-      return new Response(readable, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-          ...getCorsHeaders(request),
-        },
-      });
+      return queryStreamError(session, headers);
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
     const timeout = Number(request.nextUrl.searchParams.get("timeout")) * 1000;
-    const isReadOnly = resolveReadOnly(request, user.role);
-
-    try {
-      if (!query) throw new Error("Missing parameter query");
-      if (Number.isNaN(timeout)) throw new Error("Invalid parameter timeout");
-
-      const graph = client.selectGraph(graphId);
-
-      const result = await runQuery(graph, query, isReadOnly, { TIMEOUT: timeout });
-
-      const writeDataLine = (chunk: string) => {
-        writer.write(encoder.encode(`data: ${chunk}\n`));
-      };
-
-      const streamResult = () => {
-        writer.write(encoder.encode("event: result\n"));
-        writeDataLine("{");
-
-        let isFirstField = true;
-
-        const entries = Object.entries(result ?? {}).filter(
-          ([, value]) => value !== undefined
-        );
-
-        for (let idx = 0; idx < entries.length; idx += 1) {
-          const [key, value] = entries[idx];
-
-          if (key === "data" && Array.isArray(value)) {
-            writeDataLine(`${isFirstField ? "" : ","}"data":[`);
-            isFirstField = false;
-
-            for (let i = 0; i < value.length; i += 1) {
-              const row = value[i];
-              const rowChunk = JSON.stringify(row);
-              writeDataLine(i < value.length - 1 ? `${rowChunk},` : rowChunk);
-            }
-
-            writeDataLine("]");
-          } else {
-            writeDataLine(
-              `${isFirstField ? "" : ","}"${key}":${JSON.stringify(value)}`
-            );
-            isFirstField = false;
-          }
-        }
-
-        writeDataLine("}");
-        writer.write(encoder.encode("\n"));
-      };
-
-      streamResult();
-      writer.close();
-    } catch (error) {
-      console.error(error);
-      writer.write(
-        encoder.encode(
-          `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message || "Internal server error",
-            status: 400,
-          })}\n\n`
-        )
-      );
-      writer.close();
-    }
+    return streamQuery(request, client, graphId, query, timeout, true);
   } catch (error) {
     console.error(error);
-    writer.write(
-      encoder.encode(
-        `event: error\ndata: ${JSON.stringify({
-          message: "Internal server error",
-          status: 500,
-        })}\n\n`
-      )
-    );
-    writer.close();
+    return queryStreamError(Response.json({ message: "Internal server error" }, { status: 500 }), headers);
   }
-
-  // Clean up if the client disconnects early
-  request.signal.addEventListener("abort", () => {
-    writer.close();
-  });
-
-  return new Response(readable, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      ...getCorsHeaders(request),
-    },
-  });
 }

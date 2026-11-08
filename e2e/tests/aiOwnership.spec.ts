@@ -25,7 +25,9 @@ for (const scenario of ["edited-clear", "new-draft-success", "switch-failure", "
     }
     const pending = Promise.withResolvers<Route>();
     await page.route("**/api/chat", route => { pending.resolve(route); });
-    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
     try {
       await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
       await expect(page.getByTestId("chatToggleButton")).toBeEnabled({ timeout: 30_000 });
@@ -64,7 +66,9 @@ for (const scenario of ["edited-clear", "new-draft-success", "switch-failure", "
         await expect(page.getByTestId("chatMessagesList").getByRole("link", { name: "Go to Settings" })).toHaveCount(0);
       }
     } finally {
-      expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+      expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`, {
+        headers: { Origin: new URL(baseUrl).origin },
+      })).ok()).toBe(true);
     }
   });
 }
@@ -74,7 +78,9 @@ test(`@admin optimize cancels on ${dismissal} and allows a fresh request`, async
   const graphName = getRandomString("optimizeOwner");
   const pending = Promise.withResolvers<Route>();
   await page.route("**/api/chat/optimize", route => { pending.resolve(route); });
-  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+    headers: { Origin: new URL(baseUrl).origin },
+  })).ok()).toBe(true);
   try {
     await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
@@ -108,7 +114,9 @@ test(`@admin optimize cancels on ${dismissal} and allows a fresh request`, async
     expect((await freshRequestPromise).postDataJSON().graphName).toBe(graphName);
     await expect(page.getByTestId("aiOptimizeQuery")).toHaveText("RETURN 3");
   } finally {
-    expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
   }
 });
 }

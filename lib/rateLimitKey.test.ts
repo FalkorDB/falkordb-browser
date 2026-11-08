@@ -1,6 +1,36 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clientAddressFromForwardedFor, readNonNegativeInt } from "./rateLimitKey.ts";
+import { clientAddressFromForwardedFor, isPreconfiguredSignIn, readNonNegativeInt } from "./rateLimitKey.ts";
+
+test("preconfigured sign-in classification cannot be bypassed with duplicate flags", async () => {
+    for (const body of ["preconfigured=false&preconfigured=true", "preconfigured=true&preconfigured=false"]) {
+        const request = new Request("https://app.example/api/auth/callback/credentials", {
+            method: "POST", body,
+            headers: { "content-type": "application/x-www-form-urlencoded", "content-length": String(body.length) },
+        });
+        assert.equal(await isPreconfiguredSignIn(request), true);
+        assert.equal(await request.text(), body);
+    }
+    const body = "preconfigured=false";
+    assert.equal(await isPreconfiguredSignIn(new Request("https://app.example/api/auth/callback/credentials", {
+        method: "POST", body, headers: { "content-length": String(body.length) },
+    })), false);
+});
+
+test("preconfigured sign-in decoding agrees with Request for a UTF-8 BOM", async () => {
+    for (const [type, text] of [
+        ["application/json", '{"preconfigured":"true"}'],
+        ["application/x-www-form-urlencoded", "preconfigured=true"],
+    ]) {
+        const body = Buffer.from(`\uFEFF${text}`);
+        const request = new Request("https://app.example/api/auth/callback/credentials", {
+            method: "POST", body,
+            headers: { "content-type": type, "content-length": String(body.byteLength) },
+        });
+        assert.equal(await isPreconfiguredSignIn(request), true);
+        assert.equal(await request.text(), text);
+    }
+});
 
 // ---------------------------------------------------------------------------
 // readNonNegativeInt

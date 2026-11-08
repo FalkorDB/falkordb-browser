@@ -1098,7 +1098,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         `/api/graph/${prepareArg(name)}?query=${prepareArg(query)}${readOnlyParam}`,
         gToast,
         gInd,
-        { connectionId: cid },
+        { connectionId: cid, method: "POST" },
       ) as { data?: Array<{ info?: unknown }> };
 
       if (superseded() || !sse || !Array.isArray(sse.data)) return [];
@@ -1215,6 +1215,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
         query: q,
         connectionId: cid,
+        method: "POST",
       }) as { data: Data; stats: QueryStatistics };
 
       if (!result) throw new Error("Failed to execute query");
@@ -1652,7 +1653,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   );
 
   const graphTabs = useGraphTabs({
-    prefixReady,
+    prefixReady: prefixReady && activeConnectionId !== null && activeConnectionId === prefixConnectionId,
     // Rebuilding a tab queries its graph, and querying a graph that has since
     // been dropped would make FalkorDB re-create it — wait for the list.
     canRestore: graphNamesLoaded,
@@ -1918,39 +1919,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             }
 
           } else {
-            // Token DB returned no connections — the session is out of sync.
-            // This happens after a server restart (FileTokenStorage wiped),
-            // a deploy that changed the storage backend, or any time the
-            // connection entry was never written (old pre-feature sessions).
-            //
-            // Fix: call the migration endpoint which:
-            //   1. Deletes stale Token DB entries for this user
-            //   2. Reconnects to FalkorDB using session.user credentials
-            //   3. Creates a fresh entry in Token DB
-            //   4. Returns the new connection
-            // Then sync the JWT and local state with the result.
-            //
-            // Also clean up stale localStorage keys so we don't restore
-            // a lastActiveConnectionId that no longer exists.
+            // Missing connection records require fresh authentication, not
+            // reconstruction from potentially revoked cookie fields.
             localStorage.removeItem("lastActiveConnectionId");
-
-            const migrateResult = await securedFetch("/api/auth/migrate-session", {
-              method: "POST",
-            }, toast, setIndicator);
-
-            if (cancelled) return;
-
-            if (migrateResult.ok) {
-              const migrateJson = await migrateResult.json();
-              if (migrateJson?.connection) {
-                const migratedConn: SessionConnection = migrateJson.connection;
-                const migratedConns = [migratedConn];
-                setAdditionalConnections(migratedConns);
-                if (!cancelled) {
-                  await pinAndSync(migratedConn.id);
-                }
-              }
-            }
+            setIndicator("offline");
+            const { signOut } = await import("next-auth/react");
+            if (!cancelled) await signOut({ callbackUrl: "/login" });
           }
         }
         sessionSyncedRef.current = true;
@@ -2604,8 +2578,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // Both queries are hardcoded, so the SSE layer's parse/connection detail is
       // for the console, not the user — silence it and report once, below.
       const loads = await Promise.allSettled([
-        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid }),
-        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid })
+        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid, method: "POST" }),
+        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid, method: "POST" })
       ]);
 
       const failedLoad = loads.find((load): load is PromiseRejectedResult => load.status === "rejected");

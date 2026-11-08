@@ -185,7 +185,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "List JWT tokens",
-        description: "Get a list of active JWT tokens. Admins see all tokens, regular users see only their own tokens.",
+        description: "Get active JWT tokens for the authenticated database endpoint. Admins see all users at that endpoint; regular users see only their own tokens. Host matching is case-insensitive.",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
@@ -273,7 +273,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "Get token metadata",
-        description: "Get detailed metadata for a specific JWT token by its token ID. Admins can view any token, regular users can only view their own tokens.",
+        description: "Get metadata for a JWT token at the authenticated database endpoint. Admins can view any user at that endpoint; regular users can only view their own tokens.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -356,7 +356,7 @@ const swaggerSpec = {
             description: "Authentication failed - invalid or missing token"
           },
           "403": {
-            description: "Forbidden - You can only view your own tokens (unless you are an Admin)",
+            description: "Forbidden - Token must belong to your connection; non-admins must also own it",
             content: {
               "application/json": {
                 schema: {
@@ -364,7 +364,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Forbidden: You can only view your own tokens"
+                      example: "Forbidden: You can only view tokens for your connection"
                     }
                   }
                 }
@@ -395,7 +395,7 @@ const swaggerSpec = {
       delete: {
         tags: ["Authentication"],
         summary: "Revoke token by ID",
-        description: "Revoke a specific JWT token by its token ID. Once revoked, the token cannot be used for authentication. Admins can revoke any token, regular users can only revoke their own tokens.",
+        description: "Revoke a JWT token at the authenticated database endpoint. Once revoked, it cannot authenticate. Admins can revoke any user at that endpoint; regular users can only revoke their own tokens.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -451,7 +451,7 @@ const swaggerSpec = {
             description: "Authentication failed - invalid or missing token"
           },
           "403": {
-            description: "Forbidden - You can only revoke your own tokens (unless you are an Admin)",
+            description: "Forbidden - Token must belong to your connection; non-admins must also own it",
             content: {
               "application/json": {
                 schema: {
@@ -459,7 +459,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Forbidden: You can only revoke your own tokens"
+                      example: "Forbidden: You can only revoke tokens for your connection"
                     }
                   }
                 }
@@ -596,8 +596,8 @@ const swaggerSpec = {
     "/api/graph/{graph}": {
       get: {
         tags: ["Graph"],
-        summary: "Execute graph query",
-        description: "Execute a Cypher query on the specified graph (Server-Sent Events)",
+        summary: "Execute a read-only graph query",
+        description: "Execute a read-only Cypher query on the specified graph (Server-Sent Events)",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -623,12 +623,12 @@ const swaggerSpec = {
           {
             in: "query",
             name: "timeout",
-            required: true,
+            required: false,
             schema: {
               type: "number"
             },
-            description: "Query timeout in milliseconds",
-            example: 30000
+            description: "Query timeout in seconds",
+            example: 30
           }
         ],
         responses: {
@@ -639,8 +639,8 @@ const swaggerSpec = {
       },
       post: {
         tags: ["Graph"],
-        summary: "Create or verify a graph",
-        description: "Create a new graph or verify that a graph exists",
+        summary: "Execute a query or verify a graph",
+        description: "Execute a Cypher query using a JSON body, or verify graph access when no query body is supplied",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -653,19 +653,34 @@ const swaggerSpec = {
             description: "Graph name to create or verify"
           }
         ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string", description: "Cypher query to execute" },
+                  timeout: { type: "number", description: "Query timeout in seconds" }
+                }
+              }
+            }
+          }
+        },
         responses: {
           "200": {
-            description: "Graph created or verified successfully",
+            description: "Query returns a Server-Sent Events stream; graph checks return JSON",
             content: {
+              "text/event-stream": {
+                schema: { type: "string" },
+                example: 'event: result\ndata: {"data":[{"value":1}]}\n\n'
+              },
               "application/json": {
                 schema: {
                   type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Graph created successfully"
-                    }
-                  }
+                  required: ["message"],
+                  properties: { message: { type: "string", example: "Graph created successfully" } }
                 }
               }
             }
@@ -803,10 +818,10 @@ const swaggerSpec = {
       }
     },
     "/api/graph/{graph}/profile": {
-      get: {
+      post: {
         tags: ["Graph"],
         summary: "Profile query execution",
-        description: "Get detailed profiling information for a Cypher query",
+        description: "Execute a Cypher query and return profiling information. Requires a writable user and connection; read-only mode returns 403.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -818,20 +833,30 @@ const swaggerSpec = {
             },
             description: "Graph name"
           },
-          {
-            in: "query",
-            name: "query",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Cypher query to profile"
-          }
         ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string", description: "Cypher query to profile" }
+                }
+              }
+            }
+          }
+        },
         responses: {
           "200": {
             description: "Query profiling information returned successfully"
-          }
+          },
+          "400": { description: "Invalid JSON, missing query, or query profiling failed" },
+          "401": { description: "Authentication or an active connection is required" },
+          "403": { description: "Profiling is unavailable in read-only mode" },
+          "415": { description: "Content-Type must be application/json" },
+          "500": { description: "Internal server error" }
         }
       }
     },

@@ -36,4 +36,13 @@ test.describe('Metadata Tests', () => {
         const isMetadataViewTabEnabled = await metadataView.GetIsMetadataViewTabEnabled();
         expect(isMetadataViewTabEnabled).toBe(true);
     });
+
+    test('@readonly profiling is disabled for read-only connections', async () => {
+        const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
+        await metadataView.selectGraphByName(GRAPH_NAME);
+        await metadataView.insertQuery("RETURN 1");
+        await metadataView.clickRunQuery();
+        await metadataView.clickMetadataViewTab();
+        await expect((await browser.getPage()).getByRole("button", { name: "Profile", exact: true })).toBeDisabled();
+    });
 });
