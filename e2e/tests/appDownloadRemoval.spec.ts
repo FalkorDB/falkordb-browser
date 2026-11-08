@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 
-const RELEASE_ASSET = "https://github.com/FalkorDB/falkordb-browser/releases/download/v2.7.3/FalkorDB-Browser-mac-arm64.dmg";
-const RELEASE_URL = "https://github.com/FalkorDB/falkordb-browser/releases/tag/v2.7.3";
+const RELEASE_ASSET = "https://github.com/FalkorDB/falkordb-browser/releases/download/v2.7.4/FalkorDB-Browser-mac-arm64.dmg";
+const RELEASE_URL = "https://github.com/FalkorDB/falkordb-browser/releases/tag/v2.7.4";
 
 test.describe("@admin App download removal", () => {
     test("desktop app downloads remain available only in release notes", async ({ page }) => {
@@ -10,8 +10,8 @@ test.describe("@admin App download removal", () => {
         await page.route("**/api/releases", (route) => route.fulfill({
             json: {
                 releases: [{
-                    tag: "v2.7.3",
-                    name: "v2.7.3",
+                    tag: "v2.7.4",
+                    name: "v2.7.4",
                     publishedAt: "2026-11-05T00:00:00Z",
                     body: `## Downloads\n[macOS](${RELEASE_ASSET})`,
                     url: RELEASE_URL,
@@ -28,8 +28,15 @@ test.describe("@admin App download removal", () => {
         await expect(page.getByTestId("appDownloadAlternate")).toHaveCount(0);
         await page.getByTestId("releasesButton").click();
 
-        const release = page.getByTestId("releaseNotes-v2.7.3");
+        const release = page.getByTestId("releaseNotes-v2.7.4");
         await expect(release.getByRole("link", { name: "macOS" })).toHaveAttribute("href", RELEASE_ASSET);
+    });
+
+    test("app download API endpoints are no longer available", async ({ request }) => {
+        for (const path of ["/api/app-links", "/api/app-download/android"]) {
+            const response = await request.get(`${urls.localHost}${path}`);
+            expect(response.status(), `${path} should not expose an app download`).toBe(404);
+        }
     });
 
     test("the login page has no app download link", async ({ browser }) => {

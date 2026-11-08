@@ -3,9 +3,7 @@ productName: FalkorDB Browser
 copyright: Copyright © FalkorDB
 directories:
   output: dist
-# No version and no spaces: the browser's "Download for …" links point at
-# releases/latest/download/<name>, which only works if the name never changes.
-# Keep in step with DESKTOP_FILES in lib/appDownload.ts.
+# Keep filenames stable because the GitHub release notes link to these assets.
 artifactName: FalkorDB-Browser-${os}-${arch}.${ext}
 files:
   - main.cjs

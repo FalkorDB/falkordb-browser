@@ -103,8 +103,8 @@ jobs:
         run: npm test
 
       # Stamp the app with the release's version (v2.6.1 -> 2.6.1), not the
-      # one last written into desktop/package.json. File names carry no
-      # version, so the browser's latest/download links keep working.
+      # one last written into desktop/package.json. Keep release asset names
+      # stable because the GitHub release notes link to these files.
       - name: Use the release version
         if: github.event_name == 'release'
         working-directory: desktop
