@@ -101,6 +101,8 @@ jobs:
       - name: Run desktop tests
         working-directory: desktop
         run: npm test
+        env:
+          NODE_V8_COVERAGE: ${{ github.workspace }}/coverage/raw/desktop
 
       # Stamp the app with the release's version (v2.6.1 -> 2.6.1), not the
       # one last written into desktop/package.json. Keep release asset names
@@ -186,6 +188,37 @@ jobs:
             desktop/dist/*.exe
           if-no-files-found: error
           retention-days: 14
+
+      # Last, so a Codecov problem never skips the installers; and never for a
+      # release, whose attach-to-release job needs this one to pass (its commit
+      # was measured when it was pushed).
+      - name: Build the desktop coverage report
+        if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name != 'release' }}
+        run: node .github/scripts/coverage-report.mjs desktop coverage/raw/desktop
+
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name != 'release' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/desktop/codecov.json
+          disable_search: true
+          flags: desktop
+          name: desktop
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name != 'release' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-desktop
+          path: coverage/desktop/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
 
   # Runs even when some platforms fail, so a missing macOS credential does not
   # hold back the Windows and Linux installers. The job still fails afterwards
