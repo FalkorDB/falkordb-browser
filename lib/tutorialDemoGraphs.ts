@@ -109,6 +109,35 @@ export function runTutorialDemoLoadOnce<T>(
   return pending;
 }
 
+export function queueTutorialDemoRecovery(
+  recoveries: Map<string, Promise<void>>,
+  key: string,
+  recover: () => Promise<void>,
+): Promise<void> {
+  const previous = recoveries.get(key) ?? Promise.resolve();
+  const pending = previous.then(recover, recover);
+  recoveries.set(key, pending);
+  const clear = () => {
+    if (recoveries.get(key) === pending) recoveries.delete(key);
+  };
+  void pending.then(clear, clear);
+  return pending;
+}
+
+export async function waitForTutorialDemoLoad<T>(pending: Promise<T>, timeout: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      pending,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Tutorial setup is still pending; retaining its ownership for later recovery")), timeout);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function isTutorialDemoOwnershipExpired(ownership: TutorialDemoOwnership, now = Date.now()): boolean {
   return ownership.lastActiveAt !== undefined && now - ownership.lastActiveAt >= TUTORIAL_DEMO_OWNER_TTL_MS;
 }

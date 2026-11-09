@@ -61,12 +61,17 @@ so they cannot recreate a sample that cleanup is removing.
 Samples whose setup did not confirm completion (including older ownership
 records without completion metadata) are retained for manual verification:
 an interrupted request could still create the graph after a reload.
+These pending names produce a manual-verification notice at most once per
+connection per browser session, not a recurring cleanup-failure notification.
 Only active tutorials renew ownership heartbeats; inactive failed-cleanup
-records keep their retry timestamp. Capability and offloaded-graph verification
+records keep their retry timestamp in separate ownership records when a new
+tutorial starts. Capability and offloaded-graph verification
 are bounded and cannot mark ordinary browsing offline. Browsing without ownership
 records does not wait for tutorial capability probes; unverifiable capabilities
 still block tutorial setup and cleanup rather than risk user graphs.
-Each connection activation waits for its own recovery. Mobile and shared-link
+Each connection activation queues a fresh recovery sweep after any earlier
+in-flight sweep for that connection. Stale activations cannot publish cleanup
+state into a later activation. Mobile and shared-link
 visits also reclaim completed samples owned by the current tab when no tutorial
 will run. Confirmed setup results stay with their original validated ownership
 record after a connection switch. Closing the tutorial restores only graphs
@@ -74,6 +79,8 @@ still present in a freshly verified list, never a reclaimed sample.
 Graph selection, including offloaded options, is unavailable during recovery.
 Configuration initialization and waiting for in-flight setup are bounded; a
 timed-out setup retains its pending ownership rather than assuming it completed.
+Replay also bounds its wait for that setup, without discarding the original
+creation promise or losing tracking of a late result.
 Closing on mobile discards the tutorial's step state and ignores late setup
 results, so Replay starts fresh. Background reads of generated samples use
 non-creating read-only queries even if cleanup has already deleted the graph.
@@ -409,4 +416,3 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-

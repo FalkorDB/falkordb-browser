@@ -10,6 +10,8 @@ import {
   parseTutorialDemoOwnership,
   pickTutorialDemoGraphNames,
   runTutorialDemoLoadOnce,
+  queueTutorialDemoRecovery,
+  waitForTutorialDemoLoad,
   tutorialDemoOwnershipKey,
 } from "./tutorialDemoGraphs.ts";
 
@@ -91,6 +93,44 @@ describe("tutorial demo graph names (#2202)", () => {
     }), /probe failed/);
     assert.equal(loads.size, 0);
     assert.equal(await runTutorialDemoLoadOnce(loads, "connection-a", async () => "retried"), "retried");
+  });
+
+  it("serializes fresh recovery activations instead of reusing an old sweep", async () => {
+    const recoveries = new Map<string, Promise<void>>();
+    let finish!: () => void;
+    const delayed = new Promise<void>(resolve => { finish = resolve; });
+    const scanned: string[] = [];
+    const records = ["old-owner"];
+    const first = queueTutorialDemoRecovery(recoveries, "a", async () => {
+      scanned.push(...records);
+      await delayed;
+      throw new Error("old activation failed");
+    });
+    await Promise.resolve();
+    records.push("owner-added-while-away");
+    const second = queueTutorialDemoRecovery(recoveries, "a", async () => { scanned.push(...records); });
+    assert.notEqual(first, second);
+    await queueTutorialDemoRecovery(recoveries, "b", async () => { scanned.push("b"); });
+    assert.deepEqual(scanned, ["old-owner", "b"]);
+    const failed = assert.rejects(first, /old activation failed/);
+    finish();
+    await failed;
+    await second;
+    assert.deepEqual(scanned, ["old-owner", "b", "old-owner", "owner-added-while-away"]);
+    assert.equal(recoveries.size, 0);
+  });
+
+  it("bounds replay waits without releasing a pending creation or losing its late result", async () => {
+    const loads = new Map<string, Promise<string>>();
+    let finish!: (value: string) => void;
+    const delayed = new Promise<string>(resolve => { finish = resolve; });
+    const pending = runTutorialDemoLoadOnce(loads, "a", () => delayed);
+    await assert.rejects(waitForTutorialDemoLoad(pending, 5), /still pending/);
+    await assert.rejects(waitForTutorialDemoLoad(pending, 5), /still pending/);
+    assert.equal(loads.get("a"), pending);
+    finish("late creation tracked");
+    assert.equal(await waitForTutorialDemoLoad(pending, 1000), "late creation tracked");
+    assert.equal(loads.size, 0);
   });
 });
 
