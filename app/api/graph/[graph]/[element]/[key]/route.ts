@@ -25,7 +25,8 @@ export async function POST(
     }
 
     const { client, user } = session;
-    const { graph: graphId, element, key } = await params;
+    const { graph: graphId, element, key: routeKey } = await params;
+    const key = request.nextUrl.searchParams.get("propertyKey") ?? routeKey;
     const elementId = Number(element);
     const isReadOnly = resolveReadOnly(request, user.role);
 
@@ -100,7 +101,8 @@ export async function DELETE(
 
     const { client, user } = session;
 
-    const { graph: graphId, element, key } = await params;
+    const { graph: graphId, element, key: routeKey } = await params;
+    const key = request.nextUrl.searchParams.get("propertyKey") ?? routeKey;
     const elementId = Number(element);
     const isReadOnly = resolveReadOnly(request, user.role);
 

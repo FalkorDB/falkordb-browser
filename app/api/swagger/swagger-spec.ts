@@ -1207,7 +1207,7 @@ const swaggerSpec = {
       post: {
         tags: ["Graph"],
         summary: "Set node/relationship property",
-        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships.",
+        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For lossless property names, use key=property in the path and supply propertyKey in the query.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1235,7 +1235,14 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name"
+            description: "Property key name, or property when using the propertyKey query parameter"
+          },
+          {
+            in: "query",
+            name: "propertyKey",
+            required: false,
+            schema: { type: "string" },
+            description: "Exact property name; overrides the path key and avoids dynamic-route normalization"
           }
         ],
         requestBody: {
@@ -1269,7 +1276,7 @@ const swaggerSpec = {
       delete: {
         tags: ["Graph"],
         summary: "Remove node/relationship property",
-        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships.",
+        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For lossless property names, use key=property in the path and supply propertyKey in the query.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1297,7 +1304,14 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name"
+            description: "Property key name, or property when using the propertyKey query parameter"
+          },
+          {
+            in: "query",
+            name: "propertyKey",
+            required: false,
+            schema: { type: "string" },
+            description: "Exact property name; overrides the path key and avoids dynamic-route normalization"
           }
         ],
         requestBody: {

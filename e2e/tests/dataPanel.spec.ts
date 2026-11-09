@@ -13,6 +13,7 @@ import {
   getRandomString,
 } from "../infra/utils";
 import { FETCH_FIRST_TEN_NODES } from "../config/constants";
+import getPropertyUrl from "../../lib/propertyUrl";
 
 test.describe("Data panel Tests", () => {
   let browser: BrowserWrapper;
@@ -210,32 +211,72 @@ test.describe("Data panel Tests", () => {
     await apicalls.removeGraph(graphName);
   });
 
-  test("@admin editing a relationship property with a reserved URL character updates only that property", async () => {
+  test("@admin property mutations preserve legacy URLs and read-only protection", async ({ request }) => {
+    const graphName = getRandomString("propertyApi");
+    const key = "_NEXTSEP_name/part";
+    try {
+      const result = await apicalls.runQuery(graphName, `CREATE (n {legacy: 1, \`${key}\`: 2}) RETURN ID(n) AS id`);
+      const id = Number(result.data[0].id);
+      const legacyUrl = `${urls.api.graphUrl}${encodeURIComponent(graphName)}/${id}/legacy`;
+      const readProperties = async () => (await apicalls.runQuery(graphName, "MATCH (n) RETURN n")).data[0].n.properties;
+      const updated = await request.post(legacyUrl, { data: { type: true, value: 7, valueType: "integer" } });
+      expect(updated.ok(), await updated.text()).toBe(true);
+      expect(await readProperties()).toEqual({ legacy: 7, [key]: 2 });
+      const removed = await request.delete(legacyUrl, { data: { type: true } });
+      expect(removed.ok(), await removed.text()).toBe(true);
+      expect(await readProperties()).toEqual({ [key]: 2 });
+      const protectedUrl = new URL(getPropertyUrl(graphName, id, key, true), `${urls.localHost}/`).toString();
+      const blockedUpdate = await request.post(protectedUrl, { data: { type: true, value: 9, valueType: "integer" } });
+      const blockedDelete = await request.delete(protectedUrl, { data: { type: true } });
+      expect(blockedUpdate.status()).toBe(403);
+      expect(blockedDelete.status()).toBe(403);
+      expect(await readProperties()).toEqual({ [key]: 2 });
+    } finally {
+      const { message } = await apicalls.removeGraph(graphName);
+      expect(message).toMatch(/deleted|empty key/);
+    }
+  });
+
+  for (const [key, isNode] of [["a?b", false], ["_NEXTSEP_name/part", false], ["_NEXTSEP_name/part", true]] as const) {
+  test(`@admin editing and deleting ${isNode ? "node" : "relationship"} property "${key}" targets the exact key`, async () => {
     test.setTimeout(60_000);
     const graphName = getRandomString("relationshipProperty");
     await apicalls.addGraph(graphName);
     try {
-      await apicalls.runQuery(graphName, "CREATE (:Person {name: 'Alice'})-[:KNOWS {`a?b`: 1, a: 2}]->(:Person {name: 'Bob'})");
+      const properties = `{\`${key}\`: 1, a: 2, \`name/part\`: 3}`;
+      await apicalls.runQuery(graphName, isNode
+        ? `CREATE (n:Person ${properties}) SET n.name = 'Alice'`
+        : `CREATE (:Person {name: 'Alice'})-[:KNOWS ${properties}]->(:Person {name: 'Bob'})`);
       const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
       await browser.setPageToFullScreen();
       await graph.selectGraphByName(graphName);
-      await graph.insertQuery("MATCH (a)-[r:KNOWS]->(b) RETURN a, r, b");
+      await graph.insertQuery(isNode ? "MATCH (n) RETURN n" : "MATCH (a)-[r:KNOWS]->(b) RETURN a, r, b");
       await graph.clickRunQuery();
       await graph.waitForCanvasAnimationToEnd();
-      await graph.clickCenterControl();
-      await graph.waitForScaleToStabilize();
-      const links = await graph.getLinksScreenPositions();
-      expect(links).toHaveLength(1);
-      await graph.clickCanvasElement(links[0].midX, links[0].midY);
-      await graph.setAttribute("a?b", "70", "integer");
-      await expect.poll(async () => {
-        const response = await apicalls.runQuery(graphName, "MATCH ()-[r:KNOWS]->() RETURN r");
-        return response.data[0].r.properties;
-      }, { timeout: 10000 }).toEqual({ "a?b": 70, a: 2 });
+      if (isNode) {
+        await graph.searchElementInCanvas("Alice");
+      } else {
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
+        const links = await graph.getLinksScreenPositions();
+        expect(links).toHaveLength(1);
+        await graph.clickCanvasElement(links[0].midX, links[0].midY);
+      }
+      const readProperties = async () => {
+        const response = await apicalls.runQuery(graphName, isNode ? "MATCH (n) RETURN n AS element" : "MATCH ()-[r:KNOWS]->() RETURN r AS element");
+        return response.data[0].element.properties;
+      };
+      const neighbours = { a: 2, "name/part": 3, ...(isNode ? { name: "Alice" } : {}) };
+      await graph.setAttribute(key, "70", "integer");
+      await expect.poll(readProperties, { timeout: 10000 }).toEqual({ [key]: 70, ...neighbours });
+      await graph.removeAttribute(key);
+      await expect.poll(readProperties, { timeout: 10000 }).toEqual(neighbours);
     } finally {
+      await browser.closeBrowser();
       await apicalls.removeGraph(graphName);
     }
   });
+  }
 
   for (const key of ["a?b", "c#d", "e/f", "g%h"]) {
     test(`@readwrite Validate modifying attribute with reserved URL character key "${key}" updates that key only`, async () => {
