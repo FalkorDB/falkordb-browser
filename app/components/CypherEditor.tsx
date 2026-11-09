@@ -196,7 +196,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
-    const { activeTabId } = useContext(GraphTabsContext);
+    const { activeTabId, tabsReady } = useContext(GraphTabsContext);
+    useEffect(() => {
+        if (!tabsReady) {
+            setMaximize(false);
+            setActionsOpen(false);
+        }
+    }, [tabsReady, setMaximize]);
     const { diagnostics, setDiagnostics } = useContext(DiagnosticsContext);
     const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
     const checkPreflight = useQueryPreflight();
@@ -1282,6 +1288,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     }, [cypherLanguageConfig, onLanguageConfig]);
 
     const handleSubmit = async () => {
+        if (!tabsReady) return;
         // Real-time grammar validation gates execution: invalid syntax never runs
         // (the backend therefore only ever sees runtime issues, not syntax errors).
         if (!isQueryValid) {
@@ -1501,10 +1508,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         languageConfig={cypherLanguageConfig}
                         options={{
                             lineNumbers: lineNumber > 1 ? "on" : "off",
+                            readOnly: !tabsReady,
                         }}
                         value={blur ? historyQuery.query.replace(/\n/g, ' ') : historyQuery.query}
                         onChange={(val) => {
-                            if (blur) return;
+                            if (blur || !tabsReady) return;
                             const newVal = val || "";
                             // Compared with the latest state, not this render's props: two quick
                             // edits can arrive before a re-render, and the second must not be lost.
@@ -1583,7 +1591,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                 data-testid="editorRun"
                                 ref={submitQuery}
                                 indicator={indicator}
-                                disabled={!historyQuery.query || !graphName}
+                                disabled={!tabsReady || !historyQuery.query || !graphName}
                                 variant="Primary"
                                 title={getLabel()}
                                 onClick={handleSubmit}
@@ -1656,7 +1664,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                 data-testid="editorRun"
                                 ref={submitQuery}
                                 indicator={indicator}
-                                disabled={!historyQuery.query || !graphName}
+                                disabled={!tabsReady || !historyQuery.query || !graphName}
                                 variant="Primary"
                                 label="RUN"
                                 title={getLabel()}
@@ -1667,7 +1675,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     )}
                 </div>
             </div>
-            <Dialog open={maximize} onOpenChange={setMaximize}>
+            <Dialog open={tabsReady && maximize} onOpenChange={setMaximize}>
                 <DialogContent hideClose className="w-full h-full mobile:w-screen mobile:max-w-none mobile:h-[100dvh] mobile:max-h-[100dvh] mobile:rounded-none mobile:p-2" onEscapeKeyDown={(e) => {
                     // When Monaco has focus, let it handle Escape (closes suggestions or blurs).
                     // Only allow the Dialog to handle Escape if Monaco is not focused.
@@ -1718,7 +1726,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                     data-testid="editorRun"
                                     className="pointer-events-auto py-2 px-8"
                                     indicator={indicator}
-                                    disabled={!historyQuery.query || !graphName}
+                                    disabled={!tabsReady || !historyQuery.query || !graphName}
                                     variant="Primary"
                                     label="RUN"
                                     title={getLabel()}
@@ -1734,6 +1742,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             language={LANGUAGE_NAME}
                             languageConfig={cypherLanguageConfig}
                             options={{
+                                readOnly: !tabsReady,
                                 lineNumbersMinChars: 3,
                                 fontSize: isMobile ? 16 : 25,
                                 // A phone has no room to scroll sideways for the rest
@@ -1746,6 +1755,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             }}
                             value={historyQuery.query}
                             onChange={(val) => {
+                                if (!tabsReady) return;
                                 setHistoryQuery(prev => ({ ...withQuery(prev, val || ""), fromEditor: true }));
                             }}
                             onMount={(e) => {

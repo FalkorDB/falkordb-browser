@@ -358,10 +358,12 @@ test.describe("@admin Graph tabs", () => {
         }
     });
 
-    test("Delayed discovery of a different connection invalidates session readiness", async () => {
+    for (const portal of ["maximized editor", "toolbar delete"] as const) {
+    test(`Delayed connection discovery closes the ${portal} when readiness is lost`, async () => {
         test.setTimeout(60_000);
-        await browser.createNewPage(GraphPage);
+        const graph = await browser.createNewPage(GraphPage);
         const page = await browser.getPage();
+        await page.setViewportSize({ width: 1400, height: 900 });
         const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
         const { connections } = await (await page.request.get(`${urls.localHost}/api/connections`)).json();
         expect(connections[0]?.id).toBeTruthy();
@@ -393,11 +395,31 @@ test.describe("@admin Graph tabs", () => {
         try {
             await page.goto(urls.graphUrl);
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
+            await graph.selectGraphByName(graphOne);
+            await graph.insertQuery("RETURN 1");
+            if (portal === "maximized editor") {
+                await page.getByTestId("editorMaximize").click();
+                await expect(page.getByTestId("editorMinimize")).toBeVisible();
+            } else {
+                await graph.insertQuery("CREATE (n:Readiness {name: 'readiness'}) RETURN n");
+                await graph.clickRunQuery();
+                await graph.searchElementInCanvas("readiness");
+                await page.getByTestId("deleteElementGraph").click();
+                await expect(page.getByTestId("deleteElementConfirmGraph")).toBeVisible();
+            }
+            let deletes = 0;
+            page.on("request", request => {
+                if (request.method() === "DELETE") deletes += 1;
+            });
             releaseDiscovery();
             await expect.poll(() => syncCompleted, { timeout: 15000 }).toBe(true);
             await expect.poll(() => replacementLists, { timeout: 15000 }).toBeGreaterThan(0);
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "false");
             await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
+            await expect(page.getByTestId("editorMinimize")).toHaveCount(0);
+            await expect(page.getByTestId("deleteElementConfirmGraph")).toHaveCount(0);
+            await expect(page.getByTestId("editorRun")).toBeDisabled();
+            expect(deletes).toBe(0);
             releaseLists();
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
@@ -406,6 +428,7 @@ test.describe("@admin Graph tabs", () => {
             releaseLists();
         }
     });
+    }
 
     test("A tab is labelled by the graph it holds", async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
