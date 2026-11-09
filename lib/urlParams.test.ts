@@ -85,7 +85,7 @@ test("an interrupted navigation applies the latest deferred parameters", () => {
         release();
         release();
     }
-    assert.deepEqual(replaceStateCalls, ["/graph?tab=new&graph=movies&query=RETURN+1"]);
+    assert.deepEqual(replaceStateCalls, ["/graph?graph=movies&tab=new&query=RETURN+1"]);
 });
 
 test("overlapping transitions defer writes until both finish", () => {
@@ -115,6 +115,18 @@ test("same-path navigation preserves its destination search and hash", () => {
     assert.equal(location.search, "?tab=destination&graph=other");
 });
 
+test("same-search navigation preserves a changed destination hash", () => {
+    const release = beginUrlNavigation();
+    try {
+        setUrlParam({ tab: "old" });
+        location.hash = "#target";
+    } finally {
+        release();
+    }
+    assert.deepEqual(replaceStateCalls, []);
+    assert.equal(location.hash, "#target");
+});
+
 test("deferred writes after navigation use only the destination state", () => {
     const release = beginUrlNavigation();
     try {
@@ -125,6 +137,17 @@ test("deferred writes after navigation use only the destination state", () => {
         release();
     }
     assert.deepEqual(replaceStateCalls, ["/graph?tab=destination&query=RETURN+2"]);
+});
+
+test("deferred updates follow the latest caller key order", () => {
+    const release = beginUrlNavigation();
+    try {
+        setUrlParam({ a: "1", b: "2", c: "3" });
+        setUrlParam({ b: "updated", a: "updated" });
+    } finally {
+        release();
+    }
+    assert.deepEqual(replaceStateCalls, ["/graph?c=3&b=updated&a=updated"]);
 });
 
 test("stale route synchronization cannot write parameters into another route", () => {

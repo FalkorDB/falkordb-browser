@@ -36,7 +36,13 @@ export function setUrlParam(updates: Record<string, string | null>) {
     const url = currentUrl();
     deferredParams = {
       url,
-      updates: { ...(deferredParams?.url === url ? deferredParams.updates : {}), ...updates },
+      updates: {
+        ...Object.fromEntries(
+          Object.entries(deferredParams?.url === url ? deferredParams.updates : {})
+            .filter(([key]) => !Object.hasOwn(updates, key)),
+        ),
+        ...updates,
+      },
     };
     return;
   }
