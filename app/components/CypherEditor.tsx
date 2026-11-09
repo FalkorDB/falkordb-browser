@@ -1489,6 +1489,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     };
 
     const getLabel = () => {
+        if (!tabsReady) return "Restoring graph tabs";
         if (!graphName) return "Select a graph first";
         if (!historyQuery.query) return "You need to type a query first";
         if (!isQueryValid) return "Fix the highlighted syntax errors to run";

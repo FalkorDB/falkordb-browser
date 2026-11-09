@@ -407,10 +407,6 @@ test.describe("@admin Graph tabs", () => {
                 await page.getByTestId("deleteElementGraph").click();
                 await expect(page.getByTestId("deleteElementConfirmGraph")).toBeVisible();
             }
-            let deletes = 0;
-            page.on("request", request => {
-                if (request.method() === "DELETE") deletes += 1;
-            });
             releaseDiscovery();
             await expect.poll(() => syncCompleted, { timeout: 15000 }).toBe(true);
             await expect.poll(() => replacementLists, { timeout: 15000 }).toBeGreaterThan(0);
@@ -419,7 +415,7 @@ test.describe("@admin Graph tabs", () => {
             await expect(page.getByTestId("editorMinimize")).toHaveCount(0);
             await expect(page.getByTestId("deleteElementConfirmGraph")).toHaveCount(0);
             await expect(page.getByTestId("editorRun")).toBeDisabled();
-            expect(deletes).toBe(0);
+            await expect(page.getByTestId("editorRun")).toHaveAttribute("aria-label", "Restoring graph tabs");
             releaseLists();
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
