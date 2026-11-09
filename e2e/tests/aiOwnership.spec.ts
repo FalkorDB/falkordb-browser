@@ -1,4 +1,5 @@
-import { expect, test, type Route } from "@playwright/test";
+import { type Route } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import { getRandomString, initializeLocalStorage } from "../infra/utils";
 import configuredUrls from "../config/urls.json";
 
