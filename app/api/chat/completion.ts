@@ -43,6 +43,10 @@ export async function requestAiCompletion(input: {
   });
   const raw = await readChatBodyWithLimit(response, 256 * 1024);
   if (raw === OVER_LIMIT) {
+    if (!response.ok) {
+      console.warn("AI completion provider rejected request:", response.status);
+      return { ok: false, error: providerError(response.status, undefined), status: response.status === 401 ? 401 : 422 };
+    }
     return { ok: false, error: "The AI provider response was too large. Please try again.", status: 422 };
   }
   let data: unknown;

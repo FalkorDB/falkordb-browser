@@ -297,6 +297,9 @@ Optimize and Fix with AI use the Responses API for OpenAI GPT-5 and o-series
 reasoning models (including GPT-5 Pro), without unsupported temperature settings.
 These requests allow up to five minutes for reasoning; other supported models
 retain the 30-second timeout. Closing Optimize cancels the request.
+Fix with AI also offers **Cancel** while loading. Cancelling, changing the query,
+tab, graph, connection, or page discards the old request; late replies cannot
+replace a newer result.
 It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without executing
 the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
 If index metadata is unavailable, analysis continues with an explicit warning.

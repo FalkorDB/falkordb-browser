@@ -9,6 +9,51 @@ const urls = { graphUrl: `${baseUrl}/graph`, api: { graphUrl: `${baseUrl}/api/gr
 
 const TEST_KEY = "sk-demo-not-a-real-api-key";
 
+test("@admin query assistance routes preserve provider error status without leaking its body", async ({ page }) => {
+  const graphName = getRandomString("aiProviderStatus");
+  let providerStatus = 401;
+  const server = createServer((request, response) => {
+    request.resume();
+    response.writeHead(providerStatus, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ error: { message: "private provider detail" } }));
+  });
+  await new Promise<void>(resolve => { server.listen(0, "127.0.0.1", resolve); });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing test provider address");
+  try {
+    expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+    try {
+      for (const feature of ["fix", "optimize"]) {
+        for (const status of [401, 429, 503]) {
+          providerStatus = status;
+          const response = await page.request.post(`${baseUrl}/api/chat/${feature}`, {
+            data: {
+              query: "RETURN 1",
+              errorMessage: "Syntax error",
+              graphName,
+              model: "ollama::test-model",
+              modelSource: "local",
+              localProvider: "ollama",
+              localEndpoint: `http://127.0.0.1:${address.port}`,
+            },
+          });
+          expect(response.status()).toBe(status === 401 ? 401 : 422);
+          expect(response.headers()["x-session-invalid"]).toBeUndefined();
+          const body = await response.json();
+          expect(body.error).toMatch(status === 401 ? /API key/ : status === 429 ? /rate limit/ : /temporarily unavailable/);
+          expect(body.error).not.toContain("private provider detail");
+        }
+      }
+    } finally {
+      expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close(error => { if (error) reject(error); else resolve(); });
+    });
+  }
+});
+
 test("@admin optimize asks for per-request guidance without a remembered-consent checkbox", async ({ page }) => {
   const graphName = getRandomString("aiOptimizeGuidance");
   await page.addInitScript(initializeLocalStorage());

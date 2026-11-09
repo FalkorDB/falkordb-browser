@@ -2,7 +2,7 @@
 
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
-import { Dispatch, SetStateAction, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dispatch, SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, supersedeGraphLists, getGraphListGeneration, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout, ToastFn } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey, ServerDecryptError } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
@@ -636,6 +636,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [lastFailure, setLastFailure] = useState<{ query: string; errorMessage: string } | null>(null);
   const [aiFixResult, setAiFixResult] = useState<AiFixResult>({ status: "idle" });
   const [pendingConsent, setPendingConsent] = useState<{ query: string; errorMessage: string; provider: ReturnType<typeof detectProviderFromModel> } | null>(null);
+  const aiFixAbortRef = useRef<AbortController | null>(null);
+  const aiFixOwnerRef = useRef<object>({});
+  const aiFixResultOwnerRef = useRef<(() => boolean) | null>(null);
+  const dismissAiFix = useCallback(() => {
+    aiFixOwnerRef.current = {};
+    aiFixAbortRef.current?.abort();
+    aiFixAbortRef.current = null;
+    aiFixResultOwnerRef.current = null;
+    setPendingConsent(null);
+    setAiFixResult({ status: "idle" });
+  }, []);
+
+  useLayoutEffect(() => {
+    dismissAiFix();
+    setLastFailure(null);
+    return dismissAiFix;
+  }, [graphName, activeConnectionId, pathname, model, chatModelSource, localLlmProvider, localLlmEndpoint, dismissAiFix]);
 
   const resolvedChatKey = useMemo(
     () => (chatApiKeys.find(k => k.id === selectedChatApiKeyId)?.key) || secretKey,
@@ -647,14 +664,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   );
 
   const doAiFix = useCallback(async (query: string, errorMessage: string) => {
+    dismissAiFix();
+    const controller = new AbortController();
+    aiFixAbortRef.current = controller;
+    const owner = aiFixOwnerRef.current;
+    const connId = getActiveConnectionIdGlobal();
+    const epoch = getConnectionEpoch();
+    const isCurrent = () => !controller.signal.aborted
+      && aiFixOwnerRef.current === owner
+      && getActiveConnectionIdGlobal() === connId
+      && getConnectionEpoch() === epoch;
+    aiFixResultOwnerRef.current = isCurrent;
     setAiFixResult({ status: "loading" });
     try {
       const headers = new Headers({ "Content-Type": "application/json" });
-      const connId = getActiveConnectionIdGlobal();
       if (connId) headers.set("X-Connection-Id", connId);
       const res = await fetch("/api/chat/fix", {
         method: "POST",
         headers,
+        signal: controller.signal,
         body: JSON.stringify({
           query,
           errorMessage,
@@ -666,26 +694,33 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           localEndpoint: localLlmEndpoint,
         }),
       });
+      if (!isCurrent()) return;
       if (res.status === 401 && res.headers.get("X-Session-Invalid") === "1") {
         const { signOut } = await import("next-auth/react");
+        if (!isCurrent()) return;
         await signOut({ callbackUrl: "/login" });
+        if (!isCurrent()) return;
         setIndicator("offline");
         setAiFixResult({ status: "idle" });
         return;
       }
       const data = await res.json().catch(() => ({}));
+      if (!isCurrent()) return;
       if (!res.ok) {
         setAiFixResult({ status: "error", error: data?.error || "Couldn't get a fix from the AI provider." });
         return;
       }
       setAiFixResult({ status: "done", explanation: data.explanation, correctedQuery: data.correctedQuery });
     } catch {
+      if (!isCurrent()) return;
       setAiFixResult({ status: "error", error: "Couldn't reach the server. Please try again." });
+    } finally {
+      if (aiFixAbortRef.current === controller) aiFixAbortRef.current = null;
     }
-  }, [graphName, model, chatModelSource, localLlmProvider, localLlmEndpoint, resolvedChatKey]);
+  }, [graphName, model, chatModelSource, localLlmProvider, localLlmEndpoint, resolvedChatKey, dismissAiFix]);
 
   const requestAiFix = useCallback((query: string, errorMessage: string) => {
-    if (aiFixResult.status === "loading") return;
+    dismissAiFix();
     if (chatModelSource === "api-key") {
       const provider = detectProviderFromModel(model);
       const consented = typeof window !== "undefined" && localStorage.getItem(`aiFixConsent-${provider}`) === "true";
@@ -697,7 +732,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       }
     }
     doAiFix(query, errorMessage);
-  }, [aiFixResult.status, chatModelSource, model, doAiFix]);
+  }, [chatModelSource, model, doAiFix, dismissAiFix]);
 
   const confirmConsent = useCallback((dontAskAgain: boolean) => {
     if (!pendingConsent) return;
@@ -718,17 +753,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     reportClientError: (query: string, errorMessage: string) => {
       // Populate lastFailure so the toast's AI-fix button targets this query,
       // without running it (grammar errors are blocked pre-execution).
+      dismissAiFix();
       setLastFailure({ query, errorMessage });
-      setAiFixResult({ status: "idle" });
     },
     confirmConsent,
     cancelConsent: () => setPendingConsent(null),
-    dismissResult: () => setAiFixResult({ status: "idle" }),
+    dismissResult: dismissAiFix,
     insertCorrectedQuery: (q: string) => {
+      if (!aiFixResultOwnerRef.current?.()) return;
       setHistoryQuery(prev => withQuery(prev, q));
-      setAiFixResult({ status: "idle" });
+      dismissAiFix();
     },
-  }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
+  }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent, dismissAiFix]);
 
   // Refs so runQuery can always call the latest requestAiFix without being in its
   // dependency array (avoids recreating runQuery on every AI-state change).
@@ -1200,6 +1236,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     setIsQueryLoading(true);
     setDiagnostics(null);
+    dismissAiFix();
     setLastFailure(null);
 
     setHistoryQuery(prev => ({
@@ -1341,7 +1378,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [limit, timeout, fetchInfo, fetchMetaStats, fetchCount, setGraphInfo, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
+  }, [limit, timeout, fetchInfo, fetchMetaStats, fetchCount, setGraphInfo, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady, dismissAiFix]);
 
   const graphNameRef = useRef(graphName);
 
@@ -1672,6 +1709,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   });
 
   markTabRanRef.current = graphTabs.markRan;
+
+  useLayoutEffect(() => {
+    dismissAiFix();
+    return dismissAiFix;
+  }, [graphTabs.activeTabId, historyQuery.query, dismissAiFix]);
 
   const graphTabsContext = useMemo(
     () => ({ ...graphTabs, setSchemaMeta }),

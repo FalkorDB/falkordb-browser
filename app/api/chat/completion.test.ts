@@ -129,10 +129,26 @@ describe("shared AI completion transport", () => {
     t.mock.method(globalThis, "fetch", async () => new Response(new ReadableStream({
       start(controller) { controller.enqueue(new Uint8Array(256 * 1024 + 1)); },
       cancel() { cancelled = true; },
-    }), { status: 400 }));
+    })));
     const result = await requestAiCompletion(input);
     assert.equal(result.ok, false);
     if (!result.ok) assert.match(result.error, /too large/);
+    assert.equal(cancelled, true);
+  });
+
+  it("preserves authentication errors when an oversized failure body is cancelled", async (t) => {
+    t.mock.method(console, "warn", () => {});
+    let cancelled = false;
+    t.mock.method(globalThis, "fetch", async () => new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new Uint8Array(256 * 1024 + 1)); },
+      cancel() { cancelled = true; },
+    }), { status: 401 }));
+    const result = await requestAiCompletion(input);
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.status, 401);
+      assert.match(result.error, /API key/);
+    }
     assert.equal(cancelled, true);
   });
 

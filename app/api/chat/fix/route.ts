@@ -8,7 +8,6 @@ import { requestAiCompletion } from "../completion";
 
 export const OPTIONS = corsPreflight;
 
-// eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
     let session;
     try {

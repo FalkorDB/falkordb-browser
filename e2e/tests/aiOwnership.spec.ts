@@ -2,6 +2,7 @@ import { type Route } from "@playwright/test";
 import { expect, test } from "../infra/coverage";
 import { getRandomString, initializeLocalStorage } from "../infra/utils";
 import configuredUrls from "../config/urls.json";
+import GraphPage from "../logic/POM/graphPage";
 
 const baseUrl = process.env.E2E_BASE_URL ?? configuredUrls.localHost;
 
@@ -14,6 +15,95 @@ test.beforeEach(async ({ page }) => {
   });
   await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
 });
+
+for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
+  test(`@admin Fix with AI aborts on ${dismissal}`, async ({ page }) => {
+    const graphName = getRandomString("fixOwner");
+    const pending = Promise.withResolvers<Route>();
+    await page.route("**/api/chat/fix", route => { pending.resolve(route); });
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    try {
+      await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+      const graph = new GraphPage(page);
+      await expect(graph.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+      await graph.insertQuery("RETRUN 1");
+      await expect.poll(() => graph.hasEditorErrorMarker()).toBe(true);
+      await graph.clickRunQuery(false);
+      await page.getByTestId("fix-with-ai").click();
+      const request = await pending.promise;
+      await expect(page.getByTestId("aiFixCancel")).toBeVisible();
+      if (dismissal === "navigate") {
+        await expect(page).toHaveURL(url => url.searchParams.get("query") === "RETRUN 1");
+      }
+      const aborted = page.waitForEvent("requestfailed", {
+        predicate: failed => failed.url().endsWith("/api/chat/fix"),
+      });
+      if (dismissal === "cancel") await page.getByTestId("aiFixCancel").click();
+      else if (dismissal === "edit") await graph.insertQuery("RETURN 99");
+      else if (dismissal === "tab-switch") await page.getByTestId("graphTabAdd").click();
+      else {
+        await page.getByRole("button", { name: "Adjust application settings", exact: true }).click();
+        await expect(page).toHaveURL(/\/settings/, { timeout: 30_000 });
+      }
+      await aborted;
+      await request.fulfill({ json: { explanation: "Stale result", correctedQuery: "RETURN 2" } });
+      await expect(page.getByTestId("aiFixCancel")).toHaveCount(0);
+      await expect(page.getByTestId("aiFixResultPanel")).toHaveCount(0);
+    } finally {
+      expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    }
+  });
+}
+
+for (const staleStatus of [200, 422, 401]) {
+  test(`@admin stale Fix with AI ${staleStatus} cannot replace a newer result`, async ({ page }) => {
+    // Simulate a transport that completes despite cancellation to exercise ownership.
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch;
+      window.fetch = (input, init) => originalFetch(input,
+        input === "/api/chat/fix" ? { ...init, signal: undefined } : init);
+    });
+    const graphName = getRandomString("fixStale");
+    const first = Promise.withResolvers<Route>();
+    const second = Promise.withResolvers<Route>();
+    let requests = 0;
+    await page.route("**/api/chat/fix", route => { (requests++ === 0 ? first : second).resolve(route); });
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    try {
+      await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+      const graph = new GraphPage(page);
+      await expect(graph.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+      await graph.insertQuery("RETRUN 1");
+      await expect.poll(() => graph.hasEditorErrorMarker()).toBe(true);
+      await graph.clickRunQuery(false);
+      await page.getByTestId("fix-with-ai").click();
+      const oldRequest = await first.promise;
+      await page.getByTestId("aiFixCancel").click();
+      await graph.insertQuery("RETRUN 3");
+      await expect.poll(() => graph.hasEditorErrorMarker()).toBe(true);
+      await graph.clickRunQuery(false);
+      await page.getByTestId("fix-with-ai").click();
+      const newRequest = await second.promise;
+      await newRequest.fulfill({ json: { explanation: "Newest result", correctedQuery: "RETURN 3" } });
+      await expect(page.getByTestId("aiFixQuery")).toHaveText("RETURN 3");
+      const response = page.waitForResponse("**/api/chat/fix");
+      await oldRequest.fulfill({
+        status: staleStatus,
+        headers: staleStatus === 401 ? { "X-Session-Invalid": "1" } : {},
+        json: staleStatus === 200
+          ? { explanation: "Stale result", correctedQuery: "RETURN 2" }
+          : { error: "Stale failure" },
+      });
+      await response;
+      await expect(page.getByTestId("aiFixQuery")).toHaveText("RETURN 3");
+      await expect(page).toHaveURL(/\/graph/);
+      await page.getByTestId("aiFixInsert").click();
+      await expect(graph.editorContainer).toHaveAttribute("data-value", "RETURN 3");
+    } finally {
+      expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    }
+  });
+}
 
 for (const scenario of ["edited-clear", "new-draft-success", "switch-failure", "session-invalid"] as const) {
   test(`@admin chat protects pending drafts during ${scenario}`, async ({ page }) => {
