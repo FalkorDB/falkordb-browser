@@ -200,8 +200,12 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
    reviewer subagent on `$(gh pr view --json baseRefOid --jq .baseRefOid)..HEAD` (the PR's actual base). Then handle the findings
    with `receiving-code-review`: verify each against the code, fix every Critical and Important
    one (or answer with a concrete reason it does not apply), and re-run the review if the fixes
-   are non-trivial. Summarize the verdict and what you changed in the PR. If your agent cannot
-   load the superpowers skills, say so and ask the user; do not skip this step silently.
+   are non-trivial. Summarize the verdict and what you changed in the PR. Install the plugin
+   once per agent if it is missing: Copilot CLI
+   `copilot plugin marketplace add obra/superpowers-marketplace` then
+   `copilot plugin install superpowers@superpowers-marketplace`; Claude Code
+   `/plugin install superpowers@claude-plugins-official`. If the skills still cannot load, say
+   so and ask the user; do not skip this step silently.
 5. **In the last round, watch CI to the end.** After the final push, wait for every check to
    finish (`gh pr checks <PR> --watch`) and confirm they all pass, then re-check the threads one
    more time: a late review or a red check starts another round.

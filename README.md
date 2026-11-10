@@ -309,7 +309,8 @@ Optimize failures close the dialog and show only a toast with the Settings actio
 Agent rules (coverage bar, docs and design-doc upkeep, PR readiness including resolving every
 review thread) live in [`.github/copilot-instructions.md`](./.github/copilot-instructions.md),
 shared with Claude Code through [`CLAUDE.md`](./CLAUDE.md); path-specific rules are in
-`.github/instructions/`. Design plans are in [`docs/design/`](./docs/design/README.md).
+`.github/instructions/`. PR readiness needs the [superpowers](https://github.com/obra/superpowers)
+plugin (install commands in the instructions). Design plans are in [`docs/design/`](./docs/design/README.md).
 
 ### Testing
 
