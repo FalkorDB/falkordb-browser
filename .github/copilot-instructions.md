@@ -125,7 +125,7 @@ Rules for every change:
   `getClient` validates an identified connection against an active token record and fails closed. The one
   exception is the legacy session fallback (no connection ID, Token DB lookup failed), which can still return a
   client without such a record; do not rely on the guarantee there.
-- **Changing an endpoint's shape updates `app/api/swagger/swagger-spec.ts`** (served at `/docs`); the **API docs** CI check fails a PR that changes a `route.ts` without it (add the `no-api-docs` label only when the contract is unchanged).
+- **Changing an endpoint's shape updates `app/api/swagger/swagger-spec.ts`** (served at `/docs`); the **API docs** CI check enforces it (see the docs table below).
 - Keep `falkordb` (server-only, BigInt) and `@falkordb/text-to-cypher` (native binaries) in
   `serverExternalPackages` in `next.config.js`; never import them from client code.
 
@@ -158,7 +158,7 @@ A change is not done until the docs that describe it are updated **in the same P
 | If you change… | Update… |
 | --- | --- |
 | User-visible behavior or a feature | `README.md` and, for features, `readme-browser.md` (the feature overview) |
-| An API route's request/response | `app/api/swagger/swagger-spec.ts` (`.github/workflows/swagger-check.yml` fails a `route.ts(x)` change without it; contract changes made only in helpers such as `validate-body.ts` are not caught) |
+| An API route's request/response | `app/api/swagger/swagger-spec.ts` (`.github/workflows/swagger-check.yml` fails a `route.ts(x)` change without it, unless labeled `no-api-docs` for an unchanged contract; contract changes made only in helpers such as `validate-body.ts` are not caught) |
 | Env vars / config | `.env.local.template`, `README.md`, `helm/falkordb-browser/values.yaml` + its `README.md`, and the Helm templates if the value must reach the pod |
 | The Cypher grammar | `lib/falkordb-cypher/generated/.grammar-src/Cypher.g4`, run `npm run generate:grammar`, commit the artifacts |
 | Desktop / mobile shell | `desktop/README.md` / `mobile/README.md` |

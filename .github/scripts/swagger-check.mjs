@@ -27,14 +27,24 @@ export function check(files, skip = false) {
 
 /** The files changed from `base` to `head`; renames count as a delete plus an add, so a moved route stays visible. */
 export function changedFiles(base, head, cwd) {
-  return execFileSync('git', ['diff', '--no-renames', '--name-only', `${base}...${head}`], { encoding: 'utf8', cwd })
-    .split('\n').filter(Boolean);
+  return execFileSync('git', ['diff', '--no-renames', '--name-only', '-z', `${base}...${head}`], { encoding: 'utf8', cwd })
+    .split('\0').filter(Boolean);
+}
+
+/** Runs the check for the CI environment and returns the exit code and the line to print. */
+export function main({ BASE_SHA, HEAD_SHA, SKIP }, cwd) {
+  const fail = (message) => ({ code: 1, output: `::error::${message.replace(/\n/g, '%0A')}` });
+  if (!BASE_SHA || !HEAD_SHA) return fail('BASE_SHA and HEAD_SHA are required');
+  try {
+    const { ok, message } = check(changedFiles(BASE_SHA, HEAD_SHA, cwd), SKIP === 'true');
+    return ok ? { code: 0, output: message } : fail(message);
+  } catch (e) {
+    return fail(`Could not diff ${BASE_SHA}...${HEAD_SHA}: ${e.stderr?.toString().trim() || e.message}`);
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const { BASE_SHA, HEAD_SHA, SKIP } = process.env;
-  if (!BASE_SHA || !HEAD_SHA) throw new Error('BASE_SHA and HEAD_SHA are required');
-  const { ok, message } = check(changedFiles(BASE_SHA, HEAD_SHA), SKIP === 'true');
-  console.log(ok ? message : `::error::${message.replace(/\n/g, '%0A')}`);
-  process.exit(ok ? 0 : 1);
+  const { code, output } = main(process.env);
+  console.log(output);
+  process.exit(code);
 }
