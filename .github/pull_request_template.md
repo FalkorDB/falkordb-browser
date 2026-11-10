@@ -9,4 +9,5 @@
 - [ ] Design doc in `docs/design/` created/updated — or not needed
 - [ ] Code is concise, efficient and clear (no dead code, duplication or speculative options)
 - [ ] **All AI and human review threads are answered and resolved**, after at least 3 AI review rounds
+- [ ] Superpowers code review (`requesting-code-review`) run on the full diff; every Critical/Important finding fixed or answered
 - [ ] CI is green on the final commit (watched to the end) with zero dangling tests (none failing, flaky or skipped)

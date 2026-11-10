@@ -193,11 +193,18 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
    you fix or answer every thread, push, and the reviewers re-review the new commit. Do not
    declare the PR ready after fewer than 3 rounds. If the reviewers go quiet earlier, say so
    and ask the user rather than declaring it ready.
-4. **In the last round, watch CI to the end.** After the final push, wait for every check to
+4. **A superpowers code review of the full PR diff is done.** Use the
+   [superpowers](https://github.com/obra/superpowers) `requesting-code-review` skill: dispatch a
+   reviewer subagent on `git merge-base origin/staging HEAD`..`HEAD`. Then handle the findings
+   with `receiving-code-review`: verify each against the code, fix every Critical and Important
+   one (or answer with a concrete reason it does not apply), and re-run the review if the fixes
+   are non-trivial. Summarize the verdict and what you changed in the PR. If your agent cannot
+   load the superpowers skills, say so and ask the user; do not skip this step silently.
+5. **In the last round, watch CI to the end.** After the final push, wait for every check to
    finish (`gh pr checks <PR> --watch`) and confirm they all pass, then re-check the threads one
    more time: a late review or a red check starts another round.
-5. Human review requests are addressed the same way.
-6. The PR template checklist is complete (tests, docs, design docs).
+6. Human review requests are addressed the same way.
+7. The PR template checklist is complete (tests, docs, design docs, superpowers review).
 
 List review threads (act on those with `isResolved: false`) with:
 `gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100){nodes{id isResolved comments(first:1){nodes{databaseId author{login} body path}}}}}}}' -f o=FalkorDB -f r=falkordb-browser -F n=<PR>`
