@@ -33,7 +33,7 @@ Stack: TypeScript (strict), React 19, Next.js 16, Tailwind 4, Radix UI, `falkord
 ```bash
 npm ci                    # install
 npm run dev               # dev server on :3000 (cp .env.local.template .env.local first)
-npm run lint              # ESLint (must be clean)
+npm run lint              # ESLint (no errors; do not add warnings)
 npx tsc --noEmit          # type-check; `npm run build` (webpack) also type-checks
 npm test                  # unit tests: node --test, native TS type-stripping
 npm run test:coverage     # unit tests + 100% gate on the listed pure modules
@@ -116,8 +116,9 @@ Rules for every change:
   codes and `getCorsHeaders(request)` headers; export `OPTIONS = corsPreflight` where siblings do.
 - Validate input with `validate-body.ts` / zod; never build Cypher by string-concatenating
   user input (see `e2e/tests/cypherInjection.spec.ts`).
-- Mutating graph routes must reject read-only users with 403 **before** running any query
-  (`resolveReadOnly`).
+- Honor read-only users (`resolveReadOnly`) the way the route's siblings do: most mutating graph
+  routes return 403 **before** running any query; some (e.g. `POST app/api/graph/[graph]/route.ts`)
+  run the work through `roQuery` / `runQuery(…, isReadOnly)` instead. Do not switch one to the other.
 - Browser requests carry `X-Connection-Id` so `getClient` pins the intended connection;
   `getClient` validates an identified connection against an active token record and fails closed. The one
   exception is the legacy session fallback (no connection ID, Token DB lookup failed), which can still return a
@@ -155,7 +156,7 @@ A change is not done until the docs that describe it are updated **in the same P
 | If you change… | Update… |
 | --- | --- |
 | User-visible behavior or a feature | `README.md` and, for features, `readme-browser.md` (the feature overview) |
-| An API route's request/response | `app/api/swagger/swagger-spec.ts` (enforced by `.github/workflows/swagger-check.yml`) |
+| An API route's request/response | `app/api/swagger/swagger-spec.ts` (`.github/workflows/swagger-check.yml` fails a `route.ts(x)` change without it; contract changes made only in helpers such as `validate-body.ts` are not caught) |
 | Env vars / config | `.env.local.template`, `README.md`, `helm/falkordb-browser/values.yaml` + its `README.md`, and the Helm templates if the value must reach the pod |
 | The Cypher grammar | `lib/falkordb-cypher/generated/.grammar-src/Cypher.g4`, run `npm run generate:grammar`, commit the artifacts |
 | Desktop / mobile shell | `desktop/README.md` / `mobile/README.md` |
@@ -179,7 +180,7 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
 
 ### A PR is ready only when
 
-1. CI is green, including `coverage/project` and `coverage/patch` (≥ 95%), lint and build, with
+1. CI is green, including `coverage/project` and `coverage/patch` (≥ 95%) and build, with
    **no dangling tests**: none failing, flaky, skipped or retried into passing (rule 8 above).
 2. **Every AI review comment is resolved and answered** (CodeRabbit, Copilot code review,
    Codecov, etc. — see `.coderabbit.yaml`). For each thread either fix it and reply with what
@@ -198,10 +199,11 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
 5. Human review requests are addressed the same way.
 6. The PR template checklist is complete (tests, docs, design docs).
 
-List unresolved threads with:
-`gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100){nodes{id isResolved comments(first:1){nodes{author{login} body path}}}}}}}' -f o=FalkorDB -f r=falkordb-browser -F n=<PR>`
-(Reply with `gh api repos/FalkorDB/falkordb-browser/pulls/<PR>/comments/<id>/replies -f body=…`;
-resolve with the `resolveReviewThread` GraphQL mutation.)
+List review threads (act on those with `isResolved: false`) with:
+`gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100){nodes{id isResolved comments(first:1){nodes{databaseId author{login} body path}}}}}}}' -f o=FalkorDB -f r=falkordb-browser -F n=<PR>`
+(Reply with `gh api repos/FalkorDB/falkordb-browser/pulls/<PR>/comments/<databaseId>/replies -f body=…`,
+using the first comment's `databaseId`; resolve with the `resolveReviewThread` GraphQL mutation
+and the thread `id`.)
 
 ## When unsure
 
