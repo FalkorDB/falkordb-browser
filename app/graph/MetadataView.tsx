@@ -1,4 +1,6 @@
-import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, prepareArg, securedFetch, Query } from "@/lib/utils";
+import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, securedFetch, Query } from "@/lib/utils";
+import { getStatsLines } from "@/lib/queryStats";
+import { getProfileUrl } from "@/lib/graphUrls";
 import { JSONTree } from "react-json-tree";
 import { useContext, useMemo, useState } from "react";
 import { Info } from "lucide-react";
@@ -39,8 +41,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
         const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
         try {
-            const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
-            const result = await securedFetch(`/api/graph/${query.graphName}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
+            const result = await securedFetch(getProfileUrl(query.graphName, query.text, isReadOnly), {
                 method: "GET",
             }, toast, setIndicator, cid);
 
@@ -83,7 +84,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
             </div>
             {
                 profile.length > 0 &&
-                <div className="h-1 grow w-full overflow-auto">
+                <div className="h-1 grow w-full overflow-auto" data-testid="profileTree">
                     <JSONTree
                         data={createNestedObject(profile)}
                         shouldExpandNodeInitially={() => true}
@@ -123,7 +124,7 @@ export function Metadata({ query, hideTitle }: {
         <>
             {!hideTitle && <h1 className="text-2xl font-bold">Metadata</h1>}
             <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs">
-                {query.metadata.map((m, i) => (
+                {getStatsLines(query).map((m, i) => (
                     <li key={i}>{m}</li>
                 ))}
             </ul>

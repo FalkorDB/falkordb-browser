@@ -28,6 +28,16 @@ export default class QueryHistory extends GraphPage {
         return this.page.getByTestId("queryHistoryPanel");
     }
 
+    /** A tab of the selected query in the history panel, e.g. "Metadata". */
+    public historyTab(name: string): Locator {
+        return this.historyPanel.getByRole('tab', { name });
+    }
+
+    /** The content of the history panel's active tab. */
+    public get historyTabPanel(): Locator {
+        return this.historyPanel.getByRole('tabpanel');
+    }
+
     public tabButton(buttonName: string): Locator {
         return this.page.getByRole('button', { name: buttonName });
     }
@@ -60,6 +70,10 @@ export default class QueryHistory extends GraphPage {
 
     async clickSelectQueryInHistory(queryNumber: string): Promise<void> {           
         await interactWhenVisible(this.selectQueryHistory(queryNumber), (el) => el.click(), `query history button`);
+    }
+
+    async clickHistoryTab(name: string): Promise<void> {
+        await interactWhenVisible(this.historyTab(name), (el) => el.click(), `history tab ${name}`);
     }
 
     async clickRunInQueryHistory(): Promise<void> {   

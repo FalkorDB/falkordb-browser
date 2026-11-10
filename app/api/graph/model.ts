@@ -54,10 +54,13 @@ const validSize = (v: unknown): number | undefined =>
 const definedOnly = <T extends object>(style: T): Partial<T> =>
   Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined)) as Partial<T>;
 
+export const labelStyleKey = (name: string) => `labelStyle_${name}`;
+export const relationshipStyleKey = (name: string) => `relationshipStyle_${name}`;
+
 export function loadLabelStyle(label: Label | InfoLabel): void {
   if (typeof window === "undefined") return;
 
-  const storageKey = `labelStyle_${label.name}`;
+  const storageKey = labelStyleKey(label.name);
   const savedStyle = getConnectionItem(storageKey);
 
   if (savedStyle) {
@@ -77,7 +80,7 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
 export function loadRelationshipStyle(relationship: Relationship | InfoRelationship): void {
   if (typeof window === "undefined") return;
 
-  const storageKey = `relationshipStyle_${relationship.name}`;
+  const storageKey = relationshipStyleKey(relationship.name);
   const savedStyle = getConnectionItem(storageKey);
 
   if (savedStyle) {
@@ -516,7 +519,7 @@ export class Graph {
 
   public static async create(
     id: string,
-    results: { data: Data; metadata: any[] },
+    results: { data: Data },
     showPropertyKeyPrefix: boolean,
     currentLimit: number,
     graphInfo?: GraphInfo,
@@ -784,7 +787,7 @@ export class Graph {
   }
 
   public async extend(
-    results: { data: Data; metadata: any[] },
+    results: { data: Data },
     collapsed = false,
     isMerge = false
   ): Promise<(Node | Link)[]> {

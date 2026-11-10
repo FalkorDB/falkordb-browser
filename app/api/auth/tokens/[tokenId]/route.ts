@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient } from "../../[...nextauth]/options";
-import { getCorsHeaders } from "../../../utils";
+import { getCorsHeaders, corsPreflight } from "../../../utils";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * Fetches token details by token_id using storage abstraction

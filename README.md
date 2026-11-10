@@ -2,6 +2,9 @@
 [![Dockerhub](https://img.shields.io/docker/pulls/falkordb/falkordb-browser?label=Docker)](https://hub.docker.com/r/falkordb/falkordb-browser/)
 [![Discord](https://img.shields.io/discord/1146782921294884966?style=flat-square)](https://discord.gg/6M4QwDXn2w)
 [![Workflow](https://github.com/FalkorDB/falkordb-browser/actions/workflows/nextjs.yml/badge.svg?branch=main)](https://github.com/FalkorDB/falkordb-browser/actions/workflows/nextjs.yml)
+[![Playwright Tests](https://github.com/FalkorDB/falkordb-browser/actions/workflows/playwright.yml/badge.svg?branch=main)](https://github.com/FalkorDB/falkordb-browser/actions/workflows/playwright.yml)
+[![Coverage (main)](https://img.shields.io/codecov/c/github/FalkorDB/falkordb-browser/main?label=coverage%20%28main%29)](https://app.codecov.io/gh/FalkorDB/falkordb-browser/tree/main)
+[![Coverage (staging)](https://img.shields.io/codecov/c/github/FalkorDB/falkordb-browser/staging?label=coverage%20%28staging%29)](https://app.codecov.io/gh/FalkorDB/falkordb-browser/tree/staging)
 
 # FalkorDB Browser
 
@@ -240,7 +243,7 @@ For detailed configuration options and examples, see the [Helm chart documentati
 ### Build and run browser from source
 
 **Prerequisites:**
-- Node.js 20.19.0 or higher
+- Node.js 24 or higher (`engines` in `package.json`)
 
 **Steps:**
 * Clone the git repository `git clone git@github.com:FalkorDB/falkordb-browser.git`
@@ -282,16 +285,70 @@ with the storage and URI handled for you. Whether `file://` can resolve depends 
 deployment and nothing the browser can see settles it, so it is assumed to work unless you
 set `LOAD_CSV_FILE_URI=false`.
 
+### AI query optimization and drafts
+
+The editor's **Optimize** action uses the model and provider configuration selected
+in Settings, with an API key only for hosted providers.
+It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without executing
+the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
+If index metadata is unavailable, analysis continues with an explicit warning.
+
+Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
+**Insert into editor** actions. Neither action runs the query. The card adapts to
+mobile screens, and long Chat queries can be collapsed.
+
+Missing AI configuration and provider errors offer **Go to Settings**. Returning
+to the graph preserves the editor query and unsent Chat input. Chat drafts are
+scoped to the connection, tab, and graph, and survive closing and reopening Chat.
+Submitted Chat input remains saved until the request succeeds; newer edits or an
+intentional clear take precedence over restoring a failed submission.
+Optimize failures close the dialog and show only a toast with the Settings action.
+
+### Contributing with AI agents
+
+Agent rules (coverage bar, docs and design-doc upkeep, PR readiness including resolving every
+review thread) live in [`.github/copilot-instructions.md`](./.github/copilot-instructions.md),
+shared with Claude Code through [`CLAUDE.md`](./CLAUDE.md); path-specific rules are in
+`.github/instructions/`. PR readiness needs the [superpowers](https://github.com/obra/superpowers)
+plugin (install commands in the instructions). Design plans are in [`docs/design/`](./docs/design/README.md).
+
 ### Testing
 
 * **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
   Runs the `*.test.ts` suites under `app/` and `lib/`. Gated in CI by the **Build**
   workflow. These execute TypeScript directly via `node --test`, which relies on native
-  type-stripping — use **Node ≥ 22.18** (CI runs Node 24). Older Node (e.g. 20.x) can run
-  the app but cannot run these tests.
-* **Coverage**: `npm run test:coverage` — runs the unit tests and enforces **100%**
-  line/branch/function coverage on `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`,
-  `lib/aiFix.ts`, `lib/cypherErrors.ts`, and `lib/clipboard.ts`.
+  type-stripping, so they need the same **Node ≥ 24** as the app (CI runs Node 24).
+* **Unit coverage gate**: `npm run test:coverage` — runs the unit tests and enforces **100%**
+  line/branch/function coverage on the modules it lists (`lib/cypherSuggestions.ts`,
+  `lib/cypherDiagnostics.ts`, `lib/aiFix.ts`, `lib/cypherErrors.ts`, `lib/clipboard.ts`, …).
+* **Codebase coverage** (the Codecov badges): measured over **every source file** — `app/`,
+  `lib/`, `components/`, `auth.ts`, `proxy.ts` and the desktop and mobile shells, without
+  tests, type declarations or the generated grammar — by every kind of test: unit, smoke,
+  e2e (browser and server side), desktop and mobile. A file no test loads counts as 0%.
+  Each CI job records raw V8 coverage and turns it into a report with
+  `.github/scripts/coverage-report.mjs`, and Codecov merges the reports per commit. The
+  **Coverage status** workflow is the gate: once every coverage workflow a commit triggers
+  has finished, and Codecov has processed their uploads, it requires **95%** of the whole
+  codebase (`coverage/project` on PRs, `coverage/project (push)` on commits pushed to `main`
+  and `staging`) and of the lines a PR changes (`coverage/patch`). A coverage job whose
+  tests or report fail, are skipped or are cancelled fails the gate, since its coverage is
+  incomplete; failures in jobs that produce no coverage (installers, the Docker smoke image,
+  the security scan) do not, and a Codecov upload error never fails a test job
+  (`.github/scripts/coverage-gate.mjs`). Dependabot runs only get Dependabot secrets, so
+  `CODECOV_TOKEN` must also be set as a Dependabot secret for their coverage to upload.
+  Each job keeps its report as a `coverage-*` workflow artifact for 3 days.
+  Locally:
+  ```bash
+  rm -rf coverage
+  NODE_V8_COVERAGE=coverage/raw/unit npm run test:coverage
+  node .github/scripts/coverage-report.mjs unit coverage/raw/unit   # coverage/unit/index.html
+  ```
+  For e2e coverage, build with `COVERAGE=1 npm run build`, start the server with
+  `NODE_V8_COVERAGE=coverage/raw/e2e npm start`, run Playwright with
+  `E2E_COVERAGE_DIR=$PWD/coverage/raw/e2e`, stop the server (it writes its coverage on
+  exit), then `node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e`. Pages are
+  recorded in Chromium only; a spec that uses Playwright's `page`, `context` or `browser`
+  fixtures imports `test` from `e2e/infra/coverage.ts` so its pages are recorded too.
 * **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — runs every `lib/**/*.smoke.ts`
   suite against the actual server error wording. This covers the "Did you mean…?"
   suggestions and the **error-hint drift guard**: each entry in the hint catalog
@@ -309,8 +366,5 @@ set `LOAD_CSV_FILE_URI=false`.
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
-
-
 
 

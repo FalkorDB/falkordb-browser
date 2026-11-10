@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "../../utils";
+import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin, corsPreflight } from "../../utils";
 import { getSessionFromRequest } from "../../auth/[...nextauth]/options";
 import { isFileUriLoadSupported, uploadProducesLoadableSource } from "@/app/lib/csv-load-capabilities";
 import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
@@ -26,9 +26,7 @@ import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
  * would hide the Upload CSV quick fix until the page is reloaded — a database
  * blip disabling a purely client-side affordance.
  */
-export async function OPTIONS(request: Request) {
-    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 export async function GET(request: NextRequest) {
     if (!isRequestOriginTrusted(request)) return rejectUntrustedOrigin(request);

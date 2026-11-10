@@ -3,6 +3,7 @@
 import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
 import { GitGraph, ScrollText, SlidersHorizontal, Table, Waypoints } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
+import { getExecutionTime, getStatsLines } from "@/lib/queryStats";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext, ForceGraphContext, ConnectionContext } from "@/app/components/provider";
 import ForceGraph from "@/app/components/ForceGraph";
@@ -74,7 +75,7 @@ function GraphView({
 
     const isTabEnabled = useCallback((tab: Tab) => {
         if (tab === "Table") return graph.Data.length !== 0;
-        if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && historyQuery.currentQuery.explain.length > 0;
+        if (tab === "Metadata") return historyQuery.currentQuery && getStatsLines(historyQuery.currentQuery).length > 0 && historyQuery.currentQuery.explain.length > 0;
         if (tab === "Graph") return graph.getElements().length !== 0;
         // The schema is derived from the graph itself, not from a query result.
         if (tab === "Schema") return graphName !== "";
@@ -212,14 +213,14 @@ function GraphView({
                 dimmed={dimmed}
             />
         ),
-        status: (historyQuery?.currentQuery?.metadata?.length ?? 0) > 0 && (
+        status: historyQuery?.currentQuery && getStatsLines(historyQuery.currentQuery).length > 0 && (
             <>
                 <div className="h-4 w-px bg-border rounded-full" />
                 <p className="text-nowrap">Nodes: {graph.NodesMap.size}</p>
                 <div className="h-4 w-px bg-border rounded-full" />
                 <p className="text-nowrap">Edges: {graph.LinksMap.size}</p>
                 <div className="h-4 w-px bg-border rounded-full" />
-                <p className="text-nowrap">RT: {historyQuery?.currentQuery?.metadata?.find(v => v.startsWith("Query internal execution time:"))?.split(":")[1]?.trim().replace(" milliseconds", "ms") ?? "N/A"}</p>
+                <p className="text-nowrap">RT: {getExecutionTime(historyQuery.currentQuery) ?? "N/A"}</p>
             </>
         ),
     };

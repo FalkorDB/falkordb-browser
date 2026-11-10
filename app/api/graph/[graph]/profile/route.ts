@@ -22,7 +22,8 @@ export async function GET(
       if (!query) throw new Error("Missing parameter query");
 
       const graph = client.selectGraph(graphId);
-      const result = await graph.profile(query);
+      // The plan's lines, which the UI renders, as before falkordb 7
+      const result = (await graph.profile(query)).steps;
 
       return NextResponse.json({ result }, { headers: getCorsHeaders(request) });
     } catch (error) {
