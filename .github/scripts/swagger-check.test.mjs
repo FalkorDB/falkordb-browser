@@ -18,7 +18,7 @@ test('fails when a route changed without the spec', () => {
   ]) {
     const result = check(['lib/utils.ts', route]);
     assert.equal(result.ok, false, route);
-    assert.match(result.message, new RegExp(route.replace(/[[\]]/g, '\\$&')));
+    assert.ok(result.message.includes(route), route);
   }
 });
 
