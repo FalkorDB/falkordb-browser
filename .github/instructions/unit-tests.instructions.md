@@ -11,5 +11,5 @@ applyTo: "{app,lib}/**/*.test.ts,.github/scripts/**/*.test.mjs"
 - Prefer table-driven cases for pure functions. Mock only I/O (`mock` from `node:test`);
   keep tests deterministic: no real network, clocks or randomness without injection.
 - A pure module that reaches 100% joins the `test:coverage` include list in `package.json`.
-- Zero dangling tests: no `skip`/`only`/`todo`, no failing or flaky test left behind; fix the root cause.
+- Zero dangling tests: no unconditional `skip`, no `only`/`todo`, no failing or flaky test left behind; fix the root cause.
 - Run: `node --test <file>`, then `npm run test:coverage`.

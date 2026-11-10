@@ -77,8 +77,10 @@ Rules for every change:
    serialization. Coerce Cypher counts with `Number()` before exact comparisons.
 7. Run the relevant tests and lint locally and report the results; do not claim a fix is
    verified without running them.
-8. **Zero dangling tests.** Never leave a test failing, flaky, hanging, skipped (`skip`, `only`,
-   `fixme`, `test.skip`), commented out or retried into passing. Find the root cause and fix it,
+8. **Zero dangling tests.** Never leave a test failing, flaky, hanging or commented out, and never
+   add an unconditional skip (`skip`, `describe.skip`, `fixme`) or a focused test (`only`).
+   Environment-gated skips with a stated reason (e.g. no API key) are fine, as is the CI retry
+   setting, but a test that passes only on retry is flaky. Find the root cause and fix it,
    whether the bug is in the test or the code, even if it looks unrelated to your change or
    fails only in CI. Never "fix" it by deleting it, loosening its assertions, adding sleeps or
    raising retries/timeouts. A flaky test counts as failing: reproduce it (run it repeatedly,
@@ -181,7 +183,7 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
 ### A PR is ready only when
 
 1. CI is green, including `coverage/project` and `coverage/patch` (≥ 95%) and build, with
-   **no dangling tests**: none failing, flaky, skipped or retried into passing (rule 8 above).
+   **no dangling tests**: none failing, flaky or newly skipped, and none passing only on retry (rule 8 above).
 2. **Every AI review comment is resolved and answered** (CodeRabbit, Copilot code review,
    Codecov, etc. — see `.coderabbit.yaml`). For each thread either fix it and reply with what
    changed (commit SHA), or reply with a concrete reason it does not apply; then resolve the
@@ -195,7 +197,7 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
    and ask the user rather than declaring it ready.
 4. **A superpowers code review of the full PR diff is done.** Use the
    [superpowers](https://github.com/obra/superpowers) `requesting-code-review` skill: dispatch a
-   reviewer subagent on `git merge-base origin/staging HEAD`..`HEAD`. Then handle the findings
+   reviewer subagent on `$(gh pr view --json baseRefOid --jq .baseRefOid)..HEAD` (the PR's actual base). Then handle the findings
    with `receiving-code-review`: verify each against the code, fix every Critical and Important
    one (or answer with a concrete reason it does not apply), and re-run the review if the fixes
    are non-trivial. Summarize the verdict and what you changed in the PR. If your agent cannot

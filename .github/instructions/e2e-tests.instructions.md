@@ -8,7 +8,8 @@ applyTo: "e2e/**/*.ts"
 - Specs using `page`/`context`/`browser` fixtures import `test` from `e2e/infra/coverage.ts`.
 - Tests run `fullyParallel` in Chromium and Firefox: use unique graph/user names per test (or
   serialize) and clean up what you create.
-- Zero dangling tests: no `test.skip`/`fixme`/`only`, and a test that fails or passes only on retry is
+- Zero dangling tests: no unconditional `test.skip`/`test.describe.skip`/`fixme` and no `only` (environment-gated
+  skips with a stated reason, e.g. missing API key, are fine), and a test that fails or passes only on retry is
   fixed at the root (`--repeat-each=10` to reproduce), never by raising retries/timeouts.
 - Wait on conditions (`expect(...).toBeVisible()`, responses), never fixed sleeps.
 - Contexts made through `BrowserWrapper` inherit the active project's viewport/touch/storageState.
