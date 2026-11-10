@@ -77,6 +77,13 @@ Rules for every change:
    serialization. Coerce Cypher counts with `Number()` before exact comparisons.
 7. Run the relevant tests and lint locally and report the results; do not claim a fix is
    verified without running them.
+8. **Zero dangling tests.** Never leave a test failing, flaky, hanging, skipped (`skip`, `only`,
+   `fixme`, `test.skip`), commented out or retried into passing. Find the root cause and fix it,
+   whether the bug is in the test or the code, even if it looks unrelated to your change or
+   fails only in CI. Never "fix" it by deleting it, loosening its assertions, adding sleeps or
+   raising retries/timeouts. A flaky test counts as failing: reproduce it (run it repeatedly,
+   e.g. `npx playwright test <file> --repeat-each=10`), then fix it. If it truly cannot be fixed
+   in the PR, stop and ask the user; do not park it.
 
 ## Code conventions
 
@@ -163,7 +170,8 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
 
 ### A PR is ready only when
 
-1. CI is green, including `coverage/project` and `coverage/patch` (≥ 95%), lint and build.
+1. CI is green, including `coverage/project` and `coverage/patch` (≥ 95%), lint and build, with
+   **no dangling tests**: none failing, flaky, skipped or retried into passing (rule 8 above).
 2. **Every AI review comment is resolved and answered** (CodeRabbit, Copilot code review,
    Codecov, etc. — see `.coderabbit.yaml`). For each thread either fix it and reply with what
    changed (commit SHA), or reply with a concrete reason it does not apply; then resolve the
