@@ -112,7 +112,9 @@ Rules for every change:
 - Mutating graph routes must reject read-only users with 403 **before** running any query
   (`resolveReadOnly`).
 - Browser requests carry `X-Connection-Id` so `getClient` pins the intended connection;
-  `getClient` validates the connection against an active token record and fails closed.
+  `getClient` validates an identified connection against an active token record and fails closed. The one
+  exception is the legacy session fallback (no connection ID, Token DB lookup failed), which can still return a
+  client without such a record; do not rely on the guarantee there.
 - **Changing an endpoint's shape updates `app/api/swagger/swagger-spec.ts`** (served at `/docs`); the **API docs** CI check fails a PR that changes a `route.ts` without it (add the `no-api-docs` label only when the contract is unchanged).
 - Keep `falkordb` (server-only, BigInt) and `@falkordb/text-to-cypher` (native binaries) in
   `serverExternalPackages` in `next.config.js`; never import them from client code.
