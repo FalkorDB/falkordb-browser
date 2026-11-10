@@ -87,6 +87,13 @@ Rules for every change:
 
 ## Code conventions
 
+- **Be a pedantic developer.** When you notice something wrong or sloppy that you can fix, fix
+  it now instead of leaving it: a typo, a stale or wrong comment or doc, a broken link, a lint or
+  type warning, dead or duplicated code, an unclear name, a missing test or doc for what you
+  touch, an inconsistency with sibling code. Check your own diff the same way before pushing.
+  Pedantry has limits: keep unrelated fixes small and in their own commit; if one is large or
+  risky, say so and ask or open an issue instead of silently skipping it or growing the PR.
+
 - TypeScript strict; no `any` without a reason. 4-space indentation in most existing files —
   match the file you are editing. Code that unit tests import directly uses relative `.ts` imports;
   bundler-only code (components, routes) uses the `@/` alias.
