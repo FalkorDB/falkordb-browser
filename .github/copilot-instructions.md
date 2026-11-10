@@ -171,8 +171,15 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
    comments after every push, since each push can trigger a fresh review round.
    Verify a suggestion before applying it — AI reviewers are sometimes wrong; do not
    blindly add code that makes the change bigger or less clear.
-3. Human review requests are addressed the same way.
-4. The PR template checklist is complete (tests, docs, design docs).
+3. **At least 3 AI review rounds are done.** A round is: a batch of AI review comments arrives,
+   you fix or answer every thread, push, and the reviewers re-review the new commit. Do not
+   declare the PR ready after fewer than 3 rounds. If the reviewers go quiet earlier, say so
+   and ask the user rather than declaring it ready.
+4. **In the last round, watch CI to the end.** After the final push, wait for every check to
+   finish (`gh pr checks <PR> --watch`) and confirm they all pass, then re-check the threads one
+   more time: a late review or a red check starts another round.
+5. Human review requests are addressed the same way.
+6. The PR template checklist is complete (tests, docs, design docs).
 
 List unresolved threads with:
 `gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100){nodes{id isResolved comments(first:1){nodes{author{login} body path}}}}}}}' -f o=FalkorDB -f r=falkordb-browser -F n=<PR>`
