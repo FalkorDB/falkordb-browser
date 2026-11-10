@@ -25,12 +25,16 @@ export function check(files, skip = false) {
   };
 }
 
+/** The files changed from `base` to `head`; renames count as a delete plus an add, so a moved route stays visible. */
+export function changedFiles(base, head, cwd) {
+  return execFileSync('git', ['diff', '--no-renames', '--name-only', `${base}...${head}`], { encoding: 'utf8', cwd })
+    .split('\n').filter(Boolean);
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { BASE_SHA, HEAD_SHA, SKIP } = process.env;
   if (!BASE_SHA || !HEAD_SHA) throw new Error('BASE_SHA and HEAD_SHA are required');
-  const files = execFileSync('git', ['diff', '--name-only', `${BASE_SHA}...${HEAD_SHA}`], { encoding: 'utf8' })
-    .split('\n').filter(Boolean);
-  const { ok, message } = check(files, SKIP === 'true');
+  const { ok, message } = check(changedFiles(BASE_SHA, HEAD_SHA), SKIP === 'true');
   console.log(ok ? message : `::error::${message.replace(/\n/g, '%0A')}`);
   process.exit(ok ? 0 : 1);
 }

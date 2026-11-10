@@ -1,13 +1,18 @@
 ---
-applyTo: "app/api/**/*.{ts,tsx}"
+applyTo: "app/api/route.{ts,tsx},app/api/**/route.{ts,tsx}"
 ---
 
 # API route handlers
 
-- `const session = await getClient(request); if (session instanceof NextResponse) return session;`
-- try/catch every handler; `console.error` the cause; return `NextResponse.json({ message }, { status, headers: getCorsHeaders(request) })`
-  with an accurate status (400 bad input, 401/403 auth, 404, 500 unexpected). Never leak stack
-  traces or credentials.
+- Handlers that touch FalkorDB: `const session = await getClient(request); if (session instanceof NextResponse) return session;`.
+  Connection-management and auth routes use `getSessionFromRequest` instead; public routes
+  (releases, app links, swagger) need neither.
+- try/catch every handler and `console.error` the cause. Return JSON errors as
+  `NextResponse.json({ error }, { status, headers: getCorsHeaders(request) })` (the dominant shape;
+  match the sibling routes if they differ) with an accurate status (400 bad input, 401/403 auth,
+  404, 500 unexpected). Never leak stack traces or credentials.
+- Streaming (SSE) handlers keep the SSE error format (`writeGetClientErrorAsSSE`, `runQuery`);
+  do not switch them to JSON.
 - Validate bodies and params (`validate-body.ts`, zod). Pass user values to Cypher as parameters.
 - Mutations reject read-only users with 403 before any query runs.
 - Update `app/api/swagger/swagger-spec.ts` when the contract changes.

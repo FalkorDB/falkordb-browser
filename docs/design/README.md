@@ -17,6 +17,8 @@ Risks and deferred — what is intentionally left out and why.
 
 ## Index
 
+Plans predating this convention carry no shipped/status note: verify them against the code.
+
 | Doc | Topic |
 | --- | --- |
 | [clear-cypher-errors-ideas.md](clear-cypher-errors-ideas.md) | Backlog for clearer Cypher error messages |

@@ -107,8 +107,8 @@ Rules for every change:
 - Browser requests carry `X-Connection-Id` so `getClient` pins the intended connection;
   `getClient` validates the connection against an active token record and fails closed.
 - **Changing an endpoint's shape updates `app/api/swagger/swagger-spec.ts`** (served at `/docs`); the **API docs** CI check fails a PR that changes a `route.ts` without it (add the `no-api-docs` label only when the contract is unchanged).
-- Keep `@redis/client` and `falkordb` external in `next.config.js` so `ErrorReply` identity
-  survives (SSE status classification depends on it).
+- Keep `falkordb` (server-only, BigInt) and `@falkordb/text-to-cypher` (native binaries) in
+  `serverExternalPackages` in `next.config.js`; never import them from client code.
 
 ### Client code
 
