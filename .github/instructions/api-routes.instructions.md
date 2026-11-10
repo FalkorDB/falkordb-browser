@@ -13,8 +13,8 @@ applyTo: "app/api/route.{ts,tsx},app/api/**/route.{ts,tsx}"
   404, 500 unexpected). Never leak stack traces or credentials.
 - Streaming (SSE) handlers keep the SSE error format (`writeGetClientErrorAsSSE`, `runQuery`);
   do not switch them to JSON.
-- Validate bodies and params (`validate-body.ts`, zod). Pass user values to Cypher as parameters.
-- Mutations reject read-only users with 403 before any query runs.
+- Validate bodies and params (`validate-body.ts`, zod). Pass literal user values to Cypher as parameters; identifiers (labels, property keys) cannot be parameters, so validate them and use `quoteCypherIdentifier`.
+- Mutations reject read-only users with 403 before any query runs (`resolveReadOnly(request, session.user.role)` from `app/api/utils.ts`).
 - Update `app/api/swagger/swagger-spec.ts` when the contract changes.
 - Put reusable logic in a sibling `.ts` helper with a `.test.ts` (routes themselves are covered
   by Playwright API tests in `e2e/`); add an e2e API test for each new route or status code.

@@ -158,7 +158,8 @@ symbol names.
 ## Branches and PRs
 
 Feature work targets `staging`; `main` is release. Dependabot PRs target `staging`. CI
-workflows are pinned by commit SHA — keep that when editing `.github/workflows/`.
+workflows pin actions by commit SHA — keep that when editing `.github/workflows/` (the one exception is
+`release-notes.yml`, which calls FalkorDB's shared reusable workflow at `@main` on purpose).
 
 ### A PR is ready only when
 
