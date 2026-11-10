@@ -329,6 +329,8 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   the security scan) do not, and a Codecov upload error never fails a test job
   (`.github/scripts/coverage-gate.mjs`). Dependabot runs only get Dependabot secrets, so
   `CODECOV_TOKEN` must also be set as a Dependabot secret for their coverage to upload.
+  Manual (`workflow_dispatch`) runs do not upload: the gate does not count them, and their
+  uploads, named like the PR's or push's, would stand in for one that was lost.
   Each job keeps its report as a `coverage-*` workflow artifact for 3 days.
   Locally:
   ```bash

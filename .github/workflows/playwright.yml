@@ -217,7 +217,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
       - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -343,7 +343,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
       - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -533,7 +533,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
       - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -714,7 +714,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
       - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -866,7 +866,7 @@ jobs:
             node .github/scripts/coverage-report.mjs e2e \
               coverage/raw/e2e-docker-browser coverage/raw/e2e-docker-server
       - name: Upload docker coverage to Codecov
-        if: ${{ !cancelled() && steps.docker-coverage.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.docker-coverage.outcome == 'success' && github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -892,7 +892,7 @@ jobs:
           docker logs falkordb-browser > docker-logs/falkordb-browser.log 2>&1 || true
           docker logs falkordb-core > docker-logs/falkordb-core.log 2>&1 || true
           if docker inspect falkordb-browser-coverage > /dev/null 2>&1; then
-            docker logs falkordb-browser-coverage > docker-logs/falkordb-browser-coverage.log 2>&1
+            docker logs falkordb-browser-coverage > docker-logs/falkordb-browser-coverage.log 2>&1 || true
           fi
       - name: Stop and remove containers
         if: always()

@@ -66,7 +66,7 @@ jobs:
         run: node .github/scripts/coverage-report.mjs unit coverage/raw/unit
 
       - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -128,7 +128,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: node .github/scripts/coverage-report.mjs smoke coverage/raw/smoke
       - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
