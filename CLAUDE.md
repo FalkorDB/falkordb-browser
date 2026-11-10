@@ -10,8 +10,6 @@ here; add only what is specific to Claude Code.
 - For a single file, `node --test path/to/file.test.ts` is the fastest loop; run
   `npm run test:coverage` before finishing to confirm the listed pure modules still meet their
   100% gate (the PR bar is ≥ 95%).
-- Before declaring a PR ready, follow "A PR is ready only when": at least 3 AI review rounds,
-  no unresolved or unanswered threads, zero dangling tests (fix any failing or flaky test at its
-  root, never skip it), and a final `gh pr checks --watch` that ends green.
+- Before declaring a PR ready, follow "A PR is ready only when" in the imported file.
 - Path-specific rules live in `.github/instructions/*.instructions.md`; read the one matching
   the files you are editing (tests, API routes, e2e).
