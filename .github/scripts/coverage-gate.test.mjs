@@ -380,6 +380,7 @@ function world({
   patch = { hits: 19, misses: 1, partials: 0 }, reportErrors = [], githubHead = SHA, timeline = [],
   // A run's jobs: by default its coverage jobs, each ending as the run did.
   jobsOf = (r) => coverageJobs(r.name, r.conclusion),
+  workflowOf = (file) => readFileSync(`${ROOT}${file}`, 'utf8'),
 } = {}) {
   const posted = [];
   const sleeps = [];
@@ -402,7 +403,8 @@ function world({
     if (path.startsWith('actions/runs?')) return { workflow_runs: /[?&]page=1(&|$)/.test(path) ? runs : [] };
     if (path.startsWith('contents/')) {
       const file = path.slice('contents/'.length).split('?')[0];
-      return { content: readFileSync(`${ROOT}${file}`).toString('base64') };
+      assert.equal(path.split('?ref=')[1], SHA);
+      return { content: Buffer.from(workflowOf(file)).toString('base64') };
     }
     throw new Error(`unexpected GitHub call ${path}`);
   };
@@ -483,15 +485,13 @@ test('gate: a coverage job that did not succeed fails both statuses', async () =
 
 test('gate: a failure outside the coverage jobs leaves the coverage complete', async () => {
   // Packaging failed on Windows (a 504 from electron-builder's download),
-  // the security scan and the docker smoke tests failed: no job of theirs
-  // makes coverage, and every coverage job succeeded.
+  // the security scan failed, but every coverage-producing step succeeded.
   const runs = [run('Build', 'failure'), run('Playwright Tests', 'failure'), run('Desktop app', 'failure')];
   const extra = {
     Build: job('security-scan', ['Run Trivy vulnerability scanner'], 'failure'),
-    'Playwright Tests': job('Run smoke tests against local docker build', ['Run smoke Playwright tests against local docker build'], 'failure'),
     'Desktop app': job('build (windows-latest)', ['Run desktop tests', 'Build installers'], 'failure'),
   };
-  const unrelated = world({ runs, jobsOf: (r) => [...coverageJobs(r.name), extra[r.name]] });
+  const unrelated = world({ runs, jobsOf: (r) => [...coverageJobs(r.name), ...(extra[r.name] ? [extra[r.name]] : [])] });
   assert.equal(await gate(unrelated.args), true);
   assert.deepEqual(unrelated.posted, [
     'coverage/project success: 96.00% (target 95%)',
@@ -507,6 +507,59 @@ test("gate: one coverage job's lost upload fails, its flag uploaded by the other
     'coverage/project failure: No e2e-cluster upload for this commit: the coverage is incomplete',
     'coverage/patch failure: No e2e-cluster upload for this commit: the coverage is incomplete',
   ]);
+});
+
+test('gate: missing Docker coverage is not hidden by other E2E uploads', async () => {
+  const lost = world({ runs: ALL_DONE, uploads: [FRESH.filter((u) => u.name !== 'e2e-docker')] });
+  assert.equal(await gate({ ...lost.args, deadline: 40_000 }), false);
+  assert.deepEqual(lost.sleeps, [20_000, 20_000]);
+  assert.deepEqual(lost.posted, [
+    'coverage/project failure: No e2e-docker upload for this commit: the coverage is incomplete',
+    'coverage/patch failure: No e2e-docker upload for this commit: the coverage is incomplete',
+  ]);
+});
+
+test('gate: waits for a delayed required Docker upload even when visible uploads are settled', async () => {
+  const delayed = world({
+    runs: ALL_DONE,
+    uploads: [FRESH.filter((u) => u.name !== 'e2e-docker'), FRESH],
+  });
+  assert.equal(await gate(delayed.args), true);
+  assert.deepEqual(delayed.sleeps, [20_000]);
+  assert.match(delayed.posted[0], /success: 96.00%/);
+});
+
+test('gate: older workflows without Docker collection do not require its steps or upload', async () => {
+  const legacy = world({
+    runs: ALL_DONE,
+    uploads: [FRESH.filter((u) => u.name !== 'e2e-docker')],
+    workflowOf: (file) => readFileSync(`${ROOT}${file}`, 'utf8').replace(
+      /^      # Keep the shipped-image smoke check above\.[\s\S]*?(?=      - name: Collect container logs)/m, '',
+    ),
+    jobsOf: (r) => coverageJobs(r.name).map((j) => j.name === 'Run smoke tests against local docker build'
+      ? job(j.name, ['Run smoke Playwright tests against local docker build'])
+      : j),
+  });
+  assert.equal(await gate(legacy.args), true);
+  assert.deepEqual(legacy.sleeps, []);
+  assert.match(legacy.posted[0], /success: 96.00%/);
+});
+
+test('gate: failed Docker recording or mapping fails both coverage statuses', async () => {
+  for (const step of ['Record existing docker smoke tests', 'Collect docker coverage and exact build artifacts']) {
+    const failed = world({
+      runs: ALL_DONE,
+      jobsOf: (r) => coverageJobs(r.name).map((j) =>
+        j.name === 'Run smoke tests against local docker build'
+          ? { ...j, steps: j.steps.map((s) => s.name === step ? { ...s, conclusion: 'failure' } : s) }
+          : j),
+    });
+    assert.equal(await gate(failed.args), false);
+    assert.deepEqual(failed.posted, [
+      'coverage/project failure: Playwright Tests: Run smoke tests against local docker build did not succeed: the coverage is incomplete',
+      'coverage/patch failure: Playwright Tests: Run smoke tests against local docker build did not succeed: the coverage is incomplete',
+    ]);
+  }
 });
 
 test("gate: a flag with only an earlier commit's coverage fails", async () => {

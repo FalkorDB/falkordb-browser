@@ -18,9 +18,21 @@ import path from 'path';
 const dir = process.env.E2E_COVERAGE_DIR;
 
 const recording = new Map<Page, Promise<void>>();
+type CapturedSource = { source: string } | { error: unknown };
+const sources = new WeakMap<Page, Map<string, Promise<CapturedSource>>>();
 
 // The chunk URLs whose source this worker has saved.
 const savedSources = new Set<string>();
+const trackedContexts = new WeakSet<BrowserContext>();
+
+function recordFailure(error: unknown) {
+    console.error("Browser coverage collection failed:", error);
+    if (!dir) throw new Error("Coverage directory is not configured");
+    mkdirSync(dir, { recursive: true });
+    writeWhole(path.join(dir, `browser-error-${randomUUID()}.json`), JSON.stringify({
+        message: error instanceof Error ? error.message : String(error),
+    }));
+}
 
 /**
  * Writes `data` whole under a temporary name and only then gives it its real
@@ -40,13 +52,26 @@ async function save(page: Page) {
     await started;
     const entries = (await page.coverage.stopJSCoverage())
         .filter(({ url }) => url.includes('/_next/static/'));
+    const capturedSources = sources.get(page);
+    sources.delete(page);
     if (!dir || !entries.length) return;
     mkdirSync(dir, { recursive: true });
     // The chunks are content-hashed, so a URL always serves the same source:
     // save each source once, not once per page. Linking the complete file into
     // place fails if another worker already saved it, and never replaces it.
-    for (const { url, source } of entries) {
-        if (source === undefined || savedSources.has(url)) continue;
+    for (const entry of entries) {
+        const { url } = entry;
+        if (savedSources.has(url)) continue;
+        let source = entry.source;
+        if (source === undefined) {
+            const captured = await capturedSources?.get(url);
+            if (!captured || 'error' in captured) {
+                throw new Error(`No source available for browser chunk ${url}`, {
+                    cause: captured && 'error' in captured ? captured.error : undefined,
+                });
+            }
+            source = captured.source;
+        }
         const file = path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
         const tmp = `${file}.${randomUUID()}.tmp`;
         writeFileSync(tmp, source);
@@ -66,17 +91,44 @@ async function save(page: Page) {
 /** Records `page`'s coverage until it closes (or its context does). */
 function track(page: Page) {
     if (recording.has(page)) return;
-    recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch(() => {}));
+    // Chromium can lose Debugger.getScriptSource during navigation. Preserve
+    // the actual response, not a later fetch that could serve a different build.
+    const capturedSources = new Map<string, Promise<CapturedSource>>();
+    sources.set(page, capturedSources);
+    page.on('response', (response) => {
+        const url = response.url();
+        if (!url.includes('/_next/static/') || response.request().resourceType() !== 'script'
+            || !response.ok() || savedSources.has(url)) return;
+        const captured = response.text().then(
+            (source): CapturedSource => ({ source }),
+            (error: unknown): CapturedSource => ({ error }),
+        );
+        const previous = capturedSources.get(url);
+        capturedSources.set(url, previous
+            ? previous.then((result) => 'source' in result ? result : captured)
+            : captured);
+    });
+    // A popup the app opens and closes at once can close before recording starts; it has no coverage to lose.
+    recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch((error: unknown) => {
+        if (!page.isClosed()) recordFailure(error);
+    }));
     const close = page.close.bind(page);
     page.close = async (options) => {
-        await save(page).catch(() => {});
-        return close(options);
+        try {
+            await save(page);
+        } catch (error) {
+            recordFailure(error);
+        } finally {
+            await close(options);
+        }
     };
 }
 
 /** Records coverage for every page opened in `context`. A no-op unless collecting. */
 export function trackContext<T extends BrowserContext>(context: T): T {
     if (!dir || context.browser()?.browserType().name() !== 'chromium') return context;
+    if (trackedContexts.has(context)) return context;
+    trackedContexts.add(context);
     context.pages().forEach(track);
     context.on('page', track);
     // A page the test opens is recording before the test can navigate it.
@@ -90,8 +142,11 @@ export function trackContext<T extends BrowserContext>(context: T): T {
     };
     const close = context.close.bind(context);
     context.close = async (options) => {
-        await Promise.all(context.pages().map((page) => save(page).catch(() => {})));
-        return close(options);
+        try {
+            await Promise.all(context.pages().map((page) => save(page).catch(recordFailure)));
+        } finally {
+            await close(options);
+        }
     };
     return context;
 }
