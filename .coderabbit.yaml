@@ -15,8 +15,8 @@ reviews:
   # High level summary
   high_level_summary: true
   
-  # Poem style summary (optional, can be disabled)
-  poem: true
+  # No poem in the summary
+  poem: false
   
   # Review status - enable reviews
   review_status: true

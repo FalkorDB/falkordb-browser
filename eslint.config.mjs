@@ -7,6 +7,7 @@ export default [
       "**/*.d.ts",
       "app/components/forceSimulationWorker.js",
       "components/ui/**",
+      "coverage/**",
       "desktop/**",
       "eslint.config.mjs",
       "mobile/**",

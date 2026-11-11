@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import { Browser, BrowserContext, Page } from "playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import urls from "../config/urls.json";
 import AppDownloadComponent from "../logic/POM/appDownloadComponent";
 import pkg from "../../package.json";
