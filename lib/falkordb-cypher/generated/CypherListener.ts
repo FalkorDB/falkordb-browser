@@ -4,6 +4,7 @@ import { ErrorNode, ParseTreeListener, ParserRuleContext, TerminalNode } from "a
 
 
 import { OC_CypherContext } from "./CypherParser.js";
+import { OC_ParameterHeaderContext } from "./CypherParser.js";
 import { OC_StatementContext } from "./CypherParser.js";
 import { OC_QueryContext } from "./CypherParser.js";
 import { OC_FalkorCommandContext } from "./CypherParser.js";
@@ -117,7 +118,6 @@ import { OC_ParameterContext } from "./CypherParser.js";
 import { OC_SchemaNameContext } from "./CypherParser.js";
 import { OC_ReservedWordContext } from "./CypherParser.js";
 import { OC_SymbolicNameContext } from "./CypherParser.js";
-import { OC_ParameterHeaderContext } from "./CypherParser.js";
 import { OC_LeftArrowHeadContext } from "./CypherParser.js";
 import { OC_RightArrowHeadContext } from "./CypherParser.js";
 import { OC_DashContext } from "./CypherParser.js";
@@ -138,6 +138,16 @@ export class CypherListener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitOC_Cypher?: (ctx: OC_CypherContext) => void;
+    /**
+     * Enter a parse tree produced by `CypherParser.oC_ParameterHeader`.
+     * @param ctx the parse tree
+     */
+    enterOC_ParameterHeader?: (ctx: OC_ParameterHeaderContext) => void;
+    /**
+     * Exit a parse tree produced by `CypherParser.oC_ParameterHeader`.
+     * @param ctx the parse tree
+     */
+    exitOC_ParameterHeader?: (ctx: OC_ParameterHeaderContext) => void;
     /**
      * Enter a parse tree produced by `CypherParser.oC_Statement`.
      * @param ctx the parse tree
@@ -1268,16 +1278,6 @@ export class CypherListener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitOC_SymbolicName?: (ctx: OC_SymbolicNameContext) => void;
-    /**
-     * Enter a parse tree produced by `CypherParser.oC_ParameterHeader`.
-     * @param ctx the parse tree
-     */
-    enterOC_ParameterHeader?: (ctx: OC_ParameterHeaderContext) => void;
-    /**
-     * Exit a parse tree produced by `CypherParser.oC_ParameterHeader`.
-     * @param ctx the parse tree
-     */
-    exitOC_ParameterHeader?: (ctx: OC_ParameterHeaderContext) => void;
     /**
      * Enter a parse tree produced by `CypherParser.oC_LeftArrowHead`.
      * @param ctx the parse tree
