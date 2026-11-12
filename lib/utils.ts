@@ -1586,7 +1586,7 @@ function analyzeCypher(query: string): { code: string; lastCodeEnd: number } {
       continue;
     }
 
-    if (!/\s/.test(char)) lastCodeEnd = i + 1;
+    if (!/\s/.test(char) && char !== ";") lastCodeEnd = i + 1;
     i += 1;
   }
 

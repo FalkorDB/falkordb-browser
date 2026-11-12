@@ -43,6 +43,30 @@ describe("getQueryWithLimit keyword detection (#2203)", () => {
     assert.deepEqual(getQueryWithLimit(query, 50), [`${query} LIMIT 50`, 50]);
   });
 
+  it("masks keywords inside escaped and doubled delimiters", () => {
+    for (const token of [
+      "'it\\'s RETURN LIMIT'",
+      '"a\\" RETURN LIMIT"',
+      "'odd\\\\\\' RETURN LIMIT'",
+      "'even\\\\'",
+      "'it''s RETURN LIMIT'",
+      '"a"" RETURN LIMIT"',
+    ]) {
+      const write = `CREATE (:Book {title: ${token}})`;
+      assert.deepEqual(getQueryWithLimit(write, 300), [write, 0]);
+      assert.deepEqual(getQueryWithLimit(`${write} RETURN 1`, 300), [`${write} RETURN 1 LIMIT 300`, 300]);
+    }
+    const backtick = "CREATE (:`a``RETURN LIMIT`)";
+    assert.deepEqual(getQueryWithLimit(backtick, 300), [backtick, 0]);
+    assert.deepEqual(getQueryWithLimit(`${backtick} RETURN 1`, 300), [`${backtick} RETURN 1 LIMIT 300`, 300]);
+  });
+
+  it("inserts LIMIT before a trailing semicolon and comment", () => {
+    for (const query of ["RETURN 1; // note", "RETURN 1; /* note */", "RETURN ';';"]) {
+      assert.deepEqual(getQueryWithLimit(query, 300), [query.replace(/;(?=\s*(?:\/\/|\/\*|$))/, " LIMIT 300;"), 300]);
+    }
+  });
+
   it("keeps an existing LIMIT and reports it", () => {
     const query = "MATCH (n) RETURN n LIMIT 10";
     assert.deepEqual(getQueryWithLimit(query, 300), [query, 10]);
