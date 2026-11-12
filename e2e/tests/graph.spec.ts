@@ -114,6 +114,40 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test("@admin graph selection handles a list shrinking to one graph while opening", async () => {
+    const graphName = getRandomString("soleGraph");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage);
+      const page = await browser.getPage();
+      let shrinkList = false;
+      const openedLists: string[][] = [];
+      await page.route(/\/api\/graph\/?$/, async route => {
+        if (route.request().method() !== "GET") {
+          await route.continue();
+          return;
+        }
+        const opts = shrinkList ? [graphName] : [graphName, `${graphName}_other`];
+        if (shrinkList) openedLists.push(opts);
+        await route.fulfill({ json: { opts } });
+      });
+      await browser.navigateTo(urls.graphUrl);
+      await expect(graph.select()).toBeEnabled();
+      shrinkList = true;
+      await graph.selectGraphByName(graphName);
+      expect(openedLists).toEqual([[graphName]]);
+      await expect(graph.select()).toHaveText(graphName);
+      await expect(graph.search()).toBeHidden();
+      await expect(page).toHaveURL(url => url.searchParams.get("graph") === graphName);
+    } finally {
+      try {
+        await browser.closeBrowser();
+      } finally {
+        expect((await apiCall.removeGraph(graphName, "admin")).message).toMatch(/deleted|empty key/i);
+      }
+    }
+  });
+
   test(`@admin Validate that the Manage Graphs toolbar and the Delete dialog stay on one row`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);

@@ -69,14 +69,14 @@ test.describe("Tutorial", () => {
 
         try {
             await tutorial.changeLocalStorage("true");
-            await tutorial.refreshPage();
+            await tutorial.visitRegularGraphPage();
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
 
             // Leaving mid-tutorial skips the cleanup, and the tutorial re-opens by
-            // itself on the next load and loads the demo data again — which used to
+            // itself on the next regular visit and loads the demo data again — which used to
             // stack another copy of the dataset on top of the old one (#2087).
-            await tutorial.refreshPage();
+            await tutorial.visitRegularGraphPage();
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
         } finally {
@@ -96,7 +96,7 @@ test.describe("Tutorial", () => {
             // it open, and the init script only fills in a missing one.
             await app.evaluate(() => localStorage.setItem("appDownloadPrompt", "true"));
             await tutorial.changeLocalStorage("true");
-            await tutorial.refreshPage();
+            await tutorial.visitRegularGraphPage();
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
 
             // Both are first-visit popups: the tour goes first, alone.
@@ -131,9 +131,9 @@ test.describe("Tutorial", () => {
         const userTabs = await tutorial.getStripTabCount();
         expect(userTabs).toBe(2);
 
-        // 2. Start the tutorial by setting localStorage and refreshing
+        // 2. Start the tutorial on a regular visit, not a serialized shared tab URL.
         await tutorial.changeLocalStorage("true");
-        await tutorial.refreshPage();
+        await tutorial.visitRegularGraphPage();
         await tutorial.waitForTimeout(2000);
 
         // Step 0: "Preparing Tutorial..." — auto-advances after loading demo graphs
@@ -437,7 +437,7 @@ test.describe("Tutorial", () => {
     test("@admin validate that clicking away doesn't dismiss the tutorial", async () => {
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         await tutorial.changeLocalStorage("true");
-        await tutorial.refreshPage();
+        await tutorial.visitRegularGraphPage();
         await tutorial.clickAtTopLeftCorner();
         // Nothing to await on: the assertion is that a dismissal the click could
         // have triggered has had time to happen and did not.

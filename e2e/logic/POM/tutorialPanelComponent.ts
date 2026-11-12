@@ -6,6 +6,7 @@ import {
   waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
+import urls from "../../config/urls.json";
 
 export default class TutorialPanel extends GraphPage {
   private get tutorialSpotlight(): Locator {
@@ -50,6 +51,11 @@ export default class TutorialPanel extends GraphPage {
     await this.page.evaluate((val) => {
       localStorage.setItem("tutorial", val);
     }, value);
+  }
+
+  async visitRegularGraphPage(): Promise<void> {
+    // Reloading a serialized tab URL is a share-link visit, which intentionally suppresses the tour.
+    await this.page.goto(urls.graphUrl, { waitUntil: "networkidle" });
   }
 
   async clickAtTopLeftCorner(): Promise<void> {

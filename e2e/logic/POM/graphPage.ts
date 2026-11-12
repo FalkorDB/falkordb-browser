@@ -1832,7 +1832,16 @@ export default class GraphPage extends BasePage {
     );
 
     await this.clickSelect();
-    await graphListResponse;
+    const response = await graphListResponse;
+    expect(response.ok()).toBe(true);
+    const { opts }: { opts: string[] } = await response.json();
+    if (opts.length === 1 && opts[0] === graphName) {
+      // The refresh auto-selects its sole graph and can close the popover before search is shown.
+      await expect(this.select("Graph")).toHaveText(graphName);
+      await this.page.keyboard.press("Escape");
+      await expect(this.search()).toBeHidden();
+      return;
+    }
     await this.fillSearch(graphName);
     await waitForElementToBeVisible(this.selectItem("Graph", graphName), 500, 20);
     await this.clickSelectItem(graphName); // selecting the first item in list after search
