@@ -55,6 +55,167 @@ test.describe("Chat Feature Tests", () => {
     await browser.closeBrowser();
   });
 
+  test.describe("Mocked chat request recovery", () => {
+    async function openMockedChat(graphName: string, model = DEFAULT_CHAT_MODEL) {
+      const chat = await browser.createNewPage(ChatComponent);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await page.addInitScript(({ selectedModel }) => {
+        localStorage.setItem("chatModelSource", "local");
+        localStorage.setItem("model", selectedModel);
+      }, { selectedModel: model });
+      await page.goto(urls.graphUrl);
+      await chat.selectGraphByName(graphName);
+      await expect(page).toHaveURL((url) =>
+        url.searchParams.get("graph") === graphName && url.searchParams.has("view") && url.searchParams.has("layout"));
+      await chat.openChat();
+      await chat.waitForChatPanel();
+      return { chat, page };
+    }
+
+    test("@readwrite Chat rejects a missing model without sending or losing the draft", async () => {
+      const graphName = getRandomString("chatValidation");
+      await apiCall.addGraph(graphName);
+      try {
+        const { chat, page } = await openMockedChat(graphName, "");
+        let requests = 0;
+        await page.route("**/api/chat", async (route) => {
+          requests += 1;
+          await route.fulfill({ json: { answer: "Unexpected request" } });
+        });
+        await chat.fillChatInput("Keep this question until a model is selected");
+        await chat.clickChatSendButton();
+
+        await expect(chat.errorToast).toContainText("No model selected");
+        await expect(chat.chatInput).toHaveValue("Keep this question until a model is selected");
+        await expect(chat.chatSendButton).toBeEnabled();
+        await expect(chat.chatUserMessages).toHaveCount(0);
+        expect(requests).toBe(0);
+        await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: [] } }));
+        await chat.goToSettingsFromValidation();
+        await expect(page).toHaveURL(/\/settings(?:\?|$)/);
+      } finally {
+        try {
+          await browser.closeBrowser();
+        } finally {
+          await apiCall.removeGraph(graphName, "admin");
+        }
+      }
+    });
+
+    for (const failure of ["HTTP rejection", "malformed JSON", "network failure"] as const) {
+      test(`@readwrite Chat restores the submitted draft after ${failure} and retries successfully`, async () => {
+        const graphName = getRandomString("chatRecovery");
+        await apiCall.addGraph(graphName);
+        try {
+          const { chat, page } = await openMockedChat(graphName);
+          const requests: { graphName: string; messages: { role: string; content: string }[] }[] = [];
+          const connectionIds: (string | undefined)[] = [];
+          const session = await page.request.get(new URL("/api/auth/session", urls.graphUrl).href);
+          expect(session.ok()).toBe(true);
+          const { activeConnectionId } = await session.json();
+          expect(activeConnectionId).toBeTruthy();
+          await page.route("**/api/chat", async (route) => {
+            requests.push(route.request().postDataJSON());
+            connectionIds.push(route.request().headers()["x-connection-id"]);
+            if (requests.length > 1) {
+              await route.fulfill({ json: { answer: "The retry succeeded.", tokenUsage: { totalTokens: 12 } } });
+            } else if (failure === "HTTP rejection") {
+              await route.fulfill({ status: 503, json: { error: "Cannot connect to local server" } });
+            } else if (failure === "malformed JSON") {
+              await route.fulfill({ status: 200, contentType: "application/json", body: '{"answer":' });
+            } else {
+              await route.abort("failed");
+            }
+          });
+          const question = "Which people are in this graph?";
+          await chat.fillChatInput(question);
+          await chat.clickChatSendButton();
+
+          const error = chat.chatAssistantMessage("Error");
+          await expect(error).toHaveCount(1);
+          if (failure === "HTTP rejection") {
+            await expect(error).toContainText("Cannot connect to local server");
+            await expect(chat.errorSettingsLink).toHaveAttribute("href", "/settings");
+          } else if (failure === "malformed JSON") {
+            await expect(error).toContainText("Failed to parse server response");
+          } else {
+            await expect(error).toContainText("Error: An unexpected error occurred. Please try again.");
+          }
+          await expect(chat.chatInput).toHaveValue(question);
+          await expect(chat.chatSendButton).toBeEnabled();
+          await expect(chat.chatAssistantMessage("Result")).toHaveCount(0);
+          await chat.clickChatSendButton();
+
+          await expect(chat.chatAssistantMessage("Result")).toContainText("The retry succeeded.");
+          await expect(chat.chatInput).toBeEmpty();
+          await expect(chat.chatFooterTotalTokens).toContainText("12");
+          expect(requests).toHaveLength(2);
+          expect(requests[1].graphName).toBe(graphName);
+          expect(requests[1].messages.at(-1)).toEqual({ role: "user", content: question });
+          expect(connectionIds).toEqual([activeConnectionId, activeConnectionId]);
+        } finally {
+          try {
+            await browser.closeBrowser();
+          } finally {
+            await apiCall.removeGraph(graphName, "admin");
+          }
+        }
+      });
+    }
+
+    test("@readwrite Chat preserves a newer draft while a delayed response completes", async () => {
+      const graphName = getRandomString("chatPending");
+      await apiCall.addGraph(graphName);
+      let releaseResponse = () => {};
+      const responseGate = new Promise<void>((resolve) => { releaseResponse = resolve; });
+      try {
+        const { chat, page } = await openMockedChat(graphName);
+        const requests: { messages: { role: string; content: string }[] }[] = [];
+        await page.route("**/api/chat", async (route) => {
+          requests.push(route.request().postDataJSON());
+          if (requests.length === 1) await responseGate;
+          await route.fulfill({ json: { answer: `Answer ${requests.length}` } });
+        });
+        await chat.fillChatInput("First question");
+        await chat.clickChatSendButton();
+        await expect.poll(() => requests.length).toBe(1);
+        await expect(chat.chatUserMessages).toHaveCount(1);
+        await chat.fillChatInput("My next question");
+        await expect(chat.chatSendButton).toBeDisabled();
+        await chat.pressChatEnter();
+        await expect(chat.chatInput).toHaveValue("My next question");
+        await expect(chat.chatUserMessages).toHaveCount(1);
+        expect(requests).toHaveLength(1);
+
+        releaseResponse();
+        await expect(chat.chatAssistantMessage("Result")).toContainText("Answer 1");
+        await expect(chat.chatInput).toHaveValue("My next question");
+        await expect(chat.chatSendButton).toBeEnabled();
+        await chat.closeChat();
+        await chat.openChat();
+        await expect(chat.chatInput).toHaveValue("My next question");
+        await chat.clickChatSendButton();
+
+        await expect(chat.chatAssistantMessage("Result")).toHaveCount(2);
+        await expect(chat.chatAssistantMessage("Result").last()).toContainText("Answer 2");
+        await expect(chat.chatInput).toBeEmpty();
+        expect(requests[1].messages).toEqual([
+          { role: "user", content: "First question" },
+          { role: "assistant", content: "Answer 1" },
+          { role: "user", content: "My next question" },
+        ]);
+      } finally {
+        releaseResponse();
+        try {
+          await browser.closeBrowser();
+        } finally {
+          await apiCall.removeGraph(graphName, "admin");
+        }
+      }
+    });
+  });
+
   test(`@readwrite Verify chat button is disabled when no graph is selected`, async () => {
     // The graph page auto-selects the only graph when exactly one exists, and
     // parallel tests on the shared FalkorDB often create exactly one. Two of our
