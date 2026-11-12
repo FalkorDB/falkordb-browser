@@ -54,12 +54,14 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     const page = await browser.getPage();
     const name = "mock-generate-retry";
     const submissions: { name: string; expiresAt: string; ttlSeconds: number }[] = [];
+    const requestTimes: number[] = [];
     const methods: string[] = [];
     await page.route("**/api/auth/tokens", async route => {
       if (route.request().method() === "GET") {
         await route.fulfill({ json: { tokens: [], role: "Admin" } });
       } else {
         methods.push(route.request().method());
+        requestTimes.push(Date.now());
         submissions.push(route.request().postDataJSON() as typeof submissions[number]);
         await route.fulfill(submissions.length === 1
           ? { status: 400, json: { message: "Token generation rejected" } }
@@ -93,10 +95,11 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     await expect(page.locator("input[readonly]")).toHaveValue("mock-token-not-a-real-credential");
     expect(submissions).toHaveLength(2);
     expect(methods).toEqual(["POST", "POST"]);
-    for (const submission of submissions) {
+    for (const [index, submission] of submissions.entries()) {
       expect(submission).toMatchObject({ name, expiresAt });
       expect(submission.ttlSeconds).toBeGreaterThan(0);
-      expect(submission.ttlSeconds).toBeLessThanOrEqual(11 * 24 * 60 * 60);
+      const expectedTtl = Math.floor((Date.parse(expiresAt) - requestTimes[index]) / 1000);
+      expect(Math.abs(submission.ttlSeconds - expectedTtl)).toBeLessThanOrEqual(5);
     }
   });
 
