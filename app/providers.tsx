@@ -517,9 +517,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const viewportResolved = useViewportResolved();
   const isMobile = useIsMobile();
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const tutorialActivationRef = useRef({ open: tutorialOpen });
-  const tutorialSampleActivationRef = useRef<{ open: boolean } | null>(null);
-  if (tutorialActivationRef.current.open !== tutorialOpen) tutorialActivationRef.current = { open: tutorialOpen };
+  const tutorialActivationRef = useRef({ open: tutorialOpen, id: 0 });
+  const tutorialSampleActivationRef = useRef<{ open: boolean; id: number } | null>(null);
+  if (tutorialActivationRef.current.open !== tutorialOpen) tutorialActivationRef.current = { open: tutorialOpen, id: tutorialActivationRef.current.id + 1 };
   // Set once the settings effect has decided whether the tour runs, so other
   // first-visit popups can wait for that answer instead of racing it.
   const [tutorialDecided, setTutorialDecided] = useState(false);
@@ -562,7 +562,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const tutorialRecoveryUser = sessionData?.user;
   const tutorialRecoveryKey = status !== "unauthenticated" && tutorialRecoveryUser && prefixReady
     && (activeConnectionId === null || prefixConnectionId === activeConnectionId)
-    ? JSON.stringify([tutorialRecoveryUser.id, tutorialRecoveryUser.host, tutorialRecoveryUser.port, tutorialRecoveryUser.username, prefixConnectionId, activeConnectionId, getConnectionEpoch(), tutorialOpen])
+    ? JSON.stringify([tutorialRecoveryUser.id, tutorialRecoveryUser.host, tutorialRecoveryUser.port, tutorialRecoveryUser.username, prefixConnectionId, activeConnectionId, getConnectionEpoch(), tutorialActivationRef.current.id])
     : null;
   const [tutorialRecoveredKey, setTutorialRecoveredKey] = useState<string | null>(null);
   const tutorialRecoveryReady = tutorialRecoveryKey !== null && tutorialRecoveredKey === tutorialRecoveryKey;
@@ -1358,8 +1358,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   /**
    * @param options.readOnly Force GRAPH.RO_QUERY regardless of the user's role.
    * @param options.silent Swallow the failure: no toast, no diagnostics, no history entry.
+   * @param options.allowTutorialCreation False for automatic loads that must not recreate tutorial samples.
    */
-  const runQuery = useCallback(async (q: string, name?: string, options?: { readOnly?: boolean; silent?: boolean }): Promise<void> => {
+  const runQuery = useCallback(async (q: string, name?: string, options?: { readOnly?: boolean; silent?: boolean; allowTutorialCreation?: boolean }): Promise<void> => {
     const n = name || activeGraphNameRef.current;
 
     // Reject while a connection switch is mid-flight — its global id and React
@@ -1414,7 +1415,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
         query: q,
         connectionId: cid,
-        allowTutorialCreation: !options?.silent,
+        allowTutorialCreation: options?.allowTutorialCreation ?? !options?.silent,
       }) as { data: Data; stats: QueryStatistics };
 
       if (!result) throw new Error("Failed to execute query");
@@ -2768,7 +2769,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   ): Promise<string[]> => {
     const requested = [...new Set(names)];
     const epoch = getConnectionEpoch();
-    const isCurrentConnection = () => getConnectionEpoch() === epoch && getConnectionPrefix() === scope && getActiveConnectionIdGlobal() === cid;
+    const activation = tutorialActivationRef.current;
+    const isCurrentConnection = () => tutorialActivationRef.current === activation && getConnectionEpoch() === epoch && getConnectionPrefix() === scope && getActiveConnectionIdGlobal() === cid;
     if (isCurrentConnection() && requested.length > 0) {
       const deleting = new Set(requested);
       supersedeGraphRefreshes();
@@ -3157,6 +3159,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         if (reclaimable.length > 0) {
           const remaining = await cleanupAndPersistTutorialGraphs(scope, cid, ownerId, reclaimable);
           demoGraphNamesRef.current = remaining;
+          if (remaining.length > 0 && isCurrent()) {
+            toast({
+              title: "Tutorial cleanup failed",
+              description: "Some previous tutorial samples could not be removed. Their ownership was retained for retry.",
+            });
+          }
         }
         if (!isCurrent()) {
           restorePreTutorialState();
@@ -3170,12 +3178,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       }
 
       ownership = readTutorialDemoOwnership(scope, ownerId);
-      const { names: recorded } = ownership;
+      const recordedTutorialNames = getRecordedTutorialDemoNames(scope, ownerId);
       demoGraphNames = pickTutorialDemoGraphNames(
         makeTutorialDemoGraphSuffix,
-        name => currentGraphs.names.includes(name) || recorded.includes(name),
+        name => currentGraphs.names.includes(name) || recordedTutorialNames.has(name),
       );
-      const recordedTutorialNames = getRecordedTutorialDemoNames(scope, ownerId);
       // Old failures must not inherit the new tutorial's heartbeat or lease.
       if (ownership.names.length > 0) {
         const retiredOwnerId = `${ownerId}-retired-${makeTutorialDemoGraphSuffix()}`;
@@ -3327,6 +3334,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const handleCleanupDemoGraphs = useCallback(async () => {
     const startEpoch = getConnectionEpoch();
+    const activation = tutorialActivationRef.current;
     const connection = tutorialConnectionRef.current;
     tutorialConnectionRef.current = null;
     let restoredGraphs: string[] | undefined;
@@ -3360,7 +3368,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       console.error("Tutorial graph cleanup skipped: storage no longer matches the tutorial's connection; retaining its ownership record");
     }
 
-    if (getConnectionEpoch() !== startEpoch) return;
+    if (getConnectionEpoch() !== startEpoch || tutorialActivationRef.current !== activation) return;
 
     // Clear current graph to avoid showing deleted demo graph. Build the empty
     // graph with the real toast/setIndicator callbacks up front so its GraphInfo
@@ -3379,7 +3387,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // Run default query for the graph if enabled
       if (runDefaultQuery && defaultQuery) {
         window.setTimeout(() => {
-          if (getConnectionEpoch() === startEpoch && graphNameRef.current === restoredName) runQuery(defaultQuery, restoredName);
+          if (getConnectionEpoch() === startEpoch && tutorialActivationRef.current === activation && graphNameRef.current === restoredName) runQuery(defaultQuery, restoredName, { allowTutorialCreation: false });
         }, 150);
       } else {
         setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));

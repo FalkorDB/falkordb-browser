@@ -45,54 +45,21 @@ Access the Browser: (https://browser.falkordb.com)
 
 ### Tutorial samples
 
-The tutorial uses unique graph names, checks for existing names before creation,
-and records the exact names it owns per connection. Cleanup never deletes graphs
-just because their names resemble tutorial samples, including `social-demo`.
-Abandoned samples are reclaimed on app visits as well as tutorial start/close.
-With Web Locks, active tabs are protected by their ownership lock. Without Web
-Locks, active tabs renew ownership every minute and only records inactive for
-24 hours are eligible. Cleanup requires the same browser's retained ownership
-records; clearing browser storage removes that evidence. Failed cleanup keeps its
-ownership record eligible for retry instead of renewing the inactive owner's lease.
-Cleanup also verifies offloaded graphs when the connection supports them and
-does not block a new tutorial if an abandoned sample cannot be removed.
-Initial graph auto-selection and saved-tab queries wait for this recovery pass
-so they cannot recreate a sample that cleanup is removing.
-Samples whose setup did not confirm completion (including older ownership
-records without completion metadata) are retained for manual verification:
-an interrupted request could still create the graph after a reload.
-These pending names produce a manual-verification notice at most once per
-connection per browser session, not a recurring cleanup-failure notification.
-Only active tutorials renew ownership heartbeats; inactive failed-cleanup
-records keep their retry timestamp in separate ownership records when a new
-tutorial starts. Capability and offloaded-graph verification
-are bounded and cannot mark ordinary browsing offline. Browsing without ownership
-records does not wait for tutorial capability probes; unverifiable capabilities
-still block tutorial setup and cleanup rather than risk user graphs.
-Each connection activation queues a fresh recovery sweep after any earlier
-in-flight sweep for that connection. Stale activations cannot publish cleanup
-state into a later activation. Mobile and shared-link
-visits also reclaim completed samples owned by the current tab when no tutorial
-will run. Confirmed setup results stay with their original validated ownership
-record after a connection switch. Closing the tutorial restores only graphs
-still present in a freshly verified list, never a reclaimed sample.
-Graph selection, including offloaded options, is unavailable during recovery.
-Configuration initialization and waiting for in-flight setup are bounded; a
-timed-out setup retains its pending ownership rather than assuming it completed.
-Replay also bounds its wait for that setup, without discarding the original
-creation promise or losing tracking of a late result.
-Closing on mobile discards the tutorial's step state and ignores late setup
-results, so Replay starts fresh. Background reads of generated samples use
-non-creating read-only queries even if cleanup has already deleted the graph.
-Tutorial track setup and step-advance queries are also explicitly read-only.
-Unreadable ownership records block a new tutorial snapshot before it creates
-samples, rather than risk restoring an unverified sample as a user graph.
-Explicit editor queries retain the user's chosen query mode even on graphs
-whose names match sample names; mutation permissions are not inferred from names.
-Each open/close transition starts a new recovery pass. A shared verification
-failure stops the abandoned-owner sweep rather than repeating its timeout for
-every record; untouched ownership records remain available for retry. Browsing
-without ownership records does not wait for connection discovery or session sync.
+- Each tutorial uses unique graph names and records ownership per connection.
+  Cleanup deletes only samples whose creation was confirmed, never user graphs
+  based on their names (including `social-demo`).
+- Completed abandoned samples are reclaimed on app visits and tutorial start/close.
+  Web Locks protect active tabs; without them, other tabs' records must be inactive
+  for 24 hours. Failed cleanup retains ownership for retry without extending that
+  inactivity window. Clearing browser storage removes ownership evidence.
+- Unconfirmed creations are retained for manual verification, with a notice at
+  most once per connection per browser session. They are never automatically
+  deleted, even after a timeout or reload.
+- Graph selection and saved-tab loads wait for recovery. Setup and Replay waits
+  are bounded; a late creation remains tracked. Switching connections or closing
+  on mobile cannot publish an old tutorial into a newer one. Background sample
+  reads cannot recreate deleted graphs; explicit editor writes retain their
+  normal permissions. Closing restores only user graphs verified to still exist.
 
 ### Quick start
 

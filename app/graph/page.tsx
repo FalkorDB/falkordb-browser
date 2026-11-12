@@ -423,7 +423,7 @@ export default function Page() {
             pendingAutoLoadRef.current = null;
 
             if (runDefaultQuery && !tutorialOpen) {
-                runQuery(defaultQuery, graphName);
+                runQuery(defaultQuery, graphName, { allowTutorialCreation: false });
                 return;
             }
 

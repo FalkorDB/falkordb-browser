@@ -484,6 +484,7 @@ test.describe("Tutorial", () => {
             await page.getByTestId("settingsTabBrowser").click();
             await page.getByTestId("replayTutorial").click();
             await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+            await expect(page.getByText("Tutorial cleanup failed", { exact: true }).first()).toBeVisible();
             const records = () => page.evaluate(() => {
                 const owner = sessionStorage.getItem("tutorialDemoOwnerId");
                 const key = `localhost:6379:default:tutorialDemoGraphOwnership:${owner}`;
@@ -782,6 +783,54 @@ test.describe("Tutorial", () => {
         });
     }
 
+    test("@admin a delayed automatic default query cannot recreate a deleted sample", async () => {
+        test.setTimeout(60_000);
+        const name = `tutorial-social-demo-${getRandomString("default-read").replaceAll("_", "-")}`;
+        await apiCall.runQuery(name, "CREATE (:Mine)");
+        const graph = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        const query = "MATCH (n) RETURN n";
+        await page.addInitScript(query => {
+            localStorage.setItem("tutorial", "false");
+            localStorage.setItem("runDefaultQuery", "true");
+            localStorage.setItem("defaultQuery", query);
+        }, query);
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        let heldUrl: URL | undefined;
+        let responseBody: string | undefined;
+        const routes: Promise<void>[] = [];
+        await page.route(url => url.pathname === `/api/graph/${name}` && !!url.searchParams.get("query")?.startsWith(query), route => {
+            heldUrl = new URL(route.request().url());
+            const pending = (async () => {
+                await gate;
+                const response = await route.fetch();
+                responseBody = await response.text();
+                await route.fulfill({ response });
+            })();
+            routes.push(pending);
+            return pending;
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await graph.selectGraphByName(name);
+            await expect.poll(() => heldUrl).toBeTruthy();
+            expect(heldUrl!.searchParams.get("readOnly")).toBe("true");
+            const { message } = await apiCall.removeGraph(name, "admin");
+            expect(message).toContain("deleted");
+            release();
+            await Promise.all(routes);
+            expect(responseBody).toContain("event: error");
+            expect((await apiCall.getGraphs()).opts).not.toContain(name);
+        } finally {
+            release();
+            await Promise.all(routes);
+            await browser.closeBrowser();
+            const { message } = await apiCall.removeGraph(name, "admin");
+            expect(message).toMatch(/deleted|empty key/);
+        }
+    });
+
     test("@admin explicit editor writes work on unrecorded generated-looking names", async () => {
         test.setTimeout(60_000);
         const name = `tutorial-social-demo-user-${getRandomString().replaceAll("_", "-")}`;
@@ -827,6 +876,85 @@ test.describe("Tutorial", () => {
             await expect(page.getByRole("button", { name: `Rename ${userGraph}`, exact: true })).toBeVisible();
         } finally {
             await page.close();
+        }
+    });
+
+    test("@admin tutorial allocation excludes other owners' pending names", async () => {
+        const suffix = "00000000-0000-4000-8000-000000000001";
+        const names = [`tutorial-social-demo-${suffix}`, `tutorial-social-test-${suffix}`];
+        await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        await page.addInitScript(({ suffix, names }) => {
+            localStorage.setItem("tutorial", "true");
+            sessionStorage.setItem("tutorialDemoOwnerId", "allocation-owner");
+            Object.defineProperty(crypto, "randomUUID", { value: () => suffix });
+            const scope = "localhost:6379:default:";
+            localStorage.setItem(`${scope}tutorialDemoGraphOwnership:other-owner`, JSON.stringify({
+                scope, ownerId: "other-owner", names, pendingNames: names, lastActiveAt: 1,
+            }));
+        }, { suffix, names });
+        const creations: string[] = [];
+        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+            creations.push(route.request().url());
+            return route.fulfill({ status: 400, json: { message: "Must not create a pending graph owned by another tutorial" } });
+        });
+        await page.goto(urls.graphUrl);
+        await expect(page.getByText("Failed to load demo graphs", { exact: true })).toBeVisible({ timeout: 30000 });
+        expect(creations).toEqual([]);
+        const ownership = await page.evaluate(() => JSON.parse(localStorage.getItem("localhost:6379:default:tutorialDemoGraphOwnership:other-owner")!));
+        expect(ownership.names).toEqual(names);
+        expect(ownership.pendingNames).toEqual(names);
+    });
+
+    test("@admin Replay waits for pending mobile-close recovery before creating new samples", async () => {
+        test.setTimeout(60_000);
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
+        const names: string[] = [];
+        page.on("request", request => {
+            const url = new URL(request.url());
+            if (url.pathname.startsWith("/api/graph/tutorial-social-") && url.searchParams.get("query")?.includes("CREATE")) {
+                names.push(decodeURIComponent(url.pathname.split("/")[3]));
+            }
+        });
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        const routes: Promise<void>[] = [];
+        let deletions = 0;
+        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-"), route => {
+            if (route.request().method() !== "DELETE") return route.continue();
+            deletions += 1;
+            const pending = (async () => {
+                await gate;
+                await route.fulfill({ response: await route.fetch() });
+            })();
+            routes.push(pending);
+            return pending;
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+            expect(names).toHaveLength(2);
+            await page.setViewportSize({ width: 900, height: 900 });
+            await expect.poll(() => deletions).toBeGreaterThan(0);
+            await page.setViewportSize({ width: 1440, height: 900 });
+            await page.getByTestId("settings").click();
+            await page.getByTestId("settingsTabBrowser").click();
+            await page.getByTestId("replayTutorial").click();
+            await expect(page.getByTestId("selectGraph")).toBeDisabled();
+            expect(names).toHaveLength(2);
+            release();
+            await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+            expect(names).toHaveLength(4);
+            await tutorial.clickNextButton();
+            await tutorial.waitForStep("Select a Graph");
+            await tutorial.clickTutorialTarget('[data-testid="selectGraph"]');
+            for (const name of names.slice(0, 2)) await expect(page.getByTestId(`selectGraph${name}Button`)).toHaveCount(0);
+            for (const name of names.slice(2)) await expect(page.getByTestId(`selectGraph${name}Button`)).toBeVisible();
+        } finally {
+            release();
+            await Promise.all(routes);
         }
     });
 
