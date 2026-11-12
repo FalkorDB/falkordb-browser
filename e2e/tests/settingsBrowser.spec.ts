@@ -57,18 +57,18 @@ test.describe('@browser Browser Settings tests', () => {
                 });
             });
             await openLocalSettings(settings, "llama3.2");
-            await expect(page.getByText("Local model server unavailable", { exact: true })).toBeVisible();
-            await expect(page.getByTestId("noModelsFoundMessage")).toBeVisible();
+            await expect(settings.feedbackMessage("Local model server unavailable")).toBeVisible();
+            await expect(settings.noModelsFoundMessage).toBeVisible();
 
-            await page.getByTestId("localLlmEndpointInput").fill("http://localhost:11435");
-            await expect(page.getByText("1 local Ollama models loaded.", { exact: true })).toBeVisible();
+            await settings.fillLocalLlmEndpoint("http://localhost:11435");
+            await expect(settings.feedbackMessage("1 local Ollama models loaded.")).toBeVisible();
             await page.waitForLoadState("networkidle");
-            await expect(page.getByTestId("localLlmEndpointInput")).toHaveValue("http://localhost:11435");
+            await expect(settings.localLlmEndpointInput).toHaveValue("http://localhost:11435");
             expect(requests).toEqual([
                 { source: "local", localProvider: "ollama", endpoint: "http://localhost:11434" },
                 { source: "local", localProvider: "ollama", endpoint: "http://localhost:11435" },
             ]);
-            await expect(page.getByTestId("selectModelllama3.2")).toBeVisible();
+            await expect(settings.getModelButton("llama3.2")).toBeVisible();
         });
 
         test("@readwrite AI settings recovers from malformed model JSON using reload", async () => {
@@ -82,12 +82,12 @@ test.describe('@browser Browser Settings tests', () => {
                     : { status: 200, json: { models: ["llama3.2"] } });
             });
             await openLocalSettings(settings);
-            await expect(page.getByText("Could not connect to local server. Check the URL and click reload.", { exact: true })).toBeVisible();
-            await expect(page.getByTestId("modelSearch")).toBeEnabled();
-            await page.getByTestId("localLlmLoadButton").click();
+            await expect(settings.feedbackMessage("Could not connect to local server. Check the URL and click reload.")).toBeVisible();
+            await expect(settings.modelSearchInput).toBeEnabled();
+            await settings.reloadLocalModels();
 
-            await expect(page.getByText("1 local Ollama models loaded.", { exact: true })).toBeVisible();
-            await expect(page.getByTestId("selectModelllama3.2")).toBeVisible();
+            await expect(settings.feedbackMessage("1 local Ollama models loaded.")).toBeVisible();
+            await expect(settings.getModelButton("llama3.2")).toBeVisible();
             await page.waitForLoadState("networkidle");
             expect(requests).toBe(2);
         });
@@ -103,12 +103,12 @@ test.describe('@browser Browser Settings tests', () => {
                 });
             });
             await openLocalSettings(settings);
-            await expect(page.getByText("No local Ollama models were returned.", { exact: true })).toBeVisible();
-            await expect(page.getByTestId("noModelsFoundMessage")).toBeVisible();
-            await page.getByTestId("localLlmLoadButton").click();
+            await expect(settings.feedbackMessage("No local Ollama models were returned.")).toBeVisible();
+            await expect(settings.noModelsFoundMessage).toBeVisible();
+            await settings.reloadLocalModels();
 
-            await expect(page.getByText("1 local Ollama models loaded.", { exact: true })).toBeVisible();
-            await expect(page.getByTestId("noModelsFoundMessage")).toHaveCount(0);
+            await expect(settings.feedbackMessage("1 local Ollama models loaded.")).toBeVisible();
+            await expect(settings.noModelsFoundMessage).toHaveCount(0);
             await page.waitForLoadState("networkidle");
             expect(requests.at(-1)).toEqual({
                 source: "local", localProvider: "ollama", endpoint: "http://localhost:11434",
@@ -147,17 +147,17 @@ test.describe('@browser Browser Settings tests', () => {
             await page.waitForLoadState("networkidle");
             await settings.expandChatSection();
             await settings.fillChatApiKey("sk-e2e-retry-not-a-real-key");
-            await page.getByTestId("addChatApiKeyButton").click();
+            await settings.submitChatApiKey();
 
-            await expect(page.getByText("Could not encrypt API keys. Please try again.", { exact: true })).toBeVisible();
-            await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(0);
-            await expect(page.getByTestId("chatApiKeyInput")).toHaveValue("sk-e2e-retry-not-a-real-key");
-            await expect(page.getByTestId("addChatApiKeyButton")).toBeEnabled();
-            await page.getByTestId("addChatApiKeyButton").click();
+            await expect(settings.feedbackMessage("Could not encrypt API keys. Please try again.")).toBeVisible();
+            await expect(settings.chatApiKeyCards).toHaveCount(0);
+            await expect(settings.chatApiKeyInput).toHaveValue("sk-e2e-retry-not-a-real-key");
+            await expect(settings.addChatApiKeyButton).toBeEnabled();
+            await settings.submitChatApiKey();
 
-            await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
-            await expect(page.getByTestId("chatApiKeyInput")).toBeEmpty();
-            await expect(page.getByText("1 live models loaded for OpenAI.", { exact: true })).toBeVisible();
+            await expect(settings.chatApiKeyCards).toHaveCount(1);
+            await expect(settings.chatApiKeyInput).toBeEmpty();
+            await expect(settings.feedbackMessage("1 live models loaded for OpenAI.")).toBeVisible();
             expect(encryptAttempts).toBe(2);
         });
     });
