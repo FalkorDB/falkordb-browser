@@ -1,4 +1,5 @@
 import { Locator } from "@playwright/test";
+import type { FalkorDBCanvas, GraphLink } from "@falkordb/canvas";
 import {
   waitForElementToBeVisible,
   interactWhenVisible,
@@ -8,6 +9,16 @@ import { EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
 import GraphInfoPage from "./graphInfoPage";
 
 export default class CustomizeStylePage extends GraphInfoPage {
+  async readRelationshipStyles(): Promise<Pick<GraphLink, "color" | "width" | "fontSize" | "arrowSize">[]> {
+    return this.page.evaluate(() => {
+      const canvas = document.querySelector<FalkorDBCanvas>("falkordb-canvas");
+      if (!canvas) throw new Error("Relationship styles require a mounted canvas");
+      return canvas.getGraphData().links.map(({ color, width, fontSize, arrowSize }) => ({
+        color, width, fontSize, arrowSize,
+      }));
+    });
+  }
+
   private customizeStyleButton(label: string): Locator {
     return this.page.getByTestId(`customizeStyle${label}`);
   }
