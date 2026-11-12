@@ -43,6 +43,13 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 
 Access the Browser: (https://browser.falkordb.com)
 
+### Desktop app
+
+Desktop installers are attached to successful GitHub releases. macOS releases
+require configured signing and notarization credentials before publishing.
+For legacy unsigned releases and their security caveat, see the
+[desktop app notes](./desktop/README.md#legacy-macos-gatekeeper).
+
 ### Quick start
 
 #### Run the graph database and browser from one docker container

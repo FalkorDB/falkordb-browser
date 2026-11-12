@@ -18,9 +18,6 @@ set -eu
 : "${VPC_ID:?set VPC_ID}"
 : "${SUBNET_IDS:?set SUBNET_IDS (comma-separated, at least two AZs)}"
 : "${IMAGE_URI:=docker.io/falkordb/falkordb-browser:latest}"
-# Optional: what the browser's "Get the app" offers phone visitors.
-: "${ANDROID_APP_URL:=}"
-: "${IOS_APP_URL:=}"
 # Optional: falkor[s]://user:pass@host:port of a FalkorDB that keeps API tokens,
 # so they survive task replacements. Left unset, an existing stack keeps what
 # it has (so a rerun never drops it by accident); "none" switches it off.
@@ -99,8 +96,6 @@ add CertificateArn "$CERTIFICATE_ARN"
 add VpcId "$VPC_ID"
 add SubnetIds "$SUBNET_IDS"
 add ImageUri "$IMAGE_URI"
-add AndroidAppUrl "$ANDROID_APP_URL"
-add IosAppUrl "$IOS_APP_URL"
 case "$TOKEN_STORAGE_URL" in
   "") ;;
   none) add TokenStorageUrl "" ;;

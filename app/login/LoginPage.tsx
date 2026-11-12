@@ -11,7 +11,6 @@ import { getTheme } from "@/lib/utils";
 import type { PreconfiguredConnectionInfo } from "@/lib/preconfiguredConnection";
 import Spinning from "@/app/components/ui/spinning";
 import Button from "@/app/components/ui/Button";
-import AppDownloadLink from "@/app/components/AppDownloadLink";
 import LoginForm, { LoginFormCredentials } from "./LoginForm";
 
 const AUTO_CONNECT_FAILED =
@@ -244,10 +243,6 @@ export default function LoginPage() {
               <FileText className="w-4 h-4" />
               API Documentation
             </Link>
-            <AppDownloadLink
-              className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
-              iconSize={16}
-            />
           </div>
         </div>
       </div>
