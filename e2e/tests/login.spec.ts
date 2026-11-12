@@ -6,164 +6,166 @@ import LoginPage from "../logic/POM/loginPage";
 import { userRoles, user } from '../config/user.json';
 import { urlPath } from "../infra/utils";
 
-test.describe("@admin Login connection details",() => {
-    test.use({ storageState: { cookies: [],origins: [] } });
+test.describe("@admin Login connection details", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+    let login: LoginPage;
 
-    const callback="**/api/auth/callback/credentials*";
-    const connectionError="Invalid credentials please recheck username and password or your connection settings. Check server logs for more info.";
-    const upload=(page: Page,title: string,name: string,contents: string) =>
-        page.getByText(title,{ exact: true }).locator("..").locator('input[type="file"]').setInputFiles({
-            name,mimeType: "application/x-pem-file",buffer: Buffer.from(contents),
+    const callback = "**/api/auth/callback/credentials*";
+    const connectionError = "Invalid credentials please recheck username and password or your connection settings. Check server logs for more info.";
+    const upload = (page: Page, title: string, name: string, contents: string) =>
+        page.getByText(title, { exact: true }).locator("..").locator('input[type="file"]').setInputFiles({
+            name, mimeType: "application/x-pem-file", buffer: Buffer.from(contents),
         });
-    const credentials=(request: Request) => {
-        const body=request.postData();
-        if(body===null) throw new Error("Sign-in request has no body");
+    const credentials = (request: Request) => {
+        const body = request.postData();
+        if (body === null) throw new Error("Sign-in request has no body");
         return new URLSearchParams(body);
     };
 
     test.beforeEach(async ({ page }) => {
+        login = new LoginPage(page);
         await page.addInitScript(() => {
-            localStorage.setItem("appDownloadPrompt","false");
-            localStorage.setItem("whatsNewSeen","v999.0.0");
+            localStorage.setItem("appDownloadPrompt", "false");
+            localStorage.setItem("whatsNewSeen", "v999.0.0");
         });
-        await page.route("**/api/connections/preconfigured",route =>
+        await page.route("**/api/connections/preconfigured", route =>
             route.fulfill({ json: { configured: false } }));
         // Exercise the real form/signIn client without needing a database or
         // creating sessions that could affect parallel login tests.
-        await page.route(callback,route =>
+        await page.route(callback, route =>
             route.fulfill({ json: { url: `${urls.loginUrl}?error=CredentialsSignin` } }));
         await page.goto(urls.loginUrl);
-        await expect(page.locator("#Port")).toBeVisible();
+        await expect(login.portField).toBeVisible();
     });
 
-    test("uses default connection settings and clears a rejected login after editing",async ({ page }) => {
-        const request=page.waitForRequest(callback);
-        await page.getByRole("button",{ name: "Log in" }).click();
-        const body=credentials(await request);
+    test("uses default connection settings and clears a rejected login after editing", async ({ page }) => {
+        const request = page.waitForRequest(callback);
+        await login.logInButton.click();
+        const body = credentials(await request);
         expect(body.get("host")).toBe("localhost");
         expect(body.get("port")).toBe("6379");
         expect(body.get("tls")).toBe("false");
         expect(body.has("username")).toBe(false);
         expect(body.has("password")).toBe(false);
-        await expect(page.getByText(connectionError,{ exact: true })).toBeVisible();
-        await page.locator("#Host").fill("corrected.example");
-        await expect(page.getByText(connectionError,{ exact: true })).toBeHidden();
+        await expect(page.getByText(connectionError, { exact: true })).toBeVisible();
+        await login.fillHost("corrected.example");
+        await expect(page.getByText(connectionError, { exact: true })).toBeHidden();
     });
 
-    test("round-trips escaped credentials and TLS between manual and URL modes",async ({ page }) => {
-        await page.locator("#Host").fill("db.example");
-        await page.locator("#Port").fill("6380");
-        await page.locator("#Username").fill("user:name%@");
-        await page.locator("#Password").fill("p@ss:/%");
+    test("round-trips escaped credentials and TLS between manual and URL modes", async ({ page }) => {
+        await login.fillHost("db.example");
+        await login.fillPort("6380");
+        await login.fillUsername("user:name%@");
+        await login.fillPassword("p@ss:/%");
         await page.getByTestId("tls-checkbox").check();
-        await page.getByRole("radio",{ name: "FalkorDB URL" }).click();
-        const url=page.locator('input[id="FalkorDB URL"]');
+        await page.getByRole("radio", { name: "FalkorDB URL" }).click();
+        const url = page.locator('input[id="FalkorDB URL"]');
         await expect(url).toHaveValue("falkors://user%3Aname%25%40:p%40ss%3A%2F%25@db.example:6380");
 
         await url.fill("rediss://other%25:next%40password@other.example:6381");
-        await page.getByRole("radio",{ name: "Manual Configuration" }).click();
-        await expect(page.locator("#Host")).toHaveValue("other.example");
-        await expect(page.locator("#Port")).toHaveValue("6381");
-        await expect(page.locator("#Username")).toHaveValue("other%");
+        await page.getByRole("radio", { name: "Manual Configuration" }).click();
+        await expect(login.hostField).toHaveValue("other.example");
+        await expect(login.portField).toHaveValue("6381");
+        await expect(login.usernameField).toHaveValue("other%");
         await expect(page.locator("#Password")).toHaveValue("next@password");
         await expect(page.getByTestId("tls-checkbox")).toBeChecked();
         await page.getByTestId("tls-checkbox").uncheck();
-        await page.getByRole("radio",{ name: "FalkorDB URL" }).click();
+        await page.getByRole("radio", { name: "FalkorDB URL" }).click();
         await expect(url).toHaveValue("falkor://other%25:next%40password@other.example:6381");
     });
 
-    test("submits decoded URL credentials after URL validation",async ({ page }) => {
-        await page.route("**/api/validate-url",route => route.fulfill({ json: { result: false } }));
-        await page.getByRole("radio",{ name: "FalkorDB URL" }).click();
+    test("submits decoded URL credentials after URL validation", async ({ page }) => {
+        await page.route("**/api/validate-url", route => route.fulfill({ json: { result: false } }));
+        await page.getByRole("radio", { name: "FalkorDB URL" }).click();
         await page.locator('input[id="FalkorDB URL"]').fill("rediss://user%25:pass%40word@db.example:6380");
-        const validated=page.waitForRequest("**/api/validate-url");
-        const signedIn=page.waitForRequest(callback);
-        await page.getByRole("button",{ name: "Log in" }).click();
+        const validated = page.waitForRequest("**/api/validate-url");
+        const signedIn = page.waitForRequest(callback);
+        await login.logInButton.click();
         expect((await validated).postDataJSON()).toEqual({ url: "rediss://user%25:pass%40word@db.example:6380" });
-        const body=credentials(await signedIn);
-        expect(Object.fromEntries(["host","port","username","password","tls"].map(key => [key,body.get(key)]))).toEqual({
-            host: "db.example",port: "6380",username: "user%",password: "pass@word",tls: "true",
+        const body = credentials(await signedIn);
+        expect(Object.fromEntries(["host", "port", "username", "password", "tls"].map(key => [key, body.get(key)]))).toEqual({
+            host: "db.example", port: "6380", username: "user%", password: "pass@word", tls: "true",
         });
-        await expect(page.getByText(connectionError,{ exact: true })).toBeVisible();
+        await expect(page.getByText(connectionError, { exact: true })).toBeVisible();
     });
 
-    for(const { title,name,status,remove,error } of [
+    for (const { title, name, status, remove, error } of [
         {
-            title: "Upload Client Certificate",name: "client.crt",status: "client-cert-uploaded-status",
-            remove: "remove-client-cert-btn",error: "Upload the client private key to use this client certificate.",
+            title: "Upload Client Certificate", name: "client.crt", status: "client-cert-uploaded-status",
+            remove: "remove-client-cert-btn", error: "Upload the client private key to use this client certificate.",
         },
         {
-            title: "Upload Client Key",name: "client.key",status: "client-key-uploaded-status",
-            remove: "remove-client-key-btn",error: "Upload the client certificate that matches this private key.",
+            title: "Upload Client Key", name: "client.key", status: "client-key-uploaded-status",
+            remove: "remove-client-key-btn", error: "Upload the client certificate that matches this private key.",
         },
     ]) {
-        test(`blocks an incomplete mTLS pair after ${title}`,async ({ page }) => {
+        test(`blocks an incomplete mTLS pair after ${title}`, async ({ page }) => {
             await page.waitForLoadState("networkidle");
-            const requests: string[]=[];
-            page.on("request",request => {
-                if(new URL(request.url()).pathname.startsWith("/api/auth/")) requests.push(request.url());
+            const requests: string[] = [];
+            page.on("request", request => {
+                if (new URL(request.url()).pathname.startsWith("/api/auth/")) requests.push(request.url());
             });
             await page.getByTestId("tls-checkbox").check();
-            await upload(page,title,name,"synthetic TLS upload");
+            await upload(page, title, name, "synthetic TLS upload");
             await expect(page.getByTestId(status)).toContainText(name);
-            await page.getByRole("button",{ name: "Log in" }).click();
-            await expect(page.getByText(error,{ exact: true })).toBeVisible();
+            await login.logInButton.click();
+            await expect(page.getByText(error, { exact: true })).toBeVisible();
             await page.waitForLoadState("networkidle");
             await page.getByTestId(remove).click();
             await expect(page.getByTestId(status)).toBeHidden();
-            await expect(page.getByText(error,{ exact: true })).toBeHidden();
-            await expect(page.getByText(title,{ exact: true })).toBeVisible();
+            await expect(page.getByText(error, { exact: true })).toBeHidden();
+            await expect(page.getByText(title, { exact: true })).toBeVisible();
             await page.waitForLoadState("networkidle");
             expect(requests).toEqual([]);
         });
     }
 
-    test("sends uploaded TLS bytes and clears every attachment when TLS is disabled",async ({ page }) => {
+    test("sends uploaded TLS bytes and clears every attachment when TLS is disabled", async ({ page }) => {
         await page.getByTestId("tls-checkbox").check();
-        const files=[
-            { title: "Upload Certificate",name: "ca.crt",contents: "synthetic CA",field: "ca",status: "certificate-uploaded-status" },
-            { title: "Upload Client Certificate",name: "client.crt",contents: "synthetic certificate",field: "cert",status: "client-cert-uploaded-status" },
-            { title: "Upload Client Key",name: "client.key",contents: "synthetic key",field: "key",status: "client-key-uploaded-status" },
+        const files = [
+            { title: "Upload Certificate", name: "ca.crt", contents: "synthetic CA", field: "ca", status: "certificate-uploaded-status" },
+            { title: "Upload Client Certificate", name: "client.crt", contents: "synthetic certificate", field: "cert", status: "client-cert-uploaded-status" },
+            { title: "Upload Client Key", name: "client.key", contents: "synthetic key", field: "key", status: "client-key-uploaded-status" },
         ];
-        for(const file of files) {
-            await upload(page,file.title,file.name,file.contents);
+        for (const file of files) {
+            await upload(page, file.title, file.name, file.contents);
             await expect(page.getByTestId(file.status)).toContainText(file.name);
         }
-        const first=page.waitForRequest(callback);
-        await page.getByRole("button",{ name: "Log in" }).click();
-        const body=credentials(await first);
-        for(const file of files) expect(body.get(file.field)).toBe(Buffer.from(file.contents).toString("base64"));
-        await expect(page.getByText(connectionError,{ exact: true })).toBeVisible();
+        const first = page.waitForRequest(callback);
+        await login.logInButton.click();
+        const body = credentials(await first);
+        for (const file of files) expect(body.get(file.field)).toBe(Buffer.from(file.contents).toString("base64"));
+        await expect(page.getByText(connectionError, { exact: true })).toBeVisible();
         await page.getByTestId("tls-checkbox").uncheck();
         await expect(page.locator("#tls-section")).toBeHidden();
-        await expect(page.getByText(connectionError,{ exact: true })).toBeHidden();
+        await expect(page.getByText(connectionError, { exact: true })).toBeHidden();
         await page.getByTestId("tls-checkbox").check();
-        for(const file of files) {
+        for (const file of files) {
             await expect(page.getByTestId(file.status)).toBeHidden();
-            await expect(page.getByText(file.title,{ exact: true })).toBeVisible();
+            await expect(page.getByText(file.title, { exact: true })).toBeVisible();
         }
-        const second=page.waitForRequest(callback);
-        await page.getByRole("button",{ name: "Log in" }).click();
-        const cleared=credentials(await second);
-        for(const file of files) expect(cleared.get(file.field)).toBe("undefined");
-        await expect(page.getByText(connectionError,{ exact: true })).toBeVisible();
+        const second = page.waitForRequest(callback);
+        await login.logInButton.click();
+        const cleared = credentials(await second);
+        for (const file of files) expect(cleared.get(file.field)).toBe("undefined");
+        await expect(page.getByText(connectionError, { exact: true })).toBeVisible();
     });
 
-    test("reports an unreadable certificate and allows the upload to be retried",async ({ page }) => {
+    test("reports an unreadable certificate and allows the upload to be retried", async ({ page }) => {
         await page.evaluate(() => {
-            const original=FileReader.prototype.readAsDataURL;
-            FileReader.prototype.readAsDataURL=function readOnce() {
-                FileReader.prototype.readAsDataURL=original;
+            const original = FileReader.prototype.readAsDataURL;
+            FileReader.prototype.readAsDataURL = function readOnce() {
+                FileReader.prototype.readAsDataURL = original;
                 this.dispatchEvent(new ProgressEvent("error"));
             };
         });
         await page.getByTestId("tls-checkbox").check();
-        await upload(page,"Upload Certificate","unreadable.crt","synthetic CA");
-        await expect(page.getByText("Could not read unreadable.crt",{ exact: true })).toBeVisible();
+        await upload(page, "Upload Certificate", "unreadable.crt", "synthetic CA");
+        await expect(page.getByText("Could not read unreadable.crt", { exact: true })).toBeVisible();
         await expect(page.getByTestId("certificate-uploaded-status")).toBeHidden();
-        await upload(page,"Upload Certificate","readable.crt","synthetic CA");
+        await upload(page, "Upload Certificate", "readable.crt", "synthetic CA");
         await expect(page.getByTestId("certificate-uploaded-status")).toContainText("readable.crt");
-        await expect(page.getByText("Could not read unreadable.crt",{ exact: true })).toBeHidden();
+        await expect(page.getByText("Could not read unreadable.crt", { exact: true })).toBeHidden();
     });
 });
 
