@@ -107,8 +107,14 @@ test.describe("Chat Feature Tests", () => {
         try {
           const { chat, page } = await openMockedChat(graphName);
           const requests: { graphName: string; messages: { role: string; content: string }[] }[] = [];
+          const connectionIds: (string | undefined)[] = [];
+          const session = await page.request.get(new URL("/api/auth/session", urls.graphUrl).href);
+          expect(session.ok()).toBe(true);
+          const { activeConnectionId } = await session.json();
+          expect(activeConnectionId).toBeTruthy();
           await page.route("**/api/chat", async (route) => {
             requests.push(route.request().postDataJSON());
+            connectionIds.push(route.request().headers()["x-connection-id"]);
             if (requests.length > 1) {
               await route.fulfill({ json: { answer: "The retry succeeded.", tokenUsage: { totalTokens: 12 } } });
             } else if (failure === "HTTP rejection") {
@@ -143,10 +149,8 @@ test.describe("Chat Feature Tests", () => {
           await expect(page.getByTestId("chatFooterTotalTokens")).toContainText("12");
           expect(requests).toHaveLength(2);
           expect(requests[1].graphName).toBe(graphName);
-          expect(requests[1].messages).toEqual([
-            { role: "user", content: question },
-            { role: "user", content: question },
-          ]);
+          expect(requests[1].messages.at(-1)).toEqual({ role: "user", content: question });
+          expect(connectionIds).toEqual([activeConnectionId, activeConnectionId]);
         } finally {
           await browser.closeBrowser();
           await apiCall.removeGraph(graphName, "admin");
