@@ -293,6 +293,20 @@ It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without exe
 the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
 If index metadata is unavailable, analysis continues with an explicit warning.
 
+API keys remain editable while models load or another key is selected. Saving or
+cancelling an edit restores the key's previous visibility unless you change it
+during the edit. Pending key additions, edits, and deletions are
+rebased onto the latest committed list, so cancelling or failing another edit
+does not discard an unrelated addition. Selecting a key while a mutation is
+pending takes precedence over that mutation's automatic selection.
+Deleting the selected key clears the selection instead of choosing another key,
+including after a reload or connection round trip.
+Temporary saved-key loading failures preserve the stored keys and selection
+for recovery on the next successful load.
+Deleting a key does not clear a newer selection's loaded model. Typing a newer
+edit while an earlier save is pending keeps that draft open instead of saving
+and closing the outdated value.
+
 Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 **Insert into editor** actions. Neither action runs the query. The card adapts to
 mobile screens, and long Chat queries can be collapsed.

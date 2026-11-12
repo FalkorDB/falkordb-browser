@@ -18,9 +18,19 @@ async function createChatPageWithSettings(
   await browser.setPageToFullScreen();
   const page = await browser.getPage();
 
+  await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
   await page.addInitScript(({ key, selectedModel }) => {
+    if (window.top !== window) return;
+    // Auth snapshots can retain explicit deselection. This fixture supplies a
+    // new credential, so start its migration without an inherited key choice.
+    for (const name of Object.keys(localStorage)) {
+      if (name.endsWith("chatApiKeys") || name.endsWith("selectedChatApiKeyId")) {
+        localStorage.removeItem(name);
+      }
+    }
     localStorage.setItem("secretKey", key);
     localStorage.setItem("model", selectedModel);
+    localStorage.setItem("chatModelSource", "api-key");
   }, { key: apiKey, selectedModel: model });
 
   await page.goto(urls.graphUrl);
@@ -32,7 +42,9 @@ async function createChatPageWithSettings(
     if (localStorage.getItem("secretKey") !== null) return false;
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
-      if (key && key.endsWith(":chatApiKeys")) return true;
+      if (key && key.endsWith(":chatApiKeys")) {
+        return Boolean(localStorage.getItem(key.replace(/chatApiKeys$/, "selectedChatApiKeyId")));
+      }
     }
     return false;
   }), { timeout: 15000 }).toBe(true);
@@ -85,16 +97,20 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
     
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    await chat.selectGraphByName(graphName);
-    
-    // Verify chat toggle button is visible when a graph is selected
-    await chat.waitForChatToggleButton();
-    const isChatButtonVisible = await chat.isChatToggleButtonVisible();
-    expect(isChatButtonVisible).toBe(true);
-    
-    await apiCall.removeGraph(graphName);
+    try {
+      const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+      await browser.setPageToFullScreen();
+      await chat.selectGraphByName(graphName);
+      const page = await browser.getPage();
+      await expect(page.getByTestId("selectGraph")).toHaveText(graphName);
+      await expect(page.getByTestId("chatToggleButton")).toBeVisible();
+      await expect(page.getByTestId("chatToggleButton")).toBeEnabled();
+    } finally {
+      await browser.closeBrowser();
+      const { message } = await apiCall.removeGraph(graphName, "admin");
+      expect(message).toMatch(/deleted|empty key/);
+      expect((await apiCall.getGraphs()).opts).not.toContain(graphName);
+    }
   });
 
   test(`@readwrite Verify attempting to send a question without API key shows error`, async () => {
@@ -137,6 +153,65 @@ test.describe("Chat Feature Tests", () => {
     
     await apiCall.removeGraph(graphName);
   });
+
+  for (const cypherOnly of [false, true]) {
+    test(`@readwrite seeded API-key settings override an inherited deselection with Cypher Only ${cypherOnly}`, async () => {
+      const graphName = getRandomString("chat-credential-fixture");
+      await apiCall.addGraph(graphName);
+      try {
+        await browser.createNewPage(ChatComponent);
+        const page = await browser.getPage();
+        await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
+        await page.route(url => url.pathname === "/api/graph", route =>
+          route.fulfill({ json: { opts: [graphName] } }));
+        await page.goto(urls.graphUrl);
+        await page.waitForLoadState("networkidle");
+        await page.evaluate(() => {
+          const marker = Object.keys(localStorage).find(key => key.endsWith(":__scopeOwner"));
+          if (!marker) throw new Error("Missing connection scope marker");
+          localStorage.setItem(marker.replace(/__scopeOwner$/, "selectedChatApiKeyId"), "");
+        });
+        await expect.poll(() => page.evaluate(() => {
+          const key = Object.keys(localStorage).find(name => name.endsWith(":selectedChatApiKeyId"));
+          return key ? localStorage.getItem(key) : null;
+        })).toBe("");
+
+        const apiKey = "sk-e2e-chat-credential-fixture";
+        const query = "MATCH (n) RETURN n";
+        let submittedKey: string | undefined;
+        let submittedCypherOnly: boolean | undefined;
+        await page.route("**/api/chat", route => {
+          const request = route.request().postDataJSON();
+          submittedKey = request.key;
+          submittedCypherOnly = request.cypherOnly;
+          return route.fulfill({
+            json: {
+              cypherQuery: query,
+              answer: cypherOnly ? undefined : "No matching nodes.",
+            },
+          });
+        });
+        const chat = await createChatPageWithSettings(browser, apiKey);
+        await expect(page.getByTestId("selectGraph")).toHaveText(graphName);
+        await expect(page.getByTestId("chatToggleButton")).toBeEnabled();
+        await chat.openChat();
+        await chat.waitForChatPanel();
+        if (cypherOnly) await chat.clickCypherOnlySwitchOn();
+        await chat.fillChatInput("List all nodes");
+        await chat.clickChatSendButton();
+        await expect(page.getByTestId("chatUserMessage")).toHaveCount(1);
+        await expect(page.getByTestId("chatAssistantMessage-CypherQuery")).toContainText(query);
+        await expect(page.getByTestId("chatAssistantMessage-Result")).toHaveCount(cypherOnly ? 0 : 1);
+        expect(submittedKey).toBe(apiKey);
+        expect(submittedCypherOnly).toBe(cypherOnly);
+      } finally {
+        await browser.closeBrowser();
+        const { message } = await apiCall.removeGraph(graphName, "admin");
+        expect(message).toMatch(/deleted|empty key/);
+        expect((await apiCall.getGraphs()).opts).not.toContain(graphName);
+      }
+    });
+  }
 
   test(`@readwrite Verify complete chat flow with API key: send question, check loading state, verify responses`, async () => {
     test.setTimeout(60000);
