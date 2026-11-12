@@ -9,8 +9,10 @@ import Button from "./ui/Button";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
 import SuggestedQuery from "./SuggestedQuery";
+import useAppRouter from "@/lib/useAppRouter";
 
 export default function AiFixDialogs() {
+    const router = useAppRouter();
     const { result, pendingConsentProvider, confirmConsent, cancelConsent, dismissResult, insertCorrectedQuery } = useContext(AiFixContext);
     const [dontAskAgain, setDontAskAgain] = useState(false);
     const { size: panelSize, onResize: onPanelResize } = useResizableSize("ai-fix-panel-size", 480, 400, 300, 250);
@@ -99,7 +101,7 @@ export default function AiFixDialogs() {
                                 {result.status === "error" && (
                                     <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
                                         <p className="text-sm text-destructive" data-testid="aiFixError">{result.error}</p>
-                                        <Link href="/settings" onClick={dismissResult} className="mt-3 inline-block text-sm underline">
+                                        <Link href="/settings" onClick={dismissResult} onNavigate={event => { event.preventDefault(); router.push("/settings"); }} className="mt-3 inline-block text-sm underline">
                                             Go to Settings
                                         </Link>
                                     </div>

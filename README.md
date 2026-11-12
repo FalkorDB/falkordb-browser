@@ -298,8 +298,10 @@ Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 mobile screens, and long Chat queries can be collapsed.
 
 Missing AI configuration and provider errors offer **Go to Settings**. Returning
-to the graph preserves the editor query and unsent Chat input. Chat drafts are
-scoped to the connection, tab, and graph, and survive closing and reopening Chat.
+to the graph preserves the editor query and unsent Chat input. Debounced URL
+updates wait for route transitions, so a draft update cannot cancel navigation
+to Settings. Chat drafts are scoped to the connection, tab, and graph, and survive
+closing and reopening Chat.
 Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.

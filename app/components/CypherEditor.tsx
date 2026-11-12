@@ -10,7 +10,7 @@ import { Monaco } from "@monaco-editor/react";
 import { SetStateAction, Dispatch, useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from "react";
 import * as monaco from "monaco-editor";
 import { History, Info, Maximize2, Minimize2, MoreHorizontal, Play, Sparkles, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import useIsMobile from "@/lib/useIsMobile";

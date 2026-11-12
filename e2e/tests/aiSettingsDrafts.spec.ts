@@ -1,4 +1,5 @@
 import { expect, test } from "../infra/coverage";
+import type { Page } from "@playwright/test";
 import { createServer } from "node:http";
 import GraphPage from "../logic/POM/graphPage";
 import { getRandomString, initializeLocalStorage } from "../infra/utils";
@@ -8,6 +9,77 @@ const baseUrl = process.env.E2E_BASE_URL ?? configuredUrls.localHost;
 const urls = { graphUrl: `${baseUrl}/graph`, api: { graphUrl: `${baseUrl}/api/graph/` } };
 
 const TEST_KEY = "sk-demo-not-a-real-api-key";
+
+function holdSettingsResponse(page: Page) {
+  let release!: () => void;
+  let signalStarted!: () => void;
+  const started = new Promise<void>(resolve => { signalStarted = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const installed = page.route(url => url.pathname === "/settings", async route => {
+    const headers = route.request().headers();
+    if (headers["next-router-prefetch"] === "1" || headers.purpose === "prefetch") return route.continue();
+    signalStarted();
+    await gate;
+    await route.continue();
+  });
+  return { installed, started, release };
+}
+
+test("@admin a retained optimization toast cannot leak URL synchronization after unmount", async ({ page }) => {
+  test.setTimeout(60_000);
+  const graphName = getRandomString("retainedToast");
+  let releaseSettingsResponse: (() => void) | undefined;
+  let query = "RETURN 1";
+  await page.addInitScript(initializeLocalStorage());
+  await page.addInitScript(() => {
+    localStorage.setItem("chatModelSource", "local");
+    localStorage.setItem("localLlmProvider", "ollama");
+    localStorage.setItem("model", "ollama::llama3.2");
+  });
+  await page.route("**/api/chat/optimize", route => route.fulfill({
+    status: 422, json: { error: "Unable to reach the AI provider. Please try again." },
+  }));
+  const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
+  expect(created.ok()).toBe(true);
+  try {
+    await page.clock.install();
+    await page.goto(`${urls.graphUrl}?graph=${graphName}&query=RETURN%201`);
+    await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", "RETURN 1", { timeout: 30000 });
+    await page.getByTestId("editorOptimize").click();
+    await expect(page.getByTestId("toast-title")).toHaveText("Query optimization failed");
+    await page.getByTestId("settings").click();
+    await expect(page).toHaveURL(/\/settings/, { timeout: 30000 });
+    await page.goBack();
+    await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", query);
+    await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 250)));
+    query = "RETURN 4242 AS retained_toast_draft";
+    await new GraphPage(page).insertQuery(query, { focus: false });
+    const settingsResponse = holdSettingsResponse(page);
+    releaseSettingsResponse = settingsResponse.release;
+    await settingsResponse.installed;
+    await page.getByRole("button", { name: "Go to Settings", exact: true }).evaluate(button => {
+      (button as HTMLButtonElement).click();
+    });
+    await settingsResponse.started;
+    await page.clock.runFor(350);
+    settingsResponse.release();
+    releaseSettingsResponse = undefined;
+    await expect(page).toHaveURL(/\/settings/, { timeout: 30_000 });
+    await page.clock.resume();
+    await page.getByTestId("settingsTabConfigurations").click();
+    await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe("Configurations");
+    await page.goBack();
+    await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", query);
+    await page.goForward();
+    await expect(page).toHaveURL(/\/settings/);
+    await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe("Configurations");
+  } finally {
+    releaseSettingsResponse?.();
+    await page.close();
+    const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`);
+    expect(removed.ok()).toBe(true);
+  }
+});
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   for (const feature of ["chat", "fix", "optimize"] as const) {
@@ -142,9 +214,11 @@ for (const { feature, scenario } of cases) {
   test(`@admin ${feature} preserves drafts through ${scenario} Settings navigation`, async ({ page }) => {
     test.setTimeout(60_000);
     const graphName = getRandomString("aiSettingsDraft");
-    const query = feature === "fix" ? "MATCH (n) RETsURN n" : "RETURN 4242 AS unsent_draft";
+    let query = feature === "fix" ? "MATCH (n) RETsURN n" : "RETURN 4242 AS unsent_draft";
     const chatDraft = "Find the person with the largest order";
     let aiRequests = 0;
+    let releaseSettingsResponse: (() => void) | undefined;
+    let chatClosedWhileNavigationPending = false;
 
     await page.addInitScript(initializeLocalStorage());
     await page.addInitScript(providerError => {
@@ -171,6 +245,7 @@ for (const { feature, scenario } of cases) {
     const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
     expect(created.ok()).toBe(true);
     try {
+      if (feature === "fix" && scenario === "missing-key") await page.clock.install();
       await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=${encodeURIComponent(query)}`);
       const graph = new GraphPage(page);
       await expect(graph.editorContainer).toHaveAttribute("data-value", query, { timeout: 30_000 });
@@ -184,12 +259,45 @@ for (const { feature, scenario } of cases) {
         await graph.clickRunQuery(false);
         await page.getByTestId("fix-with-ai").click();
       } else {
+        if (scenario === "missing-key") {
+          await expect.poll(() => new URL(page.url()).searchParams.get("tab")).not.toBeNull();
+          // Fire the pending draft debounce while the Settings response is held.
+          await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+          await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
+          query += "\n";
+          await graph.insertQuery(query);
+          await page.route(url => url.pathname === "/settings", async route => {
+            await page.clock.runFor(350);
+            await route.continue();
+          });
+        }
         await page.getByTestId("editorOptimize").click();
       }
 
       if (scenario === "missing-key") {
         await expect(page.getByTestId("toast-title")).toHaveText("No API Key Provided");
-        await page.getByRole("button", { name: "Go to Settings", exact: true }).click();
+        if (feature === "fix") {
+          await page.getByTestId("settings").click();
+          await expect(page).toHaveURL(/\/settings/, { timeout: 30_000 });
+          await page.goBack();
+          await expect(graph.editorContainer).toHaveAttribute("data-value", query);
+          await expect(page.getByRole("button", { name: "Go to Settings", exact: true })).toBeVisible();
+          await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 250)));
+          query = "RETURN 4242 AS retained_fix_draft";
+          await graph.insertQuery(query, { focus: false });
+          const settingsResponse = holdSettingsResponse(page);
+          releaseSettingsResponse = settingsResponse.release;
+          await settingsResponse.installed;
+          await page.getByRole("button", { name: "Go to Settings", exact: true }).evaluate(button => {
+            (button as HTMLButtonElement).click();
+          });
+          await settingsResponse.started;
+          await page.clock.runFor(350);
+          settingsResponse.release();
+          releaseSettingsResponse = undefined;
+        } else {
+          await page.getByRole("button", { name: "Go to Settings", exact: true }).click();
+        }
       } else if (feature === "optimize") {
         await expect(page.getByTestId("toast-title")).toHaveText("Query optimization failed");
         await expect(page.getByTestId("toast-description")).toContainText("Unable to reach the AI provider");
@@ -199,9 +307,31 @@ for (const { feature, scenario } of cases) {
       } else {
         const errorContainer = page.getByTestId(feature === "chat" ? "chatMessagesList" : "aiFixResultBody");
         await expect(errorContainer).toContainText("Unable to reach the AI provider");
-        await errorContainer.getByRole("link", { name: "Go to Settings", exact: true }).click();
+        if (feature === "chat" && scenario === "provider-error") {
+          await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+          await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
+          query += "\n";
+          await graph.insertQuery(query);
+          const settingsResponse = holdSettingsResponse(page);
+          releaseSettingsResponse = settingsResponse.release;
+          await settingsResponse.installed;
+          await errorContainer.getByRole("link", { name: "Go to Settings", exact: true }).evaluate(link => {
+            (link as HTMLAnchorElement).click();
+          });
+          await settingsResponse.started;
+          await page.clock.runFor(350);
+          await page.getByTestId("chatCloseButton").click();
+          chatClosedWhileNavigationPending = true;
+          settingsResponse.release();
+          releaseSettingsResponse = undefined;
+        } else {
+          await errorContainer.getByRole("link", { name: "Go to Settings", exact: true }).click();
+        }
       }
       await expect(page).toHaveURL(/\/settings/, { timeout: 30_000 });
+      if ((feature === "optimize" && scenario === "missing-key")
+        || (feature === "fix" && scenario === "missing-key")
+        || (feature === "chat" && scenario === "provider-error")) await page.clock.resume();
       if (scenario === "missing-key") {
         await page.getByTestId("chatSectionHeader").click();
         await page.getByTestId("chatApiKeyInput").fill(TEST_KEY);
@@ -212,6 +342,9 @@ for (const { feature, scenario } of cases) {
       await page.goBack();
       await expect(graph.editorContainer).toHaveAttribute("data-value", query);
       if (feature === "chat") {
+        if (chatClosedWhileNavigationPending && !(await page.getByTestId("chatInput").isVisible())) {
+          await page.getByTestId("chatToggleButton").click();
+        }
         await expect(page.getByTestId("chatInput")).toHaveValue(chatDraft);
         await page.getByTestId("chatCloseButton").click();
         await page.getByTestId("chatToggleButton").click();
@@ -219,6 +352,7 @@ for (const { feature, scenario } of cases) {
       }
       expect(aiRequests).toBe(scenario === "missing-key" ? 0 : 1);
     } finally {
+      releaseSettingsResponse?.();
       const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`);
       expect(removed.ok()).toBe(true);
     }
