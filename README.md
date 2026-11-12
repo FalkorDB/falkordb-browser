@@ -243,7 +243,7 @@ For detailed configuration options and examples, see the [Helm chart documentati
 ### Build and run browser from source
 
 **Prerequisites:**
-- Node.js 20.19.0 or higher
+- Node.js 24 or higher (`engines` in `package.json`)
 
 **Steps:**
 * Clone the git repository `git clone git@github.com:FalkorDB/falkordb-browser.git`
@@ -304,13 +304,20 @@ Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
 
+### Contributing with AI agents
+
+Agent rules (coverage bar, docs and design-doc upkeep, PR readiness including resolving every
+review thread) live in [`.github/copilot-instructions.md`](./.github/copilot-instructions.md),
+shared with Claude Code through [`CLAUDE.md`](./CLAUDE.md); path-specific rules are in
+`.github/instructions/`. PR readiness needs the [superpowers](https://github.com/obra/superpowers)
+plugin (install commands in the instructions). Design plans are in [`docs/design/`](./docs/design/README.md).
+
 ### Testing
 
 * **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
   Runs the `*.test.ts` suites under `app/` and `lib/`. Gated in CI by the **Build**
   workflow. These execute TypeScript directly via `node --test`, which relies on native
-  type-stripping — use **Node ≥ 22.18** (CI runs Node 24). Older Node (e.g. 20.x) can run
-  the app but cannot run these tests.
+  type-stripping, so they need the same **Node ≥ 24** as the app (CI runs Node 24).
 * **Unit coverage gate**: `npm run test:coverage` — runs the unit tests and enforces **100%**
   line/branch/function coverage on the modules it lists (`lib/cypherSuggestions.ts`,
   `lib/cypherDiagnostics.ts`, `lib/aiFix.ts`, `lib/cypherErrors.ts`, `lib/clipboard.ts`, …).
@@ -329,6 +336,8 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   the security scan) do not, and a Codecov upload error never fails a test job
   (`.github/scripts/coverage-gate.mjs`). Dependabot runs only get Dependabot secrets, so
   `CODECOV_TOKEN` must also be set as a Dependabot secret for their coverage to upload.
+  Manual (`workflow_dispatch`) runs do not upload: the gate does not count them, and their
+  uploads, named like the PR's or push's, would stand in for one that was lost.
   Each job keeps its report as a `coverage-*` workflow artifact for 3 days.
   Locally:
   ```bash
