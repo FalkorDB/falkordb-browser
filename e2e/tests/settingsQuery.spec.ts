@@ -21,54 +21,52 @@ test.describe.serial("Query Settings", () => {
 
   test("@admin cancelling query settings restores saved values and survives reload", async () => {
     const settings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
-    const page = await browser.getPage();
     await settings.expandQueryExecutionSection();
     await settings.fillLimit(41);
     await settings.fillTimeout(7);
     await settings.clickSaveQuerySettingsBtn();
     await settings.refreshPage();
     await settings.expandQueryExecutionSection();
-    const savedLimit = await settings.getLimit();
-    const savedTimeout = await settings.getTimeout();
-    expect(savedLimit).toBe("41");
-    expect(savedTimeout).toBe("7 seconds");
+    const savedLimit = "41";
+    const savedTimeout = "7 seconds";
+    await expect(settings.limitInput).toHaveValue(savedLimit);
+    await expect(settings.timeoutInput).toHaveValue(savedTimeout);
     await settings.fillLimit(17);
     await settings.fillTimeout(23);
     await settings.clickCancelQuerySettingsBtn();
-    await expect(page.locator("#limitInput")).toHaveValue(savedLimit);
-    await expect(page.locator("#timeoutInput")).toHaveValue(savedTimeout);
-    await expect(page.locator("#saveQuerySettingsBtn")).toBeHidden();
+    await expect(settings.limitInput).toHaveValue(savedLimit);
+    await expect(settings.timeoutInput).toHaveValue(savedTimeout);
+    await expect(settings.saveQuerySettingsBtn).toBeHidden();
     await settings.refreshPage();
     await settings.expandQueryExecutionSection();
-    await expect(page.locator("#limitInput")).toHaveValue(savedLimit);
-    await expect(page.locator("#timeoutInput")).toHaveValue(savedTimeout);
+    await expect(settings.limitInput).toHaveValue(savedLimit);
+    await expect(settings.timeoutInput).toHaveValue(savedTimeout);
   });
 
   test("@admin query limit and timeout zero round-trip as infinity", async () => {
     const settings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
-    const page = await browser.getPage();
     await settings.expandQueryExecutionSection();
     await settings.fillLimit(41);
     await settings.fillTimeout(7);
     await settings.clickSaveQuerySettingsBtn();
     await settings.refreshPage();
     await settings.expandQueryExecutionSection();
-    await expect(page.locator("#limitInput")).toHaveValue("41");
-    await expect(page.locator("#timeoutInput")).toHaveValue("7 seconds");
+    await expect(settings.limitInput).toHaveValue("41");
+    await expect(settings.timeoutInput).toHaveValue("7 seconds");
     await settings.fillLimit(0);
     await settings.fillTimeout(0);
     await settings.clickSaveQuerySettingsBtn();
     await settings.refreshPage();
     await settings.expandQueryExecutionSection();
-    await expect(page.locator("#limitInput")).toHaveValue("∞");
-    await expect(page.locator("#timeoutInput")).toHaveValue("∞");
+    await expect(settings.limitInput).toHaveValue("∞");
+    await expect(settings.timeoutInput).toHaveValue("∞");
     await settings.fillLimit(1);
     await settings.fillTimeout(1);
     await settings.clickSaveQuerySettingsBtn();
     await settings.refreshPage();
     await settings.expandQueryExecutionSection();
-    await expect(page.locator("#limitInput")).toHaveValue("1");
-    await expect(page.locator("#timeoutInput")).toHaveValue("1 seconds");
+    await expect(settings.limitInput).toHaveValue("1");
+    await expect(settings.timeoutInput).toHaveValue("1 seconds");
   });
 
   test(`@admin Validate that running a query with timeout returns an error`, async () => {

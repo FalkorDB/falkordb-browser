@@ -15,11 +15,11 @@ export default class SettingsQueryPage extends GraphPage {
     return this.page.getByTestId("userExperienceSectionHeader");
   }
 
-  private get limitInput(): Locator {
+  public get limitInput(): Locator {
     return this.page.locator("#limitInput");
   }
 
-  private get timeoutInput(): Locator {
+  public get timeoutInput(): Locator {
     return this.page.locator("#timeoutInput");
   }
 
@@ -55,7 +55,7 @@ export default class SettingsQueryPage extends GraphPage {
     return this.page.locator("#cancelQuerySettingsBtn");
   }
 
-  private get saveQuerySettingsBtn(): Locator {
+  public get saveQuerySettingsBtn(): Locator {
     return this.page.locator("#saveQuerySettingsBtn");
   }
 
