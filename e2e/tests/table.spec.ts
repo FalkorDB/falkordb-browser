@@ -1,4 +1,5 @@
-import test, { expect } from "@playwright/test";
+import { test, expect } from "../infra/coverage";
+import { readFile } from "fs/promises";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import urls from '../config/urls.json';
 import ApiCalls from "../logic/api/apiCalls";
@@ -9,14 +10,22 @@ test.describe('Table View Tests', () => {
 
     let browser: BrowserWrapper;
     let apiCalls: ApiCalls;
+    let cleanupGraph: string | undefined;
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apiCalls = new ApiCalls();
+        cleanupGraph = undefined;
     });
 
     test.afterEach(async () => {
-        await browser.closeBrowser();
+        try {
+            await browser.closeBrowser();
+        } finally {
+            if (cleanupGraph) {
+                expect((await apiCalls.removeGraph(cleanupGraph, "admin")).message).toMatch(/deleted|empty key/i);
+            }
+        }
     });
 
     test('@admin Validate that table view is disabled when there is no data', async () => {
@@ -97,5 +106,49 @@ test.describe('Table View Tests', () => {
         } finally {
             await apiCalls.removeGraph(graphName);
         }
+    });
+
+    test('@admin exports null, nested and quoted result values as exact CSV', async () => {
+        const graphName = getRandomString('table-export');
+        await apiCalls.addGraph(graphName);
+        cleanupGraph = graphName;
+        const tableView = await browser.createNewPage(TableView);
+        const page = await browser.getPage();
+        await page.addInitScript(() => { Reflect.deleteProperty(window, 'showSaveFilePicker'); });
+        await browser.navigateTo(urls.graphUrl);
+        await tableView.selectGraphByName(graphName);
+        await tableView.insertQuery(`RETURN null AS missing, 'Alice, "Bob"' AS quoted, {nested: [1, 2]} AS object, true AS enabled`);
+        await tableView.clickRunQuery(false);
+        await tableView.clickTableTab();
+        const downloadPromise = page.waitForEvent('download');
+        await tableView.clickExportButton();
+        const download = await downloadPromise;
+        expect(download.suggestedFilename()).toBe(`${graphName}_table_export.csv`);
+        const file = await download.path();
+        expect(file).not.toBeNull();
+        expect(await readFile(file!, 'utf8')).toBe(
+            '"missing","quoted","object","enabled"\n"","Alice, ""Bob""","{""nested"":[1,2]}","true"'
+        );
+    });
+
+    test('@admin a new query replaces old table columns and rows', async () => {
+        const graphName = getRandomString('table-replace');
+        await apiCalls.addGraph(graphName);
+        cleanupGraph = graphName;
+        const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+        await tableView.selectGraphByName(graphName);
+        await tableView.insertQuery("UNWIND [1, 2, 3] AS previous RETURN previous");
+        await tableView.clickRunQuery(false);
+        await tableView.clickTableTab();
+        await expect(tableView.tableViewTableRows).toHaveCount(3);
+        await expect(tableView.lastColumnCells).toHaveText(['previous:1', 'previous:2', 'previous:3']);
+        await tableView.insertQuery("RETURN 'replacement-value' AS replacement");
+        await tableView.clickRunQuery(false);
+        await tableView.clickTableTab();
+        await expect(tableView.tableViewTableRows).toHaveCount(1);
+        await expect(tableView.tableViewTabPanel).toContainText('replacement-value');
+        await expect(tableView.columnHeader(/^previous/)).toHaveCount(0);
+        await expect(tableView.columnHeader(/^replacement/)).toBeVisible();
+        await expect(tableView.lastColumnCells).toHaveText(['replacement:"replacement-value"']);
     });
 });

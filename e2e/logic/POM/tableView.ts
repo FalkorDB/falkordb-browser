@@ -8,12 +8,20 @@ export default class TableView extends GraphPage {
         return this.page.getByTestId("tableTab");
     }
 
-    private get tableViewTabPanel(): Locator {
+    public get tableViewTabPanel(): Locator {
         return this.page.getByRole('tabpanel', { name: 'Table' });
     }
 
-    private get tableViewTableRows(): Locator {
+    public get tableViewTableRows(): Locator {
         return this.tableViewTabPanel.locator('tbody tr');
+    }
+
+    public get lastColumnCells(): Locator {
+        return this.tableViewTableRows.locator('td:last-child');
+    }
+
+    columnHeader(name: RegExp): Locator {
+        return this.tableViewTabPanel.getByRole('columnheader').filter({ hasText: name });
     }
 
     public async clickTableViewTab(): Promise<void> {
