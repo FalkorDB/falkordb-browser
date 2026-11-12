@@ -24,6 +24,11 @@ export default class ConnectionManagerComponent extends BasePage {
         await this.dropdownContent.waitFor({ state: "visible", timeout: 5000 });
     }
 
+    async selectConnection(id: string): Promise<void> {
+        await this.openDropdown();
+        await this.page.getByTestId(`connection-item-${id}`).click();
+    }
+
     async isDropdownVisible(): Promise<boolean> {
         return this.dropdownContent.isVisible();
     }

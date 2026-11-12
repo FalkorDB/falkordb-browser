@@ -76,6 +76,10 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.getByTestId(`selectModel${modelName}`);
   }
 
+  async expectModelAbsent(modelName: string): Promise<void> {
+    await expect(this.getModelButton(modelName)).toHaveCount(0);
+  }
+
   private getModelButtonByDisplayText(displayText: string): Locator {
     return this.page.locator(`button[data-testid^="selectModel"]:has(span:text-is("${displayText}"))`);
   }

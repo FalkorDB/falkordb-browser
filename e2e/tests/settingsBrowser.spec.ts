@@ -6,6 +6,7 @@ import SettingsBrowserPage from "../logic/POM/settingsBrowserPage";
 import ApiCalls from "../logic/api/apiCalls";
 import ChatComponent from "../logic/POM/chatComponent";
 import HeaderComponent from "../logic/POM/headerComponent";
+import ConnectionManagerComponent from "../logic/POM/connectionManagerComponent";
 import { getRandomString } from "../infra/utils";
 
 async function delayNextKeyEncryption(page: Page) {
@@ -320,15 +321,14 @@ test.describe('@browser Browser Settings tests', () => {
             await settings.expandChatSection();
             await settings.selectLocalLlmModelSource();
             await started;
-            await page.getByTestId("connections-dropdown-trigger").click();
-            await page.getByTestId(`connection-item-${second.id}`).click();
+            await new ConnectionManagerComponent(page).selectConnection(second.id);
             await switchStarted;
             release();
             await finished;
             await page.evaluate(() => new Promise<void>(resolve => {
                 requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
             }));
-            await expect(page.getByTestId(`selectModel${staleModel}`)).toHaveCount(0);
+            await settings.expectModelAbsent(staleModel);
             expect(await page.evaluate(() => localStorage.getItem("model"))).not.toBe(staleModel);
             releaseSwitch();
             await expect.poll(() => active.id).toBe(second.id);
