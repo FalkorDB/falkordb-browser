@@ -60,6 +60,8 @@ test.describe('@config Settings config tests', () => {
         });
         await browser.navigateTo(urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
+        await settingsConfigPage.hoverOnRoleContentValue("MAX_QUEUED_QUERIES");
+        await expect(page.getByTestId("tableRowConfigsMAX_QUEUED_QUERIES").getByTestId("editButtonConfigs")).toBeVisible();
         const readonlyRow = page.getByTestId("tableRowConfigsTHREAD_COUNT");
         await expect(readonlyRow).toBeVisible();
         await readonlyRow.hover();
@@ -77,12 +79,12 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage);
         const page = await browser.getPage();
         const submissions: { value: string }[] = [];
+        const requests: { method: string; path: string }[] = [];
         await page.route(/\/api\/graph\/config(?:\/.*)?$/, async route => {
             if (route.request().method() === "GET") {
                 await route.fulfill({ json: { configs: [["MAX_QUEUED_QUERIES", 25]] } });
             } else {
-                expect(route.request().method()).toBe("POST");
-                expect(new URL(route.request().url()).pathname).toBe("/api/graph/config/MAX_QUEUED_QUERIES");
+                requests.push({ method: route.request().method(), path: new URL(route.request().url()).pathname });
                 submissions.push(route.request().postDataJSON() as { value: string });
                 await route.fulfill(submissions.length === 1
                     ? { status: 400, json: { message: "Configuration update rejected" } }
@@ -103,6 +105,7 @@ test.describe('@config Settings config tests', () => {
         await expect(page.getByTestId("inputConfigs")).toHaveCount(0);
         await expect(page.getByTestId("contentConfigsMAX_QUEUED_QUERIESValue")).toHaveText("42");
         expect(submissions).toEqual([{ value: "42" }, { value: "42" }]);
+        expect(requests).toEqual(Array(2).fill({ method: "POST", path: "/api/graph/config/MAX_QUEUED_QUERIES" }));
     });
 
     Data.inputDataRejectsZero.forEach(({ input, description, expected }, index) => {
