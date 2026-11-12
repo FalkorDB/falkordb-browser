@@ -43,7 +43,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return this.page.getByTestId("customizeStyleClose");
   }
 
-  private get saveStyleButton(): Locator {
+  public get saveStyleButton(): Locator {
     return this.page.getByTestId("saveStyleChanges");
   }
 
@@ -87,6 +87,22 @@ export default class CustomizeStylePage extends GraphInfoPage {
       (el) => el.click(),
       `Customize Style Button ${label}`
     );
+  }
+
+  async clickCustomizeRelationshipStyleButton(relationship: string): Promise<void> {
+    await this.page.getByTestId(`graphInfo${relationship}Edge`).click();
+    await this.page.getByTestId(`customizeRelationshipStyle${relationship}`).click();
+  }
+
+  async getRelationshipStyleFromLocalStorage(relationship: string): Promise<{
+    color: string; width: number; fontSize: number; arrowSize: number;
+  } | null> {
+    return this.page.evaluate((name) => {
+      const suffix = `relationshipStyle_${name}`;
+      const keys = Object.keys(localStorage).filter(key => key.endsWith(suffix));
+      if (keys.length > 1) throw new Error(`Ambiguous scoped relationship style for ${suffix}`);
+      return keys.length === 1 ? JSON.parse(localStorage.getItem(keys[0])!) : null;
+    }, relationship);
   }
 
   async isPanelVisible(): Promise<boolean> {
