@@ -253,6 +253,13 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Restoring graph tabs
+
+Graph editing waits for saved tabs and the query timeout to initialize for the
+current connection, while information panels and Chat remain accessible.
+If timeout configuration does not respond within five seconds, restoration uses
+the 60-second fallback.
+
 ### Error help
 
 When a Cypher query fails, the browser shows the database's message together with an

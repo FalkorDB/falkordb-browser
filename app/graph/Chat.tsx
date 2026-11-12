@@ -78,7 +78,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graphName } = useContext(GraphContext);
     const { setHistoryQuery } = useContext(HistoryQueryContext);
-    const { activeTabId } = useContext(GraphTabsContext);
+    const { activeTabId, tabsReady } = useContext(GraphTabsContext);
     const { activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
@@ -413,6 +413,7 @@ export default function Chat({ onClose }: Props) {
                     <SuggestedQuery
                         query={message.content}
                         onInsert={query => setHistoryQuery(prev => withQuery(prev, query))}
+                        insertDisabled={!tabsReady}
                         collapsible
                         testIds={{ query: "chatSuggestedQuery", copy: "chatCopyQueryButton", insert: "chatInsertQueryButton" }}
                     />

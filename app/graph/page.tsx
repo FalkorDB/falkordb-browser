@@ -80,7 +80,7 @@ export default function Page() {
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
-    const { tabs, activeTabId } = useContext(GraphTabsContext);
+    const { tabs, activeTabId, tabsReady, graphNamesReady } = useContext(GraphTabsContext);
     const isReadOnlyRef = useRef(isReadOnly);
     isReadOnlyRef.current = isReadOnly;
     const {
@@ -632,7 +632,7 @@ export default function Page() {
     }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
 
     const handleDeleteElement = useCallback(async () => {
-        if (!canvasRef.current) return;
+        if (!tabsReady || !canvasRef.current) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
 
@@ -694,7 +694,7 @@ export default function Page() {
             description: `${deletedElements.length > 1 ? "Elements" : "Element"} deleted
             ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.`,
         });
-    }, [selectedElements, graph, graphName, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+    }, [tabsReady, selectedElements, graph, graphName, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined;
@@ -825,7 +825,7 @@ export default function Page() {
 
     if (isMobile) {
         return (
-            <div className="h-full w-full flex flex-col min-h-0">
+            <div className="h-full w-full flex flex-col min-h-0" data-testid="graphPage" data-graph-names-ready={graphNamesReady} aria-busy={!tabsReady}>
                 <GraphSubHeader />
                 <div className="h-1 grow min-h-0 flex flex-col gap-1 p-1">
                     {selectorNode}
@@ -833,7 +833,9 @@ export default function Page() {
                         graph — the header and navigation above stay visible, which is
                         what makes the data read as nested inside the graph context. */}
                     <div className="h-1 grow min-h-0 relative overflow-hidden">
-                        {graphViewNode}
+                        <div className="h-full w-full" inert={tabsReady ? undefined : true}>
+                            {graphViewNode}
+                        </div>
                         {/* No sheet title: the info panel renders its own header and
                             close button, and it needs the height for its grid rows. */}
                         <BottomSheet
@@ -857,7 +859,9 @@ export default function Page() {
                             height="full"
                             data-testid="mobileDataSheet"
                         >
-                            {getCurrentPanel()}
+                            <div className="h-full w-full">
+                                {getCurrentPanel()}
+                            </div>
                         </BottomSheet>
                         {/* No sheet title: Chat renders its own header and close button. */}
                         <BottomSheet
@@ -876,7 +880,7 @@ export default function Page() {
     }
 
     return (
-        <div className="h-full w-full flex flex-col min-h-0">
+        <div className="h-full w-full flex flex-col min-h-0" data-testid="graphPage" data-graph-names-ready={graphNamesReady} aria-busy={!tabsReady}>
             <GraphSubHeader />
             <div className="relative h-1 grow flex">
                 <ResizablePanelGroup orientation="horizontal" className="h-full grow">
@@ -910,7 +914,9 @@ export default function Page() {
                                         collapsible
                                         minSize="30%"
                                     >
-                                        {graphViewNode}
+                                        <div className="h-full w-full" inert={tabsReady ? undefined : true}>
+                                            {graphViewNode}
+                                        </div>
                                     </ResizablePanel>
                                     <ResizableHandle
                                         withHandle

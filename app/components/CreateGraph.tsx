@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef, useCallback } from "react";
 import { InfoIcon, Plus, File as FileIcon, X } from "lucide-react";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
 import { DUMP_RESTORE_ENABLED } from "@/lib/graphUpload";
@@ -15,6 +15,7 @@ import CloseDialog from "./CloseDialog";
 import Input from "./ui/Input";
 import Dropzone from "./ui/Dropzone";
 import { Progress } from "@/components/ui/progress";
+import { useSession } from "next-auth/react";
 import { IndicatorContext, ConnectionContext } from "./provider";
 
 interface Props {
@@ -22,12 +23,14 @@ interface Props {
     graphNames: string[]
     label?: string
     trigger?: React.ReactNode
+    ready?: boolean
 }
 
 export default function CreateGraph({
     onSetGraphName,
     graphNames,
     label = "",
+    ready = true,
     trigger = (
         <Button
             data-testid="createGraph"
@@ -42,6 +45,7 @@ export default function CreateGraph({
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { data: session } = useSession();
 
     const { toast } = useToast();
 
@@ -51,21 +55,48 @@ export default function CreateGraph({
     const [files, setFiles] = useState<globalThis.File[]>([]);
     const [phase, setPhase] = useState<"uploading" | "processing" | null>(null);
     const [uploadPct, setUploadPct] = useState(0);
+    const readyRef = useRef(ready);
+    readyRef.current = ready;
+    const pendingCreatedGraphRef = useRef<{ name: string; epoch: number; connectionId: string | null; hasDump: boolean } | null>(null);
+
+    const publishCreatedGraph = useCallback((name: string, hasDump: boolean) => {
+        onSetGraphName(name);
+        toast({
+            title: hasDump ? "Graph restored successfully" : "Graph created successfully",
+            description: hasDump
+                ? "The graph data has been restored from the dump file"
+                : "The graph has been created successfully",
+        });
+    }, [onSetGraphName, toast]);
 
     useEffect(() => {
-        if (!open) {
+        const pending = pendingCreatedGraphRef.current;
+        if (!ready || !pending) return;
+        pendingCreatedGraphRef.current = null;
+        const currentConnectionId = getActiveConnectionIdGlobal();
+        if (getConnectionEpoch() !== pending.epoch || (currentConnectionId !== null && currentConnectionId !== pending.connectionId)) return;
+        publishCreatedGraph(pending.name, pending.hasDump);
+    }, [ready, publishCreatedGraph]);
+
+    useEffect(() => {
+        if (!ready) setOpen(false);
+    }, [ready]);
+
+    useEffect(() => {
+        if (!open && !isLoading) {
             setGraphName("");
-            setIsLoading(false);
             setFiles([]);
             setPhase(null);
             setUploadPct(0);
         }
-    }, [open]);
+    }, [open, isLoading]);
 
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (!ready || isLoading) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
+        const connectionId = cid ?? session?.activeConnectionId ?? null;
         try {
             setIsLoading(true);
             const name = graphName.trim();
@@ -138,17 +169,16 @@ export default function CreateGraph({
                 if (!processResult.ok) return;
             }
 
-            if (getConnectionEpoch() !== startEpoch) return;
+            const currentConnectionId = getActiveConnectionIdGlobal();
+            if (getConnectionEpoch() !== startEpoch || (currentConnectionId !== null && currentConnectionId !== connectionId)) return;
 
-            onSetGraphName(name);
+            if (!readyRef.current) {
+                pendingCreatedGraphRef.current = { name, epoch: startEpoch, connectionId, hasDump };
+                return;
+            }
+            publishCreatedGraph(name, hasDump);
             setGraphName("");
             setOpen(false);
-            toast({
-                title: hasDump ? "Graph restored successfully" : "Graph created successfully",
-                description: hasDump
-                    ? "The graph data has been restored from the dump file"
-                    : "The graph has been created successfully",
-            });
         } finally {
             setIsLoading(false);
             setPhase(null);
@@ -158,8 +188,8 @@ export default function CreateGraph({
 
     return (
         <DialogComponent
-            open={open}
-            onOpenChange={(next) => { if (next || !isLoading) setOpen(next); }}
+            open={ready && (open || isLoading)}
+            onOpenChange={(next) => { if (ready && (next || !isLoading)) setOpen(next); }}
             trigger={trigger}
             title={"Create New Graph"}
         >

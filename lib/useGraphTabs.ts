@@ -282,6 +282,7 @@ export default function useGraphTabs<S>({
     }, [prefixReady, persist]);
 
     const selectTab = useCallback((id: string) => {
+        if (!canRestore) return;
         const prev = stateRef.current;
         if (id === prev.activeTabId) return;
 
@@ -291,9 +292,10 @@ export default function useGraphTabs<S>({
         sessionsRef.current.set(prev.activeTabId, captureSessionRef.current());
         setState({ tabs: withLive(prev), activeTabId: id });
         onActivateRef.current(target, sessionsRef.current.get(id));
-    }, [withLive]);
+    }, [canRestore, withLive]);
 
     const addTab = useCallback(() => {
+        if (!canRestore) return;
         const prev = stateRef.current;
         // Lowering the setting never closes tabs, so an existing strip can sit
         // above the cap; it just cannot grow any further.
@@ -304,10 +306,11 @@ export default function useGraphTabs<S>({
         sessionsRef.current.set(prev.activeTabId, captureSessionRef.current());
         setState({ tabs: [...withLive(prev), tab], activeTabId: tab.id });
         onActivateRef.current(tab, undefined);
-    }, [withLive]);
+    }, [canRestore, withLive]);
 
     /** Sets (or clears, when blank) a tab's custom label. */
     const renameTab = useCallback((id: string, name: string) => {
+        if (!canRestore) return;
         const trimmed = name.trim();
 
         setState(prev => ({
@@ -316,9 +319,10 @@ export default function useGraphTabs<S>({
             // otherwise reverts its query and view to the last folded values.
             tabs: withLive(prev).map(t => (t.id === id ? { ...t, name: trimmed || undefined } : t)),
         }));
-    }, [withLive]);
+    }, [canRestore, withLive]);
 
     const closeTab = useCallback((id: string) => {
+        if (!canRestore) return;
         const prev = stateRef.current;
         // The last tab is never closable — there is always one working context.
         if (prev.tabs.length <= 1) return;
@@ -344,7 +348,7 @@ export default function useGraphTabs<S>({
 
         setState({ tabs: remaining, activeTabId: next ? next.id : prev.activeTabId });
         if (next) onActivateRef.current(next, sessionsRef.current.get(next.id));
-    }, [withLive, prefixReady]);
+    }, [canRestore, withLive, prefixReady]);
 
     /**
      * The user ran a query against `graph`, so if that is the active tab's
