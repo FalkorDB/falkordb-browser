@@ -1,4 +1,4 @@
-import test, { expect } from "playwright/test";
+import { test, expect } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import MetadataView from "../logic/POM/metadataView";
 import urls from "../config/urls.json";
@@ -18,8 +18,11 @@ test.describe('Metadata Tests', () => {
     });
     
     test.afterEach(async () => {
-        await apiCalls.removeGraph(GRAPH_NAME);
-        await browser.closeBrowser();
+        try {
+            await browser.closeBrowser();
+        } finally {
+            expect((await apiCalls.removeGraph(GRAPH_NAME, "admin")).message).toMatch(/deleted|empty key/i);
+        }
     });
 
     test('@admin check metadata view tab is disabled when there is no metadata', async () => {
@@ -53,6 +56,59 @@ test.describe('Metadata Tests', () => {
         expect(isMetadataViewTabEnabled).toBe(true);
     });
 
+    test('@admin metadata replaces mutation statistics after a read query', async () => {
+        const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
+        const page = await browser.getPage();
+        await metadataView.selectGraphByName(GRAPH_NAME);
+        await metadataView.insertQuery("CREATE (:MetadataCoverage {name: 'created'})");
+        await metadataView.clickRunQuery(false);
+        await metadataView.clickMetadataViewTab();
+        const panel = metadataView.metadataViewTabPanel;
+        await expect(panel).toContainText('Nodes created: 1');
+        await expect(panel).toContainText('Properties set: 1');
+        const readQuery = "MATCH (n:MetadataCoverage) RETURN n LIMIT 10";
+        await metadataView.insertQuery(readQuery);
+        const readResponse = page.waitForResponse(response => {
+            const url = new URL(response.url());
+            return url.pathname === `/api/graph/${GRAPH_NAME}`
+                && url.searchParams.get("query") === readQuery;
+        });
+        await metadataView.clickRunQuery(false);
+        expect((await readResponse).ok()).toBe(true);
+        await metadataView.clickMetadataViewTab();
+        await expect(panel).toContainText('Query internal execution time:');
+        await expect(panel).not.toContainText(
+            /(?:Labels (?:added|removed)|Nodes (?:created|deleted)|Properties (?:set|removed)|(?:Relationships|Indices|Constraints) (?:created|deleted)):/,
+        );
+    });
+
+    test('@admin failed profiling can be retried without losing metadata', async () => {
+        const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
+        const page = await browser.getPage();
+        await metadataView.selectGraphByName(GRAPH_NAME);
+        await metadataView.insertQuery("MATCH (n) RETURN n");
+        await metadataView.clickRunQuery(false);
+        await metadataView.clickMetadataViewTab();
+        let attempts = 0;
+        await page.route(`**/api/graph/${GRAPH_NAME}/profile?*`, async (route) => {
+            attempts += 1;
+            await route.fulfill(attempts === 1
+                ? { status: 400, json: { message: 'Invalid input: profile temporarily unavailable' } }
+                : { json: { result: ['Results | Records produced: 0', '    All Node Scan | Records produced: 0'] } });
+        });
+        const panel = metadataView.metadataViewTabPanel;
+        const { metadataLines } = metadataView;
+        await expect(metadataLines).toContainText([/Query internal execution time:/]);
+        const metadataBeforeProfiling = await metadataLines.allTextContents();
+        await metadataView.clickProfileButton();
+        await expect(metadataView.errorToast).toContainText('Invalid input: profile temporarily unavailable');
+        await expect(metadataView.profileButton).toBeEnabled();
+        await expect(metadataLines).toHaveText(metadataBeforeProfiling);
+        await metadataView.clickProfileButton();
+        await expect(panel).toContainText('Records produced: 0');
+        expect(attempts).toBe(2);
+    });
+
     test('@admin profile works for a graph name with reserved URL characters', async () => {
         const graphName = `${getRandomString('metadata')}#a/b%c`;
         const encodedName = encodeURIComponent(graphName);
@@ -74,7 +130,11 @@ test.describe('Metadata Tests', () => {
             await expect(page.getByTestId("profileTree")).toBeVisible();
             await expect(page.getByTestId("profileTree")).not.toBeEmpty();
         } finally {
-            await apiCalls.removeGraph(encodedName);
+            try {
+                await browser.closeBrowser();
+            } finally {
+                expect((await apiCalls.removeGraph(encodedName, "admin")).message).toMatch(/deleted|empty key/i);
+            }
         }
     });
 });
