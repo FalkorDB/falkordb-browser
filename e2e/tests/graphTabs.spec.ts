@@ -358,7 +358,7 @@ test.describe("@admin Graph tabs", () => {
         }
     });
 
-    for (const portal of ["maximized editor", "toolbar delete", "create graph", "manage graphs"] as const) {
+    for (const portal of ["maximized editor", "toolbar delete", "create graph", "creating graph", "manage graphs"] as const) {
     test(`Delayed connection discovery closes the ${portal} when readiness is lost`, async () => {
         test.setTimeout(60_000);
         const graph = await browser.createNewPage(GraphPage);
@@ -371,6 +371,9 @@ test.describe("@admin Graph tabs", () => {
         const discoveryGate = new Promise<void>(resolve => { releaseDiscovery = resolve; });
         let releaseLists!: () => void;
         const listGate = new Promise<void>(resolve => { releaseLists = resolve; });
+        let releaseCreate!: () => void;
+        const createGate = new Promise<void>(resolve => { releaseCreate = resolve; });
+        let createRequests = 0;
         let discovered = false;
         let syncCompleted = false;
         let replacementLists = 0;
@@ -392,6 +395,15 @@ test.describe("@admin Graph tabs", () => {
             }
             await route.fulfill({ json: { opts: [graphOne, graphTwo] } });
         });
+        await page.route("**/api/graph/unsaved-readiness-graph", async route => {
+            if (route.request().method() !== "POST") {
+                await route.continue();
+                return;
+            }
+            createRequests += 1;
+            await createGate;
+            await route.fulfill({ json: {} });
+        });
         try {
             await page.goto(urls.graphUrl);
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
@@ -406,10 +418,14 @@ test.describe("@admin Graph tabs", () => {
                 await graph.searchElementInCanvas("readiness");
                 await page.getByTestId("deleteElementGraph").click();
                 await expect(page.getByTestId("deleteElementConfirmGraph")).toBeVisible();
-            } else if (portal === "create graph") {
+            } else if (portal === "create graph" || portal === "creating graph") {
                 await graph.create.click();
                 await graph.insertInput.fill("unsaved-readiness-graph");
                 await expect(graph.createConfirm).toBeVisible();
+                if (portal === "creating graph") {
+                    await graph.createConfirm.click();
+                    await expect.poll(() => createRequests).toBe(1);
+                }
             } else {
                 await graph.select().click();
                 await graph.manage.click();
@@ -431,8 +447,15 @@ test.describe("@admin Graph tabs", () => {
             releaseLists();
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
-            await expect(graph.createConfirm).toHaveCount(0);
             await expect(graph.manageContent).toHaveCount(0);
+            if (portal === "creating graph") {
+                await expect(graph.createConfirm).toBeDisabled();
+                expect(createRequests).toBe(1);
+                releaseCreate();
+                await expect(graph.createConfirm).toHaveCount(0);
+            } else {
+                await expect(graph.createConfirm).toHaveCount(0);
+            }
             if (portal === "create graph") {
                 await graph.create.click();
                 await expect(graph.insertInput).toHaveValue("");
@@ -444,6 +467,7 @@ test.describe("@admin Graph tabs", () => {
         } finally {
             releaseDiscovery();
             releaseLists();
+            releaseCreate();
         }
     });
     }

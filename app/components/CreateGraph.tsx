@@ -22,12 +22,14 @@ interface Props {
     graphNames: string[]
     label?: string
     trigger?: React.ReactNode
+    ready?: boolean
 }
 
 export default function CreateGraph({
     onSetGraphName,
     graphNames,
     label = "",
+    ready = true,
     trigger = (
         <Button
             data-testid="createGraph"
@@ -53,17 +55,21 @@ export default function CreateGraph({
     const [uploadPct, setUploadPct] = useState(0);
 
     useEffect(() => {
-        if (!open) {
+        if (!ready) setOpen(false);
+    }, [ready]);
+
+    useEffect(() => {
+        if (!open && !isLoading) {
             setGraphName("");
-            setIsLoading(false);
             setFiles([]);
             setPhase(null);
             setUploadPct(0);
         }
-    }, [open]);
+    }, [open, isLoading]);
 
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (!ready || isLoading) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         try {
@@ -158,8 +164,8 @@ export default function CreateGraph({
 
     return (
         <DialogComponent
-            open={open}
-            onOpenChange={(next) => { if (next || !isLoading) setOpen(next); }}
+            open={ready && (open || isLoading)}
+            onOpenChange={(next) => { if (ready && (next || !isLoading)) setOpen(next); }}
             trigger={trigger}
             title={"Create New Graph"}
         >
