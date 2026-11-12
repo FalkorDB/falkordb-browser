@@ -1,5 +1,9 @@
 import { expect, test } from "../infra/coverage";
 import urls from "../config/urls.json";
+import AppDownloadRemovalPage from "../logic/POM/appDownloadRemovalPage";
+import HeaderComponent from "../logic/POM/headerComponent";
+import LoginPage from "../logic/POM/loginPage";
+import MobileGraphPage from "../logic/POM/mobileGraphPage";
 
 const RELEASE_ASSET = "https://github.com/FalkorDB/falkordb-browser/releases/download/v2.7.4/FalkorDB-Browser-mac-arm64.dmg";
 const RELEASE_URL = "https://github.com/FalkorDB/falkordb-browser/releases/tag/v2.7.4";
@@ -19,17 +23,17 @@ test.describe("@admin App download removal", () => {
             },
         }));
 
+        const header = new HeaderComponent(page);
+        const downloads = new AppDownloadRemovalPage(page);
         await page.goto(urls.graphUrl);
-        await page.waitForTimeout(2000);
-        await expect(page.getByTestId("appDownloadPrompt")).toHaveCount(0);
+        await header.clickOnHelpBtn();
+        await expect(header.releasesButton).toBeVisible();
+        await expect(downloads.prompt).toHaveCount(0);
+        await expect(downloads.downloadLink).toHaveCount(0);
+        await expect(downloads.alternateDownloadLink).toHaveCount(0);
+        await header.releasesButton.click();
 
-        await page.getByRole("button", { name: "Help" }).click();
-        await expect(page.getByTestId("appDownload")).toHaveCount(0);
-        await expect(page.getByTestId("appDownloadAlternate")).toHaveCount(0);
-        await page.getByTestId("releasesButton").click();
-
-        const release = page.getByTestId("releaseNotes-v2.7.4");
-        await expect(release.getByRole("link", { name: "macOS" })).toHaveAttribute("href", RELEASE_ASSET);
+        await expect(downloads.releaseLink("v2.7.4", "macOS")).toHaveAttribute("href", RELEASE_ASSET);
     });
 
     test("app download API endpoints are no longer available", async ({ request }) => {
@@ -43,10 +47,12 @@ test.describe("@admin App download removal", () => {
         const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
         try {
             const page = await context.newPage();
+            const login = new LoginPage(page);
+            const downloads = new AppDownloadRemovalPage(page);
             await page.goto(urls.loginUrl);
-            await page.waitForTimeout(2000);
-            await expect(page.getByTestId("appDownload")).toHaveCount(0);
-            await expect(page.getByTestId("appDownloadPrompt")).toHaveCount(0);
+            await expect(login.logInButton).toBeVisible();
+            await expect(downloads.downloadLink).toHaveCount(0);
+            await expect(downloads.prompt).toHaveCount(0);
         } finally {
             await context.close();
         }
@@ -54,11 +60,12 @@ test.describe("@admin App download removal", () => {
 
     test("the mobile navigation drawer has no app download link", async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
+        const graph = new MobileGraphPage(page);
+        const downloads = new AppDownloadRemovalPage(page);
         await page.goto(urls.graphUrl);
-        await page.waitForTimeout(2000);
-        await page.getByTestId("mobileNavToggle").click();
+        await graph.navToggle.click();
 
-        await expect(page.getByTestId("appDownload")).toHaveCount(0);
-        await expect(page.getByTestId("mobileReleasesButton")).toBeVisible();
+        await expect(graph.releasesButton).toBeVisible();
+        await expect(downloads.downloadLink).toHaveCount(0);
     });
 });
