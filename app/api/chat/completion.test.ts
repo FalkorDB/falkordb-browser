@@ -54,8 +54,8 @@ describe("shared AI completion transport", () => {
     if (result.ok) assert.equal(parseFixResponse(result.reply, "RETRUN 1").correctedQuery, "RETURN 1");
   });
 
-  for (const model of ["gpt-4o-mini", "gpt-5", "openai:gpt-5-mini", "openai::gpt-5-pro-2025-10-06", "gpt-5.1", "o1", "o3-pro", "o4-mini", "gpt-6-preview", "o5-mini", "codex-mini-latest"]) {
-    it(`uses Responses without sampling options for hosted OpenAI model ${model}`, async (t) => {
+  for (const model of ["gpt-5", "openai:gpt-5-mini", "openai::gpt-5-pro-2025-10-06", "gpt-5.1", "o1", "o3-pro", "o4-mini"]) {
+    it(`uses Responses without sampling options for reasoning model ${model}`, async (t) => {
       const timeout = t.mock.method(AbortSignal, "timeout", () => new AbortController().signal);
       t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
         assert.equal(url, "https://api.openai.com/v1/responses");
@@ -64,6 +64,22 @@ describe("shared AI completion transport", () => {
       });
       assert.deepEqual(await requestAiCompletion({ ...input, model }), { ok: true, reply: "reply" });
       assert.equal(timeout.mock.calls[0].arguments[0], 240_000);
+    });
+  }
+
+  for (const model of ["gpt-4o-mini", "gpt-audio", "gpt-audio-1.5", "gpt-audio-mini", "gpt-6-preview", "o5-mini", "codex-mini-latest"]) {
+    it(`preserves Chat Completions for hosted OpenAI model ${model}`, async (t) => {
+      const timeout = t.mock.method(AbortSignal, "timeout", () => new AbortController().signal);
+      t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
+        assert.equal(url, "https://api.openai.com/v1/chat/completions");
+        const body = JSON.parse(String(init.body));
+        assert.equal(body.temperature, 0);
+        assert.deepEqual(body.messages, input.messages);
+        assert.equal(body.input, undefined);
+        return Response.json({ choices: [{ message: { content: "reply" } }] });
+      });
+      assert.deepEqual(await requestAiCompletion({ ...input, model }), { ok: true, reply: "reply" });
+      assert.equal(timeout.mock.calls[0].arguments[0], 30_000);
     });
   }
 

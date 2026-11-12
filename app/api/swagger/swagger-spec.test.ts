@@ -10,6 +10,7 @@ describe("AI assistance OpenAPI documentation", () => {
     assert.deepEqual(fixSchema.properties.modelSource.enum, ["api-key", "local"]);
     assert.equal(fix.responses["200"].content["application/json"].schema.properties.correctedQuery.type, "string");
     assert.equal(fix.responses["413"].description, "Request body is too large");
+    assert.equal(fix.responses["500"].description, "Internal server error");
 
     const optimize = swaggerSpec.paths["/api/chat/optimize"].post;
     const optimizeSchema = optimize.requestBody.content["application/json"].schema;
@@ -20,5 +21,6 @@ describe("AI assistance OpenAPI documentation", () => {
       "suggestions",
       "executionPlan",
     ]);
+    assert.equal(optimize.responses["500"].description, "Internal server error");
   });
 });

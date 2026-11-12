@@ -30,7 +30,9 @@ export async function requestAiCompletion(input: {
   signal: AbortSignal;
 }): Promise<CompletionResult> {
   const model = getProviderModelName(input.model);
-  const responses = input.target.source === "api-key" && input.target.provider === "openai";
+  const responses = input.target.source === "api-key"
+    && input.target.provider === "openai"
+    && /^(?:gpt-5(?:[.-]|$)|o[134](?:-|$))/.test(model);
   const url = responses ? "https://api.openai.com/v1/responses" : getChatCompletionsUrl(input.target);
   const response = await fetch(url, {
     method: "POST",

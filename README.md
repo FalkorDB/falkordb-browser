@@ -293,9 +293,10 @@ Before each analysis, optionally describe what to optimize, such as reducing sca
 or improving a specific join. This guidance is included only in that request's
 prompt and is not saved or reused. Leave it blank for a general review.
 Each analysis requires clicking **Analyze**; there is no remembered-consent checkbox.
-Optimize and Fix with AI use the Responses API for hosted OpenAI models, without
-unsupported temperature settings. These requests allow up to four minutes to
-finish; other supported providers retain the 30-second timeout. Closing Optimize
+Optimize and Fix with AI use the Responses API for hosted OpenAI GPT-5 and o1/o3/o4
+models, without unsupported temperature settings. Other OpenAI models and supported
+providers retain Chat Completions and the 30-second timeout. Responses requests allow
+up to four minutes to finish. Closing Optimize
 cancels the request.
 Fix with AI also offers **Cancel** while loading. Cancelling, changing the query,
 tab, graph, connection, or page discards the old request; late replies cannot

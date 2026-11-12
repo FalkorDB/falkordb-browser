@@ -652,7 +652,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     dismissAiFix();
     setLastFailure(null);
     return dismissAiFix;
-  }, [graphName, activeConnectionId, pathname, model, chatModelSource, localLlmProvider, localLlmEndpoint, dismissAiFix]);
+  }, [graphName, activeConnectionId, pathname, model, chatModelSource, localLlmProvider, localLlmEndpoint, switchPending, dismissAiFix]);
 
   const resolvedChatKey = useMemo(
     () => (chatApiKeys.find(k => k.id === selectedChatApiKeyId)?.key) || secretKey,
