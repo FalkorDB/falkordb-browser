@@ -109,6 +109,12 @@ export default function Chat({ onClose }: Props) {
     const draftScope = `${getConnectionPrefix()}${draftKey}`;
     const loadedDraftScopeRef = useRef<string | null>(null);
     const draftRevisionsRef = useRef(new Map<string, number>());
+    const draftOwnerRef = useRef<object | null>(null);
+
+    useLayoutEffect(() => {
+        draftOwnerRef.current = {};
+        return () => { draftOwnerRef.current = null; };
+    }, []);
 
     useLayoutEffect(() => {
         if (!getConnectionPrefix() || activeConnectionId !== prefixConnectionId) {
@@ -203,9 +209,11 @@ export default function Chat({ onClose }: Props) {
         // and only this conversation's loading state may be settled by it.
         const submittedKey = historyKey;
         const submittedScope = draftScope;
+        const submittedOwner = draftOwnerRef.current;
         const submittedDraft = { text: newMessage, revision: draftRevisionsRef.current.get(submittedScope) ?? 0 };
-        const isStale = () => historyKeyRef.current !== submittedKey || loadedDraftScopeRef.current !== submittedScope;
-        const draftUnchanged = () => isUnchangedChatDraft(submittedDraft, localStorage.getItem(submittedScope), draftRevisionsRef.current.get(submittedScope) ?? 0);
+        const ownsDraft = () => submittedOwner !== null && draftOwnerRef.current === submittedOwner;
+        const isStale = () => !ownsDraft() || historyKeyRef.current !== submittedKey || loadedDraftScopeRef.current !== submittedScope;
+        const draftUnchanged = () => ownsDraft() && isUnchangedChatDraft(submittedDraft, localStorage.getItem(submittedScope), draftRevisionsRef.current.get(submittedScope) ?? 0);
         const showRequestError = (content: string) => {
             if (isStale()) return;
             if (draftUnchanged()) setNewMessage(submittedDraft.text);

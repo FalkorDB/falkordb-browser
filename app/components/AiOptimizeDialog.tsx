@@ -11,7 +11,7 @@ export type AiOptimizeResultState =
   | { status: "loading" }
   | { status: "done"; query: string; context: string; epoch: number; result: QueryOptimizationAnalysis };
 
-export type AiOptimizeConsent = {
+export type AiOptimizeRequest = {
   query: string;
   graphName: string;
   provider: string;
@@ -19,13 +19,13 @@ export type AiOptimizeConsent = {
 
 interface Props {
   open: boolean;
-  pendingConsent: AiOptimizeConsent | null;
-  dontAskAgain: boolean;
+  pendingRequest: AiOptimizeRequest | null;
+  guidance: string;
   result: AiOptimizeResultState;
   currentQuery: string;
   contextMatches: boolean;
   onOpenChange: (open: boolean) => void;
-  onDontAskAgainChange: (checked: boolean) => void;
+  onGuidanceChange: (guidance: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
   onUseQuery: (query: string) => void;
@@ -33,13 +33,13 @@ interface Props {
 
 export default function AiOptimizeDialog({
   open,
-  pendingConsent,
-  dontAskAgain,
+  pendingRequest,
+  guidance,
   result,
   currentQuery,
   contextMatches,
   onOpenChange,
-  onDontAskAgainChange,
+  onGuidanceChange,
   onConfirm,
   onCancel,
   onUseQuery,
@@ -51,31 +51,40 @@ export default function AiOptimizeDialog({
 
   return (
     <DialogComponent
-      title={pendingConsent ? "Send query context to AI?" : "Query optimization"}
+      title={pendingRequest ? "Optimize your query" : "Query optimization"}
       label="aiOptimize"
       trigger={<span className="hidden" aria-hidden />}
       open={open}
       onOpenChange={onOpenChange}
       className="w-[min(56rem,calc(100vw-2rem))] max-w-none gap-0 p-4 mobile:p-3"
     >
-      {pendingConsent ? (
+      {pendingRequest ? (
         <div className="flex min-w-0 flex-col gap-5 px-1 pt-4 pb-1 break-words">
+          <div className="flex min-w-0 flex-col gap-2">
+            <label htmlFor="aiOptimizeGuidance" className="text-sm font-medium">
+              What would you like to optimize? <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+            <textarea
+              id="aiOptimizeGuidance"
+              data-testid="aiOptimizeGuidance"
+              className="min-h-28 w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              rows={4}
+              maxLength={2000}
+              value={guidance}
+              onChange={event => onGuidanceChange(event.target.value)}
+              placeholder="For example: reduce full scans, focus on the slow join, or suggest indexes for this lookup."
+              aria-describedby="aiOptimizeGuidanceHelp"
+            />
+            <p id="aiOptimizeGuidanceHelp" className="text-xs text-muted-foreground">
+              Included only in this request, not saved. Query results and write behavior must stay the same.
+            </p>
+          </div>
           <p className="text-sm leading-relaxed">
-            Your <span className="font-semibold">Cypher query, EXPLAIN plan, and index metadata</span>
-            {" "}for graph <span className="font-semibold">{pendingConsent.graphName}</span> will be sent to{" "}
-            <span className="font-semibold">{pendingConsent.provider}</span> for analysis.
+            Your <span className="font-semibold">Cypher query, guidance, EXPLAIN plan, and index metadata</span>
+            {" "}for graph <span className="font-semibold">{pendingRequest.graphName}</span> will be sent to{" "}
+            <span className="font-semibold">{pendingRequest.provider}</span> for analysis.
             The query will not be executed by this workflow.
           </p>
-          <label className="flex items-center gap-2.5 text-sm cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded accent-primary"
-              checked={dontAskAgain}
-              onChange={(event) => onDontAskAgainChange(event.target.checked)}
-              data-testid="aiOptimizeDontAskAgain"
-            />
-            Don&apos;t ask again for this provider
-          </label>
           <div className="flex gap-2 justify-end pt-1">
             <Button variant="Secondary" onClick={onCancel}>Cancel</Button>
             <Button variant="Primary" data-testid="aiOptimizeConsentConfirm" onClick={onConfirm}>

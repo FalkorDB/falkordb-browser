@@ -9,6 +9,110 @@ const urls = { graphUrl: `${baseUrl}/graph`, api: { graphUrl: `${baseUrl}/api/gr
 
 const TEST_KEY = "sk-demo-not-a-real-api-key";
 
+test("@admin Optimize identifies LM Studio as the local data recipient", async ({ page }) => {
+  const graphName = getRandomString("aiOptimizeLmStudio");
+  await page.addInitScript(initializeLocalStorage());
+  await page.addInitScript(() => {
+    localStorage.setItem("chatModelSource", "local");
+    localStorage.setItem("localLlmProvider", "lmstudio");
+    localStorage.setItem("model", "openai::local-test-model");
+  });
+  await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
+  expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+  try {
+    await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+    await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+    await page.getByTestId("editorOptimize").click();
+    const dialog = page.getByTestId("aiOptimizeContent");
+    await expect(dialog).toContainText("will be sent to LM Studio");
+    await expect(dialog).not.toContainText("will be sent to OpenAI");
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  } finally {
+    expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+  }
+});
+
+test("@admin query assistance routes preserve provider error status without leaking its body", async ({ page }) => {
+  const graphName = getRandomString("aiProviderStatus");
+  let providerStatus = 401;
+  const server = createServer((request, response) => {
+    request.resume();
+    response.writeHead(providerStatus, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ error: { message: "private provider detail" } }));
+  });
+  await new Promise<void>(resolve => { server.listen(0, "127.0.0.1", resolve); });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing test provider address");
+  try {
+    expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+    try {
+      for (const feature of ["fix", "optimize"]) {
+        for (const status of [401, 429, 503]) {
+          providerStatus = status;
+          const response = await page.request.post(`${baseUrl}/api/chat/${feature}`, {
+            data: {
+              query: "RETURN 1",
+              errorMessage: "Syntax error",
+              graphName,
+              model: "ollama::test-model",
+              modelSource: "local",
+              localProvider: "ollama",
+              localEndpoint: `http://127.0.0.1:${address.port}`,
+            },
+          });
+          expect(response.status()).toBe(status === 401 ? 401 : 422);
+          expect(response.headers()["x-session-invalid"]).toBeUndefined();
+          const body = await response.json();
+          expect(body.error).toMatch(status === 401 ? /API key/ : status === 429 ? /rate limit/ : /temporarily unavailable/);
+          expect(body.error).not.toContain("private provider detail");
+        }
+      }
+    } finally {
+      expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close(error => { if (error) reject(error); else resolve(); });
+    });
+  }
+});
+
+test("@admin optimize asks for per-request guidance without a remembered-consent checkbox", async ({ page }) => {
+  const graphName = getRandomString("aiOptimizeGuidance");
+  await page.addInitScript(initializeLocalStorage());
+  await page.addInitScript(key => {
+    localStorage.setItem("chatModelSource", "api-key");
+    localStorage.setItem("model", "gpt-4o-mini");
+    localStorage.setItem("secretKey", key);
+  }, TEST_KEY);
+  await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
+  const requests: Record<string, unknown>[] = [];
+  await page.route("**/api/chat/optimize", route => {
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({ json: { explanation: "Review complete.", suggestions: [], executionPlan: ["Results"] } });
+  });
+  expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+  try {
+    await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+    await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+    for (const guidance of ["Prioritize latency.", ""]) {
+      await page.getByTestId("editorOptimize").click();
+      await expect(page.getByTestId("aiOptimizeGuidance")).toHaveValue("");
+      await expect(page.getByTestId("aiOptimizeDontAskAgain")).toHaveCount(0);
+      await page.getByTestId("aiOptimizeGuidance").fill(guidance);
+      const requestCount = requests.length;
+      await page.getByTestId("aiOptimizeConsentConfirm").click();
+      await expect(page.getByTestId("aiOptimizeExplanation")).toHaveText("Review complete.");
+      expect(requests).toHaveLength(requestCount + 1);
+      expect(requests.at(-1)?.guidance).toBe(guidance || undefined);
+      expect(await page.evaluate(() => localStorage.getItem("aiOptimizeConsent-openai"))).toBeNull();
+      await page.getByTestId("closeAiOptimize").click();
+    }
+  } finally {
+    expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+  }
+});
+
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   for (const feature of ["chat", "fix", "optimize"] as const) {
     test(`@admin ${feature} copies and inserts without execution at ${viewport.width}px`, async ({ page }) => {
@@ -16,7 +120,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       const graphName = getRandomString("aiQueryCards");
       const query = "RETURN 4242 AS unsent_draft";
       const invalidQuery = "MATCH (n) RETsURN n";
-      const suggestion = "WITH 4242 AS unsent_draft\nWITH unsent_draft\nRETURN unsent_draft";
+      const suggestion = feature === "fix"
+        ? `WITH 4242 AS unsent_draft\n${"WITH unsent_draft\n".repeat(40)}RETURN unsent_draft`
+        : "WITH 4242 AS unsent_draft\nWITH unsent_draft\nRETURN unsent_draft";
       let providerPrompt = "";
       let queryRequests = 0;
       const server = createServer((request, response) => {
@@ -80,11 +186,18 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             if (viewport.width < 1100) await page.getByTestId("editorMore").click();
             await page.getByTestId("editorOptimize").click();
             const result = page.getByTestId("aiOptimizeContent");
+            const guidance = page.getByTestId("aiOptimizeGuidance");
+            await expect(guidance).toHaveValue("");
+            await expect(guidance).toBeInViewport();
+            expect(providerPrompt).toBe("");
+            await guidance.fill("Focus on reducing scans without changing the returned rows.");
+            await page.getByTestId("aiOptimizeConsentConfirm").click();
             await expect(page.getByTestId("aiOptimizeQuery")).toHaveText(suggestion);
             await page.getByTestId("aiOptimizePlan").getByText("EXPLAIN execution plan", { exact: true }).click();
             await expect(page.getByTestId("aiOptimizePlanText")).toContainText("Results");
             expect(providerPrompt).toContain("FalkorDB EXPLAIN plan");
             expect(providerPrompt).toContain("Results");
+            expect(providerPrompt).toContain("Focus on reducing scans without changing the returned rows.");
             const bounds = await result.boundingBox();
             if (!bounds) throw new Error("Missing Optimize dialog bounds");
             expect(bounds.x).toBeGreaterThanOrEqual(0);
@@ -95,6 +208,19 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             expect(await page.evaluate(() => sessionStorage.getItem("copiedQuery"))).toBe(suggestion);
             await expect(editor).toHaveAttribute("data-value", query);
             await page.getByTestId("aiOptimizeApply").click();
+            if (viewport.width < 1100) await page.getByTestId("editorMore").click();
+            await page.getByTestId("editorOptimize").click();
+            await expect(page.getByTestId("aiOptimizeGuidance")).toHaveValue("");
+            await page.getByTestId("aiOptimizeGuidance").fill("Discard this goal on cancel");
+            await page.getByRole("button", { name: "Cancel", exact: true }).click();
+            if (viewport.width < 1100) await page.getByTestId("editorMore").click();
+            await page.getByTestId("editorOptimize").click();
+            await expect(page.getByTestId("aiOptimizeGuidance")).toHaveValue("");
+            await page.getByTestId("aiOptimizeConsentConfirm").click();
+            await expect(page.getByTestId("aiOptimizeExplanation")).toContainText("This query already has a simple execution plan.");
+            expect(providerPrompt).not.toContain("User optimization goal:");
+            expect(providerPrompt).not.toContain("Discard this goal on cancel");
+            await page.getByTestId("closeAiOptimize").click();
           } else if (feature === "fix") {
             const graph = new GraphPage(page);
             await graph.insertQuery(invalidQuery);
@@ -106,6 +232,10 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             await expect(page.getByTestId("aiFixCopy")).toHaveText("Copied!");
             expect(await page.evaluate(() => sessionStorage.getItem("copiedQuery"))).toBe(suggestion);
             await expect(editor).toHaveAttribute("data-value", invalidQuery);
+            await page.getByTestId("aiFixInsert").scrollIntoViewIfNeeded();
+            await expect(page.getByTestId("aiFixInsert")).toBeInViewport();
+            const card = page.getByTestId("aiFixInsert").locator("xpath=ancestor::section");
+            expect(await card.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
             await page.getByTestId("aiFixInsert").click();
           } else {
             await page.getByTestId("chatToggleButton").click();
@@ -185,6 +315,7 @@ for (const { feature, scenario } of cases) {
         await page.getByTestId("fix-with-ai").click();
       } else {
         await page.getByTestId("editorOptimize").click();
+        if (scenario === "provider-error") await page.getByTestId("aiOptimizeConsentConfirm").click();
       }
 
       if (scenario === "missing-key") {

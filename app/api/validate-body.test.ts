@@ -55,6 +55,14 @@ describe("updateGraphElementAttribute", () => {
       const result = optimizeRequest.parse({ ...validRequest, graphName: " people " });
       assert.equal(result.graphName, " people ");
     });
+    it("validates optional per-request guidance at the exact length boundary", () => {
+      assert.equal(optimizeRequest.parse(validRequest).guidance, undefined);
+      assert.equal(optimizeRequest.parse({ ...validRequest, guidance: "  Reduce scans  " }).guidance, "Reduce scans");
+      assert.equal(optimizeRequest.parse({ ...validRequest, guidance: "   " }).guidance, "");
+      assert.equal(optimizeRequest.safeParse({ ...validRequest, guidance: "x".repeat(2000) }).success, true);
+      assert.equal(optimizeRequest.safeParse({ ...validRequest, guidance: "x".repeat(2001) }).success, false);
+      assert.equal(optimizeRequest.safeParse({ ...validRequest, guidance: 42 }).success, false);
+    });
   });
 
   it("turns a value the named type cannot be built from away", () => {

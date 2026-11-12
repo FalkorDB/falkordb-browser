@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildFixMessages, parseFixResponse, getProviderModelName, getChatCompletionsUrl, resolveFixTarget } from "@/lib/aiFix";
+import { buildFixMessages, parseFixResponse, resolveFixTarget } from "@/lib/aiFix";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { fixRequest, validateBody } from "../../validate-body";
 import { getCorsHeaders, corsPreflight } from "../../utils";
 import { MAX_CHAT_BODY_BYTES, OVER_LIMIT, readChatBodyWithLimit } from "../requestBody";
+import { requestAiCompletion } from "../completion";
 
 export const OPTIONS = corsPreflight;
 
-const REQUEST_TIMEOUT_MS = 30_000;
-
-// eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
     let session;
     try {
@@ -57,34 +55,21 @@ export async function POST(request: NextRequest) {
     const { target, authHeader } = resolved;
 
     try {
-        const url = getChatCompletionsUrl(target);
         const messages = buildFixMessages({ query, errorMessage, hint });
 
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeader },
-            body: JSON.stringify({
-                model: getProviderModelName(model),
-                messages,
-                temperature: 0,
-            }),
-            signal: AbortSignal.any([request.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+        const completion = await requestAiCompletion({
+            target,
+            authHeader,
+            model,
+            messages,
+            signal: request.signal,
         });
 
-        if (!response.ok) {
-            const friendly = response.status === 401
-                ? "The AI provider rejected your API key. Check it in Settings."
-                : "The AI provider couldn't process the request. Please try again.";
-            return NextResponse.json({ error: friendly }, { status: response.status === 401 ? 401 : 422, headers: getCorsHeaders(request) });
+        if (!completion.ok) {
+            return NextResponse.json({ error: completion.error }, { status: completion.status, headers: getCorsHeaders(request) });
         }
 
-        const data = await response.json();
-        const reply: string = data?.choices?.[0]?.message?.content ?? "";
-        if (!reply) {
-            return NextResponse.json({ error: "The AI provider returned an empty response." }, { status: 422, headers: getCorsHeaders(request) });
-        }
-
-        return NextResponse.json(parseFixResponse(reply, query), { headers: getCorsHeaders(request) });
+        return NextResponse.json(parseFixResponse(completion.reply, query), { headers: getCorsHeaders(request) });
     } catch (error) {
         // Avoid logging the query/error/prompt content.
         const name = (error as Error)?.name;

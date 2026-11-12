@@ -343,6 +343,7 @@ export const fixRequest = z.object({
 
 export const optimizeRequest = z.object({
   query: z.string().trim().min(1, "Query cannot be empty").max(8192, "Query is too long"),
+  guidance: z.string().trim().max(2000, "Optimization guidance is too long").optional(),
   graphName: z.string().min(1, "Graph name is required").max(255, "Graph name is too long"),
   key: z.string().max(1024, "API key is too long").optional().default(""),
   model: z.string().trim().min(1, "Model cannot be empty").max(256, "Model is too long"),

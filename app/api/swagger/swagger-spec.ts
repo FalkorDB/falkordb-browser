@@ -30,6 +30,10 @@ const swaggerSpec = {
       name: "Graph",
       description: "Graph management and query endpoints",
     },
+    {
+      name: "AI Assistance",
+      description: "AI-assisted Cypher query analysis and repair",
+    },
     // {
     //   name: "Schema",
     //   description: "Schema management endpoints",
@@ -768,6 +772,112 @@ const swaggerSpec = {
           }
         }
       }
+    },
+    "/api/chat/fix": {
+      post: {
+        tags: ["AI Assistance"],
+        summary: "Suggest a fix for a Cypher query",
+        description: "Analyze a failed Cypher query and return an explanation and optional corrected query. The query is not executed.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query", "errorMessage", "model"],
+                properties: {
+                  query: { type: "string", minLength: 1, maxLength: 8192 },
+                  errorMessage: { type: "string", minLength: 1, maxLength: 4096 },
+                  graphName: { type: "string", maxLength: 255 },
+                  hint: { type: "string", maxLength: 1024 },
+                  key: { type: "string", maxLength: 1024, writeOnly: true },
+                  model: { type: "string", minLength: 1, maxLength: 256 },
+                  modelSource: { type: "string", enum: ["api-key", "local"], default: "api-key" },
+                  localProvider: { type: "string", enum: ["ollama", "lmstudio"], default: "ollama" },
+                  localEndpoint: { type: "string", maxLength: 2048 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Explanation and optional corrected query",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["explanation"],
+                  properties: {
+                    explanation: { type: "string" },
+                    correctedQuery: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Invalid request or unsupported provider" },
+          "401": { description: "Authentication failed or the provider rejected its API key" },
+          "413": { description: "Request body is too large" },
+          "422": { description: "The provider could not complete the request" },
+          "500": { description: "Internal server error" },
+        },
+      },
+    },
+    "/api/chat/optimize": {
+      post: {
+        tags: ["AI Assistance"],
+        summary: "Analyze a Cypher query for optimization opportunities",
+        description: "Analyze the query, its EXPLAIN plan, and available indexes without executing the query.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query", "graphName", "model"],
+                properties: {
+                  query: { type: "string", minLength: 1, maxLength: 8192 },
+                  guidance: { type: "string", maxLength: 2000 },
+                  graphName: { type: "string", minLength: 1, maxLength: 255 },
+                  key: { type: "string", maxLength: 1024, writeOnly: true },
+                  model: { type: "string", minLength: 1, maxLength: 256 },
+                  modelSource: { type: "string", enum: ["api-key", "local"], default: "api-key" },
+                  localProvider: { type: "string", enum: ["ollama", "lmstudio"], default: "ollama" },
+                  localEndpoint: { type: "string", maxLength: 2048 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Query analysis and original execution plan",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["explanation", "suggestions", "executionPlan"],
+                  properties: {
+                    explanation: { type: "string" },
+                    suggestions: { type: "array", items: { type: "string" } },
+                    optimizedQuery: { type: "string" },
+                    executionPlan: { type: "array", items: { type: "string" } },
+                    indexWarning: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Invalid request or unable to read the query plan" },
+          "401": { description: "Authentication failed or the provider rejected its API key" },
+          "413": { description: "Request body is too large" },
+          "422": { description: "The provider could not complete the request" },
+          "500": { description: "Internal server error" },
+        },
+      },
     },
     "/api/graph/{graph}/explain": {
       get: {

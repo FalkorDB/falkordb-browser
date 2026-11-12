@@ -30,7 +30,7 @@ import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext
 import useQueryPreflight from "./useQueryPreflight";
 import { Graph } from "../api/graph/model";
 import ToastButton from "./ToastButton";
-import AiOptimizeDialog, { type AiOptimizeConsent, type AiOptimizeResultState } from "./AiOptimizeDialog";
+import AiOptimizeDialog, { type AiOptimizeRequest, type AiOptimizeResultState } from "./AiOptimizeDialog";
 
 interface Props {
     graph: Graph
@@ -51,7 +51,7 @@ const PLACEHOLDER = "Type your query here to start";
 export const CYPHER_LANGUAGE_NAME = "cypher-custom-language";
 const LANGUAGE_NAME = CYPHER_LANGUAGE_NAME;
 
-type PendingOptimizationRequest = AiOptimizeConsent & {
+type PendingOptimizationRequest = AiOptimizeRequest & {
     connectionId: string | null;
     model: string;
     modelSource: ChatModelSource;
@@ -207,17 +207,17 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     );
     const [optimizationOpen, setOptimizationOpen] = useState(false);
     const [pendingOptimization, setPendingOptimization] = useState<PendingOptimizationRequest | null>(null);
+    const [optimizationGuidance, setOptimizationGuidance] = useState("");
     const [optimizationResult, setOptimizationResult] = useState<AiOptimizeResultState>({ status: "idle" });
-    const [dontAskAgain, setDontAskAgain] = useState(false);
     const optimizationContext = JSON.stringify([activeTabId, graphName, activeConnectionId]);
     const optimizationOwnerRef = useRef<object>({});
     const optimizationAbortRef = useRef<AbortController | null>(null);
     useLayoutEffect(() => {
         optimizationOwnerRef.current = {};
         setPendingOptimization(null);
+        setOptimizationGuidance("");
         setOptimizationResult({ status: "idle" });
         setOptimizationOpen(false);
-        setDontAskAgain(false);
         return () => {
             optimizationOwnerRef.current = {};
             optimizationAbortRef.current?.abort();
@@ -275,9 +275,9 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     const showOptimizationError = useCallback((description: string) => {
         setPendingOptimization(null);
+        setOptimizationGuidance("");
         setOptimizationResult({ status: "idle" });
         setOptimizationOpen(false);
-        setDontAskAgain(false);
         toast({
             title: "Query optimization failed",
             description,
@@ -286,7 +286,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         });
     }, [router, toast]);
 
-    const startOptimization = useCallback(async (pending: PendingOptimizationRequest) => {
+    const startOptimization = useCallback(async (pending: PendingOptimizationRequest, guidance: string) => {
         optimizationAbortRef.current?.abort();
         const controller = new AbortController();
         optimizationAbortRef.current = controller;
@@ -297,6 +297,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             && getConnectionEpoch() === epoch
             && getActiveConnectionIdGlobal() === pending.connectionId;
         setPendingOptimization(null);
+        setOptimizationGuidance("");
         setOptimizationResult({ status: "loading" });
         setOptimizationOpen(true);
 
@@ -309,6 +310,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 signal: controller.signal,
                 body: JSON.stringify({
                     query: pending.query,
+                    guidance: guidance.trim() || undefined,
                     graphName: pending.graphName,
                     model: pending.model,
                     key: pending.modelSource === "local" ? "" : resolvedChatKey,
@@ -400,25 +402,19 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             query,
             graphName,
             connectionId: getActiveConnectionIdGlobal(),
-            provider: getProviderDisplayName(provider),
+            provider: chatModelSource === "local"
+                ? localLlmProvider === "lmstudio" ? "LM Studio" : "Ollama"
+                : getProviderDisplayName(provider),
             model,
             modelSource: chatModelSource,
             localProvider: localLlmProvider,
             localEndpoint: localLlmEndpoint,
         };
 
-        if (
-            chatModelSource === "api-key"
-            && localStorage.getItem(`aiOptimizeConsent-${provider}`) !== "true"
-        ) {
-            setOptimizationResult({ status: "idle" });
-            setDontAskAgain(false);
-            setPendingOptimization(pending);
-            setOptimizationOpen(true);
-            return;
-        }
-
-        void startOptimization(pending);
+        setOptimizationResult({ status: "idle" });
+        setOptimizationGuidance("");
+        setPendingOptimization(pending);
+        setOptimizationOpen(true);
     }, [
         historyQuery.query,
         graphName,
@@ -433,13 +429,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         resolvedChatKey,
         localLlmProvider,
         localLlmEndpoint,
-        startOptimization,
     ]);
 
     const confirmOptimization = useCallback(() => {
         if (!pendingOptimization) return;
         if (model !== pendingOptimization.model || chatModelSource !== pendingOptimization.modelSource) {
-            showOptimizationError("AI settings changed while consent was open. Start the optimization again.");
+            showOptimizationError("AI settings changed while optimization was open. Start the optimization again.");
             return;
         }
         if (
@@ -447,15 +442,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             || graphName !== pendingOptimization.graphName
             || getActiveConnectionIdGlobal() !== pendingOptimization.connectionId
         ) {
-            showOptimizationError("The query, graph, or connection changed while consent was open. Start the optimization again.");
+            showOptimizationError("The query, graph, or connection changed while optimization was open. Start the optimization again.");
             return;
         }
-        if (dontAskAgain) {
-            localStorage.setItem(`aiOptimizeConsent-${detectProviderFromModel(pendingOptimization.model)}`, "true");
-        }
-        setDontAskAgain(false);
-        void startOptimization(pendingOptimization);
-    }, [pendingOptimization, model, chatModelSource, historyQuery.query, graphName, dontAskAgain, startOptimization, showOptimizationError]);
+        void startOptimization(pendingOptimization, optimizationGuidance);
+    }, [pendingOptimization, optimizationGuidance, model, chatModelSource, historyQuery.query, graphName, startOptimization, showOptimizationError]);
 
     const handleOptimizationOpenChange = (open: boolean) => {
         setOptimizationOpen(open);
@@ -464,7 +455,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             optimizationAbortRef.current = null;
             setOptimizationResult({ status: "idle" });
             setPendingOptimization(null);
-            setDontAskAgain(false);
+            setOptimizationGuidance("");
         }
     };
 
@@ -1772,15 +1763,15 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             </Dialog>
             <AiOptimizeDialog
                 open={optimizationOpen}
-                pendingConsent={pendingOptimization}
-                dontAskAgain={dontAskAgain}
+                pendingRequest={pendingOptimization}
+                guidance={optimizationGuidance}
+                onGuidanceChange={setOptimizationGuidance}
                 result={optimizationResult}
                 currentQuery={historyQuery.query}
                 contextMatches={optimizationResult.status === "done"
                     && optimizationResult.context === optimizationContext
                     && optimizationResult.epoch === getConnectionEpoch()}
                 onOpenChange={handleOptimizationOpenChange}
-                onDontAskAgainChange={setDontAskAgain}
                 onConfirm={confirmOptimization}
                 onCancel={cancelOptimization}
                 onUseQuery={useOptimizedQuery}
