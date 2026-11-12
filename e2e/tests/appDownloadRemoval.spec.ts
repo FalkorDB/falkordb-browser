@@ -7,10 +7,18 @@ import MobileGraphPage from "../logic/POM/mobileGraphPage";
 
 const RELEASE_ASSET = "https://github.com/FalkorDB/falkordb-browser/releases/download/v2.7.4/FalkorDB-Browser-mac-arm64.dmg";
 const RELEASE_URL = "https://github.com/FalkorDB/falkordb-browser/releases/tag/v2.7.4";
+// The removed prompt opened 1.5 seconds after becoming eligible.
+const FORMER_PROMPT_DELAY_MS = 2000;
 
 test.describe("@admin App download removal", () => {
     test("desktop app downloads remain available only in release notes", async ({ page }) => {
-        await page.addInitScript(() => localStorage.setItem("whatsNewSeen", "v999.0.0"));
+        await page.clock.install();
+        await page.addInitScript(() => {
+            localStorage.setItem("whatsNewSeen", "v999.0.0");
+            localStorage.setItem("tutorial", "false");
+            localStorage.removeItem("appDownloadPrompt");
+            sessionStorage.removeItem("appDownloadPromptShown");
+        });
         await page.route("**/api/releases", (route) => route.fulfill({
             json: {
                 releases: [{
@@ -28,12 +36,13 @@ test.describe("@admin App download removal", () => {
         await page.goto(urls.graphUrl);
         await header.clickOnHelpBtn();
         await expect(header.releasesButton).toBeVisible();
-        await expect(downloads.prompt).toHaveCount(0);
         await expect(downloads.downloadLink).toHaveCount(0);
         await expect(downloads.alternateDownloadLink).toHaveCount(0);
         await header.releasesButton.click();
 
         await expect(downloads.releaseLink("v2.7.4", "macOS")).toHaveAttribute("href", RELEASE_ASSET);
+        await page.clock.runFor(FORMER_PROMPT_DELAY_MS);
+        await expect(downloads.prompt).toHaveCount(0);
     });
 
     test("app download API endpoints are no longer available", async ({ request }) => {
@@ -49,9 +58,16 @@ test.describe("@admin App download removal", () => {
             const page = await context.newPage();
             const login = new LoginPage(page);
             const downloads = new AppDownloadRemovalPage(page);
+            await page.clock.install();
+            await page.addInitScript(() => {
+                localStorage.setItem("whatsNewSeen", "v999.0.0");
+                localStorage.removeItem("appDownloadPrompt");
+                sessionStorage.removeItem("appDownloadPromptShown");
+            });
             await page.goto(urls.loginUrl);
             await expect(login.logInButton).toBeVisible();
             await expect(downloads.downloadLink).toHaveCount(0);
+            await page.clock.runFor(FORMER_PROMPT_DELAY_MS);
             await expect(downloads.prompt).toHaveCount(0);
         } finally {
             await context.close();
