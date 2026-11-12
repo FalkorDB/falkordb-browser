@@ -358,7 +358,7 @@ test.describe("@admin Graph tabs", () => {
         }
     });
 
-    for (const portal of ["maximized editor", "toolbar delete"] as const) {
+    for (const portal of ["maximized editor", "toolbar delete", "create graph", "manage graphs"] as const) {
     test(`Delayed connection discovery closes the ${portal} when readiness is lost`, async () => {
         test.setTimeout(60_000);
         const graph = await browser.createNewPage(GraphPage);
@@ -400,12 +400,20 @@ test.describe("@admin Graph tabs", () => {
             if (portal === "maximized editor") {
                 await page.getByTestId("editorMaximize").click();
                 await expect(page.getByTestId("editorMinimize")).toBeVisible();
-            } else {
+            } else if (portal === "toolbar delete") {
                 await graph.insertQuery("CREATE (n:Readiness {name: 'readiness'}) RETURN n");
                 await graph.clickRunQuery();
                 await graph.searchElementInCanvas("readiness");
                 await page.getByTestId("deleteElementGraph").click();
                 await expect(page.getByTestId("deleteElementConfirmGraph")).toBeVisible();
+            } else if (portal === "create graph") {
+                await graph.create.click();
+                await graph.insertInput.fill("unsaved-readiness-graph");
+                await expect(graph.createConfirm).toBeVisible();
+            } else {
+                await graph.select().click();
+                await graph.manage.click();
+                await expect(graph.manageContent).toBeVisible();
             }
             releaseDiscovery();
             await expect.poll(() => syncCompleted, { timeout: 15000 }).toBe(true);
@@ -414,11 +422,25 @@ test.describe("@admin Graph tabs", () => {
             await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
             await expect(page.getByTestId("editorMinimize")).toHaveCount(0);
             await expect(page.getByTestId("deleteElementConfirmGraph")).toHaveCount(0);
+            await expect(graph.createConfirm).toHaveCount(0);
+            await expect(graph.manageContent).toHaveCount(0);
+            await expect(graph.create).toBeDisabled();
+            await expect(graph.select()).toBeDisabled();
             await expect(page.getByTestId("editorRun")).toBeDisabled();
             await expect(page.getByTestId("editorRun")).toHaveAttribute("aria-label", "Restoring graph tabs");
             releaseLists();
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+            await expect(graph.createConfirm).toHaveCount(0);
+            await expect(graph.manageContent).toHaveCount(0);
+            if (portal === "create graph") {
+                await graph.create.click();
+                await expect(graph.insertInput).toHaveValue("");
+            } else if (portal === "manage graphs") {
+                await graph.select().click();
+                await graph.manage.click();
+                await expect(graph.manageContent).toBeVisible();
+            }
         } finally {
             releaseDiscovery();
             releaseLists();

@@ -121,8 +121,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <h1 className="text-lg font-semibold">Graph Info</h1>
                             <Network size={20} className="text-foreground/50" />
                         </div>
+                        {/* Remount the controls on readiness changes so their portals cannot outlive this boundary. */}
                         <fieldset disabled={!tabsReady} className="w-full min-w-0 flex gap-2 items-center overflow-hidden" inert={tabsReady ? undefined : true}>
                             <SelectGraph
+                                key={tabsReady ? "ready" : "restoring"}
                                 options={graphNames}
                                 setOptions={handleSetOptions}
                                 selectedValue={graphName}
@@ -132,6 +134,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             {
                                 !isReadOnly &&
                                 <CreateGraph
+                                    key={tabsReady ? "ready" : "restoring"}
                                     graphNames={graphNames ?? []}
                                     onSetGraphName={handleGraphCreated}
                                     trigger={
