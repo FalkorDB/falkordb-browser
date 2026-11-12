@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState, useContext } from "react";
-import { prepareArg, securedFetch, Row, DataCell } from "@/lib/utils";
+import { prepareArg, securedFetch, Row } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
@@ -194,7 +194,7 @@ export default function Configurations() {
         toast({
             title: "Success",
             description: "Configuration value set successfully",
-            action: valueToRestore !== undefined && valueToRestore !== null && isUndo ?
+            action: valueToRestore !== undefined && valueToRestore !== null && valueToRestore !== "" && isUndo ?
                 <ToastButton
                     showUndo
                     onClick={() => handleSetConfig(name, String(valueToRestore), false)}
@@ -237,7 +237,6 @@ export default function Configurations() {
                     !disableRunTimeConfigs.has(name)
                         ? {
                             value: formattedValue,
-                            onChange: (val: string) => handleSetConfig(name, val, true),
                             type: "text",
                         }
                         : {
@@ -265,7 +264,15 @@ export default function Configurations() {
                 label="Configs"
                 entityName="Config"
                 headers={["Name", "Description", "Value"]}
-                rows={configs}
+                rows={configs.map(config => ({
+                    ...config,
+                    cells: config.cells.map(cell => cell.type === "text"
+                        ? {
+                            ...cell,
+                            onChange: (value: string) => handleSetConfig(String(config.cells[0].value), value, true)
+                        }
+                        : cell)
+                }))}
                 itemHeight={60}
             />
         </div>

@@ -29,6 +29,7 @@ The search bar now indexes schema, nodes, and metadata. Results are ranked more 
 
 #### Expanded Settings & User Controls  
 New options let you fine-tune database behavior, toggle visual preferences, and manage users without falling back to CLI tools.
+Database configuration edits offer Undo to restore the immediately preceding value, including zero; empty prior values cannot be restored.
 
 #### Node Style Customization  
 Customize the visual appearance of nodes per label. Select custom colors from a palette, adjust node sizes, and choose which property to display as the node caption. All customizations are saved per graph and persist across sessions.
@@ -389,3 +390,6 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
+  The isolated configuration Undo regressions use real React rendering with table/toast
+  presentation and HTTP fixtures; no application server or database is required:
+  `npx playwright test e2e/tests/configurationsUndo.spec.ts --project="Configurations component" --workers=1`.
