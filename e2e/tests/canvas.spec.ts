@@ -66,6 +66,11 @@ test.describe('Canvas Tests', () => {
             await graph.clickRunQuery();
             await graph.fillElementCanvasSearch("existing-search-node");
             await expect(graph.elementCanvasSuggestionList.locator("li")).toHaveCount(1);
+            await graph.elementCanvasSearch.press("Escape");
+            await expect(graph.elementCanvasSearch).toHaveValue("");
+            await expect(graph.elementCanvasSuggestionList).toBeHidden();
+            await graph.fillElementCanvasSearch("existing-search-node");
+            await expect(graph.elementCanvasSuggestionList.locator("li")).toHaveCount(1);
             await graph.fillElementCanvasSearch("no-such-canvas-value");
             await expect(graph.elementCanvasSuggestionList).toBeHidden();
             await graph.elementCanvasSearch.press("Enter");
