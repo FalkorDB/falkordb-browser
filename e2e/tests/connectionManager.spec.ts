@@ -195,9 +195,15 @@ test.describe("Connection Manager Tests", () => {
         attempts.push(route.request().postDataJSON());
         await route.continue();
       });
+      const rejectedResponse = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === "/api/connections"
+        && response.request().method() === "POST");
       const dialog = await manager.submitAdditionalConnection("readwriteuser", "first-attempt");
+      const response = await rejectedResponse;
+      expect(response.status()).toBe(400);
+      expect((await response.json()).message).toMatch(/^Authentication failed/);
       await expect(dialog.getByRole("button", { name: "Add Connection", exact: true })).toBeDisabled();
-      await expect(dialog.getByText(/^Authentication failed/)).toBeVisible();
+      await expect(dialog.getByText("Failed to add connection", { exact: true })).toBeVisible();
       await dialog.locator("#Password").fill(user.password);
       await expect(dialog.getByRole("button", { name: "Add Connection", exact: true })).toBeEnabled();
       await dialog.getByRole("button", { name: "Add Connection", exact: true }).click();
