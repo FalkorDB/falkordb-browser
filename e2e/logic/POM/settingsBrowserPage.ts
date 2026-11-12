@@ -12,7 +12,7 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.getByTestId("chatSectionHeader");
   }
 
-  private get chatApiKeyInput(): Locator {
+  public get chatApiKeyInput(): Locator {
     return this.page.getByTestId("chatApiKeyInput");
   }
 
@@ -28,11 +28,11 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.getByTestId("chatApiKeyProvidersInfo");
   }
 
-  private get addChatApiKeyButton(): Locator {
+  public get addChatApiKeyButton(): Locator {
     return this.page.getByTestId("addChatApiKeyButton");
   }
 
-  private get chatApiKeyCards(): Locator {
+  public get chatApiKeyCards(): Locator {
     return this.page.getByTestId("chatApiKeyCard");
   }
 
@@ -44,7 +44,7 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.getByTestId("localLlmProviderLmStudio");
   }
 
-  private get localLlmEndpointInput(): Locator {
+  public get localLlmEndpointInput(): Locator {
     return this.page.getByTestId("localLlmEndpointInput");
   }
 
@@ -66,11 +66,11 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   // Model Selector Elements
-  private get modelSearchInput(): Locator {
+  public get modelSearchInput(): Locator {
     return this.page.getByTestId("modelSearch");
   }
 
-  private getModelButton(modelName: string): Locator {
+  public getModelButton(modelName: string): Locator {
     return this.page.getByTestId(`selectModel${modelName}`);
   }
 
@@ -83,8 +83,24 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.locator(`h3.text-sm.font-bold:has-text("${categoryName}")`);
   }
 
-  private get noModelsFoundMessage(): Locator {
+  public get noModelsFoundMessage(): Locator {
     return this.page.getByTestId("noModelsFoundMessage");
+  }
+
+  feedbackMessage(text: string): Locator {
+    return this.page.getByText(text, { exact: true });
+  }
+
+  async reloadLocalModels(): Promise<void> {
+    await this.localLlmLoadButton.click();
+  }
+
+  async submitChatApiKey(): Promise<void> {
+    await interactWhenVisible(
+      this.addChatApiKeyButton,
+      (el) => el.click(),
+      "Add Chat API Key Button"
+    );
   }
 
   // Wait for Interactive Methods
@@ -235,10 +251,7 @@ export default class SettingsBrowserPage extends BasePage {
   async fillLocalLlmEndpoint(endpoint: string): Promise<void> {
     await interactWhenVisible(
       this.localLlmEndpointInput,
-      async (el) => {
-        await el.clear();
-        await el.fill(endpoint);
-      },
+      (el) => el.fill(endpoint),
       "Local LLM Endpoint Input"
     );
   }
@@ -312,11 +325,7 @@ export default class SettingsBrowserPage extends BasePage {
 
   async addChatApiKey(apiKey: string): Promise<void> {
     await this.fillChatApiKey(apiKey);
-    await interactWhenVisible(
-      this.addChatApiKeyButton,
-      (el) => el.click(),
-      "Add Chat API Key Button"
-    );
+    await this.submitChatApiKey();
     await this.getMaskedChatApiKeyCard(apiKey).waitFor({ state: "visible", timeout: 5000 });
   }
 
