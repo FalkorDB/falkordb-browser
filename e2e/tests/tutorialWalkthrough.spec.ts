@@ -1171,6 +1171,49 @@ test.describe("Tutorial", () => {
         }
     });
 
+    test("@admin closing reports pending ownership even when cleanup verification fails", async () => {
+        test.setTimeout(60_000);
+        const scope = "localhost:6379:default:";
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
+        let pendingGraph = "";
+        let failVerification = false;
+        await page.route(url => url.pathname === "/api/graph", route => {
+            if (failVerification && route.request().method() === "GET") {
+                failVerification = false;
+                return route.fulfill({ status: 503, json: { message: "Graph list unavailable" } });
+            }
+            return route.continue();
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+            pendingGraph = await page.evaluate(scope => {
+                const owner = sessionStorage.getItem("tutorialDemoOwnerId");
+                const key = `${scope}tutorialDemoGraphOwnership:${owner}`;
+                const stored = localStorage.getItem(key);
+                if (!owner || !stored) throw new Error("Missing active tutorial ownership");
+                const ownership = JSON.parse(stored) as { names: string[]; pendingNames: string[] };
+                const pending = ownership.names[0];
+                if (!pending) throw new Error("Missing tutorial graph");
+                ownership.pendingNames = [pending];
+                localStorage.setItem(key, JSON.stringify(ownership));
+                return pending;
+            }, scope);
+            failVerification = true;
+            await tutorial.skip();
+            await expect(page.getByText("Tutorial cleanup failed", { exact: true }).first()).toBeVisible();
+            await expect(page.getByTestId("toast-description")).toContainText("Unconfirmed samples were retained for manual verification");
+            expect((await apiCall.getGraphs()).opts).toContain(pendingGraph);
+        } finally {
+            if (pendingGraph) {
+                const { message } = await apiCall.removeGraph(pendingGraph, "admin");
+                expect(message).toMatch(/deleted|empty key/);
+            }
+        }
+    });
+
     test("@admin closing the tutorial cannot restore and recreate another owner's reclaimed sample", async () => {
         test.setTimeout(60_000);
         const suffix = getRandomString("snapshot").replaceAll("_", "-");

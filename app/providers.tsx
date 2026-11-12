@@ -3343,19 +3343,30 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // at another connection the record cannot be verified, so it is left in
     // place for the next tutorial in that scope to reclaim.
     if (connection && getConnectionPrefix() === connection.scope) {
+      let hasPendingOwnership = false;
       try {
         const ownerId = await getTutorialDemoOwnerId();
         const ownership = readTutorialDemoOwnership(connection.scope, ownerId);
         const reclaimable = getTutorialDemoReclaimableNames(ownership);
+        hasPendingOwnership = (ownership.pendingNames ?? ownership.names).length > 0;
+        try {
+          notifyPendingTutorialOwnership(ownership);
+        } catch (error) {
+          console.error("Failed to notify about pending tutorial ownership", error);
+        }
         const remaining = await cleanupAndPersistTutorialGraphs(connection.scope, connection.cid, ownerId, reclaimable);
         const reclaimableSet = new Set(reclaimable);
         demoGraphNamesRef.current = [...ownership.names.filter(name => !reclaimableSet.has(name)), ...remaining];
-        notifyPendingTutorialOwnership(ownership);
         if (remaining.length > 0) throw new Error("Some tutorial graphs could not be removed");
         await reclaimAbandonedTutorialGraphs(connection, ownerId);
       } catch (error) {
         console.error("Failed to cleanup demo graphs", error);
-        toast({ title: "Tutorial cleanup failed", description: "Some tutorial samples may remain. Cleanup will be retried on your next visit." });
+        toast({
+          title: "Tutorial cleanup failed",
+          description: hasPendingOwnership
+            ? "Some confirmed tutorial samples may remain and cleanup will be retried on your next visit. Unconfirmed samples were retained for manual verification and will not be deleted automatically."
+            : "Some tutorial samples may remain. Cleanup will be retried on your next visit.",
+        });
       }
       try {
         const ownerId = await getTutorialDemoOwnerId();
@@ -3365,7 +3376,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           .filter(name => verified.opts.includes(name) && !recordedTutorialNames.has(name));
       } catch (error) {
         console.error("Could not verify the graphs to restore after the tutorial", error);
-        toast({ title: "Tutorial cleanup failed", description: "Could not verify your graph list. It will be refreshed before restoring a selection." });
+        toast({
+          title: "Tutorial cleanup failed",
+          description: hasPendingOwnership
+            ? "Could not verify your graph list. It will be refreshed before restoring a selection. Unconfirmed samples were retained for manual verification and will not be deleted automatically."
+            : "Could not verify your graph list. It will be refreshed before restoring a selection.",
+        });
       }
     } else if (connection) {
       console.error("Tutorial graph cleanup skipped: storage no longer matches the tutorial's connection; retaining its ownership record");
