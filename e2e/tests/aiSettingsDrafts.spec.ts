@@ -42,6 +42,7 @@ test("@admin a retained optimization toast cannot leak URL synchronization after
   const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
   expect(created.ok()).toBe(true);
   try {
+    await page.clock.install();
     await page.goto(`${urls.graphUrl}?graph=${graphName}&query=RETURN%201`);
     await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", "RETURN 1", { timeout: 30000 });
     await page.getByTestId("editorOptimize").click();
@@ -50,10 +51,9 @@ test("@admin a retained optimization toast cannot leak URL synchronization after
     await expect(page).toHaveURL(/\/settings/, { timeout: 30000 });
     await page.goBack();
     await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", query);
-    await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
-    await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
+    await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 250)));
     query = "RETURN 4242 AS retained_toast_draft";
-    await new GraphPage(page).insertQuery(query);
+    await new GraphPage(page).insertQuery(query, { focus: false });
     const settingsResponse = holdSettingsResponse(page);
     releaseSettingsResponse = settingsResponse.release;
     await settingsResponse.installed;
@@ -245,6 +245,7 @@ for (const { feature, scenario } of cases) {
     const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
     expect(created.ok()).toBe(true);
     try {
+      if (feature === "fix" && scenario === "missing-key") await page.clock.install();
       await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=${encodeURIComponent(query)}`);
       const graph = new GraphPage(page);
       await expect(graph.editorContainer).toHaveAttribute("data-value", query, { timeout: 30_000 });
@@ -281,10 +282,9 @@ for (const { feature, scenario } of cases) {
           await page.goBack();
           await expect(graph.editorContainer).toHaveAttribute("data-value", query);
           await expect(page.getByRole("button", { name: "Go to Settings", exact: true })).toBeVisible();
-          await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
-          await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
+          await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 250)));
           query = "RETURN 4242 AS retained_fix_draft";
-          await graph.insertQuery(query);
+          await graph.insertQuery(query, { focus: false });
           const settingsResponse = holdSettingsResponse(page);
           releaseSettingsResponse = settingsResponse.release;
           await settingsResponse.installed;
