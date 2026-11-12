@@ -83,7 +83,7 @@ export default class GraphPage extends BasePage {
   }
 
   public get uploadDialog(): Locator {
-    return this.page.getByRole("dialog");
+    return this.page.getByRole("dialog", { name: "Upload Data", exact: true });
   }
 
   public get uploadFileInput(): Locator {
