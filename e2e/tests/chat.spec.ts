@@ -86,11 +86,28 @@ test.describe("Chat Feature Tests", () => {
   });
 
   test(`@readwrite Verify chat button is disabled when no graph is selected`, async () => {
-    await createChatPageWithGraphList(browser, []);
-    const page = await browser.getPage();
-    await expect(page.getByTestId("selectGraph")).toBeDisabled();
-    await expect(page.getByTestId("chatToggleButton")).toBeVisible();
-    await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
+    // The graph page auto-selects the only graph when exactly one exists, and
+    // parallel tests on the shared FalkorDB often create exactly one. Two of our
+    // own keep the count above one so nothing gets auto-selected.
+    const graphNames = [getRandomString("chat"), getRandomString("chat")];
+    await Promise.all(graphNames.map((name) => apiCall.addGraph(name)));
+
+    try {
+      await browser.createNewPage(ChatComponent);
+      const page = await browser.getPage();
+      await page.addInitScript(() => {
+        for (const key of Object.keys(localStorage)) {
+          if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
+        }
+      });
+      await page.goto(urls.graphUrl);
+      await browser.setPageToFullScreen();
+
+      await expect(page.getByTestId("chatToggleButton")).toBeVisible();
+      await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
+    } finally {
+      await Promise.all(graphNames.map((name) => apiCall.removeGraph(name)));
+    }
   });
 
   test(`@readwrite Verify chat button is displayed when a graph is selected`, async () => {
