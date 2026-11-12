@@ -8,6 +8,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import CustomizeStylePage from "../logic/POM/customizeStylePage";
 import DataPanel from "../logic/POM/dataPanelComponent";
 import urls from "../config/urls.json";
+// The package root imports force-graph, which requires window in this Node-side spec.
 import { LINK_WIDTH, LINK_FONT_SIZE, ARROW_SIZE } from "@falkordb/canvas/dist/canvas-utils.js";
 
 test.describe("Customize Style Tests", () => {
@@ -105,6 +106,14 @@ test.describe("Customize Style Tests", () => {
       expect(await readPersisted()).toBeNull();
       await graph.selectSizeByIndex(originalSize === 5 ? 2 : 5);
       expect(await readPersisted()).toBeNull();
+      await expect.poll(async () => {
+        const [preview] = await linkStyle();
+        return preview
+          && preview.color !== originalLinks[0].color
+          && preview.width !== originalLinks[0].width
+          && preview.fontSize !== originalLinks[0].fontSize
+          && preview.arrowSize !== originalLinks[0].arrowSize;
+      }).toBe(true);
       await graph.clickCancelStyleButton();
       await expect(graph.saveStyleButton).toBeHidden();
       expect(await graph.getSelectedColorButtonIndex()).toBe(originalColor);
