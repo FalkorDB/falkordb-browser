@@ -309,6 +309,60 @@ test.describe("@admin Graph tabs", () => {
         }
     });
 
+    test("A graph created during same-connection discovery is selected after bootstrap", async () => {
+        test.setTimeout(60_000);
+        const graph = await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        await page.setViewportSize({ width: 1400, height: 900 });
+        const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
+        const { connections } = await (await page.request.get(`${urls.localHost}/api/connections`)).json();
+        const connection = connections.find((candidate: { id: string }) => candidate.id === session.activeConnectionId);
+        expect(connection).toBeTruthy();
+        let releaseDiscovery!: () => void;
+        const discoveryGate = new Promise<void>(resolve => { releaseDiscovery = resolve; });
+        let releaseCreate!: () => void;
+        const createGate = new Promise<void>(resolve => { releaseCreate = resolve; });
+        let syncCompleted = false;
+        let createStarted = false;
+        let initialConnectionHeader: string | undefined;
+        await page.route("**/api/connections", async route => {
+            await discoveryGate;
+            await route.fulfill({ json: { connections: [connection] } });
+        });
+        await page.route("**/api/auth/session", async route => {
+            if (route.request().method() === "POST") syncCompleted = true;
+            await route.fulfill({ json: session });
+        });
+        await page.route("**/api/graph", route => route.fulfill({ json: { opts: [graphOne, graphTwo] } }));
+        await page.route("**/api/graph/bootstrap-created-graph", async route => {
+            if (route.request().method() !== "POST") {
+                await route.continue();
+                return;
+            }
+            initialConnectionHeader = route.request().headers()["x-connection-id"];
+            createStarted = true;
+            await createGate;
+            await route.fulfill({ json: {} });
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
+            await graph.create.click();
+            await graph.insertInput.fill("bootstrap-created-graph");
+            await graph.createConfirm.click();
+            await expect.poll(() => createStarted).toBe(true);
+            expect(initialConnectionHeader).toBeUndefined();
+            releaseDiscovery();
+            await expect.poll(() => syncCompleted, { timeout: 15000 }).toBe(true);
+            releaseCreate();
+            await expect(graph.stripTab("bootstrap-created-graph")).toBeVisible();
+            await expect(page.getByTestId("toast-title").filter({ hasText: "Graph created successfully" })).toBeVisible();
+        } finally {
+            releaseDiscovery();
+            releaseCreate();
+        }
+    });
+
     test("Delayed same-connection discovery preserves tutorial selector demos", async () => {
         test.setTimeout(60_000);
         const tutorial = await browser.createNewPage(TutorialPanel);

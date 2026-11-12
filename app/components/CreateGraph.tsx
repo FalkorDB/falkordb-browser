@@ -15,6 +15,7 @@ import CloseDialog from "./CloseDialog";
 import Input from "./ui/Input";
 import Dropzone from "./ui/Dropzone";
 import { Progress } from "@/components/ui/progress";
+import { useSession } from "next-auth/react";
 import { IndicatorContext, ConnectionContext } from "./provider";
 
 interface Props {
@@ -44,6 +45,7 @@ export default function CreateGraph({
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { data: session } = useSession();
 
     const { toast } = useToast();
 
@@ -71,7 +73,8 @@ export default function CreateGraph({
         const pending = pendingCreatedGraphRef.current;
         if (!ready || !pending) return;
         pendingCreatedGraphRef.current = null;
-        if (getConnectionEpoch() !== pending.epoch || getActiveConnectionIdGlobal() !== pending.connectionId) return;
+        const currentConnectionId = getActiveConnectionIdGlobal();
+        if (getConnectionEpoch() !== pending.epoch || (currentConnectionId !== null && currentConnectionId !== pending.connectionId)) return;
         publishCreatedGraph(pending.name, pending.hasDump);
     }, [ready, publishCreatedGraph]);
 
@@ -93,6 +96,7 @@ export default function CreateGraph({
         if (!ready || isLoading) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
+        const connectionId = cid ?? session?.activeConnectionId ?? null;
         try {
             setIsLoading(true);
             const name = graphName.trim();
@@ -165,10 +169,11 @@ export default function CreateGraph({
                 if (!processResult.ok) return;
             }
 
-            if (getConnectionEpoch() !== startEpoch || getActiveConnectionIdGlobal() !== cid) return;
+            const currentConnectionId = getActiveConnectionIdGlobal();
+            if (getConnectionEpoch() !== startEpoch || (currentConnectionId !== null && currentConnectionId !== connectionId)) return;
 
             if (!readyRef.current) {
-                pendingCreatedGraphRef.current = { name, epoch: startEpoch, connectionId: cid, hasDump };
+                pendingCreatedGraphRef.current = { name, epoch: startEpoch, connectionId, hasDump };
                 return;
             }
             publishCreatedGraph(name, hasDump);
