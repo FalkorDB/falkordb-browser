@@ -1699,11 +1699,17 @@ function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>): number[] 
   const keyword = /(?<![\p{ID_Continue}\p{Sc}])UNION(?![\p{ID_Continue}\p{Sc}])/giu;
   const clauses: number[] = [];
   let quotedIndex = 0;
+  let scanned = 0;
+  let depth = 0;
   let previousQuote: { end: number; quote: string } | undefined;
   let match = keyword.exec(code);
   while (match) {
     const unionStart = match.index;
     const unionEnd = unionStart + match[0].length;
+    for (; scanned < unionStart; scanned += 1) {
+      if ("([{".includes(code[scanned])) depth += 1;
+      else if (")]}".includes(code[scanned])) depth -= 1;
+    }
     const before = code.slice(0, unionStart).trimEnd();
     const after = code.slice(unionEnd);
     while (quotedIndex < quotedTokens.length && quotedTokens[quotedIndex].end <= unionStart) {
@@ -1713,6 +1719,7 @@ function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>): number[] 
     const wildcardProjection = /\bRETURN\s+(?:DISTINCT\s+)?\*$/i.test(before);
     const keywordIdentifier = /(?:[.:$]\s*|\bAS\s+)(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)$/i.test(before);
     if (
+      depth === 0 &&
       (!/[.:$,([{/*+%<>=|&^-]$/.test(before) || previousQuotedToken || wildcardProjection) &&
       (previousQuotedToken || keywordIdentifier || !/\b(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)\s*$/i.test(before)) &&
       /^\s+(?:ALL\s+)?(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD|FOREACH)\b/i.test(after)

@@ -92,6 +92,8 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
     assert.deepEqual(getQueryWithLimit(parameterized, 300), [parameterized, 0]);
     const nested = "CALL /* c */ { RETURN 1 AS x } RETURN x UNION CALL { RETURN 2 AS x LIMIT 5 } RETURN x";
     assert.deepEqual(getQueryWithLimit(nested, 300), [`${nested} LIMIT 300`, 300]);
+    const nestedUnion = "CALL /* c */ { RETURN 1 AS x } RETURN x UNION CALL { RETURN 2 AS x UNION RETURN 3 AS x } RETURN x LIMIT 5";
+    assert.deepEqual(getQueryWithLimit(nestedUnion, 300), [nestedUnion, 5]);
   });
 
   it("recognises UNION after wildcard and keyword-named property projections", () => {
