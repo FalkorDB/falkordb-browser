@@ -14,6 +14,28 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem("model", "ollama::llama3.2");
   });
   await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch;
+    let settled = 0;
+    const markSettled = () => {
+      // Run after the caller's promise handlers and React's resulting paint.
+      setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.documentElement.dataset.aiFixSettled = String(++settled);
+      })), 0);
+    };
+    window.fetch = async (input, init) => {
+      if (input !== "/api/chat/fix") return originalFetch(input, init);
+      let response: Response;
+      try {
+        response = await originalFetch(input, init);
+      } catch (error) {
+        markSettled();
+        throw error;
+      }
+      void response.clone().arrayBuffer().then(markSettled, markSettled);
+      return response;
+    };
+  });
 });
 
 for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
@@ -47,6 +69,7 @@ for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
       }
       await aborted;
       await request.fulfill({ json: { explanation: "Stale result", correctedQuery: "RETURN 2" } });
+      await expect(page.locator("html")).toHaveAttribute("data-ai-fix-settled", "1");
       await expect(page.getByTestId("aiFixCancel")).toHaveCount(0);
       await expect(page.getByTestId("aiFixResultPanel")).toHaveCount(0);
     } finally {
@@ -86,6 +109,7 @@ for (const staleStatus of [200, 422, 401]) {
       const newRequest = await second.promise;
       await newRequest.fulfill({ json: { explanation: "Newest result", correctedQuery: "RETURN 3" } });
       await expect(page.getByTestId("aiFixQuery")).toHaveText("RETURN 3");
+      await expect(page.locator("html")).toHaveAttribute("data-ai-fix-settled", "1");
       const response = page.waitForResponse("**/api/chat/fix");
       await oldRequest.fulfill({
         status: staleStatus,
@@ -95,6 +119,7 @@ for (const staleStatus of [200, 422, 401]) {
           : { error: "Stale failure" },
       });
       await response;
+      await expect(page.locator("html")).toHaveAttribute("data-ai-fix-settled", "2");
       await expect(page.getByTestId("aiFixQuery")).toHaveText("RETURN 3");
       await expect(page).toHaveURL(/\/graph/);
       await page.getByTestId("aiFixInsert").click();

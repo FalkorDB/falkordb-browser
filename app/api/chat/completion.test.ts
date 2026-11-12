@@ -54,8 +54,8 @@ describe("shared AI completion transport", () => {
     if (result.ok) assert.equal(parseFixResponse(result.reply, "RETRUN 1").correctedQuery, "RETURN 1");
   });
 
-  for (const model of ["gpt-5", "openai:gpt-5-mini", "openai::gpt-5-pro-2025-10-06", "gpt-5.1", "o1", "o3-pro", "o4-mini"]) {
-    it(`omits unsupported sampling options for ${model} and allows reasoning time`, async (t) => {
+  for (const model of ["gpt-4o-mini", "gpt-5", "openai:gpt-5-mini", "openai::gpt-5-pro-2025-10-06", "gpt-5.1", "o1", "o3-pro", "o4-mini", "gpt-6-preview", "o5-mini", "codex-mini-latest"]) {
+    it(`uses Responses without sampling options for hosted OpenAI model ${model}`, async (t) => {
       const timeout = t.mock.method(AbortSignal, "timeout", () => new AbortController().signal);
       t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
         assert.equal(url, "https://api.openai.com/v1/responses");
@@ -63,12 +63,11 @@ describe("shared AI completion transport", () => {
         return Response.json(responsesBody("reply"));
       });
       assert.deepEqual(await requestAiCompletion({ ...input, model }), { ok: true, reply: "reply" });
-      assert.equal(timeout.mock.calls[0].arguments[0], 300_000);
+      assert.equal(timeout.mock.calls[0].arguments[0], 240_000);
     });
   }
 
   for (const config of [
-    { target: input.target, model: "gpt-4o-mini", url: "https://api.openai.com/v1/chat/completions" },
     { target: { source: "api-key", provider: "groq" } as const, model: "groq::llama-3.3-70b", url: "https://api.groq.com/openai/v1/chat/completions" },
     { target: { source: "api-key", provider: "xai" } as const, model: "xai::grok-3", url: "https://api.x.ai/v1/chat/completions" },
     { target: { source: "local", localProvider: "ollama", localEndpoint: "http://localhost:11434" } as const, model: "ollama::gpt-5-custom", url: "http://localhost:11434/v1/chat/completions" },
@@ -124,17 +123,23 @@ describe("shared AI completion transport", () => {
     });
   }
 
-  it("caps streamed provider bodies, including unsuccessful responses", async (t) => {
-    let cancelled = false;
-    t.mock.method(globalThis, "fetch", async () => new Response(new ReadableStream({
-      start(controller) { controller.enqueue(new Uint8Array(256 * 1024 + 1)); },
-      cancel() { cancelled = true; },
-    })));
-    const result = await requestAiCompletion(input);
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.match(result.error, /too large/);
-    assert.equal(cancelled, true);
-  });
+  for (const status of [200, 400, 429, 503]) {
+    it(`caps oversized streamed provider bodies with HTTP ${status}`, async (t) => {
+      t.mock.method(console, "warn", () => {});
+      let cancelled = false;
+      t.mock.method(globalThis, "fetch", async () => new Response(new ReadableStream({
+        start(controller) { controller.enqueue(new Uint8Array(256 * 1024 + 1)); },
+        cancel() { cancelled = true; },
+      }), { status }));
+      const result = await requestAiCompletion(input);
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(result.status, 422);
+        assert.match(result.error, status === 200 ? /too large/ : status === 400 ? /HTTP 400/ : status === 429 ? /rate limit/ : /temporarily unavailable/);
+      }
+      assert.equal(cancelled, true);
+    });
+  }
 
   it("preserves authentication errors when an oversized failure body is cancelled", async (t) => {
     t.mock.method(console, "warn", () => {});

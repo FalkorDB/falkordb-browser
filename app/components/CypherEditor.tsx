@@ -402,7 +402,9 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             query,
             graphName,
             connectionId: getActiveConnectionIdGlobal(),
-            provider: getProviderDisplayName(provider),
+            provider: chatModelSource === "local"
+                ? localLlmProvider === "lmstudio" ? "LM Studio" : "Ollama"
+                : getProviderDisplayName(provider),
             model,
             modelSource: chatModelSource,
             localProvider: localLlmProvider,

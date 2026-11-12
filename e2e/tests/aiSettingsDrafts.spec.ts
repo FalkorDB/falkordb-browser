@@ -9,6 +9,29 @@ const urls = { graphUrl: `${baseUrl}/graph`, api: { graphUrl: `${baseUrl}/api/gr
 
 const TEST_KEY = "sk-demo-not-a-real-api-key";
 
+test("@admin Optimize identifies LM Studio as the local data recipient", async ({ page }) => {
+  const graphName = getRandomString("aiOptimizeLmStudio");
+  await page.addInitScript(initializeLocalStorage());
+  await page.addInitScript(() => {
+    localStorage.setItem("chatModelSource", "local");
+    localStorage.setItem("localLlmProvider", "lmstudio");
+    localStorage.setItem("model", "openai::local-test-model");
+  });
+  await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
+  expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+  try {
+    await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+    await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+    await page.getByTestId("editorOptimize").click();
+    const dialog = page.getByTestId("aiOptimizeContent");
+    await expect(dialog).toContainText("will be sent to LM Studio");
+    await expect(dialog).not.toContainText("will be sent to OpenAI");
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  } finally {
+    expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+  }
+});
+
 test("@admin query assistance routes preserve provider error status without leaking its body", async ({ page }) => {
   const graphName = getRandomString("aiProviderStatus");
   let providerStatus = 401;
