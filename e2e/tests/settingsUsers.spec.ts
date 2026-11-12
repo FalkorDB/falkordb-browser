@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
+import type { CreateUser } from "@/app/api/user/model";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
@@ -17,6 +18,105 @@ test.describe('@Config Settings users tests', () => {
 
     test.afterEach(async () => {
         await browser.closeBrowser();
+    });
+
+    test("@admin Failed user creation preserves the form and retries without adding a phantom row", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const page = await browser.getPage();
+        const username = "mock-create-retry";
+        const submissions: (CreateUser & { keys: string[] })[] = [];
+        const methods: string[] = [];
+        let saves = 0;
+        await page.route(/\/api\/user(?:\/.*)?$/, async route => {
+            if (route.request().method() === "GET") {
+                await route.fulfill({ json: { result: [] } });
+            } else if (route.request().url().endsWith("/save")) {
+                saves += 1;
+                await route.fulfill({ json: {} });
+            } else {
+                methods.push(route.request().method());
+                submissions.push(route.request().postDataJSON() as CreateUser & { keys: string[] });
+                await route.fulfill(submissions.length === 1
+                    ? { status: 409, json: { message: "User creation temporarily rejected" } }
+                    : { json: {} });
+            }
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.clickOnAddUserBtn();
+        await settingsUsersPage.fillUserNameField(username);
+        await settingsUsersPage.fillPasswordField(user.password);
+        await settingsUsersPage.fillConfirmPasswordField(user.confirmPassword);
+        await settingsUsersPage.clickOnSelectRoleBtnInAddUser();
+        await settingsUsersPage.clickOnSelectUserRole(user.ReadWrite);
+        await settingsUsersPage.clickOnSubmitUserAddition();
+        await expect(settingsUsersPage.errorToast).toContainText("An unexpected error occurred. Please try again.");
+        await expect(settingsUsersPage.userNameField).toHaveValue(username);
+        await expect(settingsUsersPage.passwordField).toHaveValue(user.password);
+        await expect(settingsUsersPage.findUserNameInTable(username)).toHaveCount(0);
+        expect(saves).toBe(0);
+
+        await settingsUsersPage.clickOnSubmitUserAddition();
+        await expect(settingsUsersPage.dialog).toHaveCount(0);
+        await expect(settingsUsersPage.findUserNameInTable(username)).toHaveCount(1);
+        await expect.poll(() => saves).toBe(1);
+        expect(submissions).toEqual([
+            { username, role: user.ReadWrite, password: user.password, keys: ["*"] },
+            { username, role: user.ReadWrite, password: user.password, keys: ["*"] },
+        ]);
+        expect(methods).toEqual(["POST", "POST"]);
+    });
+
+    test("@admin Failed user edit retains original permissions and retries without changing the password", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const page = await browser.getPage();
+        const username = "mock-edit-retry";
+        const submissions: { role: string; keys: string[]; password?: string }[] = [];
+        const methods: string[] = [];
+        let saves = 0;
+        await page.route(/\/api\/user(?:\/.*)?$/, async route => {
+            if (route.request().method() === "GET") {
+                await route.fulfill({ json: { result: [{ username, role: user.ReadWrite, keys: ["reports:*"] }] } });
+            } else if (route.request().url().endsWith("/save")) {
+                saves += 1;
+                await route.fulfill({ json: {} });
+            } else {
+                methods.push(route.request().method());
+                submissions.push(route.request().postDataJSON() as typeof submissions[number]);
+                await route.fulfill(submissions.length === 1
+                    ? { status: 403, json: { message: "User update denied" } }
+                    : { json: {} });
+            }
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.clickUserCheckboxBtn(username);
+        await settingsUsersPage.clickOnEditUserBtn();
+        await expect(settingsUsersPage.userNameField).toBeDisabled();
+        await settingsUsersPage.clickOnSelectRoleBtnInAddUser();
+        await settingsUsersPage.clickOnSelectUserRole(user.ReadOnly);
+        await settingsUsersPage.fillEditKeysField("analytics:*");
+        await settingsUsersPage.clickOnSubmitEditUser();
+        await expect(settingsUsersPage.errorToast).toContainText("An unexpected error occurred. Please try again.");
+        await expect(settingsUsersPage.userRoleContent(username)).toHaveText(user.ReadWrite);
+        await expect(settingsUsersPage.userKeysContent(username)).toHaveText("reports:*");
+        await expect(settingsUsersPage.dialog).toBeVisible();
+        await expect(settingsUsersPage.editSelectRoleBtn).toContainText(user.ReadOnly);
+        await expect(settingsUsersPage.permissionRemovalButton("analytics:*")).toBeVisible();
+        await expect(settingsUsersPage.editNewPasswordField).toHaveValue("");
+        await expect(settingsUsersPage.editConfirmPasswordField).toHaveValue("");
+        expect(saves).toBe(0);
+
+        await settingsUsersPage.clickOnSubmitEditUser();
+        await expect(settingsUsersPage.dialog).toHaveCount(0);
+        await expect(settingsUsersPage.userRoleContent(username)).toHaveText(user.ReadOnly);
+        await expect(settingsUsersPage.userKeysContent(username)).toHaveText("analytics:*");
+        await expect.poll(() => saves).toBe(1);
+        expect(submissions).toEqual([
+            { role: user.ReadOnly, keys: ["analytics:*"] },
+            { role: user.ReadOnly, keys: ["analytics:*"] },
+        ]);
+        expect(methods).toEqual(["PATCH", "PATCH"]);
     });
 
     test("@admin Add one new user -> validating user exists in the users list", async () => {
