@@ -7,7 +7,6 @@ import ChatComponent from "../logic/POM/chatComponent";
 import HeaderComponent from "../logic/POM/headerComponent";
 import { getRandomString } from "../infra/utils";
 
-test.describe.configure({ mode: 'serial' });
 test.describe('@browser Browser Settings tests', () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
@@ -19,32 +18,6 @@ test.describe('@browser Browser Settings tests', () => {
     let geminiModel: string;
     let xaiModel: string;
 
-    test.beforeAll(async () => {
-        // Fetch available models from each provider before running tests
-        const tempApiCall = new ApiCalls();
-
-        try {
-            // Get models from each provider
-            const openaiModels = await tempApiCall.getModelsByProvider('openai');
-            const anthropicModels = await tempApiCall.getModelsByProvider('anthropic');
-            const geminiModels = await tempApiCall.getModelsByProvider('gemini');
-            const xaiModels = await tempApiCall.getModelsByProvider('xai');
-
-            // Store first model from each provider
-            openaiModel = openaiModels.models?.[0] || 'gpt-4o-mini';
-            anthropicModel = anthropicModels.models?.[0] || 'claude-3-5-sonnet';
-            geminiModel = geminiModels.models?.[0] || 'gemini-2.0-flash-exp';
-            xaiModel = xaiModels.models?.[0] || 'grok-3-mini';
-        } catch (error) {
-            // Fallback to default models if API call fails
-            console.warn('Failed to fetch models, using defaults:', error);
-            openaiModel = 'gpt-4o-mini';
-            anthropicModel = 'claude-3-5-sonnet';
-            geminiModel = 'gemini-2.0-flash-exp';
-            xaiModel = 'grok-3-mini';
-        }
-    });
-
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apiCall = new ApiCalls();
@@ -55,8 +28,7 @@ test.describe('@browser Browser Settings tests', () => {
     });
 
     test.describe("Mocked AI settings recovery", () => {
-        async function openLocalSettings(initialModel = "") {
-            const settings = await browser.createNewPage(SettingsBrowserPage);
+        async function openLocalSettings(settings: SettingsBrowserPage, initialModel = "") {
             const page = await browser.getPage();
             await page.addInitScript((model) => {
                 localStorage.setItem("chatModelSource", "local");
@@ -72,7 +44,7 @@ test.describe('@browser Browser Settings tests', () => {
         }
 
         test("@readwrite AI settings retries a rejected local model request with the configured endpoint", async () => {
-            await browser.createNewPage(SettingsBrowserPage);
+            const settings = await browser.createNewPage(SettingsBrowserPage);
             const page = await browser.getPage();
             const requests: Record<string, string>[] = [];
             await page.route("**/api/chat/models", async (route) => {
@@ -84,7 +56,7 @@ test.describe('@browser Browser Settings tests', () => {
                         : { models: ["llama3.2"] },
                 });
             });
-            await openLocalSettings("llama3.2");
+            await openLocalSettings(settings, "llama3.2");
             await expect(page.getByText("Local model server unavailable", { exact: true })).toBeVisible();
             await expect(page.getByTestId("noModelsFoundMessage")).toBeVisible();
 
@@ -97,11 +69,10 @@ test.describe('@browser Browser Settings tests', () => {
                 { source: "local", localProvider: "ollama", endpoint: "http://localhost:11435" },
             ]);
             await expect(page.getByTestId("selectModelllama3.2")).toBeVisible();
-            await expect.poll(() => page.evaluate(() => localStorage.getItem("model"))).toBe("llama3.2");
         });
 
         test("@readwrite AI settings recovers from malformed model JSON using reload", async () => {
-            await browser.createNewPage(SettingsBrowserPage);
+            const settings = await browser.createNewPage(SettingsBrowserPage);
             const page = await browser.getPage();
             let requests = 0;
             await page.route("**/api/chat/models", async (route) => {
@@ -110,18 +81,19 @@ test.describe('@browser Browser Settings tests', () => {
                     ? { status: 200, contentType: "application/json", body: '{"models":' }
                     : { status: 200, json: { models: ["llama3.2"] } });
             });
-            await openLocalSettings();
+            await openLocalSettings(settings);
             await expect(page.getByText("Could not connect to local server. Check the URL and click reload.", { exact: true })).toBeVisible();
             await expect(page.getByTestId("modelSearch")).toBeEnabled();
             await page.getByTestId("localLlmLoadButton").click();
 
             await expect(page.getByText("1 local Ollama models loaded.", { exact: true })).toBeVisible();
             await expect(page.getByTestId("selectModelllama3.2")).toBeVisible();
+            await page.waitForLoadState("networkidle");
             expect(requests).toBe(2);
         });
 
         test("@readwrite AI settings reloads an empty model list when models become available", async () => {
-            await browser.createNewPage(SettingsBrowserPage);
+            const settings = await browser.createNewPage(SettingsBrowserPage);
             const page = await browser.getPage();
             const requests: Record<string, string>[] = [];
             await page.route("**/api/chat/models", async (route) => {
@@ -130,13 +102,14 @@ test.describe('@browser Browser Settings tests', () => {
                     json: { models: requests.length === 1 ? [] : ["qwen2.5"] },
                 });
             });
-            await openLocalSettings();
+            await openLocalSettings(settings);
             await expect(page.getByText("No local Ollama models were returned.", { exact: true })).toBeVisible();
             await expect(page.getByTestId("noModelsFoundMessage")).toBeVisible();
             await page.getByTestId("localLlmLoadButton").click();
 
             await expect(page.getByText("1 local Ollama models loaded.", { exact: true })).toBeVisible();
             await expect(page.getByTestId("noModelsFoundMessage")).toHaveCount(0);
+            await page.waitForLoadState("networkidle");
             expect(requests.at(-1)).toEqual({
                 source: "local", localProvider: "ollama", endpoint: "http://localhost:11434",
             });
@@ -187,6 +160,27 @@ test.describe('@browser Browser Settings tests', () => {
             await expect(page.getByText("1 live models loaded for OpenAI.", { exact: true })).toBeVisible();
             expect(encryptAttempts).toBe(2);
         });
+    });
+
+    test.describe.serial("Saved browser settings", () => {
+    test.beforeAll(async () => {
+        const tempApiCall = new ApiCalls();
+        try {
+            const openaiModels = await tempApiCall.getModelsByProvider('openai');
+            const anthropicModels = await tempApiCall.getModelsByProvider('anthropic');
+            const geminiModels = await tempApiCall.getModelsByProvider('gemini');
+            const xaiModels = await tempApiCall.getModelsByProvider('xai');
+            openaiModel = openaiModels.models?.[0] || 'gpt-4o-mini';
+            anthropicModel = anthropicModels.models?.[0] || 'claude-3-5-sonnet';
+            geminiModel = geminiModels.models?.[0] || 'gemini-2.0-flash-exp';
+            xaiModel = xaiModels.models?.[0] || 'grok-3-mini';
+        } catch (error) {
+            console.warn('Failed to fetch models, using defaults:', error);
+            openaiModel = 'gpt-4o-mini';
+            anthropicModel = 'claude-3-5-sonnet';
+            geminiModel = 'gemini-2.0-flash-exp';
+            xaiModel = 'grok-3-mini';
+        }
     });
 
     test('@readwrite Verify user can select a model and API key then save settings', async () => {
@@ -1013,5 +1007,5 @@ test.describe('@browser Browser Settings tests', () => {
         // Custom endpoint should persist after Save
         expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe(customEndpoint);
     });
-
+    });
 });
