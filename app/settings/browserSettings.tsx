@@ -149,12 +149,6 @@ export default function BrowserSettings() {
         setEditingKeyValue("");
     }, []);
 
-    useEffect(() => {
-        setKeyInput("");
-        handleCancelEditKey();
-        setVisibleKeyIds(new Set());
-    }, [activeConnectionId, prefixConnectionId, handleCancelEditKey]);
-
     const handleDiscardSettings = useCallback(() => {
         handleCancelEditKey();
         resetSettings();
@@ -168,8 +162,23 @@ export default function BrowserSettings() {
     const [isDeletingKey, setIsDeletingKey] = useState(false);
     const modelFetchRequestIdRef = useRef(0);
     const modelFetchAbortRef = useRef<AbortController | null>(null);
+    const modelResultsConnectionRef = useRef<{ id: string | null; epoch: number } | null>(null);
     const latestModelRef = useRef(newModel);
     latestModelRef.current = newModel;
+
+    useEffect(() => {
+        modelFetchRequestIdRef.current += 1;
+        modelFetchAbortRef.current?.abort();
+        modelFetchAbortRef.current = null;
+        modelResultsConnectionRef.current = null;
+        setModelDisplayNames([]);
+        setIsLoadingModels(false);
+        setIsManualLocalModelLoad(false);
+        setLoadingChatApiKeyId("");
+        setKeyInput("");
+        handleCancelEditKey();
+        setVisibleKeyIds(new Set());
+    }, [activeConnectionId, prefixConnectionId, handleCancelEditKey]);
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
         chat: false,
@@ -243,9 +252,16 @@ export default function BrowserSettings() {
         const requestId = modelFetchRequestIdRef.current + 1;
         modelFetchRequestIdRef.current = requestId;
         const controller = new AbortController();
+        const connectionId = getActiveConnectionIdGlobal();
+        const epoch = getConnectionEpoch();
+        const isCurrent = () => requestId === modelFetchRequestIdRef.current
+            && !controller.signal.aborted
+            && getActiveConnectionIdGlobal() === connectionId
+            && getConnectionEpoch() === epoch;
         modelFetchAbortRef.current = controller;
 
         const fetchLocalModels = async () => {
+            if (!isCurrent() || (connectionId !== null && connectionId !== prefixConnectionId)) return;
             if (newChatModelSource === "api-key" && !selectedChatApiKey) {
                 setModelDisplayNames([]);
                 setModelsMessage("Enter your API key to load live models.");
@@ -278,12 +294,13 @@ export default function BrowserSettings() {
                     signal: controller.signal,
                 });
 
-                if (requestId !== modelFetchRequestIdRef.current) return;
+                if (!isCurrent()) return;
 
                 if (result.ok) {
                     const { models } = await result.json();
-                    if (requestId !== modelFetchRequestIdRef.current) return;
+                    if (!isCurrent()) return;
 
+                    modelResultsConnectionRef.current = { id: connectionId, epoch };
                     setModelDisplayNames(models);
                     setModelsMessage(models.length > 0
                         ? newChatModelSource === "local"
@@ -294,7 +311,7 @@ export default function BrowserSettings() {
                             : "No live models were returned for this key.");
                 } else {
                     const { error } = await result.json().catch(() => ({ error: "" }));
-                    if (requestId !== modelFetchRequestIdRef.current) return;
+                    if (!isCurrent()) return;
 
                     setModelDisplayNames([]);
                     setModelsMessage(error || (newChatModelSource === "local"
@@ -303,7 +320,7 @@ export default function BrowserSettings() {
                 }
             } catch (error) {
                 if (error instanceof DOMException && error.name === "AbortError") return;
-                if (requestId !== modelFetchRequestIdRef.current) return;
+                if (!isCurrent()) return;
                 setModelDisplayNames([]);
                 setModelsMessage(newChatModelSource === "local"
                     ? "Could not connect to local server. Check the URL and click reload."
@@ -324,12 +341,14 @@ export default function BrowserSettings() {
             clearTimeout(timeoutId);
             controller.abort();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedChatApiKey, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, modelLoadNonce]);
+    }, [selectedChatApiKey, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, modelLoadNonce, activeConnectionId, prefixConnectionId]);
 
     // Auto-select the best model once the list loads after a key/source change.
     useEffect(() => {
-        if (modelDisplayNames.length === 0) return;
+        const resultConnection = modelResultsConnectionRef.current;
+        if (modelDisplayNames.length === 0 || !resultConnection
+            || resultConnection.id !== getActiveConnectionIdGlobal()
+            || resultConnection.epoch !== getConnectionEpoch()) return;
         const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
         // Prefer the stored preference for this source; fall back to first available model.
         const storedModel = perSourceModels[currentSourceKey] ?? "";
@@ -589,13 +608,15 @@ export default function BrowserSettings() {
                     });
                     return false;
                 }
-                // Rebase only after an actual commit, never because another
-                // mutation merely started and might still fail or be cancelled.
-                if (keyStateRef.current !== snapshot) continue;
+                // Only a changed key list needs new ciphertext. Recompute the
+                // selection separately if it changed while encryption ran.
+                const latest = keyStateRef.current;
+                if (latest.keys !== snapshot.keys) continue;
+                const updatedSelection = latest === snapshot ? selectedId : update(latest).selectedId;
                 // A later selection wins only if the mutation did not remove it.
                 const keepLaterSelection = keySelectionGenerationRef.current !== selectionGeneration
-                    && (!snapshot.selectedId || keys.some(({ id }) => id === snapshot.selectedId));
-                const commitSelectedId = keepLaterSelection ? snapshot.selectedId : selectedId;
+                    && (!latest.selectedId || keys.some(({ id }) => id === latest.selectedId));
+                const commitSelectedId = keepLaterSelection ? latest.selectedId : updatedSelection;
                 const selectedApiKey = commitSelectedId ? getSelectedChatApiKey(keys, commitSelectedId) : undefined;
                 const nextSelectedId = selectedApiKey?.id ?? "";
                 if (keys.length > 0) {

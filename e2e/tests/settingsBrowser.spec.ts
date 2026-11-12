@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import type { Session, SessionConnection } from "next-auth";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import SettingsBrowserPage from "../logic/POM/settingsBrowserPage";
@@ -13,8 +14,14 @@ async function delayNextKeyEncryption(page: Page) {
     let markStarted!: () => void;
     const started = new Promise<void>((resolve) => { markStarted = resolve; });
     let delayed = false;
+    let encryptions = 0;
     await page.route("**/api/encrypt", async (route) => {
-        if (delayed || route.request().postDataJSON().action !== "encrypt") {
+        if (route.request().postDataJSON().action !== "encrypt") {
+            await route.continue();
+            return;
+        }
+        encryptions += 1;
+        if (delayed) {
             await route.continue();
             return;
         }
@@ -24,7 +31,7 @@ async function delayNextKeyEncryption(page: Page) {
         await gate;
         await route.fulfill({ response });
     });
-    return { release, started };
+    return { release, started, encryptionCount: () => encryptions };
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -240,6 +247,96 @@ test.describe('@browser Browser Settings tests', () => {
         expect(tooltipText).toContain("Gemini");
         expect(tooltipText).toContain("Groq");
         expect(tooltipText).toContain("xAI");
+    });
+
+    test("@readwrite an old model response cannot update settings after switching connections", async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        const sessionResponse = await page.request.get(`${urls.localHost}/api/auth/session`);
+        const connectionsResponse = await page.request.get(`${urls.localHost}/api/connections`);
+        expect(sessionResponse.ok()).toBe(true);
+        expect(connectionsResponse.ok()).toBe(true);
+        const session = await sessionResponse.json() as Session;
+        const { connections } = await connectionsResponse.json() as { connections: SessionConnection[] };
+        const first = connections[0];
+        if (!first) throw new Error("Model switch test needs an authenticated connection");
+        const second = { ...first, id: getRandomString("model-connection"), host: "model-secondary.invalid" };
+        let active = first;
+        let releaseSwitch!: () => void;
+        const switchGate = new Promise<void>(resolve => { releaseSwitch = resolve; });
+        let markSwitchStarted!: () => void;
+        const switchStarted = new Promise<void>(resolve => { markSwitchStarted = resolve; });
+        await page.route("**/api/**", route => {
+            const headers = route.request().headers();
+            const url = new URL(route.request().url());
+            if (url.searchParams.get("connectionId") === second.id) url.searchParams.set("connectionId", first.id);
+            return route.continue({
+                url: url.toString(),
+                headers: headers["x-connection-id"] === second.id ? { ...headers, "x-connection-id": first.id } : headers,
+            });
+        });
+        await page.route("**/api/connections", route => route.fulfill({ json: { connections: [first, second] } }));
+        await page.route("**/api/auth/csrf", route => route.fulfill({ json: { csrfToken: "model-test-csrf" } }));
+        await page.route("**/api/auth/session", async route => {
+            if (route.request().method() === "POST") {
+                const body = route.request().postDataJSON() as { data?: { activeConnectionId?: string } };
+                if (body.data?.activeConnectionId === second.id) {
+                    markSwitchStarted();
+                    await switchGate;
+                    active = second;
+                }
+            }
+            await route.fulfill({ json: {
+                ...session,
+                activeConnectionId: active.id,
+                user: { ...session.user, host: active.host, port: active.port },
+            } });
+        });
+        await page.addInitScript(id => localStorage.setItem("lastActiveConnectionId", id), first.id);
+
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        let requested!: () => void;
+        const started = new Promise<void>(resolve => { requested = resolve; });
+        let delayed = false;
+        let completed!: () => void;
+        const finished = new Promise<void>(resolve => { completed = resolve; });
+        const staleModel = "stale-connection-model";
+        await page.route("**/api/chat/models**", async route => {
+            if (delayed || route.request().postDataJSON().source !== "local") {
+                return route.fulfill({ json: { models: [] } });
+            }
+            delayed = true;
+            requested();
+            await gate;
+            try {
+                await route.fulfill({ json: { models: [staleModel] } });
+            } finally {
+                completed();
+            }
+        });
+        try {
+            await page.goto(urls.settingsUrl);
+            await settings.expandChatSection();
+            await settings.selectLocalLlmModelSource();
+            await started;
+            await page.getByTestId("connections-dropdown-trigger").click();
+            await page.getByTestId(`connection-item-${second.id}`).click();
+            await switchStarted;
+            release();
+            await finished;
+            await page.evaluate(() => new Promise<void>(resolve => {
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+            }));
+            await expect(page.getByTestId(`selectModel${staleModel}`)).toHaveCount(0);
+            expect(await page.evaluate(() => localStorage.getItem("model"))).not.toBe(staleModel);
+            releaseSwitch();
+            await expect.poll(() => active.id).toBe(second.id);
+        } finally {
+            release();
+            releaseSwitch();
+            await page.unrouteAll({ behavior: "wait" });
+        }
     });
 
     test("@readwrite loading models does not discard an API key edit", async () => {
@@ -568,6 +665,7 @@ test.describe('@browser Browser Settings tests', () => {
                 encryption.release();
                 if (mutation === "delete") await expect.poll(() => settings.isChatApiKeyPresent(secondKey)).toBe(false);
                 else await expect.poll(() => settings.isChatApiKeyPresent(thirdKey)).toBe(true);
+                expect(encryption.encryptionCount()).toBe(1);
                 await expect.poll(selectedId).toBe(firstId);
                 await expect(selectedModel).toHaveAttribute("data-selected", "true");
                 expect(await page.evaluate(() => localStorage.getItem("model"))).toBe(firstModel);
@@ -669,6 +767,7 @@ test.describe('@browser Browser Settings tests', () => {
             await expect(page.getByTestId(`selectModel${model}`)).toHaveAttribute("data-selected", "true");
             encryption.release();
             await expect(page.getByTestId("chatApiKeyCard")).toHaveCount(1);
+            expect(encryption.encryptionCount()).toBe(1);
             await expect(page.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "false");
             expect(await page.evaluate(() => {
                 const key = Object.keys(localStorage).find(name => name.endsWith(":selectedChatApiKeyId"));
