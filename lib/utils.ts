@@ -612,6 +612,7 @@ function extractResponseErrorMessage(bodyText: string): string {
 }
 
 const USER_READABLE_ERROR_PATTERNS = [
+  /^profile only supports\b/i,
   /\bunknown function\b/i,
   /\bnot defined\b/i,
   /\balready exists\b/i,

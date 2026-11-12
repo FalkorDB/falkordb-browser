@@ -806,7 +806,7 @@ const swaggerSpec = {
       get: {
         tags: ["Graph"],
         summary: "Profile query execution",
-        description: "Get detailed profiling information for a Cypher query",
+        description: "Get detailed profiling information for a valid read-only Cypher query. Update clauses and CALL procedures, including read-only procedures, are not supported.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -831,6 +831,9 @@ const swaggerSpec = {
         responses: {
           "200": {
             description: "Query profiling information returned successfully"
+          },
+          "400": {
+            description: "Missing, invalid or unsupported query: profiling accepts only read-only Cypher without CALL procedures."
           }
         }
       }

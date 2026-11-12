@@ -243,7 +243,7 @@ For detailed configuration options and examples, see the [Helm chart documentati
 ### Build and run browser from source
 
 **Prerequisites:**
-- Node.js 20.19.0 or higher
+- Node.js 24 or higher (`engines` in `package.json`)
 
 **Steps:**
 * Clone the git repository `git clone git@github.com:FalkorDB/falkordb-browser.git`
@@ -304,13 +304,20 @@ Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
 
+### Contributing with AI agents
+
+Agent rules (coverage bar, docs and design-doc upkeep, PR readiness including resolving every
+review thread) live in [`.github/copilot-instructions.md`](./.github/copilot-instructions.md),
+shared with Claude Code through [`CLAUDE.md`](./CLAUDE.md); path-specific rules are in
+`.github/instructions/`. PR readiness needs the [superpowers](https://github.com/obra/superpowers)
+plugin (install commands in the instructions). Design plans are in [`docs/design/`](./docs/design/README.md).
+
 ### Testing
 
 * **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
   Runs the `*.test.ts` suites under `app/` and `lib/`. Gated in CI by the **Build**
   workflow. These execute TypeScript directly via `node --test`, which relies on native
-  type-stripping — use **Node ≥ 22.18** (CI runs Node 24). Older Node (e.g. 20.x) can run
-  the app but cannot run these tests.
+  type-stripping, so they need the same **Node ≥ 24** as the app (CI runs Node 24).
 * **Unit coverage gate**: `npm run test:coverage` — runs the unit tests and enforces **100%**
   line/branch/function coverage on the modules it lists (`lib/cypherSuggestions.ts`,
   `lib/cypherDiagnostics.ts`, `lib/aiFix.ts`, `lib/cypherErrors.ts`, `lib/clipboard.ts`, …).
@@ -325,10 +332,12 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   codebase (`coverage/project` on PRs, `coverage/project (push)` on commits pushed to `main`
   and `staging`) and of the lines a PR changes (`coverage/patch`). A coverage job whose
   tests or report fail, are skipped or are cancelled fails the gate, since its coverage is
-  incomplete; failures in jobs that produce no coverage (installers, the Docker smoke image,
+  incomplete; failures in jobs that produce no coverage (installers,
   the security scan) do not, and a Codecov upload error never fails a test job
   (`.github/scripts/coverage-gate.mjs`). Dependabot runs only get Dependabot secrets, so
   `CODECOV_TOKEN` must also be set as a Dependabot secret for their coverage to upload.
+  Manual (`workflow_dispatch`) runs do not upload: the gate does not count them, and their
+  uploads, named like the PR's or push's, would stand in for one that was lost.
   Each job keeps its report as a `coverage-*` workflow artifact for 3 days.
   Locally:
   ```bash
@@ -342,6 +351,27 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   exit), then `node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e`. Pages are
   recorded in Chromium only; a spec that uses Playwright's `page`, `context` or `browser`
   fixtures imports `test` from `e2e/infra/coverage.ts` so its pages are recorded too.
+  Browser-running CI jobs use `REQUIRE_BROWSER_COVERAGE=1` when generating the report:
+  missing recordings or recorder errors fail collection, even when server coverage exists.
+  Original script responses are captured in case Chromium loses a source during
+  navigation; a source missing from both the recording and its response fails collection.
+  Server-only test jobs do not require or launch a browser. The gate waits for all six
+  shard uploads plus the TLS, cluster and stateless uploads, and the Docker upload
+  when the workflow declares it, not just an `e2e` flag from one job.
+  It waits up to 15 minutes for required uploads to appear
+  and finish processing before reporting missing names. Docker is required only
+  when the measured commit's workflow declares Docker coverage; reruns of older
+  workflows retain their original requirements.
+
+  Docker smoke tests still check the normal production image first. They also run against
+  a separate image built with `--build-arg COVERAGE=1`; its browser and server coverage
+  is uploaded as `e2e-docker`. The report uses that container's exact `.next` artifacts
+  and `COVERAGE_SERVER_ROOT=/app` to translate server paths into the reporting checkout.
+  Server mappings use the V8 source-map cache or the container's copied external map;
+  a missing referenced server map fails reporting rather than silently dropping hits.
+  The default Docker build remains optimized and does not expose browser source maps.
+  Stacked PR branches can validate the same jobs with
+  `gh workflow run playwright.yml --ref <branch>` before their base reaches `staging`.
 * **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — runs every `lib/**/*.smoke.ts`
   suite against the actual server error wording. This covers the "Did you mean…?"
   suggestions and the **error-hint drift guard**: each entry in the hint catalog
@@ -359,5 +389,3 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
-
