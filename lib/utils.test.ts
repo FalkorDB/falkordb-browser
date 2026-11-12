@@ -6,6 +6,251 @@ import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats
 const noopToast = () => {};
 const noopIndicator = () => {};
 
+describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
+  it("does not wrap a query whose string or comment mentions UNION", () => {
+    for (const keyword of ["UNION", "CALL"]) {
+      const write = `CREATE (:Book {title:'${keyword} station'})`;
+      assert.deepEqual(getQueryWithLimit(write, 300), [write, 0]);
+    }
+    const writeWithTrailingComment = "CREATE (:Book {title:'The Return of the King'}) // UNION";
+    assert.deepEqual(getQueryWithLimit(writeWithTrailingComment, 300), [writeWithTrailingComment, 0]);
+
+    const unionString = "MATCH (n) WHERE n.name = 'European UNION' RETURN n";
+    assert.deepEqual(getQueryWithLimit(unionString, 300), [`${unionString} LIMIT 300`, 300]);
+
+    const trailingComment = "MATCH (n) RETURN n // UNION";
+    assert.deepEqual(getQueryWithLimit(trailingComment, 300), ["MATCH (n) RETURN n LIMIT 300 // UNION", 300]);
+  });
+
+  it("removes trailing statement terminators before adding LIMIT", () => {
+    assert.deepEqual(
+      getQueryWithLimit("MATCH (n) RETURN n;", 300),
+      ["MATCH (n) RETURN n LIMIT 300", 300],
+    );
+    assert.deepEqual(
+      getQueryWithLimit("MATCH (n) RETURN n; // done", 300),
+      ["MATCH (n) RETURN n LIMIT 300 // done", 300],
+    );
+    assert.deepEqual(getQueryWithLimit("RETURN n;;", 300), ["RETURN n LIMIT 300", 300]);
+    assert.deepEqual(getQueryWithLimit("RETURN n; ; // done", 300), ["RETURN n LIMIT 300  // done", 300]);
+    assert.deepEqual(getQueryWithLimit("RETURN ';';", 300), ["RETURN ';' LIMIT 300", 300]);
+    assert.deepEqual(getQueryWithLimit("RETURN n LIMIT 5;", 300), ["RETURN n LIMIT 5", 5]);
+    assert.deepEqual(getQueryWithLimit("RETURN n;", 0), ["RETURN n", 0]);
+  });
+
+  it("does not mistake UNION identifiers for clauses", () => {
+    for (const identifier of ["n:Union", "n : Union", "n:UNION", "n:union"]) {
+      const query = `MATCH (${identifier}) SET n.x = 1`;
+      assert.deepEqual(getQueryWithLimit(query, 300), [query, 0]);
+      const limited = `MATCH (${identifier}) RETURN n LIMIT 5`;
+      assert.deepEqual(getQueryWithLimit(limited, 300), [limited, 5]);
+    }
+    const quotedLabel = "MATCH (n:`UNION`) RETURN n";
+    assert.deepEqual(getQueryWithLimit(quotedLabel, 300), [`${quotedLabel} LIMIT 300`, 300]);
+
+    for (const expression of ["n.union", "n . UNION", "{union: 1}", "$union", "union"]) {
+      const query = `MATCH (n) RETURN ${expression}`;
+      assert.deepEqual(getQueryWithLimit(query, 300), [`${query} LIMIT 300`, 300]);
+    }
+    for (const query of [
+      "WITH 1 AS union RETURN union",
+      "WITH 1 AS x, 2 AS union RETURN union",
+      "WITH 1 AS union WITH 3 + union AS x RETURN x",
+      "WITH 1 AS union WITH 3 * union AS total MATCH (n) RETURN n",
+      "WITH true AS union MATCH (n) WHERE union RETURN n",
+      "WITH true AS union MATCH (n) WHERE NOT union RETURN n",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 300), [`${query} LIMIT 300`, 300]);
+    }
+  });
+
+  it("recognises UNION after quoted return values", () => {
+    const query = "RETURN 'one' AS x UNION RETURN 'two' AS x";
+    assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    const unnamed = "RETURN 'one' UNION RETURN 'two'";
+    assert.deepEqual(getQueryWithLimit(unnamed, 1), [`CALL { ${unnamed}\n} RETURN * LIMIT 1`, 1]);
+  });
+
+  it("recognises UNION after strings following operators and commas", () => {
+    for (const query of [
+      "MATCH (n) RETURN n, 'tag' UNION MATCH (n) RETURN n, 'tag'",
+      "RETURN 'a' + 'b' UNION ALL RETURN 'a' + 'b'",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
+  });
+
+  it("does not mistake Unicode identifiers ending in union for a clause", () => {
+    const query = "MATCH (réunion) WITH réunion RETURN réunion LIMIT 1000";
+    assert.deepEqual(getQueryWithLimit(query, 300), [query, 1000]);
+  });
+
+  it("recognises UNION after Unicode and keyword-named variables", () => {
+    for (const query of [
+      "MATCH (éreturn) RETURN éreturn UNION ALL MATCH (éreturn) RETURN éreturn",
+      "UNWIND [1,2] AS yield RETURN yield UNION ALL UNWIND [3,4] AS yield RETURN yield",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
+  });
+
+  it("does not treat a node variable followed by a map as a CALL clause", () => {
+    const query = "MATCH (call {x: 1}) RETURN call UNION MATCH (m) RETURN m AS call";
+    assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+  });
+
+  it("ignores UNIONs inside expressions when applying the outer limit", () => {
+    const query = "MATCH (n) WHERE EXISTS { RETURN 1 AS x UNION RETURN 2 AS x } RETURN n LIMIT 1000";
+    assert.deepEqual(getQueryWithLimit(query, 300), [query, 1000]);
+  });
+
+  it("preserves a final branch limit after a commented CALL block", () => {
+    const query = "CALL /* c */ { RETURN 1 AS x } RETURN x UNION RETURN 2 AS x LIMIT 5";
+    assert.deepEqual(getQueryWithLimit(query, 300), [query, 5]);
+    const parameterized = "CALL /* c */ { RETURN 1 AS x } RETURN x UNION RETURN 2 AS x LIMIT $count";
+    assert.deepEqual(getQueryWithLimit(parameterized, 300), [parameterized, 0]);
+    const nested = "CALL /* c */ { RETURN 1 AS x } RETURN x UNION CALL { RETURN 2 AS x LIMIT 5 } RETURN x";
+    assert.deepEqual(getQueryWithLimit(nested, 300), [`${nested} LIMIT 300`, 300]);
+    const nestedUnion = "CALL /* c */ { RETURN 1 AS x } RETURN x UNION CALL { RETURN 2 AS x UNION RETURN 3 AS x } RETURN x LIMIT 5";
+    assert.deepEqual(getQueryWithLimit(nestedUnion, 300), [nestedUnion, 5]);
+    const property = "CALL /* c */ { MATCH (n) RETURN n } RETURN n.`name` UNION MATCH (n) RETURN n.`name` LIMIT 5";
+    assert.deepEqual(getQueryWithLimit(property, 300), [property, 5]);
+  });
+
+  it("recognises UNION after wildcard and keyword-named property projections", () => {
+    for (const expression of ["*", "DISTINCT *", "n.return", "n . where", "n.as", "$return"]) {
+      const query = `MATCH (n) RETURN ${expression} UNION MATCH (n) RETURN ${expression}`;
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
+    for (const alias of ["return", "where", "as"]) {
+      const query = `RETURN 1 AS ${alias} UNION RETURN 2 AS ${alias}`;
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
+  });
+
+  it("does not wrap UNION branches beginning with WITH", () => {
+    for (const query of [
+      "WITH 1 AS x RETURN x union WITH 2 AS x RETURN x",
+      "RETURN 1 AS x UNION ALL WITH 2 AS x RETURN x",
+      "CYPHER p=1 WITH $p AS x RETURN x UNION RETURN 2 AS x",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 1), [`${query} LIMIT 1`, 1]);
+    }
+  });
+
+  it("recognises UNION after a backtick-quoted property", () => {
+    const query = "MATCH (n) RETURN n.`name` UNION ALL MATCH (m) RETURN m.`name`";
+    assert.deepEqual(getQueryWithLimit(query, 300), [`CALL { ${query}\n} RETURN * LIMIT 300`, 300]);
+  });
+
+  it("wraps lowercase union all clauses", () => {
+    const query = "return 1 as n union all return 2 as n";
+    assert.deepEqual(getQueryWithLimit(query, 300), [`CALL { ${query}\n} RETURN * LIMIT 300`, 300]);
+  });
+
+  it("wraps actual UNION queries without retaining a trailing semicolon", () => {
+    const query = "MATCH (n) RETURN n UNION MATCH (m) RETURN m;";
+    assert.deepEqual(
+      getQueryWithLimit(query, 300),
+      ["CALL { MATCH (n) RETURN n UNION MATCH (m) RETURN m\n} RETURN * LIMIT 300", 300],
+    );
+  });
+
+  it("closes the CALL wrapper after a trailing line comment", () => {
+    const query = "MATCH (n) RETURN n UNION MATCH (m) RETURN m // both";
+    assert.deepEqual(
+      getQueryWithLimit(query, 300),
+      [`CALL { ${query}\n} RETURN * LIMIT 300`, 300],
+    );
+  });
+
+  it("does not mistake CALL identifiers for subqueries when wrapping UNION", () => {
+    const query = "MATCH (n:Call) RETURN n UNION MATCH (n:Call) RETURN n";
+    assert.deepEqual(getQueryWithLimit(query, 300), [`CALL { ${query}\n} RETURN * LIMIT 300`, 300]);
+
+    const propertyQuery = "MATCH (n) RETURN n.call UNION MATCH (m) RETURN m.call";
+    assert.deepEqual(getQueryWithLimit(propertyQuery, 300), [`CALL { ${propertyQuery}\n} RETURN * LIMIT 300`, 300]);
+
+    const stringQuery = "MATCH (n) WHERE n.x = 'CALL db.labels()' RETURN n UNION MATCH (m) RETURN m";
+    assert.deepEqual(getQueryWithLimit(stringQuery, 300), [`CALL { ${stringQuery}\n} RETURN * LIMIT 300`, 300]);
+
+    const callInIdentifierQuery = "MATCH (n:`CALL {`) RETURN n UNION MATCH (m) RETURN m";
+    assert.deepEqual(
+      getQueryWithLimit(callInIdentifierQuery, 300),
+      [`CALL { ${callInIdentifierQuery}\n} RETURN * LIMIT 300`, 300],
+    );
+  });
+
+  it("recognises CALL targets when comments separate the keyword and target", () => {
+    const query = "CALL /* target */ db /* namespace */ . /* procedure */ labels() YIELD label RETURN label UNION MATCH (n) RETURN n.name AS label LIMIT 1000";
+    assert.deepEqual(getQueryWithLimit(query, 300), [query, 1000]);
+
+    const subquery = "CALL /* subquery */ { MATCH (n) RETURN n } RETURN n UNION MATCH (m) RETURN m";
+    const [result] = getQueryWithLimit(subquery, 300);
+    assert.equal(result.startsWith("CALL { CALL /* subquery */"), false);
+    assert.match(result, /LIMIT 300$/);
+  });
+
+  it("does not treat CALL labels or map keys as subquery clauses", () => {
+    for (const pattern of ["(n: Call {x: 1})", "(n {call: {x: 1}})"]) {
+      const query = `MATCH ${pattern} RETURN n UNION ALL MATCH (m) RETURN m`;
+      assert.deepEqual(getQueryWithLimit(query, 300), [`CALL { ${query}\n} RETURN * LIMIT 300`, 300]);
+    }
+  });
+
+  it("keeps a CYPHER parameter header outside the UNION wrapper", () => {
+    const query = "CYPHER text='CALL' RETURN $text AS x UNION RETURN 'other' AS x";
+    assert.deepEqual(
+      getQueryWithLimit(query, 300),
+      ["CYPHER text='CALL' CALL { RETURN $text AS x UNION RETURN 'other' AS x\n} RETURN * LIMIT 300", 300],
+    );
+  });
+
+  it("keeps keyword-named and nested CYPHER parameters outside the UNION wrapper", () => {
+    for (const [header, body] of [
+      ["CYPHER match=1 ", "RETURN 1 AS x UNION RETURN 2 AS x"],
+      ["CYPHER p={match:'CALL'} ", "RETURN $p.match AS x UNION RETURN 'other' AS x"],
+      ["CYPHER p=[{return:'x'}, {with: ['CALL']}] /* header */ match=2 ", "RETURN $match AS x UNION RETURN 3 AS x"],
+      ["CYPHER p='text' match=2 ", "RETURN $p AS x UNION RETURN 'other' AS x"],
+      ["CYPHER p=toString(1) ", "RETURN $p AS x UNION RETURN 'other' AS x"],
+    ]) {
+      assert.deepEqual(getQueryWithLimit(header + body, 300), [`${header}CALL { ${body}\n} RETURN * LIMIT 300`, 300]);
+    }
+    for (const query of [
+      "CYPHER match=1 WITH $match AS x RETURN x UNION RETURN 2 AS x",
+      "CYPHER return=1 WITH $return AS x RETURN x UNION RETURN 2 AS x",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 1), [`${query} LIMIT 1`, 1]);
+    }
+  });
+
+  it("removes trailing semicolons separated by comments", () => {
+    assert.deepEqual(
+      getQueryWithLimit("MATCH (n) RETURN n; /* done */ ;", 300),
+      ["MATCH (n) RETURN n LIMIT 300 /* done */ ", 300],
+    );
+    assert.deepEqual(
+      getQueryWithLimit("RETURN n LIMIT 5; /* done */ ;", 300),
+      ["RETURN n LIMIT 5 /* done */ ", 5],
+    );
+    assert.deepEqual(
+      getQueryWithLimit("RETURN n; /* done */ ;", 0),
+      ["RETURN n /* done */ ", 0],
+    );
+  });
+
+  it("recognises real CALL procedures and subqueries alongside UNION", () => {
+    const procedureQuery = "CALL db.labels() YIELD label RETURN label UNION MATCH (n) RETURN n";
+    assert.deepEqual(getQueryWithLimit(procedureQuery, 300), [`${procedureQuery} LIMIT 300`, 300]);
+
+    const compactSubqueryQuery = "CALL{ MATCH (n) RETURN n } RETURN n UNION MATCH (m) RETURN m";
+    assert.deepEqual(getQueryWithLimit(compactSubqueryQuery, 300), [`${compactSubqueryQuery} LIMIT 300`, 300]);
+
+    const escapedProcedureQuery = "CALL `db`.`labels`() YIELD label RETURN label UNION MATCH (n) RETURN n";
+    assert.deepEqual(getQueryWithLimit(escapedProcedureQuery, 300), [`${escapedProcedureQuery} LIMIT 300`, 300]);
+  });
+});
+
 describe("getQueryWithLimit keyword detection (#2203)", () => {
   it("does not append LIMIT to a write query whose string contains RETURN", () => {
     const query = "CREATE (:Book {title:'The Return of the King'})";
@@ -61,9 +306,9 @@ describe("getQueryWithLimit keyword detection (#2203)", () => {
     assert.deepEqual(getQueryWithLimit(`${backtick} RETURN 1`, 300), [`${backtick} RETURN 1 LIMIT 300`, 300]);
   });
 
-  it("inserts LIMIT before a trailing semicolon and comment", () => {
+  it("removes a trailing semicolon while keeping the comment after LIMIT", () => {
     for (const query of ["RETURN 1; // note", "RETURN 1; /* note */", "RETURN ';';"]) {
-      assert.deepEqual(getQueryWithLimit(query, 300), [query.replace(/;(?=\s*(?:\/\/|\/\*|$))/, " LIMIT 300;"), 300]);
+      assert.deepEqual(getQueryWithLimit(query, 300), [query.replace(/;(?=\s*(?:\/\/|\/\*|$))/, " LIMIT 300"), 300]);
     }
   });
 
