@@ -43,6 +43,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     await page.locator("#custom-date").fill("2000-01-01");
     await settingsTokensPage.clickGenerateTokenConfirmButton();
     await expect(page.getByText("Expiration date must be in the future", { exact: true })).toBeVisible();
+    await expect(page.locator("#custom-date")).toHaveValue("2000-01-01");
     await expect(page.locator("#token-name")).toHaveValue("mock-custom-expiration");
     await expect(page.getByRole("button", { name: "Generate token", exact: true })).toBeEnabled();
     expect(mutations).toBe(0);
@@ -53,14 +54,12 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     const page = await browser.getPage();
     const name = "mock-generate-retry";
     const submissions: { name: string; expiresAt: string; ttlSeconds: number }[] = [];
-    const future = new Date();
-    future.setDate(future.getDate() + 10);
-    const date = future.toISOString().slice(0, 10);
+    const methods: string[] = [];
     await page.route("**/api/auth/tokens", async route => {
       if (route.request().method() === "GET") {
         await route.fulfill({ json: { tokens: [], role: "Admin" } });
       } else {
-        expect(route.request().method()).toBe("POST");
+        methods.push(route.request().method());
         submissions.push(route.request().postDataJSON() as typeof submissions[number]);
         await route.fulfill(submissions.length === 1
           ? { status: 400, json: { message: "Token generation rejected" } }
@@ -68,6 +67,17 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       }
     });
     await browser.navigateTo(urls.settingsUrl);
+    const { date, expiresAt } = await page.evaluate(() => {
+      const future = new Date();
+      future.setDate(future.getDate() + 10);
+      const year = future.getFullYear();
+      const month = future.getMonth();
+      const day = future.getDate();
+      return {
+        date: `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        expiresAt: new Date(year, month, day, 23, 59, 59, 999).toISOString(),
+      };
+    });
     await settingsTokensPage.navigateToTokensTab();
     await settingsTokensPage.clickGenerateTokenButton();
     await settingsTokensPage.fillTokenNameInput(name);
@@ -82,10 +92,9 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     await settingsTokensPage.clickGenerateTokenConfirmButton();
     await expect(page.locator("input[readonly]")).toHaveValue("mock-token-not-a-real-credential");
     expect(submissions).toHaveLength(2);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    expect(methods).toEqual(["POST", "POST"]);
     for (const submission of submissions) {
-      expect(submission).toMatchObject({ name, expiresAt: endOfDay.toISOString() });
+      expect(submission).toMatchObject({ name, expiresAt });
       expect(submission.ttlSeconds).toBeGreaterThan(0);
       expect(submission.ttlSeconds).toBeLessThanOrEqual(11 * 24 * 60 * 60);
     }
@@ -96,6 +105,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     const page = await browser.getPage();
     const name = "mock-revoke-retry";
     let attempts = 0;
+    const methods: string[] = [];
     await page.route("**/api/auth/tokens", route => route.fulfill({
       json: { role: "Admin", tokens: [{
         token_id: "mock-token-id", name, username: "mock-user", role: "Read-Only",
@@ -103,7 +113,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       }] },
     }));
     await page.route("**/api/auth/tokens/mock-token-id", async route => {
-      expect(route.request().method()).toBe("DELETE");
+      methods.push(route.request().method());
       attempts += 1;
       await route.fulfill(attempts === 1
         ? { status: 403, json: { message: "Token revocation denied" } }
@@ -123,6 +133,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     await expect(settingsTokensPage.getRowByText(name)).toHaveCount(0);
     await expect(page.getByText("No active tokens. Generate one to get started.")).toBeVisible();
     expect(attempts).toBe(2);
+    expect(methods).toEqual(["DELETE", "DELETE"]);
   });
 
   test.describe("Token Generation - Admin User", () => {
