@@ -1,4 +1,4 @@
-import { Locator } from "playwright";
+import { Locator, Response } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { interactWhenVisible } from "@/e2e/infra/utils";
 
@@ -22,6 +22,21 @@ export default class ConnectionManagerComponent extends BasePage {
     async openDropdown(): Promise<void> {
         await interactWhenVisible(this.dropdownTrigger, (el) => el.click(), "Open connections dropdown");
         await this.dropdownContent.waitFor({ state: "visible", timeout: 5000 });
+    }
+
+    async submitAdditionalConnection(username: string, password: string): Promise<Locator> {
+        await this.openDropdown();
+        await this.page.getByRole("menuitem", { name: "Add Connection" }).click();
+        const dialog = this.page.getByRole("dialog");
+        await dialog.locator("#Username").fill(username);
+        await dialog.locator("#Password").fill(password);
+        await dialog.getByRole("button", { name: "Add Connection", exact: true }).click();
+        return dialog;
+    }
+
+    waitForSessionUpdate(): Promise<Response> {
+        return this.page.waitForResponse(response =>
+            new URL(response.url()).pathname === "/api/auth/session" && response.request().method() === "POST");
     }
 
     async isDropdownVisible(): Promise<boolean> {
