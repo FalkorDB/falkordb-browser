@@ -28,7 +28,8 @@ export default class ConnectionManagerComponent extends BasePage {
     }
 
     connectionForUser(username: string): Locator {
-        return this.connectionItems.filter({ hasText: `${username}@` });
+        const escapedUsername = username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return this.connectionItems.filter({ hasText: new RegExp(`^${escapedUsername}@`) });
     }
 
     activeMarkerForUser(username: string): Locator {
