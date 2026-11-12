@@ -1586,11 +1586,17 @@ function hasCallTarget(query: string, start: number): boolean {
 // Comments are whitespace between CALL and its target. Reject punctuation
 // contexts such as labels and properties before checking for a target.
 function hasCallClause(query: string, code: string): boolean {
-  const callKeyword = /\bCALL\b/gi;
+  const callKeyword = /(?<![\p{ID_Continue}\p{Sc}])CALL(?![\p{ID_Continue}\p{Sc}])/giu;
+  let scanned = 0;
+  let depth = 0;
   let match = callKeyword.exec(code);
   while (match) {
+    for (; scanned < match.index; scanned += 1) {
+      if ("([{".includes(code[scanned])) depth += 1;
+      else if (")]}".includes(code[scanned])) depth -= 1;
+    }
     const before = code.slice(0, match.index).trimEnd();
-    if (!/[.:$]$/.test(before) && hasCallTarget(query, match.index + match[0].length)) return true;
+    if (depth === 0 && !/[.:$]$/.test(before) && hasCallTarget(query, match.index + match[0].length)) return true;
     match = callKeyword.exec(code);
   }
   return false;
@@ -1717,11 +1723,11 @@ function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>): number[] 
     }
     const previousQuotedToken = previousQuote !== undefined && /^\s*$/.test(code.slice(previousQuote.end, unionStart));
     const wildcardProjection = /\bRETURN\s+(?:DISTINCT\s+)?\*$/i.test(before);
-    const keywordIdentifier = /(?:[.:$]\s*|\bAS\s+)(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)$/i.test(before);
+    const keywordIdentifier = /(?:[.:$]\s*|\bAS\s+|\bRETURN\s+(?:DISTINCT\s+)?|,\s*)(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)$/i.test(before);
     if (
       depth === 0 &&
       (!/[.:$,([{/*+%<>=|&^-]$/.test(before) || previousQuotedToken || wildcardProjection) &&
-      (previousQuotedToken || keywordIdentifier || !/\b(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)\s*$/i.test(before)) &&
+      (previousQuotedToken || keywordIdentifier || !/(?<![\p{ID_Continue}\p{Sc}])(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)\s*$/iu.test(before)) &&
       /^\s+(?:ALL\s+)?(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD|FOREACH)\b/i.test(after)
     ) {
       clauses.push(unionEnd);
@@ -1731,16 +1737,23 @@ function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>): number[] 
   return clauses;
 }
 
-function hasTopLevelLimit(code: string): boolean {
+function hasTopLevelLimit(code: string, quotedTokenEnds: number[]): boolean {
   let depth = 0;
+  let quotedIndex = 0;
+  let previousQuoteEnd = -1;
   for (let index = 0; index < code.length; index += 1) {
+    while (quotedIndex < quotedTokenEnds.length && quotedTokenEnds[quotedIndex] <= index) {
+      previousQuoteEnd = quotedTokenEnds[quotedIndex++];
+    }
     const char = code[index];
     if ("([{".includes(char)) depth += 1;
     else if (")]}".includes(char)) depth -= 1;
     else if (depth === 0 && (char === "L" || char === "l") &&
       /^LIMIT(?![\p{ID_Continue}\p{Sc}])/iu.test(code.slice(index, index + 7))) {
       const before = code.slice(0, index).trimEnd();
-      if (!/[\p{ID_Continue}\p{Sc}]$/u.test(code.slice(Math.max(0, index - 2), index)) && !/[.:$]$/.test(before)) return true;
+      const afterQuotedValue = previousQuoteEnd !== -1 && /^\s*$/.test(code.slice(previousQuoteEnd, index));
+      if (!/[\p{ID_Continue}\p{Sc}]$/u.test(code.slice(Math.max(0, index - 2), index)) &&
+        (afterQuotedValue || !/[.:$]$/.test(before))) return true;
     }
   }
   return false;
@@ -1811,8 +1824,10 @@ export function getQueryWithLimit(
       return [wrapUnionQuery(query, bodyStart, limit), limit];
     }
 
+    const finalBranchStart = unionClauses[unionClauses.length - 1];
     if (hasCallBlockWithReturnNoLimit(analysis.code) &&
-      !hasTopLevelLimit(analysis.code.slice(unionClauses[unionClauses.length - 1]))) {
+      !hasTopLevelLimit(analysis.code.slice(finalBranchStart),
+        analysis.quotedTokens.filter(token => token.end > finalBranchStart).map(token => token.end - finalBranchStart))) {
       return [insertLimit(query, analysis, limit), limit];
     }
   }

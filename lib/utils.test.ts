@@ -85,6 +85,25 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
     assert.deepEqual(getQueryWithLimit(query, 300), [query, 1000]);
   });
 
+  it("recognises UNION after Unicode and keyword-named variables", () => {
+    for (const query of [
+      "MATCH (éreturn) RETURN éreturn UNION ALL MATCH (éreturn) RETURN éreturn",
+      "UNWIND [1,2] AS yield RETURN yield UNION ALL UNWIND [3,4] AS yield RETURN yield",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
+  });
+
+  it("does not treat a node variable followed by a map as a CALL clause", () => {
+    const query = "MATCH (call {x: 1}) RETURN call UNION MATCH (m) RETURN m AS call";
+    assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+  });
+
+  it("ignores UNIONs inside expressions when applying the outer limit", () => {
+    const query = "MATCH (n) WHERE EXISTS { RETURN 1 AS x UNION RETURN 2 AS x } RETURN n LIMIT 1000";
+    assert.deepEqual(getQueryWithLimit(query, 300), [query, 1000]);
+  });
+
   it("preserves a final branch limit after a commented CALL block", () => {
     const query = "CALL /* c */ { RETURN 1 AS x } RETURN x UNION RETURN 2 AS x LIMIT 5";
     assert.deepEqual(getQueryWithLimit(query, 300), [query, 5]);
@@ -94,6 +113,8 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
     assert.deepEqual(getQueryWithLimit(nested, 300), [`${nested} LIMIT 300`, 300]);
     const nestedUnion = "CALL /* c */ { RETURN 1 AS x } RETURN x UNION CALL { RETURN 2 AS x UNION RETURN 3 AS x } RETURN x LIMIT 5";
     assert.deepEqual(getQueryWithLimit(nestedUnion, 300), [nestedUnion, 5]);
+    const property = "CALL /* c */ { MATCH (n) RETURN n } RETURN n.`name` UNION MATCH (n) RETURN n.`name` LIMIT 5";
+    assert.deepEqual(getQueryWithLimit(property, 300), [property, 5]);
   });
 
   it("recognises UNION after wildcard and keyword-named property projections", () => {
