@@ -82,6 +82,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("uploadGraphCancel");
   }
 
+  public get uploadDialog(): Locator {
+    return this.page.getByRole("dialog", { name: "Upload Data", exact: true });
+  }
+
   public get uploadFileInput(): Locator {
     return this.page.locator('input[type="file"]');
   }

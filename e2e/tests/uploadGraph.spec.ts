@@ -1,5 +1,5 @@
 /* eslint-disable no-await-in-loop */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -58,6 +58,107 @@ test.describe("Upload Graph – Cypher batch", () => {
       expect(await graph.uploadConfirm.isDisabled()).toBe(true);
     } finally {
       await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
+  });
+
+  test("@admin rejects unsupported Cypher replacements without losing the valid file or uploading", async () => {
+    const graphName = getRandomString("uploadRejected");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      let uploadRequests = 0;
+      await page.route("**/api/upload", async (route) => {
+        uploadRequests += 1;
+        await route.fulfill({ json: { id: "should-not-upload" } });
+      });
+      await graph.openUploadDialog(graphName);
+      await graph.setUploadFile(CYPHER_FIXTURE);
+      await expect(graph.uploadConfirm).toBeEnabled();
+      await expect(graph.uploadDialog).toContainText("upload-people.cypher");
+      await graph.uploadFileInput.setInputFiles({
+        name: "invalid.json", mimeType: "application/json", buffer: Buffer.from('{"invalid":true}'),
+      });
+      await expect(graph.errorToast).toContainText("Please choose a .txt or .cypher file.");
+      await expect(graph.uploadConfirm).toBeEnabled();
+      await expect(graph.uploadDialog).toContainText("upload-people.cypher");
+      await expect(graph.uploadDialog).not.toContainText("invalid.json");
+      await page.waitForLoadState("networkidle");
+      expect(uploadRequests).toBe(0);
+    } finally {
+      try {
+        await browser.closeBrowser();
+      } finally {
+        expect((await apiCall.removeGraph(graphName, "admin")).message).toMatch(/deleted|empty key/i);
+      }
+    }
+  });
+
+  test("@admin malformed upload responses keep the file available for retry", async () => {
+    const graphName = getRandomString("uploadMalformed");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      let uploads = 0;
+      let processing = 0;
+      const processingPayloads: unknown[] = [];
+      await page.route("**/api/upload", async (route) => {
+        uploads += 1;
+        await route.fulfill({ json: uploads === 1 ? {} : { id: "retry-file" } });
+      });
+      await page.route(`**/api/graph/${graphName}/upload`, async (route) => {
+        processing += 1;
+        processingPayloads.push(route.request().postDataJSON());
+        await route.fulfill({ json: { message: "Retry accepted" } });
+      });
+      await graph.openUploadDialog(graphName);
+      await graph.setUploadFile(CYPHER_FIXTURE);
+      await graph.uploadConfirm.click();
+      await expect(graph.errorToast).toContainText("Unexpected response from server.");
+      await expect(graph.uploadConfirm).toBeEnabled();
+      expect(processing).toBe(0);
+      await graph.uploadConfirm.click();
+      await expect(graph.toast).toContainText("Retry accepted");
+      await expect(graph.uploadConfirm).toBeHidden();
+      expect(uploads).toBe(2);
+      expect(processing).toBe(1);
+      expect(processingPayloads).toEqual([{ fileId: "retry-file" }]);
+    } finally {
+      try {
+        await browser.closeBrowser();
+      } finally {
+        expect((await apiCall.removeGraph(graphName, "admin")).message).toMatch(/deleted|empty key/i);
+      }
+    }
+  });
+
+  test("@admin rejected Cypher processing can be cancelled and reopened without stale files", async () => {
+    const graphName = getRandomString("uploadProcessError");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await page.route("**/api/upload", (route) => route.fulfill({ json: { id: "rejected-file" } }));
+      await page.route(`**/api/graph/${graphName}/upload`, (route) =>
+        route.fulfill({ status: 400, json: { message: "Invalid input: Cypher batch rejected" } }));
+      await graph.openUploadDialog(graphName);
+      await graph.setUploadFile(CYPHER_FIXTURE);
+      await graph.uploadConfirm.click();
+      await expect(graph.errorToast).toContainText("Invalid input: Cypher batch rejected");
+      await expect(graph.uploadConfirm).toBeEnabled();
+      await expect(graph.uploadDialog).toContainText("upload-people.cypher");
+      await graph.uploadCancel.click();
+      await expect(graph.uploadConfirm).toBeHidden();
+      await graph.uploadBtn.click();
+      await expect(graph.uploadConfirm).toBeDisabled();
+      await expect(graph.uploadDialog).not.toContainText("upload-people.cypher");
+    } finally {
+      try {
+        await browser.closeBrowser();
+      } finally {
+        expect((await apiCall.removeGraph(graphName, "admin")).message).toMatch(/deleted|empty key/i);
+      }
     }
   });
 });
