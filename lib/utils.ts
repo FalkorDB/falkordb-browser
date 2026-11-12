@@ -1601,12 +1601,12 @@ function analyzeCypher(query: string): {
   code: string;
   lastCodeEnd: number;
   lastNonTerminatorEnd: number;
-  quotedIdentifiers: { start: number; end: number }[];
+  quotedTokens: { end: number; quote: string }[];
 } {
   const code = query.split("");
   let lastCodeEnd = 0;
   let lastNonTerminatorEnd = 0;
-  const quotedIdentifiers: { start: number; end: number }[] = [];
+  const quotedTokens: { end: number; quote: string }[] = [];
   let i = 0;
 
   const maskRange = (target: string[], start: number, end: number) => {
@@ -1659,7 +1659,7 @@ function analyzeCypher(query: string): {
       maskRange(code, start, i);
       lastCodeEnd = i;
       lastNonTerminatorEnd = i;
-      if (quote === "`") quotedIdentifiers.push({ start, end: i });
+      quotedTokens.push({ end: i, quote });
       continue;
     }
 
@@ -1670,7 +1670,7 @@ function analyzeCypher(query: string): {
     i += 1;
   }
 
-  return { code: code.join(""), lastCodeEnd, lastNonTerminatorEnd, quotedIdentifiers };
+  return { code: code.join(""), lastCodeEnd, lastNonTerminatorEnd, quotedTokens };
 }
 
 function insertLimit(query: string, analysis: { code: string; lastCodeEnd: number }, limit: number): string {
@@ -1693,27 +1693,41 @@ function withoutTrailingSemicolons(query: string, analysis: ReturnType<typeof an
   return result;
 }
 
-function hasUnionClause(analysis: ReturnType<typeof analyzeCypher>): boolean {
-  const { code, quotedIdentifiers } = analysis;
+function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>): number[] {
+  const { code, quotedTokens } = analysis;
   const keyword = /\bUNION\b/gi;
+  const clauses: number[] = [];
+  let quotedIndex = 0;
+  let previousQuote: { end: number; quote: string } | undefined;
   let match = keyword.exec(code);
   while (match) {
     const unionStart = match.index;
     const unionEnd = unionStart + match[0].length;
     const before = code.slice(0, unionStart).trimEnd();
     const after = code.slice(unionEnd);
-    const previousIdentifier = quotedIdentifiers.some(({ end }) =>
-      end <= unionStart && /^\s*$/.test(code.slice(end, unionStart)),
-    );
+    while (quotedIndex < quotedTokens.length && quotedTokens[quotedIndex].end <= unionStart) {
+      previousQuote = quotedTokens[quotedIndex++];
+    }
+    const previousQuotedToken = previousQuote !== undefined && /^\s*$/.test(code.slice(previousQuote.end, unionStart));
+    const previousIdentifier = previousQuotedToken && previousQuote?.quote === "`";
     if (
-      (!/[.:$]$/.test(before) || previousIdentifier) &&
+      (!/[.:$,([{/*+%<>=|&^-]$/.test(before) || previousIdentifier) &&
+      (previousQuotedToken || !/\b(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)\s*$/i.test(before)) &&
       /^\s+(?:ALL\s+)?(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD|FOREACH)\b/i.test(after)
     ) {
-      return true;
+      clauses.push(unionEnd);
     }
     match = keyword.exec(code);
   }
-  return false;
+  return clauses;
+}
+
+function startsWithClause(code: string): boolean {
+  const header = /^\s*CYPHER\b/i.exec(code);
+  if (!header) return /^\s*WITH\b/i.test(code);
+  const clause = /\b(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD\s+CSV|FOREACH|DELETE|SET|REMOVE)\b/gi;
+  clause.lastIndex = header[0].length;
+  return clause.exec(code)?.[0].toUpperCase() === "WITH";
 }
 
 function wrapUnionQuery(query: string, code: string, limit: number): string {
@@ -1745,8 +1759,13 @@ export function getQueryWithLimit(
 
   if (limit === 0) return [query, existingLimit];
 
-  if (hasUnionClause(analysis)) {
-    if (!hasCallClause(query, analysis.code)) {
+  const unionClauses = findUnionClauses(analysis);
+  if (unionClauses.length > 0) {
+    // FalkorDB treats leading WITH inside CALL as an import; leave such UNIONs
+    // unwrapped even though the trailing LIMIT then applies to the last branch.
+    const hasLeadingWith = startsWithClause(analysis.code) ||
+      unionClauses.some(end => /^\s+(?:ALL\s+)?WITH\b/i.test(analysis.code.slice(end)));
+    if (!hasLeadingWith && !hasCallClause(query, analysis.code)) {
       return [wrapUnionQuery(query, analysis.code, limit), limit];
     }
 

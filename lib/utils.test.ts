@@ -51,6 +51,32 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
       const query = `MATCH (n) RETURN ${expression}`;
       assert.deepEqual(getQueryWithLimit(query, 300), [`${query} LIMIT 300`, 300]);
     }
+    for (const query of [
+      "WITH 1 AS union RETURN union",
+      "WITH 1 AS x, 2 AS union RETURN union",
+      "WITH 1 AS union WITH 3 + union AS x RETURN x",
+      "WITH true AS union MATCH (n) WHERE union RETURN n",
+      "WITH true AS union MATCH (n) WHERE NOT union RETURN n",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 300), [`${query} LIMIT 300`, 300]);
+    }
+  });
+
+  it("recognises UNION after quoted return values", () => {
+    const query = "RETURN 'one' AS x UNION RETURN 'two' AS x";
+    assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    const unnamed = "RETURN 'one' UNION RETURN 'two'";
+    assert.deepEqual(getQueryWithLimit(unnamed, 1), [`CALL { ${unnamed}\n} RETURN * LIMIT 1`, 1]);
+  });
+
+  it("does not wrap UNION branches beginning with WITH", () => {
+    for (const query of [
+      "WITH 1 AS x RETURN x union WITH 2 AS x RETURN x",
+      "RETURN 1 AS x UNION ALL WITH 2 AS x RETURN x",
+      "CYPHER p=1 WITH $p AS x RETURN x UNION RETURN 2 AS x",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 1), [`${query} LIMIT 1`, 1]);
+    }
   });
 
   it("recognises UNION after a backtick-quoted property", () => {
