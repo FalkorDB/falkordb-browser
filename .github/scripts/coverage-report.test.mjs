@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import {
-  browserEntries, isFlagSource, isSourceFile, localSourceMap, mappedLines, toSourcePath,
+  browserEntries, isFlagSource, isSourceFile, localSourceMap, mappedLines, toSourcePath, validateBrowserCoverage,
 } from './coverage-report.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -103,6 +103,25 @@ test('gives each browser entry its saved source, and drops one saved without it'
   rmSync(dir, { recursive: true, force: true });
 });
 
+test('requires usable browser recordings only when explicitly requested', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'coverage-validation-'));
+  try {
+    assert.throws(() => validateBrowserCoverage([path.join(dir, 'missing')]), /No usable browser coverage/);
+    writeFileSync(path.join(dir, 'coverage-1.json'), JSON.stringify({ result: [] }));
+    assert.throws(() => validateBrowserCoverage([dir]), /No usable browser coverage/);
+    validateBrowserCoverage([dir], false);
+    writeFileSync(path.join(dir, 'browser-1.json'), JSON.stringify([{ url: 'http://localhost/_next/static/a.js' }]));
+    assert.throws(() => validateBrowserCoverage([dir]), /missing chunk sources/);
+    assert.throws(() => validateBrowserCoverage([dir], false), /missing chunk sources/);
+    writeFileSync(path.join(dir, 'browser-error-1.json'), JSON.stringify({ message: 'disk failure' }));
+    rmSync(path.join(dir, 'browser-1.json'));
+    assert.throws(() => validateBrowserCoverage([dir]), /disk failure/);
+    assert.throws(() => validateBrowserCoverage([dir], false), /disk failure/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // A scratch checkout the report runs on (COVERAGE_ROOT), with coverage of one
 // file from Node and, separately, from a browser bundle.
 const AREA = `import type { Unit } from "./units";
@@ -135,8 +154,8 @@ function scratchCheckout() {
   return root;
 }
 
-function report(root, flag, rawDir) {
-  const env = { ...process.env, COVERAGE_ROOT: root };
+function report(root, flag, rawDir, options = {}) {
+  const env = { ...process.env, COVERAGE_ROOT: root, ...options };
   delete env.NODE_V8_COVERAGE;
   delete env.GITHUB_STEP_SUMMARY;
   execFileSync(process.execPath, [SCRIPT, flag, rawDir], { cwd: root, env, stdio: 'pipe' });
@@ -193,9 +212,39 @@ test('reports every source file of a flag, and a file the same from Node and fro
     assert.ok(fromNode['lib/area.ts'][13] > 0);
     assert.equal(fromNode['lib/area.ts'][10], 0);
     assert.ok(fromBrowser['lib/area.ts'][13] > 0);
+    assert.throws(() => report(root, 'e2e', nodeRaw, { REQUIRE_BROWSER_COVERAGE: '1' }), /No usable browser coverage/);
+    assert.deepEqual(report(root, 'e2e', browserRaw, { REQUIRE_BROWSER_COVERAGE: '1' }), fromBrowser);
+
+    // Docker server entries use /app paths; resolve them against the exact
+    // artifacts copied to this reporting checkout, not a different build.
+    const serverFile = '.next/server/chunks/area.js';
+    mkdirSync(path.join(root, '.next/server/chunks'), { recursive: true });
+    writeFileSync(path.join(root, serverFile), source);
+    const dockerRaw = path.join(root, 'raw-docker');
+    mkdirSync(dockerRaw);
+    writeFileSync(path.join(dockerRaw, 'coverage-1.json'), JSON.stringify({
+      result: [{
+        url: `file:///app/${serverFile}`,
+        scriptId: '1',
+        functions: [{ functionName: '', isBlockCoverage: true, ranges: [{ startOffset: 0, endOffset: source.length, count: 1 }] }],
+      }, { url: 'node:fs', functions: [] }],
+    }));
+    assert.deepEqual(report(root, 'e2e', dockerRaw, { COVERAGE_SERVER_ROOT: '/app' }), fromBrowser);
+    const externalSource = 'const embedded = `\n//# sourceMappingURL=not-a-sidecar.js.map\n`;\n'
+      + out.outputText.replace(/\/\/# sourceMappingURL=.*$/m, '//# sourceMappingURL=area.js.map');
+    writeFileSync(path.join(root, serverFile), externalSource);
+    writeFileSync(path.join(root, `${serverFile}.map`), JSON.stringify(map));
+    const dockerRecording = JSON.parse(readFileSync(path.join(dockerRaw, 'coverage-1.json'), 'utf8'));
+    dockerRecording.result[0].functions[0].ranges[0].endOffset = externalSource.length;
+    writeFileSync(path.join(dockerRaw, 'coverage-1.json'), JSON.stringify(dockerRecording));
+    assert.deepEqual(report(root, 'e2e', dockerRaw, { COVERAGE_SERVER_ROOT: '/app' }), fromBrowser);
+    rmSync(path.join(root, `${serverFile}.map`));
+    assert.throws(() => report(root, 'e2e', dockerRaw, { COVERAGE_SERVER_ROOT: '/app' }), /ENOENT.*area\.js\.map/);
 
     // The desktop flag covers its own file only.
     assert.deepEqual(Object.keys(report(root, 'desktop', nodeRaw)), ['desktop/main.cjs']);
+    writeFileSync(path.join(browserRaw, 'browser-error-1.json'), JSON.stringify({ message: 'recorder failed' }));
+    assert.throws(() => report(root, 'e2e', browserRaw), /Browser coverage collection failed.*recorder failed/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
