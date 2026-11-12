@@ -1210,7 +1210,7 @@ const swaggerSpec = {
       post: {
         tags: ["Graph"],
         summary: "Set node/relationship property",
-        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships.",
+        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use property as the key path segment and supply the name in the propertyKey query parameter.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1238,7 +1238,14 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name"
+            description: "Property key name, or property when propertyKey is supplied"
+          },
+          {
+            in: "query",
+            name: "propertyKey",
+            required: false,
+            schema: { type: "string" },
+            description: "Exact property name to set; overrides the key in the path"
           }
         ],
         requestBody: {
@@ -1272,7 +1279,7 @@ const swaggerSpec = {
       delete: {
         tags: ["Graph"],
         summary: "Remove node/relationship property",
-        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships.",
+        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use property as the key path segment and supply the name in the propertyKey query parameter.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1300,7 +1307,14 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name"
+            description: "Property key name, or property when propertyKey is supplied"
+          },
+          {
+            in: "query",
+            name: "propertyKey",
+            required: false,
+            schema: { type: "string" },
+            description: "Exact property name to remove; overrides the key in the path"
           }
         ],
         requestBody: {
