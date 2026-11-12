@@ -9,6 +9,7 @@ import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDi
 import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import useLongPress from "@/lib/useLongPress";
+import { getNodeUrl } from "@/lib/graphUrls";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
 
@@ -206,7 +207,7 @@ export default function ForceGraph({
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
 
-        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}${isReadOnly ? '?readOnly=true' : ''}`, {
+        const result = await securedFetch(getNodeUrl(graph.Id, node.id, isReadOnly), {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
