@@ -55,6 +55,7 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
       "WITH 1 AS union RETURN union",
       "WITH 1 AS x, 2 AS union RETURN union",
       "WITH 1 AS union WITH 3 + union AS x RETURN x",
+      "WITH 1 AS union WITH 3 * union AS total MATCH (n) RETURN n",
       "WITH true AS union MATCH (n) WHERE union RETURN n",
       "WITH true AS union MATCH (n) WHERE NOT union RETURN n",
     ]) {
@@ -67,6 +68,17 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
     assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
     const unnamed = "RETURN 'one' UNION RETURN 'two'";
     assert.deepEqual(getQueryWithLimit(unnamed, 1), [`CALL { ${unnamed}\n} RETURN * LIMIT 1`, 1]);
+  });
+
+  it("recognises UNION after wildcard and keyword-named property projections", () => {
+    for (const expression of ["*", "DISTINCT *", "n.return", "n . where", "n.as", "$return"]) {
+      const query = `MATCH (n) RETURN ${expression} UNION MATCH (n) RETURN ${expression}`;
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
+    for (const alias of ["return", "where", "as"]) {
+      const query = `RETURN 1 AS ${alias} UNION RETURN 2 AS ${alias}`;
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
   });
 
   it("does not wrap UNION branches beginning with WITH", () => {

@@ -1710,9 +1710,11 @@ function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>): number[] 
     }
     const previousQuotedToken = previousQuote !== undefined && /^\s*$/.test(code.slice(previousQuote.end, unionStart));
     const previousIdentifier = previousQuotedToken && previousQuote?.quote === "`";
+    const wildcardProjection = /\bRETURN\s+(?:DISTINCT\s+)?\*$/i.test(before);
+    const keywordIdentifier = /(?:[.:$]\s*|\bAS\s+)(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)$/i.test(before);
     if (
-      (!/[.:$,([{/*+%<>=|&^-]$/.test(before) || previousIdentifier) &&
-      (previousQuotedToken || !/\b(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)\s*$/i.test(before)) &&
+      (!/[.:$,([{/*+%<>=|&^-]$/.test(before) || previousIdentifier || wildcardProjection) &&
+      (previousQuotedToken || keywordIdentifier || !/\b(?:AS|WITH|RETURN|YIELD|DISTINCT|WHERE|NOT|AND|OR|XOR|IN|WHEN|THEN|ELSE)\s*$/i.test(before)) &&
       /^\s+(?:ALL\s+)?(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD|FOREACH)\b/i.test(after)
     ) {
       clauses.push(unionEnd);
