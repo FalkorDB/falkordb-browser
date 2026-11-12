@@ -174,7 +174,7 @@ export default defineConfig({
       testMatch: /.*mobile\.spec\.ts$/,
     },
 
-    // Settings tests (run separately)
+    // Both settings projects mutate server-wide state, so Firefox must wait for Chromium.
     {
       name: '[Admin: Settings - Chromium]',
       use: {
@@ -192,7 +192,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/admin.json',
       },
       grep: /@admin|@config/,
-      dependencies: ['setup'],
+      dependencies: ['[Admin: Settings - Chromium]'],
       testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
     },
 
