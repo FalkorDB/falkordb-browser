@@ -51,9 +51,11 @@ test.describe("Graph Tests", () => {
       await expect(page.getByText("Invalid graph name: retry this operation", { exact: true })).toBeVisible();
       await expect(page.getByTestId("createGraphInput")).toHaveValue(graphName);
       await expect(page.getByTestId("createGraphConfirm")).toBeEnabled();
+      await expect(page.getByText("Graph created successfully", { exact: true })).toHaveCount(0);
       await graph.clickConfirmCreateGraph();
       await expect(page.getByTestId("createGraphInput")).toBeHidden();
-      await expect(page.getByTestId("editorContainer")).toBeVisible();
+      await expect.poll(() => graph.getSelectedGraphName()).toBe(graphName);
+      await expect(page.getByText("Graph created successfully", { exact: true })).toBeVisible();
       expect(attempts).toBe(2);
       expect((await apiCall.getGraphs()).opts).toContain(graphName);
     } finally {
@@ -90,6 +92,7 @@ test.describe("Graph Tests", () => {
       await expect(page.getByText("Invalid input: deletion rejected", { exact: true })).toBeVisible();
       expect((await apiCall.getGraphs()).opts).toContain(graphName);
       await expect(page.getByText("Graph(s) deleted successfully", { exact: true })).toHaveCount(0);
+      await expect(graph.tableCheckboxByName(graphName)).not.toBeChecked();
       await graph.clickTableCheckboxByName(graphName);
       await graph.clickDelete();
       await graph.clickDeleteConfirm();
