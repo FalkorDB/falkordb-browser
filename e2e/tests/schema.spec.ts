@@ -92,7 +92,8 @@ test.describe("Schema View Tests", () => {
             new URL(response.url()).pathname === `/api/graph/${GRAPH_NAME}` && isSchemaDiscovery(response.url()));
         await schemaView.clickSchemaTab();
         expect(await (await rejectedDiscovery).finished()).toBeNull();
-        await expect(page.getByText("Invalid input: schema discovery rejected", { exact: true })).toBeVisible();
+        await expect(schemaView.errorToast).toBeVisible();
+        await expect(schemaView.errorToast).toContainText("Invalid input: schema discovery rejected");
         await schemaView.waitForSchemaTripleCount(0);
         await schemaView.clickGraphTab();
         await schemaView.clickSchemaTab();

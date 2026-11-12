@@ -43,16 +43,22 @@ test.describe('@Config Settings users tests', () => {
         });
         await browser.navigateTo(urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
-        await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
-        await expect(page.locator("input[id='Username']")).toHaveValue(username);
-        await expect(page.locator("input[id='Password']")).toHaveValue(user.password);
-        await expect(page.getByTestId(`tableRowUsers${username}`)).toHaveCount(0);
+        await settingsUsersPage.clickOnAddUserBtn();
+        await settingsUsersPage.fillUserNameField(username);
+        await settingsUsersPage.fillPasswordField(user.password);
+        await settingsUsersPage.fillConfirmPasswordField(user.confirmPassword);
+        await settingsUsersPage.clickOnSelectRoleBtnInAddUser();
+        await settingsUsersPage.clickOnSelectUserRole(user.ReadWrite);
+        await settingsUsersPage.clickOnSubmitUserAddition();
+        await expect(settingsUsersPage.errorToast).toContainText("An unexpected error occurred. Please try again.");
+        await expect(settingsUsersPage.userNameField).toHaveValue(username);
+        await expect(settingsUsersPage.passwordField).toHaveValue(user.password);
+        await expect(settingsUsersPage.findUserNameInTable(username)).toHaveCount(0);
         expect(saves).toBe(0);
 
         await settingsUsersPage.clickOnSubmitUserAddition();
-        await expect(page.getByRole("dialog")).toHaveCount(0);
-        await expect(page.getByTestId(`tableRowUsers${username}`)).toHaveCount(1);
+        await expect(settingsUsersPage.dialog).toHaveCount(0);
+        await expect(settingsUsersPage.findUserNameInTable(username)).toHaveCount(1);
         await expect.poll(() => saves).toBe(1);
         expect(submissions).toEqual([
             { username, role: user.ReadWrite, password: user.password, keys: ["*"] },
@@ -86,25 +92,25 @@ test.describe('@Config Settings users tests', () => {
         await settingsUsersPage.navigateToUserTab();
         await settingsUsersPage.clickUserCheckboxBtn(username);
         await settingsUsersPage.clickOnEditUserBtn();
-        await expect(page.locator("input[id='Username']")).toBeDisabled();
+        await expect(settingsUsersPage.userNameField).toBeDisabled();
         await settingsUsersPage.clickOnSelectRoleBtnInAddUser();
         await settingsUsersPage.clickOnSelectUserRole(user.ReadOnly);
         await settingsUsersPage.fillEditKeysField("analytics:*");
         await settingsUsersPage.clickOnSubmitEditUser();
-        await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
-        await expect(page.getByTestId(`contentUsers${username}Role`)).toHaveText(user.ReadWrite);
-        await expect(page.getByTestId(`contentUsers${username}Key / Graph Permissions`)).toHaveText("reports:*");
-        await expect(page.getByRole("dialog")).toBeVisible();
+        await expect(settingsUsersPage.errorToast).toContainText("An unexpected error occurred. Please try again.");
+        await expect(settingsUsersPage.userRoleContent(username)).toHaveText(user.ReadWrite);
+        await expect(settingsUsersPage.userKeysContent(username)).toHaveText("reports:*");
+        await expect(settingsUsersPage.dialog).toBeVisible();
         await expect(settingsUsersPage.editSelectRoleBtn).toContainText(user.ReadOnly);
-        await expect(settingsUsersPage.editKeysField.locator("..").getByRole("button", { name: "Remove analytics:*", exact: true })).toBeVisible();
+        await expect(settingsUsersPage.permissionRemovalButton("analytics:*")).toBeVisible();
         await expect(settingsUsersPage.editNewPasswordField).toHaveValue("");
         await expect(settingsUsersPage.editConfirmPasswordField).toHaveValue("");
         expect(saves).toBe(0);
 
         await settingsUsersPage.clickOnSubmitEditUser();
-        await expect(page.getByRole("dialog")).toHaveCount(0);
-        await expect(page.getByTestId(`contentUsers${username}Role`)).toHaveText(user.ReadOnly);
-        await expect(page.getByTestId(`contentUsers${username}Key / Graph Permissions`)).toHaveText("analytics:*");
+        await expect(settingsUsersPage.dialog).toHaveCount(0);
+        await expect(settingsUsersPage.userRoleContent(username)).toHaveText(user.ReadOnly);
+        await expect(settingsUsersPage.userKeysContent(username)).toHaveText("analytics:*");
         await expect.poll(() => saves).toBe(1);
         expect(submissions).toEqual([
             { role: user.ReadOnly, keys: ["analytics:*"] },

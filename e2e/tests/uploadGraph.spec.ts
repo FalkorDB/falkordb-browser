@@ -75,14 +75,14 @@ test.describe("Upload Graph – Cypher batch", () => {
       await graph.openUploadDialog(graphName);
       await graph.setUploadFile(CYPHER_FIXTURE);
       await expect(graph.uploadConfirm).toBeEnabled();
-      await expect(page.getByRole("dialog")).toContainText("upload-people.cypher");
+      await expect(graph.uploadDialog).toContainText("upload-people.cypher");
       await graph.uploadFileInput.setInputFiles({
         name: "invalid.json", mimeType: "application/json", buffer: Buffer.from('{"invalid":true}'),
       });
-      await expect(page.getByText("Please choose a .txt or .cypher file.", { exact: true })).toBeVisible();
+      await expect(graph.errorToast).toContainText("Please choose a .txt or .cypher file.");
       await expect(graph.uploadConfirm).toBeEnabled();
-      await expect(page.getByRole("dialog")).toContainText("upload-people.cypher");
-      await expect(page.getByRole("dialog")).not.toContainText("invalid.json");
+      await expect(graph.uploadDialog).toContainText("upload-people.cypher");
+      await expect(graph.uploadDialog).not.toContainText("invalid.json");
       await page.waitForLoadState("networkidle");
       expect(uploadRequests).toBe(0);
     } finally {
@@ -115,11 +115,11 @@ test.describe("Upload Graph – Cypher batch", () => {
       await graph.openUploadDialog(graphName);
       await graph.setUploadFile(CYPHER_FIXTURE);
       await graph.uploadConfirm.click();
-      await expect(page.getByText("Unexpected response from server.", { exact: true })).toBeVisible();
+      await expect(graph.errorToast).toContainText("Unexpected response from server.");
       await expect(graph.uploadConfirm).toBeEnabled();
       expect(processing).toBe(0);
       await graph.uploadConfirm.click();
-      await expect(page.getByText("Retry accepted", { exact: true })).toBeVisible();
+      await expect(graph.toast).toContainText("Retry accepted");
       await expect(graph.uploadConfirm).toBeHidden();
       expect(uploads).toBe(2);
       expect(processing).toBe(1);
@@ -145,14 +145,14 @@ test.describe("Upload Graph – Cypher batch", () => {
       await graph.openUploadDialog(graphName);
       await graph.setUploadFile(CYPHER_FIXTURE);
       await graph.uploadConfirm.click();
-      await expect(page.getByText("Invalid input: Cypher batch rejected", { exact: true })).toBeVisible();
+      await expect(graph.errorToast).toContainText("Invalid input: Cypher batch rejected");
       await expect(graph.uploadConfirm).toBeEnabled();
-      await expect(page.getByRole("dialog")).toContainText("upload-people.cypher");
+      await expect(graph.uploadDialog).toContainText("upload-people.cypher");
       await graph.uploadCancel.click();
       await expect(graph.uploadConfirm).toBeHidden();
       await graph.uploadBtn.click();
       await expect(graph.uploadConfirm).toBeDisabled();
-      await expect(page.getByRole("dialog")).not.toContainText("upload-people.cypher");
+      await expect(graph.uploadDialog).not.toContainText("upload-people.cypher");
     } finally {
       try {
         await browser.closeBrowser();

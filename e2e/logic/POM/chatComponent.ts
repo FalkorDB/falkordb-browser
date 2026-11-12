@@ -27,11 +27,11 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatMessagesList");
   }
 
-  private get chatUserMessages(): Locator {
+  public get chatUserMessages(): Locator {
     return this.page.getByTestId("chatUserMessage");
   }
 
-  private chatAssistantMessage(type: string): Locator {
+  public chatAssistantMessage(type: string): Locator {
     return this.page.getByTestId(`chatAssistantMessage-${type}`);
   }
 
@@ -44,12 +44,24 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatForm");
   }
 
-  private get chatInput(): Locator {
+  public get chatInput(): Locator {
     return this.page.getByTestId("chatInput");
   }
 
-  private get chatSendButton(): Locator {
+  public get chatSendButton(): Locator {
     return this.page.getByTestId("chatSendButton");
+  }
+
+  public get errorSettingsLink(): Locator {
+    return this.chatAssistantMessage("Error").getByRole("link", { name: /settings/i });
+  }
+
+  async goToSettingsFromValidation(): Promise<void> {
+    await this.page.getByRole("button", { name: "Go to Settings" }).click();
+  }
+
+  async pressChatEnter(): Promise<void> {
+    await this.chatInput.press("Enter");
   }
 
   // Query Actions
@@ -362,7 +374,7 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatFooterLastTokens");
   }
 
-  private get chatFooterTotalTokens(): Locator {
+  public get chatFooterTotalTokens(): Locator {
     return this.page.getByTestId("chatFooterTotalTokens");
   }
 

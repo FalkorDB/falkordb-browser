@@ -89,7 +89,9 @@ export default class DataPanel extends GraphPage {
   }
 
   attributeValueForKey(key: string): Locator {
-    return this.dataPanelAttribute(key).locator("xpath=following-sibling::div[1]");
+    return this.dataPanelAttribute(key)
+      .filter({ has: this.page.locator(":scope > p") })
+      .locator("xpath=following-sibling::div[1]");
   }
 
   private get dataPanelSetAttributeCancel(): Locator {

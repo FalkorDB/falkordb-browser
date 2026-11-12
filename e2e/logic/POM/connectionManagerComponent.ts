@@ -11,8 +11,64 @@ export default class ConnectionManagerComponent extends BasePage {
         return this.page.getByTestId("connections-dropdown-content");
     }
 
-    private get connectionItems(): Locator {
+    public get connectionItems(): Locator {
         return this.page.locator('[data-testid^="connection-item-"]');
+    }
+
+    public get logoutDialog(): Locator {
+        return this.page.getByTestId("connectionLogoutDialog");
+    }
+
+    public get addDialog(): Locator {
+        return this.page.getByRole("dialog");
+    }
+
+    public get addConnectionSubmit(): Locator {
+        return this.addDialog.getByRole("button", { name: "Add Connection", exact: true });
+    }
+
+    connectionForUser(username: string): Locator {
+        return this.connectionItems.filter({ hasText: `${username}@` });
+    }
+
+    activeMarkerForUser(username: string): Locator {
+        return this.connectionForUser(username).locator("svg.text-primary");
+    }
+
+    feedbackMessage(text: string): Locator {
+        return this.page.getByText(text, { exact: true });
+    }
+
+    async selectConnection(username: string): Promise<void> {
+        await this.connectionForUser(username).click();
+    }
+
+    async requestRemoval(username: string): Promise<void> {
+        await this.connectionForUser(username).getByRole("button", { name: /Sign out of connection/ }).click();
+    }
+
+    async requestFirstRemoval(): Promise<void> {
+        await this.page.getByTestId(/^connection-logout-/).first().click();
+    }
+
+    async confirmRemoval(): Promise<void> {
+        await this.page.getByTestId("connectionLogoutConfirm").click();
+    }
+
+    async cancelRemoval(): Promise<void> {
+        await this.page.getByTestId("connectionLogoutCancel").click();
+    }
+
+    async closeDropdown(): Promise<void> {
+        await this.page.keyboard.press("Escape");
+    }
+
+    async fillAdditionalPassword(password: string): Promise<void> {
+        await this.addDialog.locator("#Password").fill(password);
+    }
+
+    async submitConnectionForm(): Promise<void> {
+        await this.addConnectionSubmit.click();
     }
 
     private get addConnectionButton(): Locator {
@@ -27,10 +83,10 @@ export default class ConnectionManagerComponent extends BasePage {
     async submitAdditionalConnection(username: string, password: string): Promise<Locator> {
         await this.openDropdown();
         await this.page.getByRole("menuitem", { name: "Add Connection" }).click();
-        const dialog = this.page.getByRole("dialog");
+        const dialog = this.addDialog;
         await dialog.locator("#Username").fill(username);
-        await dialog.locator("#Password").fill(password);
-        await dialog.getByRole("button", { name: "Add Connection", exact: true }).click();
+        await this.fillAdditionalPassword(password);
+        await this.submitConnectionForm();
         return dialog;
     }
 

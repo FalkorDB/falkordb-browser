@@ -39,11 +39,11 @@ export default class SettingsUsersPage extends BasePage {
       );
   }
 
-  private get userNameField(): Locator {
+  public get userNameField(): Locator {
     return this.page.locator("//input[@id='Username']");
   }
 
-  private get passwordField(): Locator {
+  public get passwordField(): Locator {
     return this.page.locator("//input[@id='Password']");
   }
 
@@ -71,12 +71,12 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.getByRole("button", { name: "Continue" });
   }
 
-  private get userRoleContent(): (selectedUser: string) => Locator {
+  public get userRoleContent(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
       this.page.getByTestId(`contentUsers${selectedUser}Role`);
   }
 
-  private get userKeysContent(): (selectedUser: string) => Locator {
+  public get userKeysContent(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
       this.page.getByTestId(`contentUsers${selectedUser}Key / Graph Permissions`);
   }
@@ -86,7 +86,7 @@ export default class SettingsUsersPage extends BasePage {
       this.page.getByTestId(`tableCheckboxUsers${selectedUser}`);
   }
 
-  private get findUserNameInTable(): (selectedUser: string) => Locator {
+  public get findUserNameInTable(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
       this.page.getByTestId(`tableRowUsers${selectedUser}`);
   }
@@ -109,6 +109,18 @@ export default class SettingsUsersPage extends BasePage {
 
   private get fakeRow(): Locator {
     return this.page.locator("//table//tbody//tr[@class='fakeRow']");
+  }
+
+  public get dialog(): Locator {
+    return this.page.getByRole("dialog");
+  }
+
+  public get errorToast(): Locator {
+    return this.page.getByTestId("toast-description");
+  }
+
+  permissionRemovalButton(key: string): Locator {
+    return this.editKeysField.locator("..").getByRole("button", { name: `Remove ${key}`, exact: true });
   }
 
   async navigateToUserTab(): Promise<void> {
