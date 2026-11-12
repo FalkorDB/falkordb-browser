@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import {
   getRandomString,
   CREATE_QUERY,
@@ -8,6 +8,8 @@ import ApiCalls from "../logic/api/apiCalls";
 import CustomizeStylePage from "../logic/POM/customizeStylePage";
 import DataPanel from "../logic/POM/dataPanelComponent";
 import urls from "../config/urls.json";
+// The package root imports force-graph, which requires window in this Node-side spec.
+import { LINK_WIDTH, LINK_FONT_SIZE, ARROW_SIZE } from "@falkordb/canvas/dist/canvas-utils.js";
 
 test.describe("Customize Style Tests", () => {
   let browser: BrowserWrapper;
@@ -20,6 +22,108 @@ test.describe("Customize Style Tests", () => {
 
   test.afterEach(async () => {
     await browser.closeBrowser();
+  });
+
+  test("@readwrite relationship style saves color and all scaled dimensions without changing node styles", async () => {
+    const graphName = getRandomString("relationshipStyle");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery(CREATE_QUERY);
+      await graph.clickRunQuery();
+      await graph.openGraphInfoButton();
+      const nodeStyleBefore = await graph.getLabelStyleFromLocalStorage("person1");
+      const nodesBefore = (await graph.readNodesScreenPositions()).map(({ id, color, size }) => ({ id, color, size }));
+      expect(nodesBefore).toHaveLength(2);
+      await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+      const colorButton = page.getByRole("button", { name: /^Select color / }).nth(2);
+      const expectedColor = (await colorButton.getAttribute("aria-label"))!.replace("Select color ", "");
+      await colorButton.click();
+      await graph.selectSizeByIndex(0);
+      await graph.clickSaveStyleButton();
+      await expect(graph.saveStyleButton).toBeHidden();
+      const readStyle = () => graph.getRelationshipStyleFromLocalStorage("KNOWS");
+      const baseline = await readStyle();
+      if (!baseline) throw new Error("Saving relationship style did not persist it");
+      await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+      await graph.selectSizeByIndex(5);
+      await graph.clickSaveStyleButton();
+      await expect(graph.saveStyleButton).toBeHidden();
+      const saved = await readStyle();
+      if (!saved) throw new Error("Saving resized relationship style did not persist it");
+      // Size options 0 and 5 use multipliers 0.25 and 1.5, a sixfold increase.
+      const scale = 6;
+      expect(saved).toEqual({
+        color: expectedColor, width: baseline.width * scale, fontSize: baseline.fontSize * scale, arrowSize: baseline.arrowSize * scale,
+      });
+      expect(await graph.getLabelStyleFromLocalStorage("person1")).toEqual(nodeStyleBefore);
+      expect((await graph.readNodesScreenPositions()).map(({ id, color, size }) => ({ id, color, size }))).toEqual(nodesBefore);
+      await graph.refreshPage();
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery("MATCH (n)-[e]->(m) RETURN n,e,m");
+      await graph.clickRunQuery();
+      const restoredLinks = await graph.getLinksScreenPositions();
+      expect(restoredLinks).toHaveLength(1);
+      expect(restoredLinks[0]).toMatchObject(saved);
+      await graph.openGraphInfoButton();
+      await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+      expect(await graph.getSelectedColorButtonIndex()).toBe(2);
+      expect(await graph.getSelectedSizeButtonIndex()).toBe(5);
+    } finally {
+      await browser.closeBrowser();
+      await apiCall.removeGraph(graphName, "admin");
+    }
+  });
+
+  test("@readwrite cancelling relationship style restores both controls and does not persist previews", async () => {
+    const graphName = getRandomString("relationshipCancel");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+      await browser.setPageToFullScreen();
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery(CREATE_QUERY);
+      await graph.clickRunQuery();
+      // Cancelling materializes the same defaults used for omitted canvas dimensions.
+      const linkStyle = async () => (await graph.readRelationshipStyles())
+        .map(({ color, width, fontSize, arrowSize }) => ({
+          color,
+          width: width ?? LINK_WIDTH,
+          fontSize: fontSize ?? LINK_FONT_SIZE,
+          arrowSize: arrowSize ?? ARROW_SIZE,
+        }));
+      const originalLinks = await linkStyle();
+      expect(originalLinks).toHaveLength(1);
+      await graph.openGraphInfoButton();
+      await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+      const originalColor = await graph.getSelectedColorButtonIndex();
+      const originalSize = await graph.getSelectedSizeButtonIndex();
+      await graph.selectColorByIndex(originalColor === 0 ? 1 : 0);
+      const readPersisted = () => graph.getRelationshipStyleFromLocalStorage("KNOWS");
+      expect(await readPersisted()).toBeNull();
+      await graph.selectSizeByIndex(originalSize === 5 ? 2 : 5);
+      expect(await readPersisted()).toBeNull();
+      await expect.poll(async () => {
+        const [preview] = await linkStyle();
+        return preview
+          && preview.color !== originalLinks[0].color
+          && preview.width !== originalLinks[0].width
+          && preview.fontSize !== originalLinks[0].fontSize
+          && preview.arrowSize !== originalLinks[0].arrowSize;
+      }).toBe(true);
+      await graph.clickCancelStyleButton();
+      await expect(graph.saveStyleButton).toBeHidden();
+      expect(await graph.getSelectedColorButtonIndex()).toBe(originalColor);
+      expect(await graph.getSelectedSizeButtonIndex()).toBe(originalSize);
+      expect(await readPersisted()).toBeNull();
+      expect(await linkStyle()).toEqual(originalLinks);
+    } finally {
+      await browser.closeBrowser();
+      await apiCall.removeGraph(graphName, "admin");
+    }
   });
 
   test(`@readwrite Validate customize style button is visible for each label`, async () => {
