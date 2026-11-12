@@ -51,8 +51,9 @@ test.describe('Metadata Tests', () => {
         await metadataView.clickRunQuery(false);
         await metadataView.clickMetadataViewTab();
         await expect(panel).toContainText('Query internal execution time:');
-        await expect(panel).not.toContainText('Nodes created: 1');
-        await expect(panel).not.toContainText('Properties set: 1');
+        await expect(panel).not.toContainText(
+            /(?:Labels (?:added|removed)|Nodes (?:created|deleted)|Properties (?:set|removed)|(?:Relationships|Indices|Constraints) (?:created|deleted)):/,
+        );
     });
 
     test('@admin failed profiling can be retried without losing metadata', async () => {
@@ -70,10 +71,14 @@ test.describe('Metadata Tests', () => {
                 : { json: { result: ['Results | Records produced: 0', '    All Node Scan | Records produced: 0'] } });
         });
         const panel = page.getByRole('tabpanel', { name: 'Metadata', exact: true });
+        const metadataLines = panel.getByRole('heading', { name: 'Metadata', exact: true })
+            .locator('..').getByRole('listitem');
+        await expect(metadataLines).toContainText([/Query internal execution time:/]);
+        const metadataBeforeProfiling = await metadataLines.allTextContents();
         await metadataView.clickProfileButton();
         await expect(page.getByText('Invalid input: profile temporarily unavailable', { exact: true })).toBeVisible();
         await expect(panel.getByRole('button', { name: 'Profile', exact: true })).toBeEnabled();
-        await expect(panel).toContainText('Query internal execution time:');
+        await expect(metadataLines).toHaveText(metadataBeforeProfiling);
         await metadataView.clickProfileButton();
         await expect(panel).toContainText('Records produced: 0');
         expect(attempts).toBe(2);
