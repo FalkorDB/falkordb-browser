@@ -18,8 +18,11 @@ test.describe('Metadata Tests', () => {
     });
     
     test.afterEach(async () => {
-        await browser.closeBrowser();
-        await apiCalls.removeGraph(GRAPH_NAME, "admin");
+        try {
+            await browser.closeBrowser();
+        } finally {
+            expect((await apiCalls.removeGraph(GRAPH_NAME, "admin")).message).toMatch(/deleted|empty key/i);
+        }
     });
 
     test('@admin check metadata view tab is disabled when there is no metadata', async () => {
@@ -60,15 +63,22 @@ test.describe('Metadata Tests', () => {
         await metadataView.insertQuery("CREATE (:MetadataCoverage {name: 'created'})");
         await metadataView.clickRunQuery(false);
         await metadataView.clickMetadataViewTab();
-        const panel = page.getByRole('tabpanel', { name: 'Metadata', exact: true });
+        const panel = metadataView.metadataViewTabPanel;
         await expect(panel).toContainText('Nodes created: 1');
         await expect(panel).toContainText('Properties set: 1');
         await metadataView.insertQuery("MATCH (n:MetadataCoverage) RETURN n");
+        const readResponse = page.waitForResponse(response => {
+            const url = new URL(response.url());
+            return url.pathname === `/api/graph/${GRAPH_NAME}`
+                && url.searchParams.get("query") === "MATCH (n:MetadataCoverage) RETURN n";
+        });
         await metadataView.clickRunQuery(false);
+        expect((await readResponse).ok()).toBe(true);
         await metadataView.clickMetadataViewTab();
         await expect(panel).toContainText('Query internal execution time:');
-        await expect(panel).not.toContainText('Nodes created: 1');
-        await expect(panel).not.toContainText('Properties set: 1');
+        await expect(panel).not.toContainText(
+            /(?:Labels (?:added|removed)|Nodes (?:created|deleted)|Properties (?:set|removed)|(?:Relationships|Indices|Constraints) (?:created|deleted)):/,
+        );
     });
 
     test('@admin failed profiling can be retried without losing metadata', async () => {
@@ -85,15 +95,19 @@ test.describe('Metadata Tests', () => {
                 ? { status: 400, json: { message: 'Invalid input: profile temporarily unavailable' } }
                 : { json: { result: ['Results | Records produced: 0', '    All Node Scan | Records produced: 0'] } });
         });
-        const panel = page.getByRole('tabpanel', { name: 'Metadata', exact: true });
+        const panel = metadataView.metadataViewTabPanel;
+        const { metadataLines } = metadataView;
+        await expect(metadataLines).toContainText([/Query internal execution time:/]);
+        const metadataBeforeProfiling = await metadataLines.allTextContents();
         await metadataView.clickProfileButton();
-        await expect(page.getByText('Invalid input: profile temporarily unavailable', { exact: true })).toBeVisible();
-        await expect(panel.getByRole('button', { name: 'Profile', exact: true })).toBeEnabled();
-        await expect(panel).toContainText('Query internal execution time:');
+        await expect(metadataView.errorToast).toContainText('Invalid input: profile temporarily unavailable');
+        await expect(metadataView.profileButton).toBeEnabled();
+        await expect(metadataLines).toHaveText(metadataBeforeProfiling);
         await metadataView.clickProfileButton();
         await expect(panel).toContainText('Records produced: 0');
         expect(attempts).toBe(2);
     });
+
     test('@admin profile works for a graph name with reserved URL characters', async () => {
         const graphName = `${getRandomString('metadata')}#a/b%c`;
         const encodedName = encodeURIComponent(graphName);
@@ -115,7 +129,11 @@ test.describe('Metadata Tests', () => {
             await expect(page.getByTestId("profileTree")).toBeVisible();
             await expect(page.getByTestId("profileTree")).not.toBeEmpty();
         } finally {
-            await apiCalls.removeGraph(encodedName);
+            try {
+                await browser.closeBrowser();
+            } finally {
+                expect((await apiCalls.removeGraph(encodedName, "admin")).message).toMatch(/deleted|empty key/i);
+            }
         }
     });
 });

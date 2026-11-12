@@ -8,12 +8,17 @@ export default class MetadataView extends GraphPage {
         return this.page.getByTestId("metadataTab");
     }
 
-    private get profileButton(): Locator {
+    public get profileButton(): Locator {
         return this.page.getByRole('button', { name: 'Profile', exact: true });
     }
 
-    private get metadataViewTabPanel(): Locator {
-        return this.page.getByRole('tabpanel', { name: 'Metadata' });
+    public get metadataViewTabPanel(): Locator {
+        return this.page.getByRole('tabpanel', { name: 'Metadata', exact: true });
+    }
+
+    public get metadataLines(): Locator {
+        return this.metadataViewTabPanel.getByRole('heading', { name: 'Metadata', exact: true })
+            .locator('..').getByRole('listitem');
     }
 
     public async clickProfileButton(): Promise<void> {
