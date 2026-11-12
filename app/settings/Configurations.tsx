@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState, useContext } from "react";
-import { prepareArg, securedFetch, Row, DataCell } from "@/lib/utils";
+import { prepareArg, securedFetch, Row } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
@@ -168,6 +168,7 @@ export default function Configurations() {
             }
         }
 
+        const valueToRestore = configs.find(row => row.cells[0].value === name)?.cells[2].value;
         const result = await securedFetch(
             `api/graph/config/${prepareArg(name)}`,
             {
@@ -181,27 +182,19 @@ export default function Configurations() {
 
         if (!result.ok) return false;
 
-        let oldValue: DataCell | undefined;
-
-        setConfigs(currentConfigs => {
-            const configToUpdate = currentConfigs.find(row => row.cells[0].value === name);
-            oldValue = configToUpdate?.cells[2].value;
-
-            return currentConfigs.map((config: Row) => {
-                if (config.cells[0].value !== name) return config;
-
-                const newConfig = { ...config };
-                newConfig.cells[2].value = value;
-                return newConfig;
-            });
-        });
-
-        const valueToRestore = oldValue;
+        setConfigs(currentConfigs => currentConfigs.map(config =>
+            config.cells[0].value === name
+                ? {
+                    ...config,
+                    cells: config.cells.map((cell, index) => index === 2 ? { ...cell, value } : cell)
+                }
+                : config
+        ));
 
         toast({
             title: "Success",
             description: "Configuration value set successfully",
-            action: valueToRestore && isUndo ?
+            action: valueToRestore !== undefined && valueToRestore !== null && valueToRestore !== "" && isUndo ?
                 <ToastButton
                     showUndo
                     onClick={() => handleSetConfig(name, String(valueToRestore), false)}
@@ -244,7 +237,6 @@ export default function Configurations() {
                     !disableRunTimeConfigs.has(name)
                         ? {
                             value: formattedValue,
-                            onChange: (val: string) => handleSetConfig(name, val, true),
                             type: "text",
                         }
                         : {
@@ -272,7 +264,15 @@ export default function Configurations() {
                 label="Configs"
                 entityName="Config"
                 headers={["Name", "Description", "Value"]}
-                rows={configs}
+                rows={configs.map(config => ({
+                    ...config,
+                    cells: config.cells.map(cell => cell.type === "text"
+                        ? {
+                            ...cell,
+                            onChange: (value: string) => handleSetConfig(String(config.cells[0].value), value, true)
+                        }
+                        : cell)
+                }))}
                 itemHeight={60}
             />
         </div>
