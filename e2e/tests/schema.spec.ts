@@ -42,6 +42,9 @@ const EXPECTED_TRIPLES = [
 /** Labels of every node the schema view draws for that fixture. */
 const EXPECTED_LABELS = ["City", "Company", "Employee", "Empty", "Person"];
 
+const isSchemaDiscovery = (url: string) =>
+    new URL(url).searchParams.get("query")?.includes("RETURN DISTINCT source, type(e)") === true;
+
 test.describe("Schema View Tests", () => {
     let browser: BrowserWrapper;
     let apiCalls: APICalls;
@@ -71,8 +74,7 @@ test.describe("Schema View Tests", () => {
         await schemaView.selectGraphByName(GRAPH_NAME);
         let attempts = 0;
         await page.route(`**/api/graph/${GRAPH_NAME}?*`, async (route) => {
-            const query = new URL(route.request().url()).searchParams.get("query") ?? "";
-            if (!query.includes("RETURN DISTINCT source, type(e)")) {
+            if (!isSchemaDiscovery(route.request().url())) {
                 await route.continue();
                 return;
             }
@@ -86,7 +88,10 @@ test.describe("Schema View Tests", () => {
                 await route.continue();
             }
         });
+        const rejectedDiscovery = page.waitForResponse(response =>
+            new URL(response.url()).pathname === `/api/graph/${GRAPH_NAME}` && isSchemaDiscovery(response.url()));
         await schemaView.clickSchemaTab();
+        expect(await (await rejectedDiscovery).finished()).toBeNull();
         await expect(page.getByText("Invalid input: schema discovery rejected", { exact: true })).toBeVisible();
         await schemaView.waitForSchemaTripleCount(0);
         await schemaView.clickGraphTab();
@@ -103,8 +108,7 @@ test.describe("Schema View Tests", () => {
         await schemaView.selectGraphByName(GRAPH_NAME);
         let intercepted = 0;
         await page.route(`**/api/graph/${GRAPH_NAME}?*`, async (route) => {
-            const query = new URL(route.request().url()).searchParams.get("query") ?? "";
-            if (!query.includes("RETURN DISTINCT source, type(e)")) {
+            if (!isSchemaDiscovery(route.request().url())) {
                 await route.continue();
                 return;
             }
@@ -121,6 +125,7 @@ test.describe("Schema View Tests", () => {
         await schemaView.clickSchemaTab();
         await schemaView.waitForSchemaTripleCount(1);
         expect(await schemaView.getSchemaTripleStrings()).toEqual(["Person-[KNOWS]->Person"]);
+        // Labels come from graph info independently of the mocked discovery rows.
         await expect.poll(() => schemaView.getSchemaLabels()).toEqual(["City", "Company", "Employee", "Person"]);
         expect(intercepted).toBe(1);
     });
