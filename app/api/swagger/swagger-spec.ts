@@ -1207,7 +1207,7 @@ const swaggerSpec = {
       post: {
         tags: ["Graph"],
         summary: "Set node/relationship property",
-        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use any placeholder in the key path segment and supply the name in the propertyKey query parameter.",
+        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use property as the key path segment and supply the name in the propertyKey query parameter.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1235,7 +1235,7 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name, or any placeholder when propertyKey is supplied"
+            description: "Property key name, or property when propertyKey is supplied"
           },
           {
             in: "query",
@@ -1276,7 +1276,7 @@ const swaggerSpec = {
       delete: {
         tags: ["Graph"],
         summary: "Remove node/relationship property",
-        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use any placeholder in the key path segment and supply the name in the propertyKey query parameter.",
+        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use property as the key path segment and supply the name in the propertyKey query parameter.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1304,7 +1304,7 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name, or any placeholder when propertyKey is supplied"
+            description: "Property key name, or property when propertyKey is supplied"
           },
           {
             in: "query",
