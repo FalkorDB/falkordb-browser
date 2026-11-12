@@ -51,6 +51,7 @@ test.describe("Customize Style Tests", () => {
       await graph.clickSaveStyleButton();
       await expect(graph.saveStyleButton).toBeHidden();
       const saved = await readStyle();
+      if (!saved) throw new Error("Saving resized relationship style did not persist it");
       // Size options 0 and 5 scale each relationship dimension by 1 and 6.
       const scale = 6;
       expect(saved).toEqual({
