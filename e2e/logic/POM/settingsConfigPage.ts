@@ -1,4 +1,4 @@
-import { Locator } from "@playwright/test";
+import { expect, Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { interactWhenVisible } from "@/e2e/infra/utils";
 
@@ -143,8 +143,7 @@ export default class SettingsConfigPage extends BasePage {
     }
     
     async isUndoBtnInToastMsg(): Promise<void> {
-        await this.page.waitForTimeout(500);
-        await this.undoBtnInToastMsg.isVisible();
+        await expect(this.undoBtnInToastMsg).toBeVisible();
     }
 
     async modifyRoleValue(role: string, input: string): Promise<string | null> {
