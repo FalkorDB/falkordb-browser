@@ -1,7 +1,7 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
+import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
@@ -297,6 +297,11 @@ describe("getQueryWithLimit keyword detection (#2203)", () => {
       stdio: "pipe",
     });
   });
+});
+
+it("shows the actionable PROFILE rejection instead of asking the user to retry", () => {
+  const message = "Profile only supports valid read-only Cypher queries; update clauses and CALL procedures are not profiled.";
+  assert.equal(toUserFriendlyMessage(message, 400).description, message);
 });
 
 afterEach(() => {

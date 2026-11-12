@@ -1,6 +1,7 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders } from "../../../utils";
+import { isReadOnlyQuery } from "@/lib/falkordb-cypher/readOnly";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -20,6 +21,12 @@ export async function GET(
 
     try {
       if (!query) throw new Error("Missing parameter query");
+      if (!isReadOnlyQuery(query)) {
+        return NextResponse.json(
+          { message: "Profile only supports valid read-only Cypher queries; update clauses and CALL procedures are not profiled." },
+          { status: 400, headers: getCorsHeaders(request) }
+        );
+      }
 
       const graph = client.selectGraph(graphId);
       // The plan's lines, which the UI renders, as before falkordb 7
