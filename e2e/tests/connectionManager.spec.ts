@@ -27,11 +27,12 @@ test.describe("Connection Manager Tests", () => {
     });
 
     test("adding a connection selects it and activates its role", async ({ page }) => {
-      await new ConnectionManagerComponent(page).openDropdown();
-      const secondary = page.getByTestId(/^connection-item-/).filter({ hasText: "readwriteuser@" });
+      const manager = new ConnectionManagerComponent(page);
+      await manager.openDropdown();
+      const secondary = manager.connectionForUser("readwriteuser");
       const secondaryId = (await secondary.getAttribute("data-testid"))?.replace("connection-item-", "");
       expect(secondaryId).toBeTruthy();
-      await expect(secondary.locator("svg.text-primary")).toHaveCount(1);
+      await expect(manager.activeMarkerForUser("readwriteuser")).toHaveCount(1);
       await expect(secondary).toContainText("Read-Write");
       const session = await page.request.get(new URL("/api/auth/session", page.url()).href);
       expect(session.ok()).toBe(true);
@@ -41,12 +42,12 @@ test.describe("Connection Manager Tests", () => {
     test("switching roles persists the selected connection across reload with both connections present", async ({ page }) => {
       const manager = new ConnectionManagerComponent(page);
       await manager.openDropdown();
-      const secondary = page.getByTestId(/^connection-item-/).filter({ hasText: "readwriteuser@" });
-      const primary = page.getByTestId(/^connection-item-/).filter({ hasText: "default@" });
+      const secondary = manager.connectionForUser("readwriteuser");
+      const primary = manager.connectionForUser("default");
       const primaryId = (await primary.getAttribute("data-testid"))?.replace("connection-item-", "");
       expect(primaryId).toBeTruthy();
       const sessionUpdate = manager.waitForSessionUpdate();
-      await primary.click();
+      await manager.selectConnection("default");
       const updatedSession = await sessionUpdate;
       expect(updatedSession.ok()).toBe(true);
       expect(await updatedSession.json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
@@ -56,41 +57,41 @@ test.describe("Connection Manager Tests", () => {
       const persisted = await persistedSession;
       expect(persisted.ok()).toBe(true);
       expect(await persisted.json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
-      await page.getByTestId("connections-dropdown-trigger").click();
-      await expect(page.getByTestId(/^connection-item-/)).toHaveCount(2);
-      await expect(primary.locator("svg.text-primary")).toHaveCount(1);
+      await manager.openDropdown();
+      await expect(manager.connectionItems).toHaveCount(2);
+      await expect(manager.activeMarkerForUser("default")).toHaveCount(1);
       await expect(secondary).toContainText("Read-Write");
     });
 
     test("removing an inactive connection preserves the active one across reload", async ({ page }) => {
       const manager = new ConnectionManagerComponent(page);
       await manager.openDropdown();
-      const secondary = page.getByTestId(/^connection-item-/).filter({ hasText: "readwriteuser@" });
-      const primary = page.getByTestId(/^connection-item-/).filter({ hasText: "default@" });
+      const primary = manager.connectionForUser("default");
       const primaryId = (await primary.getAttribute("data-testid"))?.replace("connection-item-", "");
       expect(primaryId).toBeTruthy();
       const switchedSession = manager.waitForSessionUpdate();
-      await primary.click();
+      await manager.selectConnection("default");
       expect(await (await switchedSession).json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
       await manager.openDropdown();
-      await secondary.getByRole("button", { name: /Sign out of connection/ }).click();
-      await expect(page.getByTestId("connectionLogoutDialog")).toContainText("other connections will remain active");
-      await page.getByTestId("connectionLogoutConfirm").click();
-      await expect(page.getByTestId("connectionLogoutDialog")).toBeHidden();
-      await expect(page.getByTestId(/^connection-item-/)).toHaveCount(1);
-      await expect(primary.locator("svg.text-primary")).toHaveCount(1);
-      await page.keyboard.press("Escape");
+      await manager.requestRemoval("readwriteuser");
+      await expect(manager.logoutDialog).toContainText("other connections will remain active");
+      await manager.confirmRemoval();
+      await expect(manager.logoutDialog).toBeHidden();
+      await expect(manager.connectionItems).toHaveCount(1);
+      await expect(manager.activeMarkerForUser("default")).toHaveCount(1);
+      await manager.closeDropdown();
       const restoredSession = manager.waitForSessionUpdate();
       await page.reload();
       const restored = await restoredSession;
       expect(restored.ok()).toBe(true);
       expect(await restored.json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
-      await page.getByTestId("connections-dropdown-trigger").click();
-      await expect(page.getByTestId(/^connection-item-/)).toHaveCount(1);
+      await manager.openDropdown();
+      await expect(manager.connectionItems).toHaveCount(1);
       await expect(primary).toContainText("Admin");
     });
 
     test("failed removal retains both connections and retry switches to the remaining one", async ({ page }) => {
+      const manager = new ConnectionManagerComponent(page);
       let attempts = 0;
       await page.route("**/api/connections/*", async (route) => {
         if (route.request().method() !== "DELETE") {
@@ -104,20 +105,19 @@ test.describe("Connection Manager Tests", () => {
           await route.continue();
         }
       });
-      await page.getByTestId("connections-dropdown-trigger").click();
-      const secondary = page.getByTestId(/^connection-item-/).filter({ hasText: "readwriteuser@" });
-      await secondary.getByRole("button", { name: /Sign out of connection/ }).click();
-      await page.getByTestId("connectionLogoutConfirm").click();
-      await expect(page.getByTestId("connectionLogoutDialog")).toBeHidden();
-      await expect(page.getByText("Failed to remove connection", { exact: true })).toBeVisible();
-      await expect(page.getByTestId(/^connection-item-/)).toHaveCount(2);
-      await expect(secondary.locator("svg.text-primary")).toHaveCount(1);
-      await secondary.getByRole("button", { name: /Sign out of connection/ }).click();
-      await page.getByTestId("connectionLogoutConfirm").click();
-      await expect(page.getByTestId("connectionLogoutDialog")).toBeHidden();
-      await expect(page.getByTestId(/^connection-item-/)).toHaveCount(1);
-      const primary = page.getByTestId(/^connection-item-/).filter({ hasText: "default@" });
-      await expect(primary.locator("svg.text-primary")).toHaveCount(1);
+      await manager.openDropdown();
+      await manager.requestRemoval("readwriteuser");
+      await manager.confirmRemoval();
+      await expect(manager.logoutDialog).toBeHidden();
+      await expect(manager.feedbackMessage("Failed to remove connection")).toBeVisible();
+      await expect(manager.connectionItems).toHaveCount(2);
+      await expect(manager.activeMarkerForUser("readwriteuser")).toHaveCount(1);
+      await manager.requestRemoval("readwriteuser");
+      await manager.confirmRemoval();
+      await expect(manager.logoutDialog).toBeHidden();
+      await expect(manager.connectionItems).toHaveCount(1);
+      const primary = manager.connectionForUser("default");
+      await expect(manager.activeMarkerForUser("default")).toHaveCount(1);
       const primaryId = (await primary.getAttribute("data-testid"))?.replace("connection-item-", "");
       expect(primaryId).toBeTruthy();
       const session = await page.request.get(new URL("/api/auth/session", page.url()).href);
@@ -167,13 +167,13 @@ test.describe("Connection Manager Tests", () => {
       await route.fulfill({ json: { url: urls.loginUrl } });
     });
     await manager.openDropdown();
-    await page.getByTestId(/^connection-logout-/).first().click();
-    await expect(page.getByTestId("connectionLogoutDialog")).toContainText("only connection");
-    await page.getByTestId("connectionLogoutCancel").click();
-    await expect(page.getByTestId("connectionLogoutDialog")).toBeHidden();
+    await manager.requestFirstRemoval();
+    await expect(manager.logoutDialog).toContainText("only connection");
+    await manager.cancelRemoval();
+    await expect(manager.logoutDialog).toBeHidden();
     await expect(page).toHaveURL(/\/graph/);
     expect(signOutRequests).toBe(0);
-    await expect(page.getByTestId(/^connection-item-/)).toHaveCount(1);
+    await expect(manager.connectionItems).toHaveCount(1);
   });
 
   test.describe("Rejected additional connections", () => {
@@ -202,19 +202,19 @@ test.describe("Connection Manager Tests", () => {
       const response = await rejectedResponse;
       expect(response.status()).toBe(400);
       expect((await response.json()).message).toMatch(/^Authentication failed/);
-      await expect(dialog.getByRole("button", { name: "Add Connection", exact: true })).toBeDisabled();
-      await expect(dialog.getByText("Failed to add connection", { exact: true })).toBeVisible();
-      await dialog.locator("#Password").fill(user.password);
-      await expect(dialog.getByRole("button", { name: "Add Connection", exact: true })).toBeEnabled();
-      await dialog.getByRole("button", { name: "Add Connection", exact: true }).click();
+      await expect(manager.addConnectionSubmit).toBeDisabled();
+      await expect(dialog).toContainText("Failed to add connection");
+      await manager.fillAdditionalPassword(user.password);
+      await expect(manager.addConnectionSubmit).toBeEnabled();
+      await manager.submitConnectionForm();
       await expect.poll(() => attempts.length).toBe(2);
       expect(attempts.map(({ password }) => password)).toEqual(["first-attempt", user.password]);
       await expect(dialog).toBeHidden();
       await manager.openDropdown();
-      await expect(page.getByTestId(/^connection-item-/)).toHaveCount(2);
-      const added = page.getByTestId(/^connection-item-/).filter({ hasText: "readwriteuser@" });
+      await expect(manager.connectionItems).toHaveCount(2);
+      const added = manager.connectionForUser("readwriteuser");
       await expect(added).toContainText("Read-Write");
-      await expect(added.locator("svg.text-primary")).toHaveCount(1);
+      await expect(manager.activeMarkerForUser("readwriteuser")).toHaveCount(1);
     });
   });
 });
