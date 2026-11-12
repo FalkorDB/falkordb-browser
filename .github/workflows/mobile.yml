@@ -32,8 +32,9 @@ permissions:
 
 concurrency:
   # A release and a manual run for the same tag share a group, so they can't
-  # both sign and upload the APK at once.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.release.tag_name || inputs.release_tag || github.ref }}
+  # both sign and upload the APK at once. Otherwise a manual run is grouped
+  # apart from a push, so it can't cancel the push run's coverage upload.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.release.tag_name || inputs.release_tag || format('{0}-{1}', github.event_name, github.ref) }}
   cancel-in-progress: true
 
 jobs:
@@ -123,7 +124,7 @@ jobs:
         run: node .github/scripts/coverage-report.mjs mobile coverage/raw/mobile
 
       - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
