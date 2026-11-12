@@ -135,22 +135,20 @@ test.describe('Table View Tests', () => {
         await apiCalls.addGraph(graphName);
         try {
             const tableView = await browser.createNewPage(TableView, urls.graphUrl);
-            const page = await browser.getPage();
             await tableView.selectGraphByName(graphName);
             await tableView.insertQuery("UNWIND [1, 2, 3] AS previous RETURN previous");
             await tableView.clickRunQuery(false);
             await tableView.clickTableTab();
-            const panel = page.getByRole('tabpanel', { name: 'Table', exact: true });
-            await expect(panel.locator('tbody tr')).toHaveCount(3);
-            await expect(panel.locator('tbody tr td:last-child')).toHaveText(['previous:1', 'previous:2', 'previous:3']);
+            await expect(tableView.tableViewTableRows).toHaveCount(3);
+            await expect(tableView.lastColumnCells).toHaveText(['previous:1', 'previous:2', 'previous:3']);
             await tableView.insertQuery("RETURN 'replacement-value' AS replacement");
             await tableView.clickRunQuery(false);
             await tableView.clickTableTab();
-            await expect(panel.locator('tbody tr')).toHaveCount(1);
-            await expect(panel).toContainText('replacement-value');
-            await expect(panel.getByRole('columnheader').filter({ hasText: /^previous/ })).toHaveCount(0);
-            await expect(panel.getByRole('columnheader').filter({ hasText: /^replacement/ })).toBeVisible();
-            await expect(panel.locator('tbody tr td:last-child')).toHaveText(['replacement:"replacement-value"']);
+            await expect(tableView.tableViewTableRows).toHaveCount(1);
+            await expect(tableView.tableViewTabPanel).toContainText('replacement-value');
+            await expect(tableView.columnHeader(/^previous/)).toHaveCount(0);
+            await expect(tableView.columnHeader(/^replacement/)).toBeVisible();
+            await expect(tableView.lastColumnCells).toHaveText(['replacement:"replacement-value"']);
         } finally {
             try {
                 await browser.closeBrowser();
