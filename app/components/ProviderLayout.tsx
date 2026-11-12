@@ -176,7 +176,7 @@ export default function ProviderLayout({
   return (
     <PanelContext.Provider value={panelContext}>
       {
-        isGraph &&
+        isGraph && tutorialOpen &&
         <Tutorial
           open={tutorialOpen}
           onClose={onCloseTutorial}

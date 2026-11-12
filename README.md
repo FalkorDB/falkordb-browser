@@ -43,6 +43,24 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 
 Access the Browser: (https://browser.falkordb.com)
 
+### Tutorial samples
+
+- Each tutorial uses unique graph names and records ownership per connection.
+  Cleanup deletes only samples whose creation was confirmed, never user graphs
+  based on their names (including `social-demo`).
+- Completed abandoned samples are reclaimed on app visits and tutorial start/close.
+  Web Locks protect active tabs; without them, other tabs' records must be inactive
+  for 24 hours. Failed cleanup retains ownership for retry without extending that
+  inactivity window. Clearing browser storage removes ownership evidence.
+- Unconfirmed creations are retained for manual verification, with a notice at
+  most once per connection per browser session. They are never automatically
+  deleted, even after a timeout or reload.
+- Graph selection and saved-tab loads wait for recovery. Setup and Replay waits
+  are bounded; a late creation remains tracked. Switching connections or closing
+  on mobile cannot publish an old tutorial into a newer one. Background sample
+  reads cannot recreate deleted graphs; explicit editor writes retain their
+  normal permissions. Closing restores only user graphs verified to still exist.
+
 ### Quick start
 
 #### Run the graph database and browser from one docker container
@@ -302,6 +320,10 @@ to the graph preserves the editor query and unsent Chat input. Debounced URL
 updates wait for route transitions, so a draft update cannot cancel navigation
 to Settings. Chat drafts are scoped to the connection, tab, and graph, and survive
 closing and reopening Chat.
+The transition guard covers mounted programmatic push/replace/refresh calls.
+History back/forward and toast callbacks retained after unmount use Next's native
+navigation without acquiring a transition token. Deferred URL updates are
+discarded when the destination's path, search, or hash differs from their source.
 Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
@@ -361,5 +383,3 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
-
