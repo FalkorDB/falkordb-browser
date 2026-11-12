@@ -9,6 +9,8 @@ import { existsSync } from "fs";
 import urls from "../../config/urls.json";
 import HeaderComponent from "./headerComponent";
 
+type TlsAttachmentKind = "ca" | "cert" | "key";
+
 export default class LoginPage extends HeaderComponent {
   private get connectBtn(): Locator {
     return this.page.getByRole("button", { name: "Log in" });
@@ -47,7 +49,7 @@ export default class LoginPage extends HeaderComponent {
     return this.page.locator("//input[@id='Username']");
   }
 
-  private get passwordInput(): Locator {
+  public get passwordInput(): Locator {
     return this.page.locator("//input[@id='Password']");
   }
 
@@ -68,7 +70,7 @@ export default class LoginPage extends HeaderComponent {
   }
 
   // TLS locators
-  private get tlsCheckbox(): Locator {
+  public get tlsCheckbox(): Locator {
     return this.page.getByTestId("tls-checkbox");
   }
 
@@ -109,8 +111,46 @@ export default class LoginPage extends HeaderComponent {
     return this.page.getByRole("radio", { name: "FalkorDB URL" });
   }
 
-  private get falkordbUrlInput(): Locator {
+  public get falkordbUrlInput(): Locator {
     return this.page.locator("//input[@id='FalkorDB URL']");
+  }
+
+  public get tlsSection(): Locator {
+    return this.page.locator("#tls-section");
+  }
+
+  validationMessage(text: string): Locator {
+    return this.page.getByText(text, { exact: true });
+  }
+
+  tlsAttachment(kind: TlsAttachmentKind): { prompt: Locator; status: Locator; remove: Locator } {
+    return {
+      ca: {
+        prompt: this.uploadCertificateInput,
+        status: this.certificateUploadedStatus,
+        remove: this.removeCertificateBtn,
+      },
+      cert: {
+        prompt: this.uploadClientCertInput,
+        status: this.clientCertUploadedStatus,
+        remove: this.page.getByTestId("remove-client-cert-btn"),
+      },
+      key: {
+        prompt: this.uploadClientKeyInput,
+        status: this.clientKeyUploadedStatus,
+        remove: this.page.getByTestId("remove-client-key-btn"),
+      },
+    }[kind];
+  }
+
+  async attachTlsFile(kind: TlsAttachmentKind, name: string, contents: string): Promise<void> {
+    await this.tlsAttachment(kind).prompt.locator("..").locator('input[type="file"]').setInputFiles({
+      name, mimeType: "application/x-pem-file", buffer: Buffer.from(contents),
+    });
+  }
+
+  async removeTlsAttachment(kind: TlsAttachmentKind): Promise<void> {
+    await this.tlsAttachment(kind).remove.click();
   }
 
   async clickConnect(): Promise<void> {
@@ -192,6 +232,10 @@ export default class LoginPage extends HeaderComponent {
       (el) => el.click(),
       "TLS checkbox"
     );
+  }
+
+  async setTlsEnabled(enabled: boolean): Promise<void> {
+    await this.tlsCheckbox.setChecked(enabled);
   }
 
   async isTLSEnabled(): Promise<boolean> {
