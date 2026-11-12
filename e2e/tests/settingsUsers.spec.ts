@@ -25,6 +25,7 @@ test.describe('@Config Settings users tests', () => {
         const page = await browser.getPage();
         const username = "mock-create-retry";
         const submissions: (CreateUser & { keys: string[] })[] = [];
+        const methods: string[] = [];
         let saves = 0;
         await page.route(/\/api\/user(?:\/.*)?$/, async route => {
             if (route.request().method() === "GET") {
@@ -33,7 +34,7 @@ test.describe('@Config Settings users tests', () => {
                 saves += 1;
                 await route.fulfill({ json: {} });
             } else {
-                expect(route.request().method()).toBe("POST");
+                methods.push(route.request().method());
                 submissions.push(route.request().postDataJSON() as CreateUser & { keys: string[] });
                 await route.fulfill(submissions.length === 1
                     ? { status: 409, json: { message: "User creation temporarily rejected" } }
@@ -57,6 +58,7 @@ test.describe('@Config Settings users tests', () => {
             { username, role: user.ReadWrite, password: user.password, keys: ["*"] },
             { username, role: user.ReadWrite, password: user.password, keys: ["*"] },
         ]);
+        expect(methods).toEqual(["POST", "POST"]);
     });
 
     test("@admin Failed user edit retains original permissions and retries without changing the password", async () => {
@@ -64,6 +66,7 @@ test.describe('@Config Settings users tests', () => {
         const page = await browser.getPage();
         const username = "mock-edit-retry";
         const submissions: { role: string; keys: string[]; password?: string }[] = [];
+        const methods: string[] = [];
         let saves = 0;
         await page.route(/\/api\/user(?:\/.*)?$/, async route => {
             if (route.request().method() === "GET") {
@@ -72,7 +75,7 @@ test.describe('@Config Settings users tests', () => {
                 saves += 1;
                 await route.fulfill({ json: {} });
             } else {
-                expect(route.request().method()).toBe("PATCH");
+                methods.push(route.request().method());
                 submissions.push(route.request().postDataJSON() as typeof submissions[number]);
                 await route.fulfill(submissions.length === 1
                     ? { status: 403, json: { message: "User update denied" } }
@@ -82,19 +85,23 @@ test.describe('@Config Settings users tests', () => {
         await browser.navigateTo(urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
         await settingsUsersPage.clickUserCheckboxBtn(username);
-        await page.locator("#edit-user").click();
+        await settingsUsersPage.clickOnEditUserBtn();
         await expect(page.locator("input[id='Username']")).toBeDisabled();
         await settingsUsersPage.clickOnSelectRoleBtnInAddUser();
         await settingsUsersPage.clickOnSelectUserRole(user.ReadOnly);
         await settingsUsersPage.fillEditKeysField("analytics:*");
-        await page.getByRole("button", { name: "Save", exact: true }).click();
+        await settingsUsersPage.clickOnSubmitEditUser();
         await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
         await expect(page.getByTestId(`contentUsers${username}Role`)).toHaveText(user.ReadWrite);
         await expect(page.getByTestId(`contentUsers${username}Key / Graph Permissions`)).toHaveText("reports:*");
         await expect(page.getByRole("dialog")).toBeVisible();
+        await expect(settingsUsersPage.editSelectRoleBtn).toContainText(user.ReadOnly);
+        await expect(settingsUsersPage.editKeysField.locator("..").getByRole("button", { name: "Remove analytics:*", exact: true })).toBeVisible();
+        await expect(settingsUsersPage.editNewPasswordField).toHaveValue("");
+        await expect(settingsUsersPage.editConfirmPasswordField).toHaveValue("");
         expect(saves).toBe(0);
 
-        await page.getByRole("button", { name: "Save", exact: true }).click();
+        await settingsUsersPage.clickOnSubmitEditUser();
         await expect(page.getByRole("dialog")).toHaveCount(0);
         await expect(page.getByTestId(`contentUsers${username}Role`)).toHaveText(user.ReadOnly);
         await expect(page.getByTestId(`contentUsers${username}Key / Graph Permissions`)).toHaveText("analytics:*");
@@ -103,6 +110,7 @@ test.describe('@Config Settings users tests', () => {
             { role: user.ReadOnly, keys: ["analytics:*"] },
             { role: user.ReadOnly, keys: ["analytics:*"] },
         ]);
+        expect(methods).toEqual(["PATCH", "PATCH"]);
     });
 
     test("@admin Add one new user -> validating user exists in the users list", async () => {

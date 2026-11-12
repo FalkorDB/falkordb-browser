@@ -51,19 +51,19 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.locator("//input[@id='Confirm Password']");
   }
 
-  private get editNewPasswordField(): Locator {
+  public get editNewPasswordField(): Locator {
     return this.page.locator("//input[@id='New Password']");
   }
 
-  private get editConfirmPasswordField(): Locator {
+  public get editConfirmPasswordField(): Locator {
     return this.page.locator("//input[@id='Confirm Password']");
   }
 
-  private get editSelectRoleBtn(): Locator {
+  public get editSelectRoleBtn(): Locator {
     return this.page.getByTestId("selectRole");
   }
 
-  private get editKeysField(): Locator {
+  public get editKeysField(): Locator {
     return this.page.locator("//input[@id='Key / Graph Permissions']");
   }
 
