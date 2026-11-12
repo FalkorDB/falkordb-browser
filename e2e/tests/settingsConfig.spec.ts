@@ -7,7 +7,6 @@ import ApiCalls from "../logic/api/apiCalls";
 import Data from '../config/settingsConfigData.json';
 import { initializeLocalStorage } from "../infra/utils";
 
-test.describe.configure({ mode: 'serial' });
 test.describe('@config Settings config tests', () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
@@ -108,6 +107,7 @@ test.describe('@config Settings config tests', () => {
         expect(requests).toEqual(Array(2).fill({ method: "POST", path: "/api/graph/config/MAX_QUEUED_QUERIES" }));
     });
 
+    test.describe.serial("Database configuration mutations", () => {
     Data.inputDataRejectsZero.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.maxQueuedQueries} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             await apiCall.modifySettingsRole(roles.maxQueuedQueries, input);
@@ -483,5 +483,5 @@ test.describe('@config Settings config tests', () => {
             expect(await settingsConfigPage.getTableRolesCount()).toBe(expected);
         });
     });
-
+    });
 });
