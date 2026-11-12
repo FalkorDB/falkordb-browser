@@ -1,9 +1,105 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
+import { execFileSync } from "node:child_process";
+import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
+
+describe("getQueryWithLimit keyword detection (#2203)", () => {
+  it("does not append LIMIT to a write query whose string contains RETURN", () => {
+    const query = "CREATE (:Book {title:'The Return of the King'})";
+    assert.deepEqual(getQueryWithLimit(query, 300), [query, 0]);
+
+    const doubleQuoted = 'CREATE (:Book {title:"return policy"})';
+    assert.deepEqual(getQueryWithLimit(doubleQuoted, 300), [doubleQuoted, 0]);
+  });
+
+  it("ignores RETURN inside comments and backtick identifiers", () => {
+    const comment = "CREATE (n:Book) // RETURN n";
+    assert.deepEqual(getQueryWithLimit(comment, 300), [comment, 0]);
+
+    const identifier = "CREATE (:`RETURN` {name:'x'})";
+    assert.deepEqual(getQueryWithLimit(identifier, 300), [identifier, 0]);
+  });
+
+  it("still limits a real RETURN even when a string mentions RETURN or LIMIT", () => {
+    const returnString = "RETURN 'The Return of the King'";
+    assert.deepEqual(getQueryWithLimit(returnString, 300), [`${returnString} LIMIT 300`, 300]);
+
+    const limitString = "MATCH (n) WHERE n.note = 'no LIMIT 5 here' RETURN n";
+    assert.deepEqual(getQueryWithLimit(limitString, 300), [`${limitString} LIMIT 300`, 300]);
+  });
+
+  it("inserts LIMIT before a trailing comment", () => {
+    assert.deepEqual(
+      getQueryWithLimit("MATCH (n) RETURN n // all nodes", 300),
+      ["MATCH (n) RETURN n LIMIT 300 // all nodes", 300],
+    );
+  });
+
+  it("does not treat backslashes as escapes inside backtick identifiers", () => {
+    const query = "MATCH (n:`path\\`) RETURN n";
+    assert.deepEqual(getQueryWithLimit(query, 50), [`${query} LIMIT 50`, 50]);
+  });
+
+  it("masks keywords inside escaped and doubled delimiters", () => {
+    for (const token of [
+      "'it\\'s RETURN LIMIT'",
+      '"a\\" RETURN LIMIT"',
+      "'odd\\\\\\' RETURN LIMIT'",
+      "'even\\\\'",
+      "'it''s RETURN LIMIT'",
+      '"a"" RETURN LIMIT"',
+    ]) {
+      const write = `CREATE (:Book {title: ${token}})`;
+      assert.deepEqual(getQueryWithLimit(write, 300), [write, 0]);
+      assert.deepEqual(getQueryWithLimit(`${write} RETURN 1`, 300), [`${write} RETURN 1 LIMIT 300`, 300]);
+    }
+    const backtick = "CREATE (:`a``RETURN LIMIT`)";
+    assert.deepEqual(getQueryWithLimit(backtick, 300), [backtick, 0]);
+    assert.deepEqual(getQueryWithLimit(`${backtick} RETURN 1`, 300), [`${backtick} RETURN 1 LIMIT 300`, 300]);
+  });
+
+  it("inserts LIMIT before a trailing semicolon and comment", () => {
+    for (const query of ["RETURN 1; // note", "RETURN 1; /* note */", "RETURN ';';"]) {
+      assert.deepEqual(getQueryWithLimit(query, 300), [query.replace(/;(?=\s*(?:\/\/|\/\*|$))/, " LIMIT 300;"), 300]);
+    }
+  });
+
+  it("keeps an existing LIMIT and reports it", () => {
+    const query = "MATCH (n) RETURN n LIMIT 10";
+    assert.deepEqual(getQueryWithLimit(query, 300), [query, 10]);
+  });
+
+  it("preserves LIMIT detection around CALL and whitespace", () => {
+    for (const [query, expected] of [
+      ["RETURN 1 LIMIT 10", 10],
+      ["RETURN 1\nCALL p() RETURN 2 LIMIT 20", 20],
+      ["RETURN CALL LIMIT 30", 30],
+      ["RETURN 1\n  LIMIT 40", 40],
+    ] as const) {
+      assert.deepEqual(getQueryWithLimit(query, 0), [query, expected]);
+    }
+  });
+
+  it("handles large masked projections and comments promptly", () => {
+    const script = `
+      import assert from "node:assert/strict";
+      import { getQueryWithLimit } from ${JSON.stringify(new URL("./utils.ts", import.meta.url).href)};
+      const literal = "RETURN '" + "x".repeat(400000) + "' LIMIT 17";
+      const comment = "RETURN /*" + "x".repeat(400000) + "*/ 1 LIMIT 19";
+      const noLimit = "RETURN '" + "x".repeat(400000) + "'";
+      assert.deepEqual(getQueryWithLimit(literal, 0), [literal, 17]);
+      assert.deepEqual(getQueryWithLimit(comment, 0), [comment, 19]);
+      assert.deepEqual(getQueryWithLimit(noLimit, 300), [noLimit + " LIMIT 300", 300]);
+    `;
+    execFileSync(process.execPath, ["--input-type=module", "--eval", script], {
+      timeout: 8000,
+      stdio: "pipe",
+    });
+  });
+});
 
 it("shows the actionable PROFILE rejection instead of asking the user to retry", () => {
   const message = "Profile only supports valid read-only Cypher queries; update clauses and CALL procedures are not profiled.";
