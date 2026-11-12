@@ -867,7 +867,7 @@ export async function securedFetch(
 }
 
 export function prepareArg(arg: string) {
-  return encodeURIComponent(arg.trim());
+  return encodeURIComponent(arg);
 }
 
 /**
