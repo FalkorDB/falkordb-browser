@@ -42,16 +42,18 @@ test.describe("Data panel Tests", () => {
       let writes = 0;
       await page.route(`**/api/graph/${graphName}/*/age`, async (route) => {
         writes += 1;
-        await route.fulfill({ status: 400, json: { message: "Unexpected property write" } });
+        await route.continue();
       });
       await graph.hoverDataPanelAttribute("age");
       await graph.clickDataPanelSetAttribute();
       await graph.fillDataPanelSetAttributeValue("99");
       await graph.clickDataPanelSetAttributeCancel();
-      await expect(page.getByTestId("DataPanelSetAttributeConfirm")).toBeHidden();
-      await expect(page.getByTestId("DataPanelAttribute30")).toBeVisible();
-      expect(writes).toBe(0);
+      await expect(graph.dataPanelSetAttributeConfirm).toBeHidden();
+      await expect(graph.attributeValueForKey("age")).toHaveText("30");
+      await page.waitForLoadState("networkidle");
       const result = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
+      await page.waitForLoadState("networkidle");
+      expect(writes).toBe(0);
       expect(Number(result.data[0].age)).toBe(30);
     } finally {
       await browser.closeBrowser();
@@ -85,12 +87,12 @@ test.describe("Data panel Tests", () => {
       await graph.fillDataPanelSetAttributeValue("31");
       await graph.clickDataPanelSetAttributeConfirm();
       await expect(page.getByText("Invalid value: age update rejected", { exact: true })).toBeVisible();
-      await expect(page.getByTestId("DataPanelSetAttributeConfirm")).toBeEnabled();
+      await expect(graph.dataPanelSetAttributeConfirm).toBeEnabled();
       const rejected = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
       expect(Number(rejected.data[0].age)).toBe(30);
       await graph.clickDataPanelSetAttributeConfirm();
-      await expect(page.getByTestId("DataPanelSetAttributeConfirm")).toBeHidden();
-      await expect(page.getByTestId("DataPanelAttribute31")).toBeVisible();
+      await expect(graph.dataPanelSetAttributeConfirm).toBeHidden();
+      await expect(graph.attributeValueForKey("age")).toHaveText("31");
       const saved = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
       expect(Number(saved.data[0].age)).toBe(31);
       expect(attempts).toBe(2);
