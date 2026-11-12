@@ -3345,9 +3345,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (connection && getConnectionPrefix() === connection.scope) {
       try {
         const ownerId = await getTutorialDemoOwnerId();
-        const demoGraphNames = readTutorialDemoOwnership(connection.scope, ownerId).names;
-        const remaining = await cleanupAndPersistTutorialGraphs(connection.scope, connection.cid, ownerId, demoGraphNames);
-        demoGraphNamesRef.current = remaining;
+        const ownership = readTutorialDemoOwnership(connection.scope, ownerId);
+        const reclaimable = getTutorialDemoReclaimableNames(ownership);
+        const remaining = await cleanupAndPersistTutorialGraphs(connection.scope, connection.cid, ownerId, reclaimable);
+        const reclaimableSet = new Set(reclaimable);
+        demoGraphNamesRef.current = [...ownership.names.filter(name => !reclaimableSet.has(name)), ...remaining];
+        notifyPendingTutorialOwnership(ownership);
         if (remaining.length > 0) throw new Error("Some tutorial graphs could not be removed");
         await reclaimAbandonedTutorialGraphs(connection, ownerId);
       } catch (error) {
@@ -3411,7 +3414,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       window.history.replaceState(null, "", `${window.location.pathname}${urlParamsBeforeTutorial}`);
     }
     setUrlParamsBeforeTutorial("");
-  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, fetchTutorialGraphList, handleSetGraphName, setHistoryQuery, reclaimAbandonedTutorialGraphs]);
+  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, fetchTutorialGraphList, handleSetGraphName, setHistoryQuery, reclaimAbandonedTutorialGraphs, notifyPendingTutorialOwnership]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>
