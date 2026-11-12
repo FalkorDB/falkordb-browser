@@ -61,7 +61,7 @@ test.describe("Upload Graph – Cypher batch", () => {
     }
   });
 
-  test("@admin rejects unsupported Cypher files without sending an upload", async () => {
+  test("@admin rejects unsupported Cypher replacements without losing the valid file or uploading", async () => {
     const graphName = getRandomString("uploadRejected");
     await apiCall.addGraph(graphName);
     try {
@@ -73,15 +73,24 @@ test.describe("Upload Graph – Cypher batch", () => {
         await route.fulfill({ json: { id: "should-not-upload" } });
       });
       await graph.openUploadDialog(graphName);
+      await graph.setUploadFile(CYPHER_FIXTURE);
+      await expect(graph.uploadConfirm).toBeEnabled();
+      await expect(page.getByRole("dialog")).toContainText("upload-people.cypher");
       await graph.uploadFileInput.setInputFiles({
         name: "invalid.json", mimeType: "application/json", buffer: Buffer.from('{"invalid":true}'),
       });
       await expect(page.getByText("Please choose a .txt or .cypher file.", { exact: true })).toBeVisible();
-      await expect(graph.uploadConfirm).toBeDisabled();
+      await expect(graph.uploadConfirm).toBeEnabled();
+      await expect(page.getByRole("dialog")).toContainText("upload-people.cypher");
+      await expect(page.getByRole("dialog")).not.toContainText("invalid.json");
+      await page.waitForLoadState("networkidle");
       expect(uploadRequests).toBe(0);
     } finally {
-      await browser.closeBrowser();
-      await apiCall.removeGraph(graphName, "admin");
+      try {
+        await browser.closeBrowser();
+      } finally {
+        expect((await apiCall.removeGraph(graphName, "admin")).message).toMatch(/deleted|empty key/i);
+      }
     }
   });
 
@@ -93,13 +102,14 @@ test.describe("Upload Graph – Cypher batch", () => {
       const page = await browser.getPage();
       let uploads = 0;
       let processing = 0;
+      const processingPayloads: unknown[] = [];
       await page.route("**/api/upload", async (route) => {
         uploads += 1;
         await route.fulfill({ json: uploads === 1 ? {} : { id: "retry-file" } });
       });
       await page.route(`**/api/graph/${graphName}/upload`, async (route) => {
         processing += 1;
-        expect(route.request().postDataJSON()).toEqual({ fileId: "retry-file" });
+        processingPayloads.push(route.request().postDataJSON());
         await route.fulfill({ json: { message: "Retry accepted" } });
       });
       await graph.openUploadDialog(graphName);
@@ -113,9 +123,13 @@ test.describe("Upload Graph – Cypher batch", () => {
       await expect(graph.uploadConfirm).toBeHidden();
       expect(uploads).toBe(2);
       expect(processing).toBe(1);
+      expect(processingPayloads).toEqual([{ fileId: "retry-file" }]);
     } finally {
-      await browser.closeBrowser();
-      await apiCall.removeGraph(graphName, "admin");
+      try {
+        await browser.closeBrowser();
+      } finally {
+        expect((await apiCall.removeGraph(graphName, "admin")).message).toMatch(/deleted|empty key/i);
+      }
     }
   });
 
@@ -133,14 +147,18 @@ test.describe("Upload Graph – Cypher batch", () => {
       await graph.uploadConfirm.click();
       await expect(page.getByText("Invalid input: Cypher batch rejected", { exact: true })).toBeVisible();
       await expect(graph.uploadConfirm).toBeEnabled();
-      await page.getByTestId("uploadGraphCancel").click();
+      await expect(page.getByRole("dialog")).toContainText("upload-people.cypher");
+      await graph.uploadCancel.click();
       await expect(graph.uploadConfirm).toBeHidden();
-      await page.getByTestId("uploadGraph").click();
+      await graph.uploadBtn.click();
       await expect(graph.uploadConfirm).toBeDisabled();
       await expect(page.getByRole("dialog")).not.toContainText("upload-people.cypher");
     } finally {
-      await browser.closeBrowser();
-      await apiCall.removeGraph(graphName, "admin");
+      try {
+        await browser.closeBrowser();
+      } finally {
+        expect((await apiCall.removeGraph(graphName, "admin")).message).toMatch(/deleted|empty key/i);
+      }
     }
   });
 });
