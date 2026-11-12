@@ -84,8 +84,14 @@ export default class DataPanel extends GraphPage {
     return this.page.getByTestId("DataPanelSetAttributeValue");
   }
 
-  private get dataPanelSetAttributeConfirm(): Locator {
+  public get dataPanelSetAttributeConfirm(): Locator {
     return this.page.getByTestId("DataPanelSetAttributeConfirm");
+  }
+
+  attributeValueForKey(key: string): Locator {
+    return this.dataPanelAttribute(key)
+      .filter({ has: this.page.locator(":scope > p") })
+      .locator("xpath=following-sibling::div[1]");
   }
 
   private get dataPanelSetAttributeCancel(): Locator {
