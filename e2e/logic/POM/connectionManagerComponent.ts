@@ -25,7 +25,7 @@ export default class ConnectionManagerComponent extends BasePage {
     }
 
     async selectConnection(id: string): Promise<void> {
-        await this.openDropdown();
+        if (!await this.dropdownContent.isVisible()) await this.openDropdown();
         await this.page.getByTestId(`connection-item-${id}`).click();
     }
 

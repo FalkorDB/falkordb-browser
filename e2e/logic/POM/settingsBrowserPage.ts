@@ -77,6 +77,7 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async expectModelAbsent(modelName: string): Promise<void> {
+    await this.expandAllCategories();
     await expect(this.getModelButton(modelName)).toHaveCount(0);
   }
 

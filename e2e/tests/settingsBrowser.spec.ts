@@ -321,7 +321,10 @@ test.describe('@browser Browser Settings tests', () => {
             await settings.expandChatSection();
             await settings.selectLocalLlmModelSource();
             await started;
-            await new ConnectionManagerComponent(page).selectConnection(second.id);
+            const connections = new ConnectionManagerComponent(page);
+            await connections.selectConnection(first.id);
+            await connections.openDropdown();
+            await connections.selectConnection(second.id);
             await switchStarted;
             release();
             await finished;
@@ -337,6 +340,24 @@ test.describe('@browser Browser Settings tests', () => {
             releaseSwitch();
             await page.unrouteAll({ behavior: "wait" });
         }
+    });
+
+    test("@readwrite model absence check detects models in collapsed categories", async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        const model = "ollama::llama3.2";
+        await page.setContent('<button data-testid="categoryToggleOllama" aria-expanded="false">Ollama</button>');
+        await page.evaluate(modelName => {
+            const toggle = document.querySelector("button");
+            if (!toggle) throw new Error("Missing model category");
+            toggle.addEventListener("click", () => {
+                toggle.setAttribute("aria-expanded", "true");
+                const button = document.createElement("button");
+                button.dataset.testid = `selectModel${modelName}`;
+                document.body.append(button);
+            });
+        }, model);
+        await expect(settings.expectModelAbsent(model)).rejects.toThrow();
     });
 
     test("@readwrite loading models does not discard an API key edit", async () => {
