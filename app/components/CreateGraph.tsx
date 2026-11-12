@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef, useCallback } from "react";
 import { InfoIcon, Plus, File as FileIcon, X } from "lucide-react";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
 import { DUMP_RESTORE_ENABLED } from "@/lib/graphUpload";
@@ -53,6 +53,27 @@ export default function CreateGraph({
     const [files, setFiles] = useState<globalThis.File[]>([]);
     const [phase, setPhase] = useState<"uploading" | "processing" | null>(null);
     const [uploadPct, setUploadPct] = useState(0);
+    const readyRef = useRef(ready);
+    readyRef.current = ready;
+    const pendingCreatedGraphRef = useRef<{ name: string; epoch: number; connectionId: string | null; hasDump: boolean } | null>(null);
+
+    const publishCreatedGraph = useCallback((name: string, hasDump: boolean) => {
+        onSetGraphName(name);
+        toast({
+            title: hasDump ? "Graph restored successfully" : "Graph created successfully",
+            description: hasDump
+                ? "The graph data has been restored from the dump file"
+                : "The graph has been created successfully",
+        });
+    }, [onSetGraphName, toast]);
+
+    useEffect(() => {
+        const pending = pendingCreatedGraphRef.current;
+        if (!ready || !pending) return;
+        pendingCreatedGraphRef.current = null;
+        if (getConnectionEpoch() !== pending.epoch || getActiveConnectionIdGlobal() !== pending.connectionId) return;
+        publishCreatedGraph(pending.name, pending.hasDump);
+    }, [ready, publishCreatedGraph]);
 
     useEffect(() => {
         if (!ready) setOpen(false);
@@ -144,17 +165,15 @@ export default function CreateGraph({
                 if (!processResult.ok) return;
             }
 
-            if (getConnectionEpoch() !== startEpoch) return;
+            if (getConnectionEpoch() !== startEpoch || getActiveConnectionIdGlobal() !== cid) return;
 
-            onSetGraphName(name);
+            if (!readyRef.current) {
+                pendingCreatedGraphRef.current = { name, epoch: startEpoch, connectionId: cid, hasDump };
+                return;
+            }
+            publishCreatedGraph(name, hasDump);
             setGraphName("");
             setOpen(false);
-            toast({
-                title: hasDump ? "Graph restored successfully" : "Graph created successfully",
-                description: hasDump
-                    ? "The graph data has been restored from the dump file"
-                    : "The graph has been created successfully",
-            });
         } finally {
             setIsLoading(false);
             setPhase(null);
