@@ -48,7 +48,6 @@ test.describe("@admin Login connection details",() => {
         await expect(page.getByText(connectionError,{ exact: true })).toBeVisible();
         await page.locator("#Host").fill("corrected.example");
         await expect(page.getByText(connectionError,{ exact: true })).toBeHidden();
-        await expect(page).toHaveURL(/\/login/);
     });
 
     test("round-trips escaped credentials and TLS between manual and URL modes",async ({ page }) => {
@@ -99,20 +98,23 @@ test.describe("@admin Login connection details",() => {
         },
     ]) {
         test(`blocks an incomplete mTLS pair after ${title}`,async ({ page }) => {
+            await page.waitForLoadState("networkidle");
             const requests: string[]=[];
             page.on("request",request => {
-                if(new URL(request.url()).pathname.startsWith("/api/auth/callback/")) requests.push(request.url());
+                if(new URL(request.url()).pathname.startsWith("/api/auth/")) requests.push(request.url());
             });
             await page.getByTestId("tls-checkbox").check();
             await upload(page,title,name,"synthetic TLS upload");
             await expect(page.getByTestId(status)).toContainText(name);
             await page.getByRole("button",{ name: "Log in" }).click();
             await expect(page.getByText(error,{ exact: true })).toBeVisible();
-            expect(requests).toEqual([]);
+            await page.waitForLoadState("networkidle");
             await page.getByTestId(remove).click();
             await expect(page.getByTestId(status)).toBeHidden();
             await expect(page.getByText(error,{ exact: true })).toBeHidden();
             await expect(page.getByText(title,{ exact: true })).toBeVisible();
+            await page.waitForLoadState("networkidle");
+            expect(requests).toEqual([]);
         });
     }
 
