@@ -35,12 +35,6 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
-    // Isolated React component regressions: no application server or login.
-    {
-      name: 'Configurations component',
-      testMatch: /configurationsUndo\.spec\.ts$/,
-      use: { ...devices['Desktop Chrome'] },
-    },
     // The setup test logs in 5 users (admin + readwrite + readonly + 2 sign-out
     // dedicated users). 30 s is not enough; use 120 s.
     {name: 'setup', testMatch: /.*\.setup\.ts/, timeout: 120000},

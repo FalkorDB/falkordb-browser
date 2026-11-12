@@ -97,6 +97,10 @@ export default class SettingsConfigPage extends BasePage {
     async getRoleContentValue(role: string): Promise<string | null> {
         return interactWhenVisible(this.roleContentValue(role), (el) => el.textContent(), `role content value ${role}`);
     }
+
+    async expectRoleContentValue(role: string, value: string): Promise<void> {
+        await expect(this.roleContentValue(role)).toHaveText(value);
+    }
     
     async clickOnUndoBtnInToastMsg(): Promise<void> {
         await interactWhenVisible(this.undoBtnInToastMsg, (el) => el.click(), "undo button in toast");

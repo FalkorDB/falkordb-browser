@@ -390,6 +390,3 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-  The isolated configuration Undo regressions use real React rendering with table/toast
-  presentation and HTTP fixtures; no application server or database is required:
-  `npx playwright test e2e/tests/configurationsUndo.spec.ts --project="Configurations component" --workers=1`.

@@ -20,6 +20,40 @@ test.describe('@config Settings config tests', () => {
         await browser.closeBrowser();
     });
 
+    [
+        { role: roles.maxQueuedQueries, initialValue: "25", first: "26", second: "27", third: "28" },
+        { role: roles.defaultTimeOut, initialValue: "0", first: "10000", second: "11000", third: "12000" },
+    ].forEach(({ role, initialValue, first, second, third }) => {
+        test(`@admin Undo restores first and repeated ${role} edits from ${initialValue}`, async () => {
+            const originalValue = String((await apiCall.getSettingsRoleValue(role)).config[1]);
+            try {
+                await apiCall.modifySettingsRole(role, initialValue);
+                const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+                await settingsConfigPage.navigateToDBConfigurationTab();
+                await settingsConfigPage.fillSearchForConfigInput(role);
+                await settingsConfigPage.expectRoleContentValue(role, initialValue);
+
+                await settingsConfigPage.modifyRoleValue(role, first);
+                await settingsConfigPage.expectRoleContentValue(role, first);
+                await settingsConfigPage.isUndoBtnInToastMsg();
+                await settingsConfigPage.clickOnUndoBtnInToastMsg();
+                await settingsConfigPage.expectRoleContentValue(role, initialValue);
+                expect(String((await apiCall.getSettingsRoleValue(role)).config[1])).toBe(initialValue);
+
+                await settingsConfigPage.modifyRoleValue(role, second);
+                await settingsConfigPage.expectRoleContentValue(role, second);
+                await settingsConfigPage.modifyRoleValue(role, third);
+                await settingsConfigPage.expectRoleContentValue(role, third);
+                await settingsConfigPage.isUndoBtnInToastMsg();
+                await settingsConfigPage.clickOnUndoBtnInToastMsg();
+                await settingsConfigPage.expectRoleContentValue(role, second);
+                expect(String((await apiCall.getSettingsRoleValue(role)).config[1])).toBe(second);
+            } finally {
+                await apiCall.modifySettingsRole(role, originalValue);
+            }
+        });
+    });
+
     Data.inputDataRejectsZero.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.maxQueuedQueries} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             await apiCall.modifySettingsRole(roles.maxQueuedQueries, input);
