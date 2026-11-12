@@ -66,11 +66,12 @@ test.describe('Metadata Tests', () => {
         const panel = metadataView.metadataViewTabPanel;
         await expect(panel).toContainText('Nodes created: 1');
         await expect(panel).toContainText('Properties set: 1');
-        await metadataView.insertQuery("MATCH (n:MetadataCoverage) RETURN n");
+        const readQuery = "MATCH (n:MetadataCoverage) RETURN n LIMIT 10";
+        await metadataView.insertQuery(readQuery);
         const readResponse = page.waitForResponse(response => {
             const url = new URL(response.url());
             return url.pathname === `/api/graph/${GRAPH_NAME}`
-                && url.searchParams.get("query") === "MATCH (n:MetadataCoverage) RETURN n";
+                && url.searchParams.get("query") === readQuery;
         });
         await metadataView.clickRunQuery(false);
         expect((await readResponse).ok()).toBe(true);
