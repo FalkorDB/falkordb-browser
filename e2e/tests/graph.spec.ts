@@ -17,14 +17,22 @@ import queryData from "../config/queries.json";
 test.describe("Graph Tests", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
+  let cleanupGraph: string | undefined;
 
   test.beforeEach(async () => {
     browser = new BrowserWrapper();
     apiCall = new ApiCalls();
+    cleanupGraph = undefined;
   });
 
   test.afterEach(async () => {
-    await browser.closeBrowser();
+    try {
+      await browser.closeBrowser();
+    } finally {
+      if (cleanupGraph) {
+        expect((await apiCall.removeGraph(cleanupGraph, "admin")).message).toMatch(/deleted|empty key/i);
+      }
+    }
   });
 
   test(`@admin Add graph via API -> verify graph exists via UI`, async () => {
@@ -33,6 +41,33 @@ test.describe("Graph Tests", () => {
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     expect(await graph.verifyGraphExists(graphName)).toBe(true);
     await apiCall.removeGraph(graphName);
+  });
+
+  test("@admin graph selection handles a list shrinking to one graph while opening", async () => {
+    const graphName = getRandomString("soleGraph");
+    await apiCall.addGraph(graphName);
+    cleanupGraph = graphName;
+    const graph = await browser.createNewPage(GraphPage);
+    const page = await browser.getPage();
+    let shrinkList = false;
+    const openedLists: string[][] = [];
+    await page.route(/\/api\/graph\/?$/, async route => {
+      if (route.request().method() !== "GET") {
+        await route.continue();
+        return;
+      }
+      const opts = shrinkList ? [graphName] : [graphName, `${graphName}_other`];
+      if (shrinkList) openedLists.push(opts);
+      await route.fulfill({ json: { opts } });
+    });
+    await browser.navigateTo(urls.graphUrl);
+    await expect(graph.select()).toBeEnabled();
+    shrinkList = true;
+    await graph.selectGraphByName(graphName);
+    expect(openedLists).toEqual([[graphName]]);
+    await expect(graph.select()).toHaveText(graphName);
+    await expect(graph.search()).toBeHidden();
+    await expect(page).toHaveURL(url => url.searchParams.get("graph") === graphName);
   });
 
   test(`@admin Validate that the Manage Graphs toolbar and the Delete dialog stay on one row`, async () => {
