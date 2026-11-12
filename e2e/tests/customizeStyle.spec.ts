@@ -8,6 +8,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import CustomizeStylePage from "../logic/POM/customizeStylePage";
 import DataPanel from "../logic/POM/dataPanelComponent";
 import urls from "../config/urls.json";
+import { LINK_WIDTH, LINK_FONT_SIZE, ARROW_SIZE } from "@falkordb/canvas/dist/canvas-utils.js";
 
 test.describe("Customize Style Tests", () => {
   let browser: BrowserWrapper;
@@ -52,7 +53,7 @@ test.describe("Customize Style Tests", () => {
       await expect(graph.saveStyleButton).toBeHidden();
       const saved = await readStyle();
       if (!saved) throw new Error("Saving resized relationship style did not persist it");
-      // Size options 0 and 5 scale each relationship dimension by 1 and 6.
+      // Size options 0 and 5 use multipliers 0.25 and 1.5, a sixfold increase.
       const scale = 6;
       expect(saved).toEqual({
         color: expectedColor, width: baseline.width * scale, fontSize: baseline.fontSize * scale, arrowSize: baseline.arrowSize * scale,
@@ -85,8 +86,14 @@ test.describe("Customize Style Tests", () => {
       await graph.selectGraphByName(graphName);
       await graph.insertQuery(CREATE_QUERY);
       await graph.clickRunQuery();
+      // Cancelling materializes the same defaults used for omitted canvas dimensions.
       const linkStyle = async () => (await graph.getLinksScreenPositions())
-        .map(({ color, width, fontSize, arrowSize }) => ({ color, width, fontSize, arrowSize }));
+        .map(({ color, width, fontSize, arrowSize }) => ({
+          color,
+          width: width ?? LINK_WIDTH,
+          fontSize: fontSize ?? LINK_FONT_SIZE,
+          arrowSize: arrowSize ?? ARROW_SIZE,
+        }));
       const originalLinks = await linkStyle();
       expect(originalLinks).toHaveLength(1);
       await graph.openGraphInfoButton();
