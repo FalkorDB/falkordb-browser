@@ -293,8 +293,9 @@ It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without exe
 the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
 If index metadata is unavailable, analysis continues with an explicit warning.
 
-API keys remain editable while models load. Saving or cancelling an edit restores
-the key's previous visibility. Pending key additions, edits, and deletions are
+API keys remain editable while models load or another key is selected. Saving or
+cancelling an edit restores the key's previous visibility unless you change it
+during the edit. Pending key additions, edits, and deletions are
 rebased onto the latest committed list, so cancelling or failing another edit
 does not discard an unrelated addition. Selecting a key while a mutation is
 pending takes precedence over that mutation's automatic selection.

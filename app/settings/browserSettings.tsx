@@ -100,7 +100,7 @@ export default function BrowserSettings() {
         replayTutorial,
     } = useContext(BrowserSettingsContext);
 
-    const { prefixConnectionId } = useContext(ConnectionContext);
+    const { activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
 
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -124,10 +124,13 @@ export default function BrowserSettings() {
     const editGenerationRef = useRef(0);
     const keyMutationGenerationRef = useRef(0);
     const keySelectionGenerationRef = useRef(0);
+    const editingSelectionGenerationRef = useRef(0);
     type ChatKeyState = { keys: typeof chatApiKeys; selectedId: string };
     const keyStateRef = useRef<ChatKeyState>({ keys: chatApiKeys, selectedId: selectedChatApiKeyId });
     useEffect(() => {
-        keyStateRef.current = { keys: chatApiKeys, selectedId: selectedChatApiKeyId };
+        if (keyStateRef.current.keys !== chatApiKeys || keyStateRef.current.selectedId !== selectedChatApiKeyId) {
+            keyStateRef.current = { keys: chatApiKeys, selectedId: selectedChatApiKeyId };
+        }
     }, [chatApiKeys, selectedChatApiKeyId]);
     useEffect(() => () => {
         editGenerationRef.current += 1;
@@ -145,6 +148,12 @@ export default function BrowserSettings() {
         setEditingKeyId(null);
         setEditingKeyValue("");
     }, []);
+
+    useEffect(() => {
+        setKeyInput("");
+        handleCancelEditKey();
+        setVisibleKeyIds(new Set());
+    }, [activeConnectionId, prefixConnectionId, handleCancelEditKey]);
 
     const handleDiscardSettings = useCallback(() => {
         handleCancelEditKey();
@@ -344,15 +353,6 @@ export default function BrowserSettings() {
         setNewTimeout(timeoutValue);
         setNewLimit(limit);
         setNewSecretKey(secretKey);
-        setKeyInput("");
-        editGenerationRef.current += 1;
-        const abandonedEdit = editingKeyVisibilityRef.current;
-        if (abandonedEdit) {
-            editingKeyVisibilityRef.current = null;
-            setVisibleKeyIds(prev => withRestoredKeyVisibility(prev, abandonedEdit));
-        }
-        setEditingKeyId(null);
-        setEditingKeyValue("");
         setNewRefreshInterval(refreshInterval);
         setNewMaxTabs(maxTabs);
         setNewGraphsSortOrder(graphsSortOrder);
@@ -662,7 +662,6 @@ export default function BrowserSettings() {
 
     const handleSelectKey = (id: string) => {
         if (isLoadingModels && id === loadingChatApiKeyId) return;
-        if (editingKeyId) handleCancelEditKey();
         modelFetchRequestIdRef.current += 1;
         modelFetchAbortRef.current?.abort();
         setActiveSelectedChatApiKeyId(id);
@@ -706,6 +705,7 @@ export default function BrowserSettings() {
             restoreEditingKeyVisibility(editingKeyVisibilityRef.current.id);
         }
         editingKeyVisibilityRef.current = { id, wasVisible: visibleKeyIds.has(id) };
+        editingSelectionGenerationRef.current = keySelectionGenerationRef.current;
         editGenerationRef.current += 1;
         setEditingKeyId(id);
         setEditingKeyValue(keyToEdit.key);
@@ -722,14 +722,15 @@ export default function BrowserSettings() {
         // the same edit supersedes an older one that is still encrypting.
         editGenerationRef.current += 1;
         const generation = editGenerationRef.current;
+        const selectionChangedDuringEdit = keySelectionGenerationRef.current !== editingSelectionGenerationRef.current;
         const isCurrentEdit = () => editGenerationRef.current === generation
             && editingKeyVisibilityRef.current?.id === id
             && keyStateRef.current.keys.some(item => item.id === id);
-        const saved = await persistChatApiKeys(({ keys }) => ({
+        const saved = await persistChatApiKeys(({ keys, selectedId }) => ({
             keys: keys.map(item => item.id === id
                 ? { ...item, key: trimmedKey, provider, label: item.label || `${providerName} key` }
                 : item),
-            selectedId: id,
+            selectedId: selectionChangedDuringEdit ? selectedId : id,
         }), isCurrentEdit);
         if (saved && isCurrentEdit()) {
             editGenerationRef.current += 1;
@@ -786,6 +787,9 @@ export default function BrowserSettings() {
     };
 
     const toggleKeyVisibility = (id: string) => {
+        if (editingKeyVisibilityRef.current?.id === id) {
+            editingKeyVisibilityRef.current.wasVisible = !visibleKeyIds.has(id);
+        }
         setVisibleKeyIds(prev => {
             const next = new Set(prev);
             if (next.has(id)) {

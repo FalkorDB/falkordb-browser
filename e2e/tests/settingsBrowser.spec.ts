@@ -242,6 +242,144 @@ test.describe('@browser Browser Settings tests', () => {
         expect(tooltipText).toContain("xAI");
     });
 
+    test("@readwrite loading models does not discard an API key edit", async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        let releaseModels!: () => void;
+        const modelGate = new Promise<void>(resolve => { releaseModels = resolve; });
+        let modelsRequested = false;
+        await page.route("**/api/chat/models**", async route => {
+            modelsRequested = true;
+            await modelGate;
+            await route.fulfill({ json: { models: ["gpt-edit-preservation-test"] } });
+        });
+        const apiKey = `sk-e2e-model-edit-${getRandomString("key")}`;
+        const draft = `${apiKey}-draft`;
+        try {
+            await settings.expandChatSection();
+            await settings.selectApiKeyModelSource();
+            await settings.waitForChatApiKeyInputEnabled();
+            await settings.addChatApiKey(apiKey);
+            await expect.poll(() => modelsRequested).toBe(true);
+            await settings.startChatApiKeyEdit(apiKey, draft);
+            releaseModels();
+            await expect.poll(() => page.evaluate(() => localStorage.getItem("model")))
+                .toBe("gpt-edit-preservation-test");
+            await expect(page.getByTestId("chatApiKeyEditInput")).toHaveValue(draft);
+            await page.getByTestId("editChatApiKeyButton").filter({ hasText: "Cancel edit" }).click();
+            await settings.deleteChatApiKey(apiKey);
+        } finally {
+            releaseModels();
+        }
+    });
+
+    for (const mutation of ["add", "delete selected"] as const) {
+        test(`@readwrite ${mutation} does not discard another API key edit`, async () => {
+            const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+            const page = await browser.getPage();
+            await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
+            const apiKey = `sk-e2e-edit-${getRandomString("key")}-first`;
+            const otherKey = `sk-e2e-edit-${getRandomString("key")}-other`;
+            const draft = `${apiKey}-draft`;
+            await settings.expandChatSection();
+            await settings.selectApiKeyModelSource();
+            await settings.waitForChatApiKeyInputEnabled();
+            await settings.addChatApiKey(apiKey);
+
+            if (mutation === "add") {
+                const { release, started } = await delayNextKeyEncryption(page);
+                try {
+                    await settings.fillChatApiKey(otherKey);
+                    await page.getByTestId("addChatApiKeyButton").click();
+                    await started;
+                    await settings.startChatApiKeyEdit(apiKey, draft);
+                    release();
+                    await expect(page.getByTestId("chatApiKeyValue").filter({ hasText: otherKey.slice(-4) })).toBeVisible();
+                    await expect(page.getByTestId("chatApiKeyEditInput")).toHaveValue(draft);
+                } finally {
+                    release();
+                }
+            } else {
+                await settings.addChatApiKey(otherKey);
+                await settings.startChatApiKeyEdit(apiKey, draft);
+                await settings.deleteChatApiKey(otherKey);
+                await expect(page.getByTestId("chatApiKeyEditInput")).toHaveValue(draft);
+            }
+            await page.getByTestId("editChatApiKeyButton").filter({ hasText: "Cancel edit" }).click();
+            await settings.deleteChatApiKey(apiKey);
+            if (mutation === "add") await settings.deleteChatApiKey(otherKey);
+        });
+    }
+
+    test("@readwrite selecting another key preserves an open edit and the new selection", async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
+        const first = `sk-e2e-select-${getRandomString("key")}-first`;
+        const second = `sk-e2e-select-${getRandomString("key")}-second`;
+        const draft = `${first}-edited`;
+        await settings.expandChatSection();
+        await settings.selectApiKeyModelSource();
+        await settings.waitForChatApiKeyInputEnabled();
+        await settings.addChatApiKey(first);
+        await settings.addChatApiKey(second);
+        await settings.selectChatApiKey(first);
+        await settings.startChatApiKeyEdit(first, draft);
+        await settings.selectChatApiKey(second);
+        await expect(page.getByTestId("chatApiKeyEditInput")).toHaveValue(draft);
+        await page.getByTestId("saveEditedChatApiKeyButton").click();
+        await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);
+        const selectedCard = page.getByTestId("chatApiKeyCard").filter({
+            has: page.getByTestId("chatApiKeyValue").filter({ hasText: second.slice(-4) }),
+        });
+        await expect(selectedCard.getByTestId("selectChatApiKeyButton")).toHaveAttribute("aria-pressed", "true");
+        await settings.deleteChatApiKey(draft);
+        await settings.deleteChatApiKey(second);
+    });
+
+    for (const finish of ["save", "cancel"] as const) {
+        test(`@readwrite visibility changed during an edit survives ${finish}`, async () => {
+            const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+            const page = await browser.getPage();
+            await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
+            const apiKey = `sk-e2e-visibility-${getRandomString("key")}`;
+            await settings.expandChatSection();
+            await settings.selectApiKeyModelSource();
+            await settings.waitForChatApiKeyInputEnabled();
+            await settings.addChatApiKey(apiKey);
+            await settings.showChatApiKey(apiKey);
+            await settings.startChatApiKeyEdit(apiKey, apiKey);
+            const editingCard = page.getByTestId("chatApiKeyCard").filter({ has: page.getByTestId("chatApiKeyEditInput") });
+            await editingCard.getByTestId("toggleChatApiKeyVisibilityButton").click();
+            if (finish === "save") await page.getByTestId("saveEditedChatApiKeyButton").click();
+            else await editingCard.getByTestId("editChatApiKeyButton").click();
+            await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);
+            expect(await settings.getChatApiKeyVisibilityLabel(apiKey)).toBe("Show");
+            await settings.deleteChatApiKey(apiKey);
+        });
+    }
+
+    test("@readwrite switching API key edits restores the first key's visibility", async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models**", route => route.fulfill({ json: { models: [] } }));
+        const first = `sk-e2e-switch-${getRandomString("key")}-first`;
+        const second = `sk-e2e-switch-${getRandomString("key")}-second`;
+        await settings.expandChatSection();
+        await settings.selectApiKeyModelSource();
+        await settings.waitForChatApiKeyInputEnabled();
+        await settings.addChatApiKey(first);
+        await settings.addChatApiKey(second);
+        await settings.showChatApiKey(first);
+        await settings.startChatApiKeyEdit(first, `${first}-draft`);
+        await settings.startChatApiKeyEdit(second, `${second}-draft`);
+        expect(await settings.getChatApiKeyVisibilityLabel(first)).toBe("Hide");
+        await page.getByTestId("editChatApiKeyButton").filter({ hasText: "Cancel edit" }).click();
+        expect(await settings.getChatApiKeyVisibilityLabel(second)).toBe("Show");
+        await settings.deleteChatApiKey(first);
+        await settings.deleteChatApiKey(second);
+    });
+
     for (const wasVisible of [false, true]) {
         test(`@readwrite discarding settings restores a ${wasVisible ? "shown" : "hidden"} key and closes its edit`, async () => {
             const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
@@ -310,8 +448,7 @@ test.describe('@browser Browser Settings tests', () => {
                     && response.request().postData()?.includes(staleKey) === true);
                 releaseEncryption();
                 await (await staleResponse).finished();
-                // Allow the resumed save to reach its commit guard before asserting.
-                await page.waitForTimeout(500);
+                await page.waitForLoadState("networkidle");
                 await expect(page.getByTestId("chatApiKeyValue").filter({
                     hasText: `sk-e2e••••••••${newerKey.slice(-4)}`,
                 })).toBeVisible();
@@ -360,7 +497,7 @@ test.describe('@browser Browser Settings tests', () => {
                 // Reload verifies the full encrypted list, not just optimistic UI state.
                 await page.reload({ waitUntil: "networkidle" });
                 await settings.expandChatSection();
-                const retainedKey = mutation === "delete" ? staleKey : apiKey;
+                const retainedKey = staleKey;
                 await expect.poll(() => settings.isChatApiKeyPresent(retainedKey)).toBe(true);
                 expect(await settings.isChatApiKeyPresent(otherKey)).toBe(mutation === "add");
                 expect(await settings.getMaskedChatApiKeyText(retainedKey)).toContain(retainedKey.slice(-4));
@@ -662,8 +799,7 @@ test.describe('@browser Browser Settings tests', () => {
                 && response.request().postData()?.includes(staleKey) === true);
             encryption.release();
             await (await staleResponse).finished();
-            // Let the resumed save reach its commit guard before checking the draft.
-            await page.waitForTimeout(500);
+            await page.waitForLoadState("networkidle");
             await expect(page.getByTestId("chatApiKeyEditInput")).toHaveValue(newerKey);
             await page.getByTestId("saveEditedChatApiKeyButton").click();
             await expect(page.getByTestId("chatApiKeyEditInput")).toHaveCount(0);

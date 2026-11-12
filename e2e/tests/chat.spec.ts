@@ -9,24 +9,6 @@ import { getRandomString } from "../infra/utils";
 
 const DEFAULT_CHAT_MODEL = "gpt-4o-mini";
 
-async function createChatPageWithGraphList(browser: BrowserWrapper, graphNames: string[]) {
-  const chat = await browser.createNewPage(ChatComponent);
-  const page = await browser.getPage();
-  await page.addInitScript(() => {
-    for (const key of Object.keys(localStorage)) {
-      if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
-    }
-  });
-  // A single graph is auto-selected, so parallel tests must not determine
-  // whether this page starts with a graph selected.
-  await page.route(url => url.pathname === "/api/graph", route =>
-    route.fulfill({ json: { opts: graphNames } }));
-  await page.goto(urls.graphUrl);
-  await page.waitForLoadState("networkidle");
-  await browser.setPageToFullScreen();
-  return chat;
-}
-
 async function createChatPageWithSettings(
   browser: BrowserWrapper,
   apiKey: string,
@@ -116,7 +98,9 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
     
     try {
-      await createChatPageWithGraphList(browser, [graphName]);
+      const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+      await browser.setPageToFullScreen();
+      await chat.selectGraphByName(graphName);
       const page = await browser.getPage();
       await expect(page.getByTestId("selectGraph")).toHaveText(graphName);
       await expect(page.getByTestId("chatToggleButton")).toBeVisible();
@@ -182,6 +166,11 @@ test.describe("Chat Feature Tests", () => {
           route.fulfill({ json: { opts: [graphName] } }));
         await page.goto(urls.graphUrl);
         await page.waitForLoadState("networkidle");
+        await page.evaluate(() => {
+          const marker = Object.keys(localStorage).find(key => key.endsWith(":__scopeOwner"));
+          if (!marker) throw new Error("Missing connection scope marker");
+          localStorage.setItem(marker.replace(/__scopeOwner$/, "selectedChatApiKeyId"), "");
+        });
         await expect.poll(() => page.evaluate(() => {
           const key = Object.keys(localStorage).find(name => name.endsWith(":selectedChatApiKeyId"));
           return key ? localStorage.getItem(key) : null;

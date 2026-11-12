@@ -2305,7 +2305,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // selectedApiKey.id is a UUID identifier, not the API key value itself
       const selectedId = String(selectedApiKey?.id ?? "");
       if (stale()) return;
-      persistSelectedChatApiKeyId(selectedId);
+      if (selectedApiKey || storedSelectedId !== null) {
+        persistSelectedChatApiKeyId(selectedId);
+      }
       setChatApiKeys(loadedChatApiKeys);
       setSelectedChatApiKeyId(selectedId);
       setSecretKey(selectedApiKey?.key ?? "");
