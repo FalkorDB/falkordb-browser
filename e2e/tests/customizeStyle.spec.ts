@@ -88,7 +88,7 @@ test.describe("Customize Style Tests", () => {
       await graph.insertQuery(CREATE_QUERY);
       await graph.clickRunQuery();
       // Cancelling materializes the same defaults used for omitted canvas dimensions.
-      const linkStyle = async () => (await graph.getLinksScreenPositions())
+      const linkStyle = async () => (await graph.readRelationshipStyles())
         .map(({ color, width, fontSize, arrowSize }) => ({
           color,
           width: width ?? LINK_WIDTH,
