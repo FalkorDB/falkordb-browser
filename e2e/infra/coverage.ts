@@ -108,7 +108,10 @@ function track(page: Page) {
             ? previous.then((result) => 'source' in result ? result : captured)
             : captured);
     });
-    recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch(recordFailure));
+    // A popup the app opens and closes at once can close before recording starts; it has no coverage to lose.
+    recording.set(page, page.coverage.startJSCoverage({ resetOnNavigation: false }).catch((error: unknown) => {
+        if (!page.isClosed()) recordFailure(error);
+    }));
     const close = page.close.bind(page);
     page.close = async (options) => {
         try {
