@@ -262,14 +262,26 @@ test.describe('@config Settings config tests', () => {
         });
 
         test(`@admin Modify maxTimeOut via UI validation via API: Input value: ${Data.roleModificationData[2].input}`, async () => {
-            const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
-            await settingsConfigPage.navigateToDBConfigurationTab();
-            await settingsConfigPage.modifyRoleValue(roles.maxTimeOut, Data.roleModificationData[2].input);
-            await settingsConfigPage.isUndoBtnInToastMsg();
-            await settingsConfigPage.waitForPageIdle();
-            const value = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
-            expect(value === Data.roleModificationData[2].input).toBe(true);
             await apiCall.modifySettingsRole(roles.maxTimeOut, "0");
+            const initialValue = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
+            expect(initialValue).toBe("0");
+
+            const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+            try {
+                await settingsConfigPage.navigateToDBConfigurationTab();
+                await settingsConfigPage.modifyRoleValue(roles.maxTimeOut, Data.roleModificationData[2].input);
+                await settingsConfigPage.isUndoBtnInToastMsg();
+                await settingsConfigPage.waitForPageIdle();
+                const value = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
+                expect(value).toBe(Data.roleModificationData[2].input);
+
+                await settingsConfigPage.clickOnUndoBtnInToastMsg();
+                await settingsConfigPage.waitForPageIdle();
+                const restoredValue = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
+                expect(restoredValue).toBe("0");
+            } finally {
+                await apiCall.modifySettingsRole(roles.maxTimeOut, "0");
+            }
         });
 
         test(`@admin Modify defaultTimeOut via UI validation via API: Input value: ${Data.roleModificationData[3].input}`, async () => {

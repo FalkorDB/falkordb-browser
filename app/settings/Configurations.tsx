@@ -201,7 +201,7 @@ export default function Configurations() {
         toast({
             title: "Success",
             description: "Configuration value set successfully",
-            action: valueToRestore && isUndo ?
+            action: valueToRestore !== undefined && isUndo ?
                 <ToastButton
                     showUndo
                     onClick={() => handleSetConfig(name, String(valueToRestore), false)}
