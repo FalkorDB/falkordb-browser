@@ -4,6 +4,7 @@ import { getRandomString } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
+import SettingsTabsPage from "../logic/POM/settingsTabsPage";
 import urls from "../config/urls.json";
 import { SYNTAX_ERROR_HINT } from "@/lib/cypherErrors";
 
@@ -348,7 +349,9 @@ test.describe("Error Toast Messages", () => {
     await graph.clickRunQuery(false);
 
     await graph.errorToast.getByTestId("toast-hint-link").click();
-    await page.waitForURL(url => url.pathname === "/settings" && url.searchParams.get("focus") === "timeout");
+    // The settings page consumes ?focus=timeout right after focusing, so assert the settled focus.
+    await page.waitForURL(url => url.pathname === "/settings");
+    await expect(new SettingsTabsPage(page).timeoutInput).toBeFocused();
   });
 
   test(`@admin Unaliased WITH projection shows the specific message and a hint`, async () => {

@@ -20,7 +20,7 @@ Object.assign(globalThis, {
     },
 });
 
-const { beginUrlNavigation, buildGraphUrlParams, buildSettingsUrlParams, setUrlParam, syncRouteUrlParams } = await import("./urlParams.ts");
+const { beginUrlNavigation, buildGraphUrlParams, createNavigationTracker, buildSettingsUrlParams, setUrlParam, syncRouteUrlParams } = await import("./urlParams.ts");
 
 beforeEach(() => {
     location.pathname = "/graph";
@@ -217,4 +217,25 @@ test("syncRouteUrlParams leaves unregistered routes alone", () => {
     location.pathname = "/schema";
     syncRouteUrlParams("/schema", { tab: "abc" });
     assert.deepEqual(replaceStateCalls, []);
+});
+
+test("a redirect started before the previous navigation settles keeps the token", () => {
+    const tracker = createNavigationTracker();
+    tracker.start();
+    const settled = tracker.generation;
+    tracker.start();
+    tracker.settle(settled);
+    setUrlParam({ tab: "abc" });
+    assert.deepEqual(replaceStateCalls, []);
+    tracker.settle(tracker.generation);
+    assert.deepEqual(replaceStateCalls, ["/graph?tab=abc"]);
+});
+
+test("disposing the navigation tracker releases a held token", () => {
+    const tracker = createNavigationTracker();
+    tracker.start();
+    setUrlParam({ tab: "abc" });
+    tracker.dispose();
+    tracker.dispose();
+    assert.deepEqual(replaceStateCalls, ["/graph?tab=abc"]);
 });
