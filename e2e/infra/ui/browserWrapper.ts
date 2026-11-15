@@ -3,6 +3,7 @@ import { existsSync } from 'fs';
 import { test } from '@playwright/test';
 import BasePage from './basePage';
 import { initializeLocalStorage } from '../utils';
+import { trackContext } from '../coverage';
 
 // Map each Playwright project to its pre-created auth state file so that
 // BrowserWrapper contexts are authenticated.  The 'setup' project and special
@@ -59,10 +60,10 @@ export default class BrowserWrapper {
 
             // Grant clipboard permissions only for Chromium-based browsers
             // Firefox doesn't support clipboard-read/clipboard-write permissions
-            this.context = await this.browser.newContext({
+            this.context = trackContext(await this.browser.newContext({
                 ...(isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] }),
                 ...(storageState ? { storageState } : {}),
-            });
+            }));
         }
         if (!this.page) {
             this.page = await this.context.newPage();
@@ -117,6 +118,13 @@ export default class BrowserWrapper {
     async closeBrowser() {
         // Close the page first (which clears intervals) before closing the browser
         await this.closePage();
+
+        // Closing the context saves the coverage of any other page it opened
+        // (popups, new tabs); closing the browser alone would lose it.
+        if (this.context) {
+            await this.context.close().catch(() => {});
+            this.context = null;
+        }
         
         if (this.browser) {
             await this.browser.close();

@@ -2,7 +2,9 @@
 [![Dockerhub](https://img.shields.io/docker/pulls/falkordb/falkordb-browser?label=Docker)](https://hub.docker.com/r/falkordb/falkordb-browser/)
 [![Discord](https://img.shields.io/discord/1146782921294884966?style=flat-square)](https://discord.gg/6M4QwDXn2w)
 [![Workflow](https://github.com/FalkorDB/falkordb-browser/actions/workflows/nextjs.yml/badge.svg?branch=main)](https://github.com/FalkorDB/falkordb-browser/actions/workflows/nextjs.yml)
-[![Codecov](https://codecov.io/gh/FalkorDB/falkordb-browser/branch/staging/graph/badge.svg)](https://codecov.io/gh/FalkorDB/falkordb-browser)
+[![Playwright Tests](https://github.com/FalkorDB/falkordb-browser/actions/workflows/playwright.yml/badge.svg?branch=main)](https://github.com/FalkorDB/falkordb-browser/actions/workflows/playwright.yml)
+[![Coverage (main)](https://img.shields.io/codecov/c/github/FalkorDB/falkordb-browser/main?label=coverage%20%28main%29)](https://app.codecov.io/gh/FalkorDB/falkordb-browser/tree/main)
+[![Coverage (staging)](https://img.shields.io/codecov/c/github/FalkorDB/falkordb-browser/staging?label=coverage%20%28staging%29)](https://app.codecov.io/gh/FalkorDB/falkordb-browser/tree/staging)
 
 # FalkorDB Browser
 
@@ -37,9 +39,42 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 |---------------------------------------------------|---------------------------------------------------|
 
 
+## Automatic query limiting
+
+When the result limit in Settings is above 0, the browser adds `LIMIT <n>` to a query
+whose final `RETURN` has none. A limit of 0 (shown as ∞) leaves queries unchanged.
+
+- Trailing semicolons are removed before the limit is added.
+- A non-`UNION` query whose final `RETURN` already has a `LIMIT` keeps it.
+- `UNION` queries are wrapped as `CALL { … } RETURN * LIMIT <n>`, even when a branch has its
+  own `LIMIT`, so the limit applies to the combined result. A leading `CYPHER` parameter
+  header stays outside the wrapper.
+- Known limitation: `UNION` queries that contain a `CALL` clause, or start with `EXPLAIN` or
+  `PROFILE`, are not wrapped; the limit is added to the last branch only.
+
 ## Get Started & Demo
 
 Access the Browser: (https://browser.falkordb.com)
+
+### Tutorial samples
+
+- Each tutorial uses unique graph names and records ownership per connection.
+  Cleanup deletes only samples whose creation was confirmed, never user graphs
+  based on their names (including `social-demo`).
+- Completed abandoned samples are reclaimed on app visits and tutorial start/close.
+  Web Locks protect active tabs; without them, other tabs' records must be inactive
+  for 24 hours. Failed cleanup retains ownership for retry without extending that
+  inactivity window. Clearing browser storage removes ownership evidence.
+- Unconfirmed creations are retained for manual verification, with a notice at
+  most once per connection per browser session. They are never automatically
+  deleted, even after a timeout or reload.
+- Graph selection and saved-tab loads wait for recovery. Setup and Replay waits
+  are bounded; a late creation remains tracked. Switching connections or closing
+  on mobile cannot publish an old tutorial into a newer one; switching while the
+  tutorial is open restarts it with samples on the new connection, leaving the
+  old connection's samples recorded for its own cleanup. Background sample
+  reads cannot recreate deleted graphs; explicit editor writes retain their
+  normal permissions. Closing restores only user graphs verified to still exist.
 
 ### Quick start
 
@@ -241,7 +276,7 @@ For detailed configuration options and examples, see the [Helm chart documentati
 ### Build and run browser from source
 
 **Prerequisites:**
-- Node.js 20.19.0 or higher
+- Node.js 24 or higher (`engines` in `package.json`)
 
 **Steps:**
 * Clone the git repository `git clone git@github.com:FalkorDB/falkordb-browser.git`
@@ -287,6 +322,23 @@ set `LOAD_CSV_FILE_URI=false`.
 
 The editor's **Optimize** action uses the model and provider configuration selected
 in Settings, with an API key only for hosted providers.
+Before each analysis, optionally describe what to optimize, such as reducing scans
+or improving a specific join. This guidance is included only in that request's
+prompt and is not saved or reused. Leave it blank for a general review.
+Each analysis requires clicking **Analyze**; there is no remembered-consent checkbox.
+Optimize and Fix with AI use the Responses API for hosted OpenAI models, including
+GPT-5, the o-series and newer reasoning models, without unsupported temperature
+settings. Older OpenAI families (GPT-3.5, GPT-4/GPT-4o/GPT-4.1, `chatgpt-*`,
+`gpt-audio*` and their fine-tunes) and the other supported providers keep Chat
+Completions with `temperature: 0` and the 30-second timeout. Responses requests allow
+up to four minutes to finish. Reverse proxies, Kubernetes ingress controllers (often
+60 seconds by default, e.g. `nginx.ingress.kubernetes.io/proxy-read-timeout` set via the
+Helm chart's `ingress.annotations`) and serverless platforms must allow that long;
+otherwise a slow reply surfaces as a generic Fix/Optimize error. Closing Optimize
+cancels the request.
+Fix with AI also offers **Cancel** while loading. Cancelling, changing the query,
+tab, graph, connection, or page discards the old request; late replies cannot
+replace a newer result.
 It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without executing
 the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
 If index metadata is unavailable, analysis continues with an explicit warning.
@@ -296,22 +348,86 @@ Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 mobile screens, and long Chat queries can be collapsed.
 
 Missing AI configuration and provider errors offer **Go to Settings**. Returning
-to the graph preserves the editor query and unsent Chat input. Chat drafts are
-scoped to the connection, tab, and graph, and survive closing and reopening Chat.
+to the graph preserves the editor query and unsent Chat input. Debounced URL
+updates wait for route transitions, so a draft update cannot cancel navigation
+to Settings. Chat drafts are scoped to the connection, tab, and graph, and survive
+closing and reopening Chat.
+The transition guard covers mounted programmatic push/replace/refresh calls.
+History back/forward and toast callbacks retained after unmount use Next's native
+navigation without acquiring a transition token. Deferred URL updates are
+discarded when the destination's path, search, or hash differs from their source.
 Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
+
+### Contributing with AI agents
+
+Agent rules (coverage bar, docs and design-doc upkeep, PR readiness including resolving every
+review thread) live in [`.github/copilot-instructions.md`](./.github/copilot-instructions.md),
+shared with Claude Code through [`CLAUDE.md`](./CLAUDE.md); path-specific rules are in
+`.github/instructions/`. PR readiness needs the [superpowers](https://github.com/obra/superpowers)
+plugin (install commands in the instructions). Design plans are in [`docs/design/`](./docs/design/README.md).
 
 ### Testing
 
 * **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
   Runs the `*.test.ts` suites under `app/` and `lib/`. Gated in CI by the **Build**
   workflow. These execute TypeScript directly via `node --test`, which relies on native
-  type-stripping — use **Node ≥ 22.18** (CI runs Node 24). Older Node (e.g. 20.x) can run
-  the app but cannot run these tests.
-* **Coverage**: `npm run test:coverage` — runs the unit tests and enforces **100%**
-  line/branch/function coverage on `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`,
-  `lib/aiFix.ts`, `lib/cypherErrors.ts`, and `lib/clipboard.ts`.
+  type-stripping, so they need the same **Node ≥ 24** as the app (CI runs Node 24).
+* **Unit coverage gate**: `npm run test:coverage` — runs the unit tests and enforces **100%**
+  line/branch/function coverage on the modules it lists (`lib/cypherSuggestions.ts`,
+  `lib/cypherDiagnostics.ts`, `lib/aiFix.ts`, `lib/cypherErrors.ts`, `lib/clipboard.ts`, …).
+* **Codebase coverage** (the Codecov badges): measured over **every source file** — `app/`,
+  `lib/`, `components/`, `auth.ts`, `proxy.ts` and the desktop and mobile shells, without
+  tests, type declarations or the generated grammar — by every kind of test: unit, smoke,
+  e2e (browser and server side), desktop and mobile. A file no test loads counts as 0%.
+  Each CI job records raw V8 coverage and turns it into a report with
+  `.github/scripts/coverage-report.mjs`, and Codecov merges the reports per commit. The
+  **Coverage status** workflow is the gate: once every coverage workflow a commit triggers
+  has finished, and Codecov has processed their uploads, it requires **95%** of the whole
+  codebase (`coverage/project` on PRs, `coverage/project (push)` on commits pushed to `main`
+  and `staging`) and of the lines a PR changes (`coverage/patch`). A coverage job whose
+  tests or report fail, are skipped or are cancelled fails the gate, since its coverage is
+  incomplete; failures in jobs that produce no coverage (installers,
+  the security scan) do not, and a Codecov upload error never fails a test job
+  (`.github/scripts/coverage-gate.mjs`). Dependabot runs only get Dependabot secrets, so
+  `CODECOV_TOKEN` must also be set as a Dependabot secret for their coverage to upload.
+  Manual (`workflow_dispatch`) runs do not upload: the gate does not count them, and their
+  uploads, named like the PR's or push's, would stand in for one that was lost.
+  Each job keeps its report as a `coverage-*` workflow artifact for 3 days.
+  Locally:
+  ```bash
+  rm -rf coverage
+  NODE_V8_COVERAGE=coverage/raw/unit npm run test:coverage
+  node .github/scripts/coverage-report.mjs unit coverage/raw/unit   # coverage/unit/index.html
+  ```
+  For e2e coverage, build with `COVERAGE=1 npm run build`, start the server with
+  `NODE_V8_COVERAGE=coverage/raw/e2e npm start`, run Playwright with
+  `E2E_COVERAGE_DIR=$PWD/coverage/raw/e2e`, stop the server (it writes its coverage on
+  exit), then `node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e`. Pages are
+  recorded in Chromium only; a spec that uses Playwright's `page`, `context` or `browser`
+  fixtures imports `test` from `e2e/infra/coverage.ts` so its pages are recorded too.
+  Browser-running CI jobs use `REQUIRE_BROWSER_COVERAGE=1` when generating the report:
+  missing recordings or recorder errors fail collection, even when server coverage exists.
+  Original script responses are captured in case Chromium loses a source during
+  navigation; a source missing from both the recording and its response fails collection.
+  Server-only test jobs do not require or launch a browser. The gate waits for all six
+  shard uploads plus the TLS, cluster and stateless uploads, and the Docker upload
+  when the workflow declares it, not just an `e2e` flag from one job.
+  It waits up to 15 minutes for required uploads to appear
+  and finish processing before reporting missing names. Docker is required only
+  when the measured commit's workflow declares Docker coverage; reruns of older
+  workflows retain their original requirements.
+
+  Docker smoke tests still check the normal production image first. They also run against
+  a separate image built with `--build-arg COVERAGE=1`; its browser and server coverage
+  is uploaded as `e2e-docker`. The report uses that container's exact `.next` artifacts
+  and `COVERAGE_SERVER_ROOT=/app` to translate server paths into the reporting checkout.
+  Server mappings use the V8 source-map cache or the container's copied external map;
+  a missing referenced server map fails reporting rather than silently dropping hits.
+  The default Docker build remains optimized and does not expose browser source maps.
+  Stacked PR branches can validate the same jobs with
+  `gh workflow run playwright.yml --ref <branch>` before their base reaches `staging`.
 * **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — runs every `lib/**/*.smoke.ts`
   suite against the actual server error wording. This covers the "Did you mean…?"
   suggestions and the **error-hint drift guard**: each entry in the hint catalog
@@ -329,5 +445,3 @@ Optimize failures close the dialog and show only a toast with the Settings actio
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
-
-

@@ -119,6 +119,12 @@ If enabled, the Browser includes a **Chat panel** that streams responses from a 
 - Chat configuration lives in Settings (model + secret key).
 - The chat backend URL is controlled by `CHAT_URL`.
 
+### Optional AI query assistance (Fix with AI, Optimize)
+With an OpenAI, Groq, xAI, Ollama or LM Studio model configured in Settings:
+- **Fix with AI** (error toast or editor quick fix) explains a failed query and suggests a corrected one. It can be cancelled while loading; stale replies never replace a newer result.
+- **Optimize** analyzes the query with its `GRAPH.EXPLAIN` plan and the graph's indexes, without running it. An optional per-request goal (for example "reduce scans") steers the advice and is never saved.
+- Suggested queries are only copied or inserted into the editor; they never run automatically.
+
 ## Common workflows
 ### 1) Run a query and visualize results
 1. Go to **Graphs** and select a graph.
