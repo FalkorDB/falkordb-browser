@@ -52,6 +52,8 @@ interface ProviderLayoutProps {
   customizingLabel: CustomizingRef | null;
   setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>>;
   tutorialOpen: boolean;
+  /** Changes when the tutorial must start over (e.g. a connection switch), remounting it. */
+  tutorialKey: number;
   /** False until the first-visit tour has been decided on, so What's New cannot open ahead of it. */
   tutorialDecided: boolean;
   onCloseTutorial: () => void;
@@ -66,6 +68,7 @@ export default function ProviderLayout({
   customizingLabel,
   setCustomizingLabel,
   tutorialOpen,
+  tutorialKey,
   tutorialDecided,
   onCloseTutorial,
   onLoadDemoGraphs,
@@ -176,8 +179,9 @@ export default function ProviderLayout({
   return (
     <PanelContext.Provider value={panelContext}>
       {
-        isGraph &&
+        isGraph && tutorialOpen &&
         <Tutorial
+          key={tutorialKey}
           open={tutorialOpen}
           onClose={onCloseTutorial}
           onLoadDemoGraphs={onLoadDemoGraphs}

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isTutorialDemoGraphName } from "@/lib/tutorialDemoGraphs";
 export { runQuery } from "./run-query";
 
 const AUTO_NEXTAUTH_URL = "auto";
@@ -18,6 +19,11 @@ const LOCALHOST_ORIGINS = new Set([
 export function resolveReadOnly(request: NextRequest, userRole?: string): boolean {
     return request.nextUrl.searchParams.get("readOnly") === "true"
         || userRole === "Read-Only";
+}
+
+// Background reads must not recreate a removed sample; explicit mutations use resolveReadOnly.
+export function resolveGraphReadOnly(request: NextRequest, userRole: string | undefined, graphId: string): boolean {
+    return isTutorialDemoGraphName(graphId) || resolveReadOnly(request, userRole);
 }
 
 /**

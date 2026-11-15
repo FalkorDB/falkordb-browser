@@ -11,6 +11,7 @@ export interface AddGraphResponse {
 
 export interface RemoveGraphResponse {
   message: string;
+  status: number;
 }
 
 export interface GetGraphsResponse {

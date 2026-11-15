@@ -42,9 +42,42 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 |---------------------------------------------------|---------------------------------------------------|
 
 
+## Automatic query limiting
+
+When the result limit in Settings is above 0, the browser adds `LIMIT <n>` to a query
+whose final `RETURN` has none. A limit of 0 (shown as ∞) leaves queries unchanged.
+
+- Trailing semicolons are removed before the limit is added.
+- A non-`UNION` query whose final `RETURN` already has a `LIMIT` keeps it.
+- `UNION` queries are wrapped as `CALL { … } RETURN * LIMIT <n>`, even when a branch has its
+  own `LIMIT`, so the limit applies to the combined result. A leading `CYPHER` parameter
+  header stays outside the wrapper.
+- Known limitation: `UNION` queries that contain a `CALL` clause, or start with `EXPLAIN` or
+  `PROFILE`, are not wrapped; the limit is added to the last branch only.
+
 ## Get Started & Demo
 
 Access the Browser: (https://browser.falkordb.com)
+
+### Tutorial samples
+
+- Each tutorial uses unique graph names and records ownership per connection.
+  Cleanup deletes only samples whose creation was confirmed, never user graphs
+  based on their names (including `social-demo`).
+- Completed abandoned samples are reclaimed on app visits and tutorial start/close.
+  Web Locks protect active tabs; without them, other tabs' records must be inactive
+  for 24 hours. Failed cleanup retains ownership for retry without extending that
+  inactivity window. Clearing browser storage removes ownership evidence.
+- Unconfirmed creations are retained for manual verification, with a notice at
+  most once per connection per browser session. They are never automatically
+  deleted, even after a timeout or reload.
+- Graph selection and saved-tab loads wait for recovery. Setup and Replay waits
+  are bounded; a late creation remains tracked. Switching connections or closing
+  on mobile cannot publish an old tutorial into a newer one; switching while the
+  tutorial is open restarts it with samples on the new connection, leaving the
+  old connection's samples recorded for its own cleanup. Background sample
+  reads cannot recreate deleted graphs; explicit editor writes retain their
+  normal permissions. Closing restores only user graphs verified to still exist.
 
 ### Quick start
 
@@ -256,6 +289,18 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Personal access tokens
+
+Custom expiration dates use the selected local calendar day, ending at
+23:59:59.999 in the browser's timezone, including daylight-saving transitions.
+
+### Restoring graph tabs
+
+Graph editing waits for saved tabs and the query timeout to initialize for the
+current connection, while information panels and Chat remain accessible.
+If timeout configuration does not respond within five seconds, restoration uses
+the 60-second fallback.
+
 ### Error help
 
 When a Cypher query fails, the browser shows the database's message together with an
@@ -292,6 +337,23 @@ set `LOAD_CSV_FILE_URI=false`.
 
 The editor's **Optimize** action uses the model and provider configuration selected
 in Settings, with an API key only for hosted providers.
+Before each analysis, optionally describe what to optimize, such as reducing scans
+or improving a specific join. This guidance is included only in that request's
+prompt and is not saved or reused. Leave it blank for a general review.
+Each analysis requires clicking **Analyze**; there is no remembered-consent checkbox.
+Optimize and Fix with AI use the Responses API for hosted OpenAI models, including
+GPT-5, the o-series and newer reasoning models, without unsupported temperature
+settings. Older OpenAI families (GPT-3.5, GPT-4/GPT-4o/GPT-4.1, `chatgpt-*`,
+`gpt-audio*` and their fine-tunes) and the other supported providers keep Chat
+Completions with `temperature: 0` and the 30-second timeout. Responses requests allow
+up to four minutes to finish. Reverse proxies, Kubernetes ingress controllers (often
+60 seconds by default, e.g. `nginx.ingress.kubernetes.io/proxy-read-timeout` set via the
+Helm chart's `ingress.annotations`) and serverless platforms must allow that long;
+otherwise a slow reply surfaces as a generic Fix/Optimize error. Closing Optimize
+cancels the request.
+Fix with AI also offers **Cancel** while loading. Cancelling, changing the query,
+tab, graph, connection, or page discards the old request; late replies cannot
+replace a newer result.
 It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without executing
 the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
 If index metadata is unavailable, analysis continues with an explicit warning.
@@ -301,8 +363,14 @@ Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 mobile screens, and long Chat queries can be collapsed.
 
 Missing AI configuration and provider errors offer **Go to Settings**. Returning
-to the graph preserves the editor query and unsent Chat input. Chat drafts are
-scoped to the connection, tab, and graph, and survive closing and reopening Chat.
+to the graph preserves the editor query and unsent Chat input. Debounced URL
+updates wait for route transitions, so a draft update cannot cancel navigation
+to Settings. Chat drafts are scoped to the connection, tab, and graph, and survive
+closing and reopening Chat.
+The transition guard covers mounted programmatic push/replace/refresh calls.
+History back/forward and toast callbacks retained after unmount use Next's native
+navigation without acquiring a transition token. Deferred URL updates are
+discarded when the destination's path, search, or hash differs from their source.
 Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
