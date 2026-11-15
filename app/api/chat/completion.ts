@@ -51,7 +51,8 @@ export async function requestAiCompletion(input: {
   // A failure body that can't be read still carries the provider's status, so report that
   // instead of letting the read error mask it.
   const raw = await readChatBodyWithLimit(response, 256 * 1024).catch((error: unknown) => {
-    if (response.ok) throw error;
+    const name = (error as Error)?.name;
+    if (response.ok || name === "TimeoutError" || name === "AbortError") throw error;
     return "";
   });
   if (raw === OVER_LIMIT) {
