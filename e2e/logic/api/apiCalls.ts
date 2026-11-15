@@ -434,9 +434,10 @@ export default class ApiCalls {
     }
   }
 
-  async getUsers(): Promise<GetUsersResponse> {
+  async getUsers(role?: string): Promise<GetUsersResponse> {
     try {
-      const result = await getRequest(urls.api.settingsUsers);
+      const headers = role === "admin" ? await getAdminToken() : undefined;
+      const result = await getRequest(urls.api.settingsUsers, headers);
       return await result.json();
     } catch (error) {
       throw new Error(
@@ -486,6 +487,58 @@ export default class ApiCalls {
         `Failed to update user. \n Error: ${(error as Error).message}`
       );
     }
+  }
+
+  /** Like `createUsers`, but hands back the status and `Location` header too, for asserting refusals. */
+  async createUserWithStatus(
+    data?: any,
+    role?: string
+  ): Promise<{ status: number; location?: string; body: any }> {
+    const headers = role === "admin" ? await getAdminToken() : undefined;
+    const result = await postRequest(
+      urls.api.settingsUsers,
+      data,
+      undefined,
+      headers
+    );
+    return {
+      status: result.status(),
+      location: result.headers().location,
+      body: await result.json(),
+    };
+  }
+
+  /** Like `deleteUsers`, but hands back the status too, for asserting refusals. */
+  async deleteUsersWithStatus(
+    data?: any,
+    role?: string
+  ): Promise<{ status: number; body: any }> {
+    const headers = role === "admin" ? await getAdminToken() : undefined;
+    const result = await deleteRequest(urls.api.settingsUsers, headers, data);
+    return { status: result.status(), body: await result.json() };
+  }
+
+  /** Like `updateUser`, but hands back the status too, for asserting refusals. */
+  async updateUserWithStatus(
+    username: string,
+    data: { role: string; keys?: string[]; password?: string },
+    role?: string
+  ): Promise<{ status: number; body: any }> {
+    const headers = role === "admin" ? await getAdminToken() : undefined;
+    const result = await patchRequest(
+      `${urls.api.settingsUser}${encodeURIComponent(username)}`,
+      data,
+      undefined,
+      headers
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
+  /** Hands back the status of `POST /api/user/save`, for asserting refusals. */
+  async saveUsersWithStatus(role?: string): Promise<{ status: number; body: any }> {
+    const headers = role === "admin" ? await getAdminToken() : undefined;
+    const result = await postRequest(`${urls.api.settingsUsers}/save`, undefined, undefined, headers);
+    return { status: result.status(), body: await result.json() };
   }
 
   // Token API methods
