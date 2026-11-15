@@ -12,6 +12,7 @@ import Input from "@/app/components/ui/Input";
 import { IndicatorContext } from "@/app/components/provider";
 import { securedFetch } from "@/lib/utils";
 import useIsMobile from "@/lib/useIsMobile";
+import { toLocalDateInputValue } from "@/lib/localDate";
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { parseISO } from "date-fns";
 
@@ -524,7 +525,7 @@ export default function PersonalAccessTokens() {
                     value={customExpirationDate}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomExpirationDate(e.target.value)}
                     disabled={isGenerating}
-                    min={new Date().toISOString().slice(0, 10)}
+                    min={toLocalDateInputValue(new Date())}
                     className="text-base h-10"
                   />
                 </div>

@@ -5,6 +5,7 @@
 "use client";
 
 import { type ClassValue, clsx } from "clsx";
+import { protectTutorialGraphRead } from "./tutorialDemoGraphs.ts";
 import { twMerge } from "tailwind-merge";
 import React, { type RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData, NodeShape } from "@falkordb/canvas";
@@ -382,7 +383,7 @@ export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
-  options?: { query?: string; signal?: AbortSignal; connectionId?: string | null }
+  options?: { query?: string; signal?: AbortSignal; connectionId?: string | null; allowTutorialCreation?: boolean }
 ): Promise<unknown> {
   const signal = options?.signal;
   // Already superseded before we even open the stream.
@@ -396,7 +397,7 @@ export async function getSSEGraphResult(
     const connId = options?.connectionId !== undefined ? options.connectionId : getActiveConnectionIdGlobal();
 
     // EventSource doesn't support headers — inject connectionId as a query param.
-    let effectiveUrl = normalizeApiUrl(url);
+    let effectiveUrl = protectTutorialGraphRead(normalizeApiUrl(url), options?.allowTutorialCreation);
     if (connId) {
       const sep = effectiveUrl.includes("?") ? "&" : "?";
       effectiveUrl += `${sep}connectionId=${encodeURIComponent(connId)}`;
@@ -867,7 +868,7 @@ export async function securedFetch(
 }
 
 export function prepareArg(arg: string) {
-  return encodeURIComponent(arg.trim());
+  return encodeURIComponent(arg);
 }
 
 /**
@@ -1527,33 +1528,371 @@ function hasCallBlockWithReturnNoLimit(query: string): boolean {
   return false;
 }
 
+function skipCypherTrivia(query: string, start: number): number {
+  let index = start;
+  while (index < query.length) {
+    if (/\s/.test(query[index])) {
+      index += 1;
+    } else if (query.startsWith("//", index)) {
+      while (index < query.length && query[index] !== "\n" && query[index] !== "\r") index += 1;
+    } else if (query.startsWith("/*", index)) {
+      const end = query.indexOf("*/", index + 2);
+      index = end === -1 ? query.length : end + 2;
+    } else {
+      break;
+    }
+  }
+  return index;
+}
+
+function readCypherIdentifierEnd(query: string, start: number): number {
+  const index = skipCypherTrivia(query, start);
+  if (query[index] === "`") {
+    let end = index + 1;
+    while (end < query.length) {
+      if (query[end] === "`") {
+        if (query[end + 1] === "`") {
+          end += 2;
+        } else {
+          return end + 1;
+        }
+      } else {
+        end += 1;
+      }
+    }
+    return -1;
+  }
+
+  const match = /^[\p{ID_Start}\p{Pc}][\p{ID_Continue}\p{Sc}]*/u.exec(query.slice(index));
+  return match ? index + match[0].length : -1;
+}
+
+function hasCallTarget(query: string, start: number): boolean {
+  let index = skipCypherTrivia(query, start);
+  if (query[index] === "{") return true;
+
+  index = readCypherIdentifierEnd(query, index);
+  if (index === -1) return false;
+  index = skipCypherTrivia(query, index);
+
+  while (query[index] === ".") {
+    index = readCypherIdentifierEnd(query, index + 1);
+    if (index === -1) return false;
+    index = skipCypherTrivia(query, index);
+  }
+
+  return query[index] === "(";
+}
+
+const UNION_PRECEDING_KEYWORDS = new Set(["AS", "WITH", "RETURN", "YIELD", "DISTINCT", "WHERE", "NOT", "AND", "OR", "XOR", "IN", "WHEN", "THEN", "ELSE"]);
+
+// Comments are whitespace between CALL and its target. Reject expression
+// contexts such as labels, properties and map projections (`RETURN call {.x}`)
+// before checking for a target.
+function hasCallClause(query: string, code: string, quotedTokenEnds: number[]): boolean {
+  const callKeyword = /(?<![\p{ID_Continue}\p{Sc}])CALL(?![\p{ID_Continue}\p{Sc}])/giu;
+  let scanned = 0;
+  let depth = 0;
+  let match = callKeyword.exec(code);
+  while (match) {
+    for (; scanned < match.index; scanned += 1) {
+      if ("([{".includes(code[scanned])) depth += 1;
+      else if (")]}".includes(code[scanned])) depth -= 1;
+    }
+    const before = code.slice(0, match.index).trimEnd();
+    const previousWord = /[\p{ID_Continue}\p{Sc}]+$/u.exec(before)?.[0].toUpperCase() ?? "";
+    const callStart = match.index;
+    const afterQuoted = quotedTokenEnds.some(end => end <= callStart && /^\s*$/.test(code.slice(end, callStart)));
+    const tokenBeforeWord = /(?:[\p{ID_Continue}\p{Sc}]+|\S)$/u.exec(before.slice(0, before.length - previousWord.length).trimEnd())?.[0].toUpperCase() ?? "";
+    const keywordNamedVariable = tokenBeforeWord === "AS" || /^[.:$,+*/%^=<>~-]$/.test(tokenBeforeWord);
+    const expressionContext = /[.:$,+*/%<>=|&^-]$/.test(before) ||
+      ((UNION_PRECEDING_KEYWORDS.has(previousWord) || previousWord === "BY") && !keywordNamedVariable);
+    if (depth === 0 && (afterQuoted || !expressionContext) && hasCallTarget(query, match.index + match[0].length)) return true;
+    match = callKeyword.exec(code);
+  }
+  return false;
+}
+
+// Strings, comments and backtick identifiers are replaced with spaces in
+// `code` (newlines kept) so keyword checks only see actual Cypher tokens.
+function analyzeCypher(query: string): {
+  code: string;
+  lastCodeEnd: number;
+  lastNonTerminatorEnd: number;
+  quotedTokenEnds: number[];
+} {
+  const code = query.split("");
+  let lastCodeEnd = 0;
+  let lastNonTerminatorEnd = 0;
+  const quotedTokenEnds: number[] = [];
+  let i = 0;
+
+  const maskRange = (target: string[], start: number, end: number) => {
+    for (let index = start; index < end; index += 1) {
+      if (target[index] !== "\n" && target[index] !== "\r") target[index] = " ";
+    }
+  };
+
+  while (i < query.length) {
+    const char = query[i];
+    const next = query[i + 1];
+
+    if (char === "/" && next === "/") {
+      const start = i;
+      i += 2;
+      while (i < query.length && query[i] !== "\n" && query[i] !== "\r") i += 1;
+      maskRange(code, start, i);
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      const start = i;
+      i += 2;
+      while (i < query.length && !(query[i] === "*" && query[i + 1] === "/")) i += 1;
+      i = Math.min(query.length, i + 2);
+      maskRange(code, start, i);
+      continue;
+    }
+
+    if (char === "'" || char === '"' || char === "`") {
+      const quote = char;
+      const start = i;
+      i += 1;
+      while (i < query.length) {
+        if (quote !== "`" && query[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        if (query[i] === quote) {
+          if (query[i + 1] === quote) {
+            i += 2;
+            continue;
+          }
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      i = Math.min(query.length, i);
+      maskRange(code, start, i);
+      lastCodeEnd = i;
+      lastNonTerminatorEnd = i;
+      quotedTokenEnds.push(i);
+      continue;
+    }
+
+    if (!/\s/.test(char)) {
+      lastCodeEnd = i + 1;
+      if (char !== ";") lastNonTerminatorEnd = i + 1;
+    }
+    i += 1;
+  }
+
+  return { code: code.join(""), lastCodeEnd, lastNonTerminatorEnd, quotedTokenEnds };
+}
+
+function insertLimit(query: string, analysis: { code: string; lastCodeEnd: number }, limit: number): string {
+  const insertAt = analysis.lastCodeEnd;
+  return `${query.slice(0, insertAt)} LIMIT ${limit}${query.slice(insertAt)}`;
+}
+
+function withoutTrailingSemicolons(query: string, analysis: ReturnType<typeof analyzeCypher>): string {
+  let result = "";
+  for (let index = 0; index < query.length; index += 1) {
+    if (
+      index >= analysis.lastNonTerminatorEnd &&
+      index < analysis.lastCodeEnd &&
+      analysis.code[index] === ";"
+    ) {
+      continue;
+    }
+    result += query[index];
+  }
+  return result;
+}
+
+// One pass over the masked code. A UNION is a clause only inside a top-level
+// RETURN, which ends every branch, so a variable named `union` that ends any
+// other clause (`ORDER BY union`, `DELETE union`, ...) is never a clause.
+function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>, bodyStart: number): number[] {
+  const { code, quotedTokenEnds } = analysis;
+  const quoted = "'";
+  const token = /[\p{ID_Continue}\p{Sc}]+|\S/gu;
+  const nextClause = /\s+(?:ALL\s+)?(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD|FOREACH)\b/iy;
+  const clauses: number[] = [];
+  token.lastIndex = bodyStart;
+  let quotedIndex = quotedTokenEnds.findIndex(end => end > bodyStart);
+  if (quotedIndex === -1) quotedIndex = quotedTokenEnds.length;
+  let depth = 0;
+  let inReturn = false;
+  let previous = "";
+  let beforePrevious = "";
+  let thirdPrevious = "";
+  const push = (text: string) => {
+    thirdPrevious = beforePrevious;
+    beforePrevious = previous;
+    previous = text;
+  };
+  for (const { 0: text, index } of code.matchAll(token)) {
+    for (; quotedIndex < quotedTokenEnds.length && quotedTokenEnds[quotedIndex] <= index; quotedIndex += 1) push(quoted);
+    const word = text.toUpperCase();
+    const afterReturn = beforePrevious === "RETURN" || (beforePrevious === "DISTINCT" && thirdPrevious === "RETURN");
+    if (word === "UNION" && depth === 0 && inReturn) {
+      const afterQuoted = previous === quoted;
+      const wildcardProjection = previous === "*" && afterReturn;
+      const keywordIdentifier = UNION_PRECEDING_KEYWORDS.has(previous) &&
+        (/^[.:$,+*/%^=<>~-]$/.test(beforePrevious) || ["AS", "AND", "OR", "XOR", "NOT", "IN", "CONTAINS"].includes(beforePrevious) ||
+          (beforePrevious === "WITH" && (thirdPrevious === "STARTS" || thirdPrevious === "ENDS")) || afterReturn);
+      nextClause.lastIndex = index + text.length;
+      if (
+        (afterQuoted || wildcardProjection || !/^[.:$,([{/*+%<>=|&^-]$/.test(previous)) &&
+        (afterQuoted || keywordIdentifier || !UNION_PRECEDING_KEYWORDS.has(previous)) &&
+        nextClause.test(code)
+      ) {
+        clauses.push(index + text.length);
+        inReturn = false;
+      }
+    } else if (word === "RETURN" && depth === 0 && previous !== "." && previous !== ":" && previous !== "AS") {
+      inReturn = true;
+    } else if ("([{".includes(text)) {
+      depth += 1;
+    } else if (")]}".includes(text)) {
+      depth -= 1;
+    }
+    push(word);
+  }
+  return clauses;
+}
+
+function hasTopLevelLimit(code: string, quotedTokenEnds: number[]): boolean {
+  let depth = 0;
+  let quotedIndex = 0;
+  let previousQuoteEnd = -1;
+  for (let index = 0; index < code.length; index += 1) {
+    while (quotedIndex < quotedTokenEnds.length && quotedTokenEnds[quotedIndex] <= index) {
+      previousQuoteEnd = quotedTokenEnds[quotedIndex++];
+    }
+    const char = code[index];
+    if ("([{".includes(char)) depth += 1;
+    else if (")]}".includes(char)) depth -= 1;
+    else if (depth === 0 && (char === "L" || char === "l") &&
+      /^LIMIT(?![\p{ID_Continue}\p{Sc}])/iu.test(code.slice(index, index + 7))) {
+      const before = code.slice(0, index).trimEnd();
+      const afterQuotedValue = previousQuoteEnd !== -1 && /^\s*$/.test(code.slice(previousQuoteEnd, index));
+      if (!/[\p{ID_Continue}\p{Sc}]$/u.test(code.slice(Math.max(0, index - 2), index)) &&
+        (afterQuotedValue || !/[.:$]$/.test(before))) return true;
+    }
+  }
+  return false;
+}
+
+// Finds where the query body starts after an optional CYPHER parameter
+// header. The body is not wrappable in CALL {} after EXPLAIN or PROFILE.
+function findCypherBody(analysis: ReturnType<typeof analyzeCypher>): { start: number; wrappable: boolean } {
+  const { code, quotedTokenEnds } = analysis;
+  const explainOrProfile = /(?<![\p{ID_Continue}\p{Sc}])(?:EXPLAIN|PROFILE)$/iu;
+  const header = /^\s*CYPHER\b/i.exec(code);
+  if (!header) return { start: 0, wrappable: !/^\s*(?:EXPLAIN|PROFILE)(?![\p{ID_Continue}\p{Sc}])/iu.test(code) };
+
+  const clause = /(?<![\p{ID_Continue}\p{Sc}])(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD\s+CSV|FOREACH|DELETE|SET|REMOVE)(?![\p{ID_Continue}\p{Sc}])/giu;
+  clause.lastIndex = header[0].length;
+  let depth = 0;
+  let scanned = header[0].length;
+  let quotedIndex = 0;
+  let previousQuoteEnd = -1;
+  let match = clause.exec(code);
+  while (match) {
+    for (; scanned < match.index; scanned += 1) {
+      if ("([{".includes(code[scanned])) depth += 1;
+      else if (")]}".includes(code[scanned])) depth -= 1;
+    }
+    while (quotedIndex < quotedTokenEnds.length && quotedTokenEnds[quotedIndex] <= match.index) {
+      previousQuoteEnd = quotedTokenEnds[quotedIndex++];
+    }
+    const before = code.slice(header[0].length, match.index).trimEnd();
+    const after = code.slice(match.index + match[0].length);
+    const afterQuotedValue = previousQuoteEnd !== -1 && /^\s*$/.test(code.slice(previousQuoteEnd, match.index));
+    if (depth === 0 && !/^\s*=/.test(after) &&
+      (afterQuotedValue || (!/[.:$=,([{/*+%<>\-|&^]$/.test(before) &&
+        !/\b(?:AND|OR|XOR|NOT|IN|WHEN|THEN|ELSE|AS)\s*$/i.test(before)))) {
+      return { start: match.index, wrappable: !explainOrProfile.test(before) };
+    }
+    match = clause.exec(code);
+  }
+  return { start: code.length, wrappable: false };
+}
+
+// Linear equivalent of /\bRETURN\b(?!\s.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is: the
+// first LIMIT after a RETURN with no later CALL and no `;` in between.
+function findFinalReturnLimit(code: string): number | undefined {
+  let lastCallStart = -1;
+  for (const match of code.matchAll(/\bCALL\b/gi)) lastCallStart = match.index;
+  const limitOrSemicolon = /;|\bLIMIT\s+(\d+)/gi;
+  let searchedTo = 0;
+  for (const match of code.matchAll(/\bRETURN\b/gi)) {
+    const returnEnd = match.index + match[0].length;
+    if (returnEnd < searchedTo || (/\s/.test(code[returnEnd] ?? "") && lastCallStart >= returnEnd + 2)) continue;
+    limitOrSemicolon.lastIndex = returnEnd;
+    const found = limitOrSemicolon.exec(code);
+    if (!found) return undefined;
+    if (found[1] !== undefined) return parseInt(found[1], 10);
+    searchedTo = limitOrSemicolon.lastIndex;
+  }
+  return undefined;
+}
+
+// FalkorDB reads a WITH that opens a CALL {} branch as an import, so an empty
+// `WITH *` import is placed before each branch that starts with WITH.
+function wrapUnionQuery(query: string, code: string, bodyStart: number, unionClauses: number[], limit: number): string {
+  const leadingWith = /\s*(?:ALL\s+)?(?=WITH(?![\p{ID_Continue}\p{Sc}]))/iuy;
+  let body = "";
+  let copied = bodyStart;
+  for (const branchStart of [bodyStart, ...unionClauses]) {
+    leadingWith.lastIndex = branchStart;
+    if (leadingWith.exec(code)) {
+      body += `${query.slice(copied, leadingWith.lastIndex)}WITH * `;
+      copied = leadingWith.lastIndex;
+    }
+  }
+  return `${query.slice(0, bodyStart)}CALL { ${body}${query.slice(copied)}\n} RETURN * LIMIT ${limit}`;
+}
+
 export function getQueryWithLimit(
   query: string,
   limit: number
 ): [string, number] {
+  const initialAnalysis = analyzeCypher(query);
+  const withoutTerminators = withoutTrailingSemicolons(query, initialAnalysis);
+  const analysis = withoutTerminators === query ? initialAnalysis : analyzeCypher(withoutTerminators);
+  query = withoutTerminators;
   let existingLimit = 0;
+  const body = findCypherBody(analysis);
+  const bodyCode = analysis.code.slice(body.start);
 
-  const finalReturnMatch = query.match(
-    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is
-  );
-  if (finalReturnMatch) {
-    existingLimit = parseInt(finalReturnMatch[1], 10);
+  const finalReturnLimit = findFinalReturnLimit(bodyCode);
+  if (finalReturnLimit !== undefined) {
+    existingLimit = finalReturnLimit;
   }
 
   if (limit === 0) return [query, existingLimit];
 
-  if (query.includes("UNION")) {
-    if (!query.includes("CALL")) {
-      return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
+  const unionClauses = findUnionClauses(analysis, body.start);
+  if (unionClauses.length > 0) {
+    if (body.wrappable && !hasCallClause(query.slice(body.start), bodyCode,
+      analysis.quotedTokenEnds.filter(end => end > body.start).map(end => end - body.start))) {
+      return [wrapUnionQuery(query, analysis.code, body.start, unionClauses, limit), limit];
     }
 
-    if (hasCallBlockWithReturnNoLimit(query)) {
-      return [`${query} LIMIT ${limit}`, limit];
+    const finalBranchStart = unionClauses[unionClauses.length - 1];
+    if (hasCallBlockWithReturnNoLimit(analysis.code) &&
+      !hasTopLevelLimit(analysis.code.slice(finalBranchStart),
+        analysis.quotedTokenEnds.filter(end => end > finalBranchStart).map(end => end - finalBranchStart))) {
+      return [insertLimit(query, analysis, limit), limit];
     }
   }
 
-  if (query.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
-    return [`${query} LIMIT ${limit}`, limit];
+  if (bodyCode.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
+    return [insertLimit(query, analysis, limit), limit];
   }
 
   return [query, existingLimit];
