@@ -198,6 +198,21 @@ test.describe('@Config Settings users tests', () => {
         await apiCall.deleteUsers({ users: [{ username }] });
     });
 
+    test("@admin Searching a selected user out of view clears the selection", async () => {
+        const selected = getRandomString('user');
+        const other = getRandomString('user');
+        await apiCall.createUsers({ username: selected, password: user.password, role: user.ReadWrite });
+        await apiCall.createUsers({ username: other, password: user.password, role: user.ReadWrite });
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.searchForElement(selected);
+        await settingsUsersPage.clickUserCheckboxBtn(selected);
+        expect(await settingsUsersPage.isEditUserButtonDisabled()).toBe(false);
+        await settingsUsersPage.searchForElement(other);
+        await expect.poll(() => settingsUsersPage.isEditUserButtonDisabled()).toBe(true);
+        await apiCall.deleteUsers({ users: [{ username: selected }, { username: other }] });
+    });
+
     test("@admin Edit button disabled when default user is selected", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();

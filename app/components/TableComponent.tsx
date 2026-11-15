@@ -281,22 +281,20 @@ export default function TableComponent({
         }
 
         const timeout = setTimeout(() => {
-            setFilteredRows([...rows].filter((row) => {
-                const is = row.cells.some(cell => handleSearchFilter(cell));
+            const matches = (row: Row) => row.cells.some(cell => handleSearchFilter(cell));
 
-                // If using row selection, uncheck rows that no longer match the search
-                if (!is) {
-                    row.checked = false;
-                }
+            // Uncheck rows the search hides through the parent, which derives its selection from rows
+            if (setRows && rows.some(row => row.checked && !matches(row))) {
+                setRows(prev => prev.map(row => (row.checked && !matches(row) ? { ...row, checked: false } : row)));
+            }
 
-                return is;
-            }));
+            setFilteredRows(rows.filter(matches));
         }, 500);
 
         return () => {
             clearTimeout(timeout);
         };
-    }, [search, rows, handleSearchFilter]);
+    }, [search, rows, setRows, handleSearchFilter]);
 
     // Clean up when rows change and cells no longer have values
     useEffect(() => {
