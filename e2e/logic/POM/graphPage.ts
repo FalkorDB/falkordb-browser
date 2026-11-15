@@ -196,6 +196,15 @@ export default class GraphPage extends BasePage {
       this.page.getByTestId(`elementCanvasSuggestionGraph${name}`);
   }
 
+  // Options only: the virtualized list also renders placeholder `li` rows.
+  public get elementCanvasSuggestions(): Locator {
+    return this.elementCanvasSuggestionList.getByRole("option");
+  }
+
+  public get elementCanvasSelectedSuggestion(): Locator {
+    return this.elementCanvasSuggestionList.getByRole("option", { selected: true });
+  }
+
   // ADD
   public get elementCanvasAdd(): Locator {
     return this.page.getByTestId("elementCanvasAddGraph");
@@ -888,6 +897,14 @@ export default class GraphPage extends BasePage {
       this.elementCanvasSearch,
       (el) => el.fill(text),
       `Element Canvas Search Graph`
+    );
+  }
+
+  async pressElementCanvasSearchKey(key: string): Promise<void> {
+    await interactWhenVisible(
+      this.elementCanvasSearch,
+      (el) => el.press(key),
+      `Element Canvas Search Graph key ${key}`
     );
   }
 
