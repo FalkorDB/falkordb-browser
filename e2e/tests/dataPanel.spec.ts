@@ -12,6 +12,15 @@ import {
 import { FETCH_FIRST_TEN_NODES } from "../config/constants";
 import { getPropertyUrl } from "../../lib/graphUrls";
 
+// Matches the editor's property writes, which carry the key as a query value
+// (see getPropertyUrl): /api/graph/<graph>/<id>/property?propertyKey=<key>.
+const isPropertyWrite = (graphName: string, key: string) => (url: URL) => {
+  const prefix = `/api/graph/${encodeURIComponent(graphName)}/`;
+  return url.pathname.startsWith(prefix)
+    && /^[^/]+\/property$/.test(url.pathname.slice(prefix.length))
+    && url.searchParams.get("propertyKey") === key;
+};
+
 test.describe("Data panel Tests", () => {
   let browser: BrowserWrapper;
   let apicalls: ApiCalls;
@@ -384,7 +393,7 @@ test.describe("Data panel Tests", () => {
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("edit-target");
     let writes = 0;
-    await page.route(`**/api/graph/${graphName}/*/age`, async (route) => {
+    await page.route(isPropertyWrite(graphName, "age"), async (route) => {
       writes += 1;
       await route.continue();
     });
@@ -413,7 +422,7 @@ test.describe("Data panel Tests", () => {
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("retry-target");
     let attempts = 0;
-    await page.route(`**/api/graph/${graphName}/*/age`, async (route) => {
+    await page.route(isPropertyWrite(graphName, "age"), async (route) => {
       attempts += 1;
       if (attempts === 1) {
         await route.fulfill({ status: 400, json: { message: "Invalid value: age update rejected" } });
