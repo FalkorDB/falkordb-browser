@@ -1,7 +1,4 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable no-param-reassign */
-/* eslint-disable no-nested-ternary */
-/* eslint-disable @typescript-eslint/no-use-before-define */
 
 "use client";
 
@@ -142,7 +139,7 @@ const Configs: Map<string, Config> = new Map([
 ]);
 
 export default function Configurations() {
-    const [configs, setConfigs] = useState<Row[]>([]);
+    const [configs, setConfigs] = useState<Config[]>([]);
     const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
     const { activeConnectionId } = useContext(ConnectionContext);
@@ -168,7 +165,7 @@ export default function Configurations() {
             }
         }
 
-        const valueToRestore = configs.find(row => row.cells[0].value === name)?.cells[2].value;
+        const valueToRestore = configs.find(config => config.name === name)?.value;
         const result = await securedFetch(
             `api/graph/config/${prepareArg(name)}`,
             {
@@ -183,18 +180,16 @@ export default function Configurations() {
         if (!result.ok) return false;
 
         setConfigs(currentConfigs => currentConfigs.map(config =>
-            config.cells[0].value === name
-                ? {
-                    ...config,
-                    cells: config.cells.map((cell, index) => index === 2 ? { ...cell, value } : cell)
-                }
-                : config
+            config.name === name ? { ...config, value } : config
         ));
 
         toast({
             title: "Success",
             description: "Configuration value set successfully",
-            action: valueToRestore !== undefined && valueToRestore !== null && valueToRestore !== "" && isUndo ?
+            action: valueToRestore !== undefined &&
+                valueToRestore !== null &&
+                valueToRestore !== "" &&
+                isUndo ?
                 <ToastButton
                     showUndo
                     onClick={() => handleSetConfig(name, String(valueToRestore), false)}
@@ -221,29 +216,12 @@ export default function Configurations() {
 
         const { configs: configurations } = await result.json();
 
-        const newConfigs: Row[] = configurations.map((config: [string, string | number]) => {
+        const newConfigs: Config[] = configurations.map((config: [string, string | number]) => {
             const [name, value] = config;
-            const formattedValue = name === "CMD_INFO"
-                ? (value === 0 ? "no" : "yes")
-                : value as string;
-
-            const description = Configs.get(name)?.description ?? "";
-
             return {
                 name,
-                cells: [
-                    { value: name, type: "readonly" },
-                    { value: description, type: "readonly" },
-                    !disableRunTimeConfigs.has(name)
-                        ? {
-                            value: formattedValue,
-                            type: "text",
-                        }
-                        : {
-                            value: formattedValue,
-                            type: "readonly"
-                        }
-                ]
+                description: Configs.get(name)?.description ?? "",
+                value: name === "CMD_INFO" ? (value === 0 ? "no" : "yes") : value
             };
         });
 
@@ -255,8 +233,22 @@ export default function Configurations() {
         // No guard needed: the server always resolves the correct connection
         // via session.activeConnectionId from the JWT.
         fetchConfigs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeConnectionId]);
+
+    const rows: Row[] = configs.map(({ name, description, value }) => ({
+        name,
+        cells: [
+            { value: name, type: "readonly" },
+            { value: description, type: "readonly" },
+            !disableRunTimeConfigs.has(name)
+                ? {
+                    value: String(value),
+                    onChange: (val: string) => handleSetConfig(name, val, true),
+                    type: "text",
+                }
+                : { value: String(value), type: "readonly" }
+        ]
+    }));
 
     return (
         <div className="grow basis-0 overflow-hidden">
@@ -264,15 +256,7 @@ export default function Configurations() {
                 label="Configs"
                 entityName="Config"
                 headers={["Name", "Description", "Value"]}
-                rows={configs.map(config => ({
-                    ...config,
-                    cells: config.cells.map(cell => cell.type === "text"
-                        ? {
-                            ...cell,
-                            onChange: (value: string) => handleSetConfig(String(config.cells[0].value), value, true)
-                        }
-                        : cell)
-                }))}
+                rows={rows}
                 itemHeight={60}
             />
         </div>

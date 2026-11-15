@@ -8,7 +8,7 @@ export default class SettingsConfigPage extends BasePage {
         return this.page.getByRole("button", { name: "Configure database settings" });
     }
 
-    private get roleContentValue(): (role: string) => Locator {
+    public get roleContentValue(): (role: string) => Locator {
         return (role: string) => this.page.getByTestId(`contentConfigs${role}Value`)
     }
 
@@ -16,11 +16,11 @@ export default class SettingsConfigPage extends BasePage {
         return () => this.page.getByTestId("editButtonConfigs");
     }
 
-    private get roleValueInput(): () => Locator {
+    public get roleValueInput(): () => Locator {
         return () => this.page.getByTestId("inputConfigs")
     }
 
-    private get confirmValueInputBtn(): () => Locator {
+    public get confirmValueInputBtn(): () => Locator {
         return () => this.page.getByTestId("saveButtonConfigs");
     }
 
@@ -50,6 +50,38 @@ export default class SettingsConfigPage extends BasePage {
 
     private get searchForConfigInput(): Locator {
         return this.page.getByTestId('searchInputConfigs');
+    }
+
+    public get currentTab(): Locator {
+        return this.page.getByTestId("settingsCurrentTab");
+    }
+
+    public get tokensTab(): Locator {
+        return this.page.getByTestId("settingsTabTokens");
+    }
+
+    public get configurationsTab(): Locator {
+        return this.page.getByTestId("settingsTabConfigurations");
+    }
+
+    valueTooltip(value: string): Locator {
+        return this.page.getByRole("tooltip").filter({ hasText: new RegExp(`^${value}$`) });
+    }
+
+    public get errorToast(): Locator {
+        return this.page.getByTestId("toast-description");
+    }
+
+    configRow(name: string): Locator {
+        return this.page.getByTestId(`tableRowConfigs${name}`);
+    }
+
+    editButtonForConfig(name: string): Locator {
+        return this.configRow(name).getByTestId("editButtonConfigs");
+    }
+
+    async cancelValueEdit(): Promise<void> {
+        await this.page.getByTestId("cancelButtonConfigs").click();
     }
 
     async navigateToDBConfigurationTab(): Promise<void> {
@@ -97,13 +129,13 @@ export default class SettingsConfigPage extends BasePage {
     async getRoleContentValue(role: string): Promise<string | null> {
         return interactWhenVisible(this.roleContentValue(role), (el) => el.textContent(), `role content value ${role}`);
     }
-
-    async expectRoleContentValue(role: string, value: string): Promise<void> {
-        await expect(this.roleContentValue(role)).toHaveText(value);
-    }
     
-    async clickOnUndoBtnInToastMsg(): Promise<void> {
+    async clickOnUndoBtnInToastMsg(role: string): Promise<void> {
+        const undoSaved = this.page.waitForResponse(response =>
+            response.request().method() === "POST" &&
+            new URL(response.url()).pathname.endsWith(`/api/graph/config/${encodeURIComponent(role)}`));
         await interactWhenVisible(this.undoBtnInToastMsg, (el) => el.click(), "undo button in toast");
+        expect((await undoSaved).ok()).toBe(true);
     }
 
     async clickToastCloseBtn(): Promise<void> {

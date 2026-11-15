@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildOptimizeMessages, parseOptimizeResponse } from "@/lib/aiOptimize";
-import { getProviderModelName, getChatCompletionsUrl, resolveFixTarget } from "@/lib/aiFix";
+import { resolveFixTarget } from "@/lib/aiFix";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { optimizeRequest, validateBody } from "../../validate-body";
 import { getCorsHeaders, corsPreflight } from "../../utils";
 import { MAX_CHAT_BODY_BYTES, OVER_LIMIT, readChatBodyWithLimit } from "../requestBody";
 import { getOptimizationContext } from "./context";
+import { requestAiCompletion } from "../completion";
 
 export const OPTIONS = corsPreflight;
-
-const REQUEST_TIMEOUT_MS = 30_000;
-const MAX_PROVIDER_BODY_BYTES = 256 * 1024;
 
 export async function POST(request: NextRequest) {
   let session;
@@ -45,7 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: validation.error }, { status: 400, headers: getCorsHeaders(request) });
   }
 
-  const { query, graphName, key, model, modelSource, localProvider, localEndpoint } = validation.data;
+  const { query, guidance, graphName, key, model, modelSource, localProvider, localEndpoint } = validation.data;
   const resolved = resolveFixTarget({ modelSource, model, key, localProvider, localEndpoint });
   if (!resolved.ok) {
     return NextResponse.json({ error: resolved.error }, { status: 400, headers: getCorsHeaders(request) });
@@ -65,44 +63,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(getChatCompletionsUrl(resolved.target), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...resolved.authHeader },
-      body: JSON.stringify({
-        model: getProviderModelName(model),
-        messages: buildOptimizeMessages({
-          query,
-          plan,
-          indexes,
-        }),
-        temperature: 0,
-      }),
-      signal: AbortSignal.any([request.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+    const completion = await requestAiCompletion({
+      target: resolved.target,
+      authHeader: resolved.authHeader,
+      model,
+      messages: buildOptimizeMessages({ query, plan, indexes, guidance }),
+      signal: request.signal,
     });
-
-    if (!response.ok) {
-      const error = response.status === 401
-        ? "The AI provider rejected your API key. Check it in Settings."
-        : "The AI provider couldn't process the optimization request. Please try again.";
-      return NextResponse.json({ error }, { status: response.status === 401 ? 401 : 422, headers: getCorsHeaders(request) });
+    if (!completion.ok) {
+      return NextResponse.json({ error: completion.error }, { status: completion.status, headers: getCorsHeaders(request) });
     }
 
-    const rawResponse = await readChatBodyWithLimit(response, MAX_PROVIDER_BODY_BYTES);
-    if (rawResponse === OVER_LIMIT) {
-      return NextResponse.json({ error: "The AI provider response was too large. Please try again." }, { status: 422, headers: getCorsHeaders(request) });
-    }
-    let data;
-    try {
-      data = JSON.parse(rawResponse);
-    } catch {
-      return NextResponse.json({ error: "The AI provider returned invalid JSON. Please try again." }, { status: 422, headers: getCorsHeaders(request) });
-    }
-    const reply: unknown = data?.choices?.[0]?.message?.content;
-    if (typeof reply !== "string" || !reply.trim()) {
-      return NextResponse.json({ error: "The AI provider returned an empty response." }, { status: 422, headers: getCorsHeaders(request) });
-    }
-
-    const result = parseOptimizeResponse(reply, query);
+    const result = parseOptimizeResponse(completion.reply, query);
     if (!result) {
       return NextResponse.json({ error: "The AI provider returned an invalid optimization response. Please try again." }, { status: 422, headers: getCorsHeaders(request) });
     }
