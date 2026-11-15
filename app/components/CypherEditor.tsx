@@ -580,7 +580,28 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         cachedSuggestionsRef.current = [];
         setProceduresVersion(v => v + 1);
 
-        if (!requestGraphId || graphUnconfirmed) return () => { cancelled = true; };
+        // Built-in procedures for CALL autocomplete when the server's list is unavailable.
+        const applyFallbackProcedures = () => {
+            procedureSuggestionsRef.current = FALLBACK_PROCEDURE_NAMES.map(info => ({
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                insertText: `${info}(\${0})`,
+                label: `${info}()`,
+                kind: monaco.languages.CompletionItemKind.Function,
+                range: new monaco.Range(1, 1, 1, 1),
+                detail: '(function)',
+            }));
+            cachedSuggestionsRef.current = [];
+            if (monacoRef.current) updateTokenizer(monacoRef.current);
+            setProceduresVersion(v => v + 1);
+        };
+
+        if (!requestGraphId) return () => { cancelled = true; };
+        // Querying a graph the list has not confirmed could re-create it, so
+        // offer the built-ins without a request until it is confirmed.
+        if (graphUnconfirmed) {
+            applyFallbackProcedures();
+            return () => { cancelled = true; };
+        }
 
         // Use the live `isReadOnly` value (not the ref) so this effect re-runs
         // whenever read-only mode toggles on the same graph.
@@ -621,17 +642,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             // On error, fall back to the well-known FalkorDB built-in procedures
             // so users retain CALL autocomplete even when the server is temporarily
             // unreachable or returns an unexpected response.
-            procedureSuggestionsRef.current = FALLBACK_PROCEDURE_NAMES.map(info => ({
-                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                insertText: `${info}(\${0})`,
-                label: `${info}()`,
-                kind: monaco.languages.CompletionItemKind.Function,
-                range: new monaco.Range(1, 1, 1, 1),
-                detail: '(function)',
-            }));
-            cachedSuggestionsRef.current = [];
-            if (monacoRef.current) updateTokenizer(monacoRef.current);
-            setProceduresVersion(v => v + 1);
+            applyFallbackProcedures();
         });
 
         return () => { cancelled = true; };

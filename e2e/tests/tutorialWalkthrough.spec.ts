@@ -3,6 +3,7 @@ import type { Session, SessionConnection } from "next-auth";
 import urls from "../config/urls.json";
 import { expect, test } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
+import { readOwnedTutorialGraphs } from "../infra/tutorialGraphs";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
 import AppDownloadComponent from "../logic/POM/appDownloadComponent";
 import ApiCalls from "../logic/api/apiCalls";
@@ -101,26 +102,7 @@ test.describe("Tutorial", () => {
         let teardownError: unknown;
         try {
             if (browser.getContext()?.pages().some(page => !page.isClosed())) {
-                const page = await browser.getPage();
-                const { ownerId, records } = await page.evaluate(() => {
-                    const ownerId = sessionStorage.getItem("tutorialDemoOwnerId");
-                    if (!ownerId) return { ownerId: null, records: [] };
-                    const suffix = `tutorialDemoGraphOwnership:${ownerId}`;
-                    const records = Object.keys(localStorage)
-                        .filter(key => key.endsWith(suffix))
-                        .map(key => ({ key, stored: localStorage.getItem(key) }));
-                    return { ownerId, records };
-                });
-                if (ownerId) {
-                    const suffix = tutorialDemoOwnershipKey(ownerId);
-                    for (const record of records) {
-                        if (!record.stored || !record.key.endsWith(suffix)) continue;
-                        const scope = record.key.slice(0, -suffix.length);
-                        if (!scope) throw new Error("Tutorial graph ownership has no connection scope");
-                        ownedTutorialGraphs.push(...parseTutorialDemoOwnership(record.stored, scope, ownerId).names);
-                    }
-                    ownedTutorialGraphs = [...new Set(ownedTutorialGraphs)];
-                }
+                ownedTutorialGraphs = await readOwnedTutorialGraphs(await browser.getPage());
             }
         } catch (error) {
             teardownError = error;

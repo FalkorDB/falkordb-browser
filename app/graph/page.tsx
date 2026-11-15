@@ -428,7 +428,10 @@ export default function Page() {
         // handleSetGraphName on a real selection change and disarmed by whoever
         // loads the graph — including an explicit runQuery, so a user hitting RUN
         // first is never followed by the default query.
-        if (graphName && pendingAutoLoadRef.current === graphName) {
+        // Settings (runDefaultQuery, defaultQuery) load with the saved timeout,
+        // which tabsReady waits for; consuming the token earlier would skip the
+        // configured default query for a graph auto-selected before they arrive.
+        if (tabsReady && graphName && pendingAutoLoadRef.current === graphName) {
             pendingAutoLoadRef.current = null;
 
             if (runDefaultQuery && !tutorialOpen) {
@@ -441,7 +444,7 @@ export default function Page() {
         }
 
         setIsQueryLoading(false);
-    }, [fetchCount, graph.Id, graphName, setGraph, runQuery, runDefaultQuery, defaultQuery, setIsQueryLoading, tutorialOpen, pendingAutoLoadRef]);
+    }, [fetchCount, graph.Id, graphName, setGraph, runQuery, runDefaultQuery, defaultQuery, setIsQueryLoading, tutorialOpen, pendingAutoLoadRef, tabsReady]);
 
     // Every route into the data panel goes through here. On mobile the panel
     // covers the canvas, so while multi select is on it has to stay shut — the

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
+import { readOwnedTutorialGraphs } from "../infra/tutorialGraphs";
 import GraphPage from "../logic/POM/graphPage";
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
@@ -40,7 +41,19 @@ test.describe("@admin Graph tabs", () => {
     });
 
     test.afterEach(async () => {
+        // Tests that run the real tutorial own sample graphs; a failure before
+        // Skip leaves them behind. Read them before closing, delete after (a
+        // live page polls graph info and could recreate them).
+        let tutorialGraphs: string[] = [];
+        if (browser.getContext()?.pages().some(page => !page.isClosed())) {
+            tutorialGraphs = await readOwnedTutorialGraphs(await browser.getPage()).catch(() => []);
+        }
         await browser.closeBrowser();
+        const results = await Promise.all(tutorialGraphs.map(graphName => apiCall.removeGraph(graphName, "admin")));
+        // Skip normally deletes them already ("empty key").
+        for (const { message } of results) {
+            expect(message.includes("deleted") || message.includes("empty key"), message).toBe(true);
+        }
     });
 
     test.afterEach(async () => {
@@ -969,6 +982,45 @@ test.describe("@admin Graph tabs", () => {
         expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
         expect(new URL(request.url()).searchParams.get("timeout")).toBe("60");
         await expect(graph.stripTab(graphOne)).toBeVisible();
+    });
+
+    test("A graph auto-selected before settings load still runs the default query", async () => {
+        test.setTimeout(60_000);
+        browser = new BrowserWrapper({ seedTimeout: false });
+        await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        const defaultQuery = `MATCH (n) RETURN n LIMIT ${Date.now() % 1000 + 1}`;
+        await page.addInitScript((query) => {
+            localStorage.removeItem("timeout");
+            localStorage.setItem("runDefaultQuery", "true");
+            localStorage.setItem("defaultQuery", query);
+        }, defaultQuery);
+        // A single-graph list auto-selects it while settings, which load with
+        // the timeout, are still held behind the config fetch.
+        await page.route("**/api/graph", route => (route.request().method() === "GET"
+            ? route.fulfill({ json: { opts: [graphOne] } })
+            : route.continue()));
+        let releaseConfig!: () => void;
+        const configGate = new Promise<void>(resolve => { releaseConfig = resolve; });
+        let configRequested = false;
+        await page.route("**/api/graph/config", async route => {
+            configRequested = true;
+            await configGate;
+            await route.continue();
+        });
+        const defaultRun = page.waitForRequest(request => {
+            const url = new URL(request.url());
+            return url.pathname === `/api/graph/${graphOne}` && url.searchParams.get("query") === defaultQuery;
+        }, { timeout: 15000 });
+        try {
+            await page.goto(urls.graphUrl);
+            await expect.poll(() => configRequested, { timeout: 15000 }).toBe(true);
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true", { timeout: 15000 });
+            releaseConfig();
+            await defaultRun;
+        } finally {
+            releaseConfig();
+        }
     });
 
     test("The mobile toolbar keeps panels usable while tab actions wait for timeout restoration", async () => {
