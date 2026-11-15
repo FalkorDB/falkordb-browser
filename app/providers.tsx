@@ -587,9 +587,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [additionalConnections, setAdditionalConnections] = useState<SessionConnection[]>([]);
   const tutorialRecoveryUser = sessionData?.user;
+  // Keyed by the effective connection only: the same-connection null → id
+  // discovery must not look like a new connection and replay recovery.
   const tutorialRecoveryKey = status !== "unauthenticated" && tutorialRecoveryUser && prefixReady
     && (activeConnectionId === null || prefixConnectionId === activeConnectionId)
-    ? JSON.stringify([tutorialRecoveryUser.id, tutorialRecoveryUser.host, tutorialRecoveryUser.port, tutorialRecoveryUser.username, prefixConnectionId, activeConnectionId, getConnectionEpoch(), tutorialActivationRef.current.id])
+    ? JSON.stringify([tutorialRecoveryUser.id, tutorialRecoveryUser.host, tutorialRecoveryUser.port, tutorialRecoveryUser.username, activeConnectionId ?? prefixConnectionId, getConnectionEpoch(), tutorialActivationRef.current.id])
     : null;
   const [tutorialRecoveredKey, setTutorialRecoveredKey] = useState<string | null>(null);
   const tutorialRecoveryReady = tutorialRecoveryKey !== null && tutorialRecoveredKey === tutorialRecoveryKey;
@@ -1923,14 +1925,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     [layout, direction, schemaLayout],
   );
 
-  const tabsReady = (tutorialOpen || graphNamesLoaded) && timeoutLoaded;
+  // Rebuilding a tab queries its graph, and querying a graph that has since
+  // been dropped would make FalkorDB re-create it — wait for the list. Tabs
+  // also wait for the saved timeout, or the rebuild runs with timeout=0, and
+  // for tutorial recovery, which may still be removing old samples.
+  const tabsReady = (tutorialOpen || graphNamesLoaded) && timeoutLoaded && tutorialRecoveryReady;
   const graphTabs = useGraphTabs({
     prefixReady,
-    // Rebuilding a tab queries its graph, and querying a graph that has since
-    // been dropped would make FalkorDB re-create it — wait for the list. It
-    // must also wait for the saved timeout, or the rebuild runs with timeout=0,
-    // and for tutorial recovery, which may still be removing old samples.
-    canRestore: tabsReady && tutorialRecoveryReady,
+    canRestore: tabsReady,
     connectionKey: activeConnectionId ?? prefixConnectionId,
     // The tutorial gets a strip of its own; the user's tabs come back with it.
     tutorialOpen,
@@ -2270,6 +2272,21 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     let cancelled = false;
     const controller = new AbortController();
+    // Decided before the config fetch below: tutorial recovery and the graph
+    // list wait on this decision, so a slow /api/graph/config must not hold them.
+    // The tour drives desktop-only chrome (side panels, hover targets, right-click),
+    // so it never runs on a phone. Read the width rather than `useIsMobile` — this
+    // effect fires before the hook has corrected its server-rendered `false`.
+    // A share link is someone asking to see a particular graph, and the tour
+    // would swap it out for demo graphs — so it waits for a regular visit
+    // instead. It is not marked as seen, so that visit still shows it.
+    setTutorialOpen(
+      window.innerWidth >= MOBILE_BREAKPOINT
+      && localStorage.getItem("tutorial") !== "false"
+      && !initialShareRef.current
+      && !isReadOnlyRef.current
+    );
+    setTutorialDecided(true);
     (async () => {
       try {
         const raw: Query[] = JSON.parse(getConnectionItem("query history") || "[]");
@@ -2347,19 +2364,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLastLimit(l);
       setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined));
       setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false");
-      // The tour drives desktop-only chrome (side panels, hover targets, right-click),
-      // so it never runs on a phone. Read the width rather than `useIsMobile` — this
-      // effect fires before the hook has corrected its server-rendered `false`.
-      // A share link is someone asking to see a particular graph, and the tour
-      // would swap it out for demo graphs — so it waits for a regular visit
-      // instead. It is not marked as seen, so that visit still shows it.
-      setTutorialOpen(
-        window.innerWidth >= MOBILE_BREAKPOINT
-        && localStorage.getItem("tutorial") !== "false"
-        && !initialShareRef.current
-        && !isReadOnlyRef.current
-      );
-      setTutorialDecided(true);
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
       setMaxTabs(loadedMaxTabs);
@@ -2760,13 +2764,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // The tab strip only settles once the graph list has loaded; writing before
     // then would strip ?tab= before it has been read back.
-    if (!tabsReady || !tutorialRecoveryReady) return;
+    if (!tabsReady) return;
 
     const timer = window.setTimeout(() => {
       syncRouteUrlParams(pathname, { tab: graphTabs.activeTabId, share: graphTabs.activeShareParams });
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [pathname, graphTabs.activeTabId, graphTabs.activeShareParams, tutorialOpen, tabsReady, tutorialRecoveryReady]);
+  }, [pathname, graphTabs.activeTabId, graphTabs.activeShareParams, tutorialOpen, tabsReady]);
 
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {

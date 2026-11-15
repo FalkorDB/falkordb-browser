@@ -198,6 +198,14 @@ test.describe("@admin Graph tabs", () => {
         });
         // The empty selector is disabled, so the empty list comes from the periodic refresh.
         await page.evaluate(() => localStorage.setItem("refreshInterval", "1"));
+        // Graph requests run GRAPH.QUERY on a writable connection and would
+        // re-create a dropped graph — none may run for it, before or after the
+        // empty list (which releases the unknown state before the selection clears).
+        const graphRequests: string[] = [];
+        page.on("request", request => {
+            const { pathname } = new URL(request.url());
+            if (pathname === `/api/graph/${graphOne}` || pathname.startsWith(`/api/graph/${graphOne}/`)) graphRequests.push(request.url());
+        });
 
         await page.reload({ waitUntil: "domcontentloaded" });
         await expect.poll(() => failedLists, { timeout: 15000 }).toBeGreaterThan(0);
@@ -208,6 +216,8 @@ test.describe("@admin Graph tabs", () => {
         // confirm that the saved graph is gone.
         listPhase = "empty";
         await expect(page.getByTestId("selectGraph")).not.toContainText(graphOne, { timeout: 15000 });
+        await graph.waitForPageIdle();
+        expect(graphRequests).toHaveLength(0);
     });
 
     test("Creating a graph after a failed graph list keeps another saved tab's graph", async () => {
@@ -316,46 +326,40 @@ test.describe("@admin Graph tabs", () => {
         }
     });
 
-    test("A bootstrap fetch deferred by the tutorial runs after Skip", async () => {
+    test("The user graph list deferred by the tutorial loads after Skip", async () => {
         test.setTimeout(60_000);
         const tutorial = await browser.createNewPage(TutorialPanel);
         const page = await browser.getPage();
-        const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
-        const { connections } = await (await page.request.get(`${urls.localHost}/api/connections`)).json();
-        expect(connections[0]?.id).toBeTruthy();
         await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
-        let syncCompleted = false;
-        let graphLists = 0;
+        // Lists pass while the tutorial prepares its samples; the ones after
+        // Welcome are held to show the page waits for the user's list.
+        let holdLists = false;
+        let heldLists = 0;
         let releaseLists!: () => void;
         const listGate = new Promise<void>(resolve => { releaseLists = resolve; });
-        await page.route("**/api/auth/session", async route => {
-            if (route.request().method() === "POST") syncCompleted = true;
-            await route.fulfill({ json: { ...session, activeConnectionId: connections[0].id } });
-        });
-        await page.route("**/api/connections", route => route.fulfill({
-            json: { connections },
-        }));
-        await page.route(url => /^\/api\/graph\/social-demo(?:-test)?(?:\/|$)/.test(url.pathname), route =>
-            route.request().method() === "DELETE"
-                ? route.fulfill({ json: { message: "Mock tutorial graph deleted" } })
-                : route.fulfill({ contentType: "text/event-stream", body: "event: result\ndata: {}\n\n" }),
-        );
         await page.route("**/api/graph", async route => {
-            graphLists += 1;
-            await listGate;
-            await route.fulfill({ json: { opts: [graphOne, graphTwo] } });
+            if (holdLists) {
+                heldLists += 1;
+                await listGate;
+            }
+            await route.continue();
         });
         try {
             await page.goto(urls.graphUrl);
             await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
-            await expect.poll(() => syncCompleted, { timeout: 15000 }).toBe(true);
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "false");
-            const beforeSkip = graphLists;
-            await tutorial.skip();
-            await expect.poll(() => graphLists, { timeout: 15000 }).toBeGreaterThan(beforeSkip);
+            holdLists = true;
+            // Skip's own cleanup lists graphs too, so the tour only closes once released.
+            await page.getByTestId("skipTutorial").click();
+            await expect.poll(() => heldLists, { timeout: 15000 }).toBeGreaterThan(0);
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "false");
             releaseLists();
-            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
+            await expect(page.getByTestId("tutorialSpotlight")).toBeHidden({ timeout: 15000 });
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true", { timeout: 15000 });
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+            await page.getByTestId("selectGraph").click();
+            await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
+            await page.keyboard.press("Escape");
         } finally {
             releaseLists();
         }
@@ -483,6 +487,7 @@ test.describe("@admin Graph tabs", () => {
 
     test("A graph created during same-connection discovery is selected after bootstrap", async () => {
         test.setTimeout(60_000);
+        const createdGraph = getRandomString("bootstrapcreated");
         const graph = await browser.createNewPage(GraphPage);
         const page = await browser.getPage();
         await page.setViewportSize({ width: 1400, height: 900 });
@@ -506,28 +511,29 @@ test.describe("@admin Graph tabs", () => {
             await route.fulfill({ json: session });
         });
         await page.route("**/api/graph", route => route.fulfill({ json: { opts: [graphOne, graphTwo] } }));
-        await page.route("**/api/graph/bootstrap-created-graph", async route => {
+        await page.route(`**/api/graph/${createdGraph}`, async route => {
             if (route.request().method() !== "POST") {
                 await route.continue();
                 return;
             }
             initialConnectionHeader = route.request().headers()["x-connection-id"];
             createStarted = true;
+            createdGraphs.push(createdGraph);
             await createGate;
-            await route.fulfill({ json: {} });
+            await route.continue();
         });
         try {
             await page.goto(urls.graphUrl);
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
             await graph.create.click();
-            await graph.insertInput.fill("bootstrap-created-graph");
+            await graph.insertInput.fill(createdGraph);
             await graph.createConfirm.click();
             await expect.poll(() => createStarted).toBe(true);
             expect(initialConnectionHeader).toBeUndefined();
             releaseDiscovery();
             await expect.poll(() => syncCompleted, { timeout: 15000 }).toBe(true);
             releaseCreate();
-            await expect(graph.stripTab("bootstrap-created-graph")).toBeVisible();
+            await expect(graph.stripTab(createdGraph)).toBeVisible();
             await expect(page.getByTestId("toast-title").filter({ hasText: "Graph created successfully" })).toBeVisible();
         } finally {
             releaseDiscovery();
@@ -613,7 +619,7 @@ test.describe("@admin Graph tabs", () => {
     });
 
     test("Delayed same-connection discovery preserves tutorial selector demos", async () => {
-        test.setTimeout(60_000);
+        test.setTimeout(90_000);
         const tutorial = await browser.createNewPage(TutorialPanel);
         const page = await browser.getPage();
         const originalSession = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
@@ -627,8 +633,10 @@ test.describe("@admin Graph tabs", () => {
         await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
         let releaseDiscovery!: () => void;
         const discoveryGate = new Promise<void>(resolve => { releaseDiscovery = resolve; });
+        let discoveryRequested = false;
         let syncCompleted = false;
         await page.route("**/api/connections", async route => {
+            discoveryRequested = true;
             await discoveryGate;
             await route.fulfill({ json: { connections: [connection] } });
         });
@@ -636,26 +644,23 @@ test.describe("@admin Graph tabs", () => {
             if (route.request().method() === "POST") syncCompleted = true;
             await route.fulfill({ json: session });
         });
-        await page.route("**/api/graph", route => route.fulfill({ json: { opts: [graphOne, graphTwo] } }));
-        await page.route(url => /^\/api\/graph\/social-demo(?:-test)?(?:\/|$)/.test(url.pathname), route =>
-            route.request().method() === "DELETE"
-                ? route.fulfill({ json: { message: "Mock tutorial graph deleted" } })
-                : route.fulfill({ contentType: "text/event-stream", body: "event: result\ndata: {}\n\n" }),
-        );
+        const demoOptions = page.locator('[data-testid^="selectGraphtutorial-social-"][data-testid$="Button"]');
         try {
             await page.goto(urls.graphUrl);
+            // The tutorial creates its samples only on the discovered connection.
+            await expect.poll(() => discoveryRequested, { timeout: 15000 }).toBe(true);
+            releaseDiscovery();
+            await expect.poll(() => syncCompleted, { timeout: 15000 }).toBe(true);
             await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
             await tutorial.clickNextButton();
             await tutorial.waitForStep("Select a Graph", 15000);
             await tutorial.clickTutorialTarget('[data-testid="selectGraph"]');
-            await expect(page.getByTestId("selectGraphsocial-demoButton")).toBeVisible();
-            await expect(page.getByTestId("selectGraphsocial-demo-testButton")).toBeVisible();
-            releaseDiscovery();
-            await expect.poll(() => syncCompleted, { timeout: 15000 }).toBe(true);
+            await expect(demoOptions).toHaveCount(2);
             await page.waitForLoadState("networkidle");
-            await expect(page.getByTestId("selectGraphsocial-demoButton")).toBeVisible();
-            await expect(page.getByTestId("selectGraphsocial-demo-testButton")).toBeVisible();
+            await expect(demoOptions).toHaveCount(2);
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+            await page.keyboard.press("Escape");
+            await tutorial.skip();
         } finally {
             releaseDiscovery();
         }
@@ -1183,36 +1188,19 @@ test.describe("@admin Graph tabs", () => {
         });
     }
 
-    test("The tutorial strip stays interactive when the initial user graph list is pending", async () => {
+    test("The tutorial strip stays interactive before the user graph list loads", async () => {
         test.setTimeout(60_000);
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         const page = await browser.getPage();
         await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
         await tutorial.changeLocalStorage("true");
-        let release!: () => void;
-        const gate = new Promise<void>(resolve => { release = resolve; });
-        let held = false;
-        await page.route(url => /^\/api\/graph\/social-demo(?:-test)?(?:\/|$)/.test(url.pathname), route =>
-            route.request().method() === "DELETE"
-                ? route.fulfill({ json: { message: "Mock tutorial graph deleted" } })
-                : route.fulfill({ contentType: "text/event-stream", body: "event: result\ndata: {}\n\n" }),
-        );
-        await page.route("**/api/graph", async route => {
-            if (held) return route.continue();
-            held = true;
-            await gate;
-            return route.continue();
-        });
-        try {
-            await page.reload();
-            await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
-            expect(held).toBe(true);
-            await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
-            release();
-            await tutorial.skip();
-        } finally {
-            release();
-        }
+        await page.reload();
+        await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+        // The tutorial defers the user's graph list until it closes.
+        await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "false");
+        await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+        await tutorial.skip();
+        await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true", { timeout: 15000 });
     });
 
     test("Closing a tab drops it and falls back to a neighbour", async () => {

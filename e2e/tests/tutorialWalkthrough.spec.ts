@@ -668,21 +668,38 @@ test.describe("Tutorial", () => {
                     }));
                 }
             }, { scope, owners });
+            // Verification lists hang until the sweep gives up; the graph list the
+            // page loads afterwards is answered so the tab strip can unlock.
             let requests = 0;
+            let released = false;
+            let release!: () => void;
+            const gate = new Promise<void>(resolve => { release = resolve; });
             await page.route(url => url.pathname === "/api/graph", async route => {
+                if (released) {
+                    await route.continue();
+                    return;
+                }
                 requests += 1;
                 if (failPublication && requests === 1) {
                     await route.fulfill({ json: { opts: [] } });
+                    return;
                 }
+                await gate;
+                // The page has usually abandoned a held verification by now.
+                await route.continue().catch(() => {});
             });
             try {
                 await page.goto(urls.graphUrl);
                 await expect(page.getByTestId("toast-title").filter({ hasText: "Tutorial cleanup failed" })).toBeVisible({ timeout: 25000 });
+                const sweepRequests = requests;
+                released = true;
+                release();
+                expect(sweepRequests).toBeLessThan(5);
                 await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
-                expect(requests).toBeLessThan(5);
                 expect(await page.evaluate(({ scope, owners }) => owners.every(owner =>
                     localStorage.getItem(`${scope}tutorialDemoGraphOwnership:${owner}`) !== null), { scope, owners })).toBe(true);
             } finally {
+                release();
                 await browser.closeBrowser();
             }
     });
@@ -1771,6 +1788,10 @@ test.describe("Tutorial", () => {
         await tutorial.addStripTab();
         const userTabs = await tutorial.getStripTabCount();
         expect(userTabs).toBe(2);
+        // The address bar follows the new blank tab after a short debounce.
+        // Reloading earlier would reload the first tab's share link, and a
+        // share link holds the tutorial back.
+        await expect(await browser.getPage()).toHaveURL(url => !url.searchParams.has("graph"));
 
         // 2. Start the tutorial by setting localStorage and refreshing
         await tutorial.changeLocalStorage("true");

@@ -22,11 +22,12 @@ import { createFalkorCypherEngine, attachGrammarLinting, registerGrammarCodeActi
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { isAiFixSupported } from "@/lib/aiFix";
+import { isGraphUnconfirmed } from "@/lib/graphTabs";
 import { isQueryOptimization, removeLegacyOptimizeConsent } from "@/lib/aiOptimize";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
-import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, GraphTabsContext, DiagnosticsContext, AiFixContext, type ChatModelSource, type LocalLlmProvider } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, GraphContext, GraphTabsContext, DiagnosticsContext, AiFixContext, type ChatModelSource, type LocalLlmProvider } from "./provider";
 import useQueryPreflight from "./useQueryPreflight";
 import { Graph } from "../api/graph/model";
 import ToastButton from "./ToastButton";
@@ -196,7 +197,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
-    const { activeTabId, tabsReady } = useContext(GraphTabsContext);
+    const { activeTabId, tabsReady, graphNamesReady } = useContext(GraphTabsContext);
+    const { graphNames, graphNamesUnknown } = useContext(GraphContext);
+    // The procedure lookup goes through GRAPH.QUERY on writable connections,
+    // which would re-create a dropped graph — same hold as the page's polls.
+    const graphUnconfirmed = isGraphUnconfirmed(graph.Id, graphNames, graphNamesUnknown, graphNamesReady);
     useEffect(() => {
         if (!tabsReady) {
             setMaximize(false);
@@ -575,7 +580,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         cachedSuggestionsRef.current = [];
         setProceduresVersion(v => v + 1);
 
-        if (!requestGraphId) return () => { cancelled = true; };
+        if (!requestGraphId || graphUnconfirmed) return () => { cancelled = true; };
 
         // Use the live `isReadOnly` value (not the ref) so this effect re-runs
         // whenever read-only mode toggles on the same graph.
@@ -631,7 +636,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [graph.Id, isReadOnly]);
+    }, [graph.Id, graphUnconfirmed, isReadOnly]);
 
     useEffect(() => {
         isReadOnlyRef.current = isReadOnly;

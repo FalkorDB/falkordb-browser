@@ -15,6 +15,7 @@ import BottomSheet from "@/components/ui/BottomSheet";
 import useIsMobile from "@/lib/useIsMobile";
 import { useResizableSize } from "@/lib/useResizableSize";
 import { tabScopedKey } from "@/lib/useGraphTabs";
+import { isGraphUnconfirmed } from "@/lib/graphTabs";
 import { getConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import GraphSubHeader from "./GraphSubHeader";
 
@@ -332,8 +333,9 @@ export default function Page() {
 
     // A restored tab keeps its graph while the list is unknown, but the polls
     // below run GRAPH.QUERY on writable connections — querying a graph that was
-    // dropped would re-create it. Hold them until a list confirms the graph.
-    const graphUnconfirmed = graphNamesUnknown && !graphNames?.includes(graphName);
+    // dropped would re-create it. Hold them until a list confirms the graph, and
+    // also when a list omits it: this effect runs before the provider clears it.
+    const graphUnconfirmed = isGraphUnconfirmed(graphName, graphNames, graphNamesUnknown, graphNamesReady);
 
     useEffect(() => {
         if (!graphName) {
