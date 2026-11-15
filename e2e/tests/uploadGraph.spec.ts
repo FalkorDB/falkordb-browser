@@ -1,4 +1,4 @@
-import { expect, test, Request } from "@playwright/test";
+import { expect, test, type Request } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -27,7 +27,6 @@ test.describe("Upload Graph – Cypher batch", () => {
   test.beforeEach(async () => {
     browser = new BrowserWrapper();
     apiCall = new ApiCalls();
-    graphName = undefined;
   });
 
   test.afterEach(async () => {
@@ -36,10 +35,12 @@ test.describe("Upload Graph – Cypher batch", () => {
 
     // Close first: a live graph page polls graph info, and that poll
     // re-creates a graph deleted out from under it.
-    await browser.closeBrowser();
-
-    if (graphToRemove) {
-      expect((await apiCall.removeGraph(graphToRemove, "admin")).message).toMatch(/deleted|empty key/i);
+    try {
+      await browser.closeBrowser();
+    } finally {
+      if (graphToRemove) {
+        expect((await apiCall.removeGraph(graphToRemove, "admin")).message).toMatch(/deleted|empty key/i);
+      }
     }
   });
 
@@ -103,9 +104,11 @@ test.describe("Upload Graph – Cypher batch", () => {
     const page = await browser.getPage();
     const uploadedFileNames: string[] = [];
     const processingPayloads: unknown[] = [];
+    let uploadCalls = 0;
     await page.route("**/api/upload", async (route) => {
+      uploadCalls += 1;
       uploadedFileNames.push(...multipartFileNames(route.request()));
-      await route.fulfill({ json: uploadedFileNames.length === 1 ? {} : { id: "retry-file" } });
+      await route.fulfill({ json: uploadCalls === 1 ? {} : { id: "retry-file" } });
     });
     await page.route(`**/api/graph/${graphName}/upload`, async (route) => {
       processingPayloads.push(route.request().postDataJSON());
