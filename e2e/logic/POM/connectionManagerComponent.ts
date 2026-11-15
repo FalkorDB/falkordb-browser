@@ -1,4 +1,4 @@
-import { Locator, Response } from "playwright";
+import { APIResponse, Locator, Response } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { interactWhenVisible } from "@/e2e/infra/utils";
 
@@ -11,6 +11,26 @@ export default class ConnectionManagerComponent extends BasePage {
         return this.page.getByTestId("connections-dropdown-content");
     }
 
+    private get addConnectionButton(): Locator {
+        return this.dropdownContent.getByRole("menuitem", { name: "Add Connection" });
+    }
+
+    private get addDialogUsername(): Locator {
+        return this.addDialog.locator("#Username");
+    }
+
+    private get addDialogPassword(): Locator {
+        return this.addDialog.locator("#Password");
+    }
+
+    private get logoutConfirm(): Locator {
+        return this.logoutDialog.getByTestId("connectionLogoutConfirm");
+    }
+
+    private get logoutCancel(): Locator {
+        return this.logoutDialog.getByTestId("connectionLogoutCancel");
+    }
+
     public get connectionItems(): Locator {
         return this.page.locator('[data-testid^="connection-item-"]');
     }
@@ -20,11 +40,16 @@ export default class ConnectionManagerComponent extends BasePage {
     }
 
     public get addDialog(): Locator {
-        return this.page.getByRole("dialog");
+        return this.page.getByRole("dialog", { name: "Add Connection" });
     }
 
     public get addConnectionSubmit(): Locator {
         return this.addDialog.getByRole("button", { name: "Add Connection", exact: true });
+    }
+
+    private static activeMarkerIn(scope: Locator): Locator {
+        // The active connection carries a Check icon (svg with class text-primary).
+        return scope.locator("svg.text-primary");
     }
 
     connectionForUser(username: string): Locator {
@@ -33,47 +58,11 @@ export default class ConnectionManagerComponent extends BasePage {
     }
 
     activeMarkerForUser(username: string): Locator {
-        return this.connectionForUser(username).locator("svg.text-primary");
+        return ConnectionManagerComponent.activeMarkerIn(this.connectionForUser(username));
     }
 
-    feedbackMessage(text: string): Locator {
-        return this.page.getByText(text, { exact: true });
-    }
-
-    async selectConnection(username: string): Promise<void> {
-        await this.connectionForUser(username).click();
-    }
-
-    async requestRemoval(username: string): Promise<void> {
-        await this.connectionForUser(username).getByRole("button", { name: /Sign out of connection/ }).click();
-    }
-
-    async requestFirstRemoval(): Promise<void> {
-        await this.page.getByTestId(/^connection-logout-/).first().click();
-    }
-
-    async confirmRemoval(): Promise<void> {
-        await this.page.getByTestId("connectionLogoutConfirm").click();
-    }
-
-    async cancelRemoval(): Promise<void> {
-        await this.page.getByTestId("connectionLogoutCancel").click();
-    }
-
-    async closeDropdown(): Promise<void> {
-        await this.page.keyboard.press("Escape");
-    }
-
-    async fillAdditionalPassword(password: string): Promise<void> {
-        await this.addDialog.locator("#Password").fill(password);
-    }
-
-    async submitConnectionForm(): Promise<void> {
-        await this.addConnectionSubmit.click();
-    }
-
-    private get addConnectionButton(): Locator {
-        return this.page.getByText("Add Connection");
+    errorToast(text: string): Locator {
+        return this.page.getByTestId("toast-destructive").filter({ hasText: text });
     }
 
     async openDropdown(): Promise<void> {
@@ -81,19 +70,71 @@ export default class ConnectionManagerComponent extends BasePage {
         await this.dropdownContent.waitFor({ state: "visible", timeout: 5000 });
     }
 
-    async submitAdditionalConnection(username: string, password: string): Promise<Locator> {
+    async closeDropdown(): Promise<void> {
+        await this.page.keyboard.press("Escape");
+    }
+
+    async selectConnection(username: string): Promise<void> {
+        await interactWhenVisible(this.connectionForUser(username), (el) => el.click(), `Select connection ${username}`);
+    }
+
+    async requestRemoval(username: string): Promise<void> {
+        await interactWhenVisible(
+            this.connectionForUser(username).getByRole("button", { name: /Sign out of connection/ }),
+            (el) => el.click(),
+            `Sign out of connection ${username}`
+        );
+    }
+
+    async confirmRemoval(): Promise<void> {
+        await interactWhenVisible(this.logoutConfirm, (el) => el.click(), "Confirm connection logout");
+    }
+
+    async cancelRemoval(): Promise<void> {
+        await interactWhenVisible(this.logoutCancel, (el) => el.click(), "Cancel connection logout");
+    }
+
+    async fillAdditionalPassword(password: string): Promise<void> {
+        await interactWhenVisible(this.addDialogPassword, (el) => el.fill(password), "Add connection password");
+    }
+
+    async submitConnectionForm(): Promise<void> {
+        await interactWhenVisible(this.addConnectionSubmit, (el) => el.click(), "Submit add connection");
+    }
+
+    async submitAdditionalConnection(username: string, password: string): Promise<void> {
         await this.openDropdown();
-        await this.page.getByRole("menuitem", { name: "Add Connection" }).click();
-        const dialog = this.addDialog;
-        await dialog.locator("#Username").fill(username);
+        await interactWhenVisible(this.addConnectionButton, (el) => el.click(), "Add Connection menu item");
+        await interactWhenVisible(this.addDialogUsername, (el) => el.fill(username), "Add connection username");
         await this.fillAdditionalPassword(password);
         await this.submitConnectionForm();
-        return dialog;
     }
 
     waitForSessionUpdate(): Promise<Response> {
         return this.page.waitForResponse(response =>
             new URL(response.url()).pathname === "/api/auth/session" && response.request().method() === "POST");
+    }
+
+    waitForAddConnectionResponse(): Promise<Response> {
+        return this.page.waitForResponse(response =>
+            new URL(response.url()).pathname === "/api/connections" && response.request().method() === "POST");
+    }
+
+    async getConnectionId(username: string): Promise<string | undefined> {
+        const testId = await interactWhenVisible(
+            this.connectionForUser(username),
+            (el) => el.getAttribute("data-testid"),
+            `Connection ${username}`
+        );
+        return testId?.replace("connection-item-", "");
+    }
+
+    async getSession(): Promise<APIResponse> {
+        return this.page.request.get(new URL("/api/auth/session", this.page.url()).href);
+    }
+
+    async getLastActiveConnectionId(): Promise<string | null> {
+        return (await this.evaluate(() => localStorage.getItem("lastActiveConnectionId"))) as string | null;
     }
 
     async isDropdownVisible(): Promise<boolean> {
@@ -126,9 +167,7 @@ export default class ConnectionManagerComponent extends BasePage {
         if (!await this.dropdownContent.isVisible()) {
             await this.openDropdown();
         }
-        // Active connection has a Check icon (svg with class text-primary)
-        const activeMarker = this.page.locator('[data-testid^="connection-item-"] svg.text-primary');
-        return activeMarker.count().then(c => c > 0);
+        return ConnectionManagerComponent.activeMarkerIn(this.connectionItems).count().then(c => c > 0);
     }
 
     async isTriggerVisible(): Promise<boolean> {
