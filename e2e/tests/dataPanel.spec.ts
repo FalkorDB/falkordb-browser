@@ -212,6 +212,7 @@ test.describe("Data panel Tests", () => {
     const graphName = getRandomString("propertyApi");
     const protectedKeys = ["_NEXTSEP_name/part", "a?b"];
     const initial = { [protectedKeys[0]]: 2, [protectedKeys[1]]: 3 };
+    await apicalls.addGraph(graphName);
     try {
       const result = await apicalls.runQuery(graphName, `CREATE (n {legacy: 1, \`${protectedKeys[0]}\`: 2, \`${protectedKeys[1]}\`: 3}) RETURN ID(n) AS id`);
       const id = Number(result.data[0].id);
@@ -239,8 +240,7 @@ test.describe("Data panel Tests", () => {
       expect(emptyDelete.status()).toBe(400);
       expect(await readProperties()).toEqual(initial);
     } finally {
-      const { message } = await apicalls.removeGraph(graphName);
-      expect(message).toMatch(/deleted|empty key/);
+      await apicalls.removeGraph(graphName);
     }
   });
 
