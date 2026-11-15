@@ -170,7 +170,7 @@ type GraphContextType = {
   setRelationships: Dispatch<SetStateAction<Relationship[]>>;
   currentTab: Tab;
   setCurrentTab: Dispatch<SetStateAction<Tab>>;
-  runQuery: (query: string, name?: string) => Promise<void>;
+  runQuery: (query: string, name?: string, options?: { readOnly?: boolean; silent?: boolean; allowTutorialCreation?: boolean }) => Promise<void>;
   fetchCount: (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number }) => Promise<void>;
   handleCooldown: (ticks?: number, isSetLoading?: boolean) => void;
   cooldownTicks: number | undefined;
@@ -251,6 +251,7 @@ type QueryLoadingContextType = {
 };
 
 type GraphTabsContextType = {
+  recoveryReady: boolean;
   /** Working contexts for the current connection, ordered left to right. */
   tabs: GraphTab[];
   activeTabId: string;
@@ -600,6 +601,7 @@ export const QueryLoadingContext = createContext<QueryLoadingContextType>({
 });
 
 export const GraphTabsContext = createContext<GraphTabsContextType>({
+  recoveryReady: false,
   tabs: [],
   activeTabId: "",
   maxTabs: DEFAULT_GRAPH_TABS,
