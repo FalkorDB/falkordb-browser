@@ -1780,8 +1780,12 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
         return () => { mountedRef.current = false; };
     }, []);
     const { handleSetGraphName, runQuery: runGraphQuery, setCurrentTab, setGraph } = useContext(GraphContext);
-    const runQuery = useCallback((query: string, name?: string) =>
-        runGraphQuery(query, name, { readOnly: true }), [runGraphQuery]);
+    // Rejecting after an unmount stops track setups and advance actions from
+    // writing the shared tab/layout once the tutorial is gone.
+    const runQuery = useCallback(async (query: string, name?: string) => {
+        await runGraphQuery(query, name, { readOnly: true });
+        if (!mountedRef.current) throw new Error("Tutorial closed while its query was running");
+    }, [runGraphQuery]);
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
     const { setLayout, setDirection, canvasRef } = useContext(ForceGraphContext);
 
@@ -1866,6 +1870,8 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
         if (onCleanupDemoGraphs) {
             await onCleanupDemoGraphs();
         }
+        // A replacement tutorial may have opened while cleanup ran.
+        if (!mountedRef.current) return;
 
         setDemoLoaded(false);
         setDemoGraphName("");

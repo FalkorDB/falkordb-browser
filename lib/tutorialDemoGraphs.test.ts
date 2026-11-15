@@ -12,6 +12,7 @@ import {
   runTutorialDemoLoadOnce,
   queueTutorialDemoRecovery,
   waitForTutorialDemoLoad,
+  TutorialDemoLoadPendingError,
   tutorialDemoOwnershipKey,
 } from "./tutorialDemoGraphs.ts";
 
@@ -125,7 +126,7 @@ describe("tutorial demo graph names (#2202)", () => {
     let finish!: (value: string) => void;
     const delayed = new Promise<string>(resolve => { finish = resolve; });
     const pending = runTutorialDemoLoadOnce(loads, "a", () => delayed);
-    await assert.rejects(waitForTutorialDemoLoad(pending, 5), /still pending/);
+    await assert.rejects(waitForTutorialDemoLoad(pending, 5), TutorialDemoLoadPendingError);
     await assert.rejects(waitForTutorialDemoLoad(pending, 5), /still pending/);
     assert.equal(loads.get("a"), pending);
     finish("late creation tracked");

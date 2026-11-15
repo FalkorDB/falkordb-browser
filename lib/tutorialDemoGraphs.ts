@@ -124,13 +124,19 @@ export function queueTutorialDemoRecovery(
   return pending;
 }
 
+export class TutorialDemoLoadPendingError extends Error {
+  constructor() {
+    super("Tutorial setup is still pending; retaining its ownership for later recovery");
+  }
+}
+
 export async function waitForTutorialDemoLoad<T>(pending: Promise<T>, timeout: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       pending,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Tutorial setup is still pending; retaining its ownership for later recovery")), timeout);
+        timer = setTimeout(() => reject(new TutorialDemoLoadPendingError()), timeout);
       }),
     ]);
   } finally {

@@ -771,6 +771,9 @@ test.describe("Tutorial", () => {
                 await routeCompleted;
                 expect(heldUrl!.searchParams.get("readOnly")).toBe("true");
                 expect(responseBody).toContain("event: error");
+                // The read fails after the unmount, so its track setup must not switch the view.
+                await expect(page.getByText("Tutorial closed while its query was running")).toHaveCount(0);
+                await expect(page.getByTestId("graphTab")).toHaveAttribute("data-state", "active");
                 expect((await apiCall.getGraphs()).opts).not.toContain(name);
             } finally {
                 release();
@@ -1042,6 +1045,97 @@ test.describe("Tutorial", () => {
             release();
             await Promise.all(routes);
             await browser.closeBrowser();
+        }
+    });
+
+    test("@admin a stalled fresh setup closes the tutorial instead of parking it on step 0", async () => {
+        test.setTimeout(60_000);
+        await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        await page.addInitScript(() => {
+            const nativeTimeout = window.setTimeout.bind(window);
+            window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
+                nativeTimeout(handler, timeout === 30_000 ? 1000 : timeout, ...args)) as typeof window.setTimeout;
+            localStorage.setItem("tutorial", "true");
+        });
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        const routes: Promise<void>[] = [];
+        const names: string[] = [];
+        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+            names.push(decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]));
+            const pending = gate.then(() => route.continue());
+            routes.push(pending);
+            return pending;
+        });
+        const readOwnership = () => page.evaluate(() => {
+            const owner = sessionStorage.getItem("tutorialDemoOwnerId");
+            return Object.keys(localStorage).some(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await expect.poll(() => names.length, { timeout: 30000 }).toBe(2);
+            await expect(page.getByText("Tutorial unavailable", { exact: true })).toBeVisible({ timeout: 10000 });
+            await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+            release();
+            await Promise.all(routes);
+            // The late completion sees the closed tutorial and drops its samples.
+            await expect.poll(readOwnership, { timeout: 30000 }).toBe(false);
+            expect((await apiCall.getGraphs()).opts.filter(name => names.includes(name))).toEqual([]);
+            await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+        } finally {
+            release();
+            await Promise.all(routes);
+        }
+    });
+
+    test("@admin a Skip cleanup that finishes after Replay leaves the new tutorial open", async () => {
+        test.setTimeout(90_000);
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        const page = await browser.getPage();
+        await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        const routes: Promise<void>[] = [];
+        let oldNames: string[] = [];
+        let deletions = 0;
+        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-"), route => {
+            if (route.request().method() !== "DELETE" || !oldNames.some(name => route.request().url().includes(name))) return route.continue();
+            deletions += 1;
+            const pending = gate.then(async () => { await route.fulfill({ response: await route.fetch() }); });
+            routes.push(pending);
+            return pending;
+        });
+        const readNames = () => page.evaluate(() => {
+            const owner = sessionStorage.getItem("tutorialDemoOwnerId");
+            const key = Object.keys(localStorage).find(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
+            return key ? (JSON.parse(localStorage.getItem(key)!) as { names: string[] }).names : [];
+        });
+        try {
+            await page.goto(urls.graphUrl);
+            await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+            oldNames = await readNames();
+            expect(oldNames).toHaveLength(2);
+            await page.getByTestId("skipTutorial").click();
+            await expect.poll(() => deletions).toBeGreaterThan(0);
+            // Unmount the skipping tutorial while its cleanup is still awaited.
+            await page.setViewportSize({ width: 900, height: 900 });
+            await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+            await page.setViewportSize({ width: 1440, height: 900 });
+            await page.getByTestId("settings").click();
+            await page.getByTestId("settingsTabBrowser").click();
+            await page.getByTestId("replayTutorial").click();
+            await expect(page).toHaveURL(/\/graph/, { timeout: 30000 });
+            release();
+            await Promise.all(routes);
+            await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+            await expect.poll(async () => (await apiCall.getGraphs()).opts.some(name => oldNames.includes(name)), { timeout: 30000 }).toBe(false);
+            await tutorial.clickNextButton();
+            await tutorial.waitForStep("Select a Graph");
+            expect(await page.evaluate(() => localStorage.getItem("tutorial"))).toBe("true");
+        } finally {
+            release();
+            await Promise.all(routes);
         }
     });
 

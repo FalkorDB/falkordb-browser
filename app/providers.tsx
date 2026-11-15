@@ -36,7 +36,7 @@ import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDimension, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
 import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
-import { TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX, completeTutorialDemoGraphSetup, getTutorialDemoReclaimableNames, isTutorialDemoGraphName, isTutorialDemoOwnerId, isTutorialDemoOwnershipExpired, parseTutorialDemoOwnership, pickTutorialDemoGraphNames, queueTutorialDemoRecovery, runTutorialDemoLoadOnce, waitForTutorialDemoLoad, tutorialDemoOwnershipKey, type TutorialDemoOwnership } from "@/lib/tutorialDemoGraphs";
+import { TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX, completeTutorialDemoGraphSetup, getTutorialDemoReclaimableNames, isTutorialDemoGraphName, isTutorialDemoOwnerId, isTutorialDemoOwnershipExpired, parseTutorialDemoOwnership, pickTutorialDemoGraphNames, queueTutorialDemoRecovery, runTutorialDemoLoadOnce, waitForTutorialDemoLoad, TutorialDemoLoadPendingError, tutorialDemoOwnershipKey, type TutorialDemoOwnership } from "@/lib/tutorialDemoGraphs";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -3152,7 +3152,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       }
     }
 
-    return runTutorialDemoLoadOnce(tutorialDemoLoadsRef.current, loadKey, async (): Promise<DemoLoadOutcome> => {
+    const load = runTutorialDemoLoadOnce(tutorialDemoLoadsRef.current, loadKey, async (): Promise<DemoLoadOutcome> => {
     if (!isCurrent()) return { status: "cancelled" };
     let demoGraphNames: string[] = [];
 
@@ -3375,6 +3375,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       throw error;
     }
     });
+
+    // Bounded like Replay so a stalled CREATE closes the tutorial instead of
+    // parking it on step 0; the load stays tracked and a late completion sees
+    // the closed activation and drops its samples.
+    try {
+      return await waitForTutorialDemoLoad(load, TUTORIAL_CONNECTION_TIMEOUT_MS);
+    } catch (error) {
+      if (error instanceof TutorialDemoLoadPendingError) {
+        console.error("Tutorial setup did not finish in time", error);
+        if (isCurrent()) toast({
+          title: "Tutorial unavailable",
+          description: "Tutorial setup is taking too long. Its ownership was retained; try again later.",
+          variant: "destructive",
+        });
+      }
+      throw error;
+    }
   }, [graphName, toast, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, handleSetGraphName, setHistoryQuery, waitForTutorialConnection, isTutorialConnectionCurrent, reclaimAbandonedTutorialGraphs, fetchTutorialGraphList]);
 
   const handleCleanupDemoGraphs = useCallback(async () => {
