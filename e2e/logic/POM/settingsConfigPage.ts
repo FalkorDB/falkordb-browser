@@ -45,7 +45,7 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     private get undoBtnInToastMsg(): Locator {
-        return this.page.locator("//button[contains(text(), 'Undo')]");
+        return this.page.getByRole("button", { name: "Undo", exact: true });
     }
 
     private get searchForConfigInput(): Locator {
