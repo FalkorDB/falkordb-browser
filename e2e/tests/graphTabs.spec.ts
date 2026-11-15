@@ -132,6 +132,8 @@ test.describe("@admin Graph tabs", () => {
             failedLists += 1;
             await route.fulfill({ status: 200, contentType: "text/html", body: "<html>not a graph list</html>" });
         });
+        // The empty selector is disabled, so recovery comes from the periodic refresh.
+        await page.evaluate(() => localStorage.setItem("refreshInterval", "1"));
         const isRestoredQuery = (requestUrl: string) => {
             const url = new URL(requestUrl);
             return url.pathname === `/api/graph/${graphOne}`
@@ -158,6 +160,7 @@ test.describe("@admin Graph tabs", () => {
         expect(graphPolls).toHaveLength(0);
 
         failLists = false;
+        await expect(page.getByTestId("selectGraph")).toBeEnabled({ timeout: 15000 });
         await page.getByTestId("selectGraph").click();
         await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
         await page.keyboard.press("Escape");
@@ -193,6 +196,8 @@ test.describe("@admin Graph tabs", () => {
             failedLists += 1;
             await route.fulfill({ status: 200, contentType: "text/html", body: "<html>not a graph list</html>" });
         });
+        // The empty selector is disabled, so the empty list comes from the periodic refresh.
+        await page.evaluate(() => localStorage.setItem("refreshInterval", "1"));
 
         await page.reload({ waitUntil: "domcontentloaded" });
         await expect.poll(() => failedLists, { timeout: 15000 }).toBeGreaterThan(0);
@@ -202,8 +207,6 @@ test.describe("@admin Graph tabs", () => {
         // The selector shows no graphs either way; the unchanged list must still
         // confirm that the saved graph is gone.
         listPhase = "empty";
-        await page.getByTestId("selectGraph").click();
-        await page.keyboard.press("Escape");
         await expect(page.getByTestId("selectGraph")).not.toContainText(graphOne, { timeout: 15000 });
     });
 
