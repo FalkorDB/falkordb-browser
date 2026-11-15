@@ -1,4 +1,4 @@
-import { expect, test } from "../infra/coverage";
+import { expect, test } from "@playwright/test";
 import { getDefaultQuery } from "@/lib/utils";
 import ApiCalls from "../logic/api/apiCalls";
 import BrowserWrapper from "../infra/ui/browserWrapper";
@@ -19,54 +19,50 @@ test.describe.serial("Query Settings", () => {
     await browser.closeBrowser();
   });
 
-  test("@admin cancelling query settings restores saved values and survives reload", async () => {
-    const settings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
-    await settings.expandQueryExecutionSection();
-    await settings.fillLimit(41);
-    await settings.fillTimeout(7);
+  const savedLimit = 41;
+  const savedTimeout = 7;
+
+  async function saveLimitAndTimeoutAndReload(settings: QuerySettingsPage, limit: number, timeout: number) {
+    await settings.fillLimit(limit);
+    await settings.fillTimeout(timeout);
     await settings.clickSaveQuerySettingsBtn();
     await settings.refreshPage();
     await settings.expandQueryExecutionSection();
-    const savedLimit = "41";
-    const savedTimeout = "7 seconds";
-    await expect(settings.limitInput).toHaveValue(savedLimit);
-    await expect(settings.timeoutInput).toHaveValue(savedTimeout);
+  }
+
+  async function expectLimitAndTimeout(settings: QuerySettingsPage, limit: string, timeout: string) {
+    await expect(settings.limitInput).toHaveValue(limit);
+    await expect(settings.timeoutInput).toHaveValue(timeout);
+  }
+
+  // Starts from saved finite values so a later "∞" cannot come from the defaults.
+  async function openSettingsWithSavedLimitAndTimeout(): Promise<QuerySettingsPage> {
+    const settings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
+    await settings.expandQueryExecutionSection();
+    await saveLimitAndTimeoutAndReload(settings, savedLimit, savedTimeout);
+    await expectLimitAndTimeout(settings, `${savedLimit}`, `${savedTimeout} seconds`);
+    return settings;
+  }
+
+  test(`@admin Validate that cancelling query settings restores the saved limit and timeout, also after reload`, async () => {
+    const settings = await openSettingsWithSavedLimitAndTimeout();
     await settings.fillLimit(17);
     await settings.fillTimeout(23);
+    await expectLimitAndTimeout(settings, "17", "23 seconds");
     await settings.clickCancelQuerySettingsBtn();
-    await expect(settings.limitInput).toHaveValue(savedLimit);
-    await expect(settings.timeoutInput).toHaveValue(savedTimeout);
+    await expectLimitAndTimeout(settings, `${savedLimit}`, `${savedTimeout} seconds`);
     await expect(settings.saveQuerySettingsBtn).toBeHidden();
     await settings.refreshPage();
     await settings.expandQueryExecutionSection();
-    await expect(settings.limitInput).toHaveValue(savedLimit);
-    await expect(settings.timeoutInput).toHaveValue(savedTimeout);
+    await expectLimitAndTimeout(settings, `${savedLimit}`, `${savedTimeout} seconds`);
   });
 
-  test("@admin query limit and timeout zero round-trip as infinity", async () => {
-    const settings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
-    await settings.expandQueryExecutionSection();
-    await settings.fillLimit(41);
-    await settings.fillTimeout(7);
-    await settings.clickSaveQuerySettingsBtn();
-    await settings.refreshPage();
-    await settings.expandQueryExecutionSection();
-    await expect(settings.limitInput).toHaveValue("41");
-    await expect(settings.timeoutInput).toHaveValue("7 seconds");
-    await settings.fillLimit(0);
-    await settings.fillTimeout(0);
-    await settings.clickSaveQuerySettingsBtn();
-    await settings.refreshPage();
-    await settings.expandQueryExecutionSection();
-    await expect(settings.limitInput).toHaveValue("∞");
-    await expect(settings.timeoutInput).toHaveValue("∞");
-    await settings.fillLimit(1);
-    await settings.fillTimeout(1);
-    await settings.clickSaveQuerySettingsBtn();
-    await settings.refreshPage();
-    await settings.expandQueryExecutionSection();
-    await expect(settings.limitInput).toHaveValue("1");
-    await expect(settings.timeoutInput).toHaveValue("1 seconds");
+  test(`@admin Validate that a zero limit and timeout are saved as infinity and finite values persist again`, async () => {
+    const settings = await openSettingsWithSavedLimitAndTimeout();
+    await saveLimitAndTimeoutAndReload(settings, 0, 0);
+    await expectLimitAndTimeout(settings, "∞", "∞");
+    await saveLimitAndTimeoutAndReload(settings, 1, 1);
+    await expectLimitAndTimeout(settings, "1", "1 seconds");
   });
 
   test(`@admin Validate that running a query with timeout returns an error`, async () => {
