@@ -95,6 +95,60 @@ test.describe("@admin Graph tabs", () => {
         await expect(page.getByTestId("editorContainer").locator("xpath=ancestor::*[@inert]")).toHaveCount(0);
     });
 
+    test("A failed graph list keeps the saved tab's graph until a later list confirms it", async () => {
+        test.setTimeout(60_000);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await graph.selectGraphByName(graphOne);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        const firstRun = page.waitForResponse(response =>
+            new URL(response.url()).searchParams.get("query")?.startsWith("MATCH (n) RETURN n") === true,
+        );
+        await graph.clickRunQuery();
+        await firstRun;
+        await graph.waitForPageIdle();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).not.toBe("initial");
+        let failedLists = 0;
+        await page.route("**/api/graph", async route => {
+            if (failedLists > 0) {
+                await route.continue();
+                return;
+            }
+            failedLists += 1;
+            await route.fulfill({ status: 200, contentType: "text/html", body: "<html>not a graph list</html>" });
+        });
+        const isRestoredQuery = (requestUrl: string) => {
+            const url = new URL(requestUrl);
+            return url.pathname === `/api/graph/${graphOne}`
+                && url.searchParams.get("query")?.startsWith("MATCH (n) RETURN n") === true;
+        };
+        const restoredQueries: string[] = [];
+        page.on("request", request => {
+            if (isRestoredQuery(request.url())) restoredQueries.push(request.url());
+        });
+
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await expect.poll(() => failedLists, { timeout: 15000 }).toBe(1);
+        await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
+        await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+        await expect(graph.stripTab(graphOne)).toBeVisible();
+        await expect(graph.editorContainer).toHaveAttribute("data-value", "MATCH (n) RETURN n");
+        await graph.waitForPageIdle();
+        expect(restoredQueries).toHaveLength(0);
+
+        await page.getByTestId("selectGraph").click();
+        await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(graph.stripTab(graphOne)).toBeVisible();
+        expect(restoredQueries).toHaveLength(0);
+
+        const restoredQuery = page.waitForRequest(request => isRestoredQuery(request.url()));
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await restoredQuery;
+        await expect(graph.stripTab(graphOne)).toBeVisible();
+    });
+
     test("A rejected bootstrap sync replaces pending graph lists using the session connection", async () => {
         test.setTimeout(60_000);
         await browser.createNewPage(GraphPage);
@@ -375,6 +429,83 @@ test.describe("@admin Graph tabs", () => {
         } finally {
             releaseDiscovery();
             releaseCreate();
+        }
+    });
+
+    test("A graph created during same-connection timeout restoration stays selected over the saved tab", async () => {
+        test.setTimeout(60_000);
+        const createdGraph = getRandomString("restorationcreated");
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await page.setViewportSize({ width: 1400, height: 900 });
+        await graph.selectGraphByName(graphOne);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.clickRunQuery();
+        await graph.waitForPageIdle();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).not.toBe("initial");
+        const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
+        let releaseCreate!: () => void;
+        const createGate = new Promise<void>(resolve => { releaseCreate = resolve; });
+        let releaseConfig!: () => void;
+        const configGate = new Promise<void>(resolve => { releaseConfig = resolve; });
+        let createStarted = false;
+        let configRequested = false;
+        await page.route(`**/api/graph/${createdGraph}`, async route => {
+            if (route.request().method() !== "POST") {
+                await route.continue();
+                return;
+            }
+            createStarted = true;
+            await createGate;
+            await route.continue();
+        });
+        try {
+            await graph.create.click();
+            await graph.insertInput.fill(createdGraph);
+            await graph.createConfirm.click();
+            await expect.poll(() => createStarted).toBe(true);
+
+            await page.evaluate(() => localStorage.removeItem("timeout"));
+            // Only the held config may restore readiness, not the production deadline.
+            await page.evaluate(() => {
+                const timeout = AbortSignal.timeout.bind(AbortSignal);
+                AbortSignal.timeout = milliseconds => timeout(milliseconds === 5000 ? 60000 : milliseconds);
+            });
+            await page.route("**/api/graph/config", async route => {
+                configRequested = true;
+                await configGate;
+                await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
+            });
+            await page.route("**/api/auth/session", route => route.fulfill({
+                json: { ...session, user: { ...session.user, id: `${session.user.id}-restoration` } },
+            }));
+            await page.evaluate(() => {
+                const channel = new BroadcastChannel("next-auth");
+                channel.postMessage({ event: "session", data: { trigger: "getSession" } });
+                channel.close();
+            });
+            await expect.poll(() => configRequested, { timeout: 15000 }).toBe(true);
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+
+            const created = page.waitForResponse(response =>
+                new URL(response.url()).pathname === `/api/graph/${createdGraph}` && response.request().method() === "POST",
+            );
+            releaseCreate();
+            expect((await created).ok()).toBe(true);
+            // Let the page settle the creation while readiness is still lost.
+            await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+            releaseConfig();
+
+            await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "false");
+            await expect(page.getByTestId("toast-title").filter({ hasText: "Graph created successfully" })).toBeVisible();
+            await expect(graph.stripTab(createdGraph)).toBeVisible();
+            await expect(graph.stripTab(graphOne)).toHaveCount(0);
+        } finally {
+            releaseCreate();
+            releaseConfig();
+            await apiCall.removeGraph(createdGraph, "admin");
         }
     });
 
@@ -890,6 +1021,11 @@ test.describe("@admin Graph tabs", () => {
             if (panel === "data" || create) await expect(page.getByRole("dialog")).toBeVisible();
             const session = await (await page.request.get(`${urls.localHost}/api/auth/session`)).json();
             await page.evaluate(() => localStorage.removeItem("timeout"));
+            // Only the held config may restore readiness, not the production deadline.
+            await page.evaluate(() => {
+                const timeout = AbortSignal.timeout.bind(AbortSignal);
+                AbortSignal.timeout = milliseconds => timeout(milliseconds === 5000 ? 60000 : milliseconds);
+            });
             let release!: () => void;
             const gate = new Promise<void>(resolve => { release = resolve; });
             let configRequested = false;

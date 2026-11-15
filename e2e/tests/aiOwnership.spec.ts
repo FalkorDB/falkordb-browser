@@ -265,3 +265,56 @@ test(`@admin optimize cancels on ${dismissal} and allows a fresh request`, async
   }
 });
 }
+
+test("@admin optimize result closes when same-connection readiness is lost", async ({ page }) => {
+  const graphName = getRandomString("optimizeReady");
+  await page.route("**/api/chat/optimize", route => route.fulfill({ json: {
+    explanation: "Result before readiness loss", suggestions: [], optimizedQuery: "RETURN 2", executionPlan: ["Results"],
+  } }));
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  let releaseConfig!: () => void;
+  const configGate = new Promise<void>(resolve => { releaseConfig = resolve; });
+  try {
+    await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+    const ai = new AiAssistComponent(page);
+    await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+    await ai.openOptimize();
+    await ai.optimizeAnalyzeButton.click();
+    await expect(ai.optimizeApplyButton).toBeVisible();
+
+    const session = await (await page.request.get(`${baseUrl}/api/auth/session`)).json();
+    await page.evaluate(() => localStorage.removeItem("timeout"));
+    // Only the held config may restore readiness, not the production deadline.
+    await page.evaluate(() => {
+      const timeout = AbortSignal.timeout.bind(AbortSignal);
+      AbortSignal.timeout = milliseconds => timeout(milliseconds === 5000 ? 60000 : milliseconds);
+    });
+    let configRequested = false;
+    await page.route("**/api/graph/config", async route => {
+      configRequested = true;
+      await configGate;
+      await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
+    });
+    await page.route("**/api/auth/session", route => route.fulfill({
+      json: { ...session, user: { ...session.user, id: `${session.user.id}-restoration` } },
+    }));
+    await page.evaluate(() => {
+      const channel = new BroadcastChannel("next-auth");
+      channel.postMessage({ event: "session", data: { trigger: "getSession" } });
+      channel.close();
+    });
+    await expect.poll(() => configRequested, { timeout: 15_000 }).toBe(true);
+    await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+    await expect(ai.optimizeDialog).toHaveCount(0);
+    await expect(ai.optimizeApplyButton).toHaveCount(0);
+    await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1");
+
+    releaseConfig();
+    await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "false");
+    await expect(ai.optimizeDialog).toHaveCount(0);
+    await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1");
+  } finally {
+    releaseConfig();
+    expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  }
+});

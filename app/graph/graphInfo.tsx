@@ -23,7 +23,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const { graphInfoVersion, nodesCount, edgesCount } = useContext(GraphInfoContext);
     const { Labels, Relationships, PropertyKeys, MemoryUsage } = graph.GraphInfo;
     const { isQueryLoading } = useContext(QueryLoadingContext);
-    const { tabsReady } = useContext(GraphTabsContext);
+    const { tabsReady, restored } = useContext(GraphTabsContext);
     const { settings: { graphInfo: { showMemoryUsage, maxItemsForSearch } } } = useContext(BrowserSettingsContext);
     const { isReadOnly, supersedeGraphRefreshes } = useContext(ConnectionContext);
 
@@ -134,7 +134,8 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             {
                                 !isReadOnly &&
                                 <CreateGraph
-                                    ready={tabsReady}
+                                    // Wait for the restored strip to commit, or it selects its saved graph over a created one.
+                                    ready={tabsReady && restored}
                                     graphNames={graphNames ?? []}
                                     onSetGraphName={handleGraphCreated}
                                     trigger={

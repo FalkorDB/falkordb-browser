@@ -215,7 +215,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const [pendingOptimization, setPendingOptimization] = useState<PendingOptimizationRequest | null>(null);
     const [optimizationGuidance, setOptimizationGuidance] = useState("");
     const [optimizationResult, setOptimizationResult] = useState<AiOptimizeResultState>({ status: "idle" });
-    const optimizationContext = JSON.stringify([activeTabId, graphName, activeConnectionId]);
+    // Losing readiness also invalidates a pending or shown optimization: its Apply would edit a locked editor.
+    const optimizationContext = JSON.stringify([activeTabId, graphName, activeConnectionId, tabsReady]);
     const optimizationOwnerRef = useRef<object>({});
     const optimizationAbortRef = useRef<AbortController | null>(null);
     useLayoutEffect(() => {

@@ -164,9 +164,14 @@ export default function useGraphTabs<S>({
     // when `stateRef` still holds the pre-restore strip. Persisting then would write
     // the outgoing connection's tabs under the incoming connection's key.
     const restoredStateRef = useRef<TabsState | null>(null);
+    // The strip the restore effect last settled: the tutorial's (true) or the
+    // user's (false); null while the gate is closed. Compared with `tutorialOpen`
+    // below, it stays false until the strip a reopened gate restores commits.
+    const [settledFor, setSettledFor] = useState<boolean | null>(null);
     const commitRestored = useCallback((next: TabsState) => {
         restoredStateRef.current = next;
         setState(next);
+        setSettledFor(false);
     }, []);
 
     const persist = useCallback(() => {
@@ -214,6 +219,7 @@ export default function useGraphTabs<S>({
         // this effect restore them from storage once the tutorial closes.
         if (!prefixReady || !canRestore || tutorialOpen) {
             restoredKeyRef.current = null;
+            setSettledFor(tutorialOpen ? true : null);
             return;
         }
 
@@ -380,6 +386,8 @@ export default function useGraphTabs<S>({
         [activeTab, liveLayout],
     );
 
+    const restored = prefixReady && canRestore && settledFor === tutorialOpen;
+
     return useMemo(() => ({
         tabs,
         activeTabId: state.activeTabId,
@@ -390,5 +398,6 @@ export default function useGraphTabs<S>({
         closeTab,
         markRan,
         activeShareParams,
-    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab, markRan, activeShareParams]);
+        restored,
+    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab, markRan, activeShareParams, restored]);
 }

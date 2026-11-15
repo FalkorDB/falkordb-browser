@@ -91,6 +91,9 @@ const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
 const LOCAL_LLM_ENDPOINT_STORAGE_KEY = "localLlmEndpoint";
 // Shared instance so an unresolved stub probe hands consumers a stable array.
 const NO_OFFLOADED_GRAPHS: string[] = [];
+// Published when the first list request fails: the selector shows no graphs,
+// but saved tabs must not be validated against it. Any later list is a new array.
+const UNKNOWN_GRAPH_NAMES: string[] = [];
 
 // The graph list waits on the stub probe, so this bounds how long a hung
 // GRAPH.STUBS can hold the selector empty.
@@ -253,9 +256,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Always-current ref so effects can validate graph names without re-running
   // on every graphNames mutation (prevents spurious URL→state rollbacks).
   const graphNamesRef = useRef<string[]>([]);
+  const graphNamesKnown = graphNames !== undefined && graphNames !== UNKNOWN_GRAPH_NAMES;
+  const graphNamesKnownRef = useRef(graphNamesKnown);
   useEffect(() => {
     graphNamesRef.current = graphNames ?? [];
-  }, [graphNames]);
+    graphNamesKnownRef.current = graphNamesKnown;
+  }, [graphNames, graphNamesKnown]);
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   // Mirrored so callbacks can tell "the graph is gone" from "the list is not in
   // yet" without re-creating themselves. Written in an effect, not during
@@ -1640,14 +1646,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // A stored tab can name a graph that has since been dropped. Rebuilding it
     // would query that name, and querying a missing graph makes FalkorDB create
-    // it — so drop the name here and keep the tab's query text.
+    // it — so drop the name here and keep the tab's query text. A failed list
+    // request proves nothing either way: keep the name, but do not run the query.
+    const listUnknown = graphNamesLoadedRef.current && !graphNamesKnownRef.current;
     const graphIsGone = !!tab.graphName
       && graphNamesLoadedRef.current
+      && !listUnknown
       && !graphNamesRef.current.includes(tab.graphName);
+    const holdQuery = tab.awaitingRun || listUnknown;
 
     // A tab that will not run its query must not keep showing the outgoing
     // tab's results either — treat its graph as a fresh selection, which clears them.
-    if (tab.awaitingRun && !graphIsGone) {
+    if (holdQuery && !graphIsGone) {
       // Same graph as the one shown: the reset clears its info and counts, and
       // /graph only refetches those when the name changes — so ask it to.
       if (graphNameRef.current === tab.graphName) setGraphInfoReload(v => v + 1);
@@ -1666,11 +1676,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     if (graphIsGone || !tab.graphName) return;
 
-    // A share link hands over someone else's query: show it, but leave running
-    // it to the user. The graph page still fetches the graph's info and counts;
-    // the default-query auto-load must not fire, or it would run a query after
-    // all and replace the shared text in the editor.
-    if (tab.awaitingRun) {
+    // A share link hands over someone else's query, and an unknown list cannot
+    // vouch for the graph: show the query, but leave running it to the user. The
+    // graph page still fetches the graph's info and counts; the default-query
+    // auto-load must not fire, or it would run a query after all and replace the
+    // tab's text in the editor.
+    if (holdQuery) {
       pendingAutoLoadRef.current = null;
       return;
     }
@@ -2488,7 +2499,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (res) {
       setGraphNames(res.opts);
     } else if (options?.clear) {
-      setGraphNames([]);
+      setGraphNames(UNKNOWN_GRAPH_NAMES);
     }
     setGraphNamesLoaded(true);
     // Auto-select is graph-scoped: only apply if the graph context is unchanged.
@@ -2499,14 +2510,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // querying it (which would make FalkorDB re-create it), clear the selection
   // once the list is known — the tab keeps its query text either way.
   useEffect(() => {
-    if (!graphNamesLoaded || !graphName) return;
+    if (!graphNamesLoaded || !graphNamesKnown || !graphName) return;
     if (graphNamesRef.current.includes(graphName)) return;
 
     // Route through handleSetGraphName so any in-flight query for it is
     // superseded (bumps contextGen).
     handleSetGraphName("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, graphNamesLoaded]);
+  }, [graphName, graphNamesLoaded, graphNamesKnown]);
 
   // One-way sync: context state → URL (only while on /graph). The URL names
   // the active tab, and carries its share params so a copied address bar opens
@@ -2541,6 +2552,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphNamesLoaded(false);
     graphNamesLoadedRef.current = false;
     setGraphNames(undefined);
+    graphNamesKnownRef.current = false;
 
     // Skip the very first selection (initial mount / login) and null resets
     if (prev === null || activeConnectionId === null) {

@@ -97,6 +97,8 @@ setIsQueryLoading(false)`), so a switch/graph‑change can't strand it; a new `r
 ## 3. Per‑function changes
 
 ### 3a. Central graph‑name commit — `commitGraphName(name)` (new)
+> Shipped as `handleSetGraphName` in `app/providers.tsx`; `commitGraphName` below is the planned name.
+
 Graph name is set at several sites that currently bypass `handleSetGraphName`:
 `providers.tsx:1407`, `:1417`, `:1498` (reset), plus the new auto‑select. Route **all** through:
 ```ts
@@ -179,16 +181,29 @@ fixed in `selectGraph`). Only the **connection‑reset** path clears it; drive t
 `loading` flag instead of `setGraphNames(undefined)`. The list is **connection‑scoped** (guard by
 connection epoch + `optionsSeq`); the auto‑select is **graph‑scoped** (also guard by `contextGen`):
 ```ts
-const ctx = contextGenRef.current; const oseq = bumpOptionsSeq();
+const oseq = (optionsSeqRef.current += 1); const ctx = contextGenRef.current;
 const cid = getActiveConnectionIdGlobal(); const epoch = getConnectionEpoch();
-if (opts?.clear) setGraphNames(undefined);            // only the connection-reset fetch passes { clear: true }
-const res = await fetchOptions(gToast, gInd, indicator, cid).catch(() => null); // a rejection is a failed refresh
-if (getConnectionEpoch() === epoch && optionsSeqRef.current === oseq) {
-  if (res) setGraphNames(res.opts);                   // on network error keep the last good list
-  setGraphNamesLoaded(true);
-  if (res?.autoSelect && contextGenRef.current === ctx) commitGraphName(res.autoSelect);
-}
+const generation = getGraphListGeneration();          // a mutation in flight already published a correct list
+const isCurrent = () => getConnectionEpoch() === epoch
+  && getGraphListGeneration() === generation && optionsSeqRef.current === oseq;
+if (options?.clear) setGraphNames(undefined);         // only the connection-reset fetch passes { clear: true }
+const res = await fetchOptions(gToast, gInd, indicator, cid).catch((error: unknown) => {
+  console.error("Failed to fetch graphs:", error);    // a rejection or non-JSON body is a failed refresh
+  gToast({ title: "Error", description: "Failed to fetch graphs", variant: "destructive" });
+  return null;
+});
+if (res) await refreshOffloadedGraphs(cid);           // settle offloaded stubs before publishing the list
+if (!isCurrent()) return;
+if (res) setGraphNames(res.opts);                     // on a failed refresh keep the last good list…
+else if (options?.clear) setGraphNames(UNKNOWN_GRAPH_NAMES); // …or mark a failed first list as unknown
+setGraphNamesLoaded(true);
+if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
 ```
+`gToast`/`gInd` drop toasts and indicator changes once `isCurrent()` is false. `UNKNOWN_GRAPH_NAMES`
+is a sentinel empty list: it settles readiness so the page unlocks, but `graphNamesKnown` stays false
+until a list is actually received. While it is false, restoring a tab keeps its graph name and query
+without running the query, and the "stored tab names a dropped graph" check does not clear the
+selection, so a later successful refresh validates the saved graph instead of discarding it.
 Expose `handleFetchOptions` on `GraphContext` (move its declaration above the context memo). A
 separate effect, ordered after the reset effect and keyed on `activeConnectionId`, `status` and
 `handleFetchOptions`, calls `handleFetchOptions({ clear: !graphNamesLoadedRef.current })`, so an
@@ -287,7 +302,7 @@ pointing at `fetchCount`. No README change.
 6. `providers.tsx`: `fetchMetaStats` forward pin + guarded callbacks.
 7. `providers.tsx`: `fetchCount` optional `isCurrent` before count writes.
 8. `providers.tsx`: `runQuery` capture tokens; pin all; guard after `Promise.all`, after `/explain`, before `Graph.create`, before success apply, in catch, in `finally` (owner‑based loading release).
-9. `providers.tsx`: `handleFetchOptions` guard list + auto‑select via `optionsSeq`+`contextGen`; route auto‑select through `commitGraphName`.
+9. `providers.tsx`: `handleFetchOptions` guard list + auto‑select via `optionsSeq`+`contextGen`; route auto‑select through `commitGraphName` (shipped as `handleSetGraphName`).
 10. `selectGraph.tsx`: use guarded `handleFetchOptions` for the dropdown refresh.
 11. `e2e/tests/connectionSwitchRace.spec.ts`: the 6 races (must fail pre‑fix).
 12. Full CI command set; iterate to green.

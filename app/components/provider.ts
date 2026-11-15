@@ -258,6 +258,8 @@ type GraphTabsContextType = {
   tabsReady: boolean;
   /** Whether the graph list has settled for the active connection. */
   graphNamesReady: boolean;
+  /** Whether the strip restored for the current readiness has been committed. */
+  restored: boolean;
   /** The user's tab limit, also used to size the tab strip. */
   maxTabs: number;
   selectTab: (id: string) => void;
@@ -608,6 +610,7 @@ export const GraphTabsContext = createContext<GraphTabsContextType>({
   activeTabId: "",
   tabsReady: false,
   graphNamesReady: false,
+  restored: false,
   maxTabs: DEFAULT_GRAPH_TABS,
   selectTab: () => { },
   addTab: () => { },
