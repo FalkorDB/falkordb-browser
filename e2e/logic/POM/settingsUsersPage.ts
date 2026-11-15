@@ -261,7 +261,7 @@ export default class SettingsUsersPage extends BasePage {
     await Promise.race([
       this.userForm.waitFor({ state: "hidden" }),
       this.errorToast.waitFor({ state: "visible" }),
-      this.page.getByRole("alert").waitFor({ state: "visible" }),
+      this.userForm.getByRole("alert").first().waitFor({ state: "visible" }),
     ]);
   }
 
