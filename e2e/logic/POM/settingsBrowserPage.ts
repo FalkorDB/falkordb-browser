@@ -675,22 +675,17 @@ export default class SettingsBrowserPage extends BasePage {
     // Expand whatever categories are currently shown (respects active search filter)
     // so we can check whether the model is present in the filtered results.
     await this.expandAllCategories();
+    return this.isModelShown(providerName);
+  }
 
+  // Checks without expanding categories: an active search auto-expands every matching
+  // category, so clicking toggles while polling would race the 200 ms search debounce.
+  async isModelShown(providerName: string): Promise<boolean> {
     const modelButton = this.getModelButton(providerName);
     if (await modelButton.count() > 0) {
-      try {
-        return await modelButton.isVisible();
-      } catch {
-        return false;
-      }
+      return modelButton.first().isVisible();
     }
-
-    try {
-      const buttonByText = this.getModelButtonByDisplayText(providerName);
-      return await buttonByText.first().isVisible();
-    } catch {
-      return false;
-    }
+    return this.getModelButtonByDisplayText(providerName).first().isVisible();
   }
 
   async isCategoryVisible(categoryName: string): Promise<boolean> {

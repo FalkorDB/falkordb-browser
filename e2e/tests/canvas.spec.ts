@@ -34,6 +34,7 @@ test.describe('Canvas Tests', () => {
             const searchQuery = `Person${node}`;
             await graph.searchElementInCanvas(searchQuery);
             await graph.hoverAtCanvasCenter();
+            await expect(graph.nodeCanvasToolTip).toBeVisible();
             await expect(graph.nodeCanvasToolTip).toHaveText(searchQuery);
             await apicalls.removeGraph(graphName);
         });
@@ -139,6 +140,7 @@ test.describe('Canvas Tests', () => {
         await graph.getNodesScreenPositions();
         await graph.searchElementInCanvas("Alice");
         await graph.hoverAtCanvasCenter();
+        await expect(graph.nodeCanvasToolTip).toBeVisible();
         await expect(graph.nodeCanvasToolTip).toHaveText("Alice");
         await apicalls.removeGraph(graphName);
     });
@@ -157,6 +159,7 @@ test.describe('Canvas Tests', () => {
         await graph.searchTextAndSelectInCanvas("lic", "Alice");
         await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
+        await expect(graph.nodeCanvasToolTip).toBeVisible();
         await expect(graph.nodeCanvasToolTip).toHaveText("Alice");
         await apicalls.removeGraph(graphName);
     });
@@ -185,6 +188,7 @@ test.describe('Canvas Tests', () => {
         await graph.searchElementInCanvas("Bob");
         await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
+        await expect(graph.nodeCanvasToolTip).toBeVisible();
         await expect(graph.nodeCanvasToolTip).toHaveText("Bob");
         await apicalls.removeGraph(graphName);
     });
@@ -727,6 +731,7 @@ test.describe('Canvas Tests', () => {
             expect(nodes.length).toBe(10);
             for (const node of nodes) {
                 await page.mouse.move(node.screenX, node.screenY);
+                await expect(graph.nodeCanvasToolTip).toBeVisible();
                 await expect(graph.nodeCanvasToolTip).toHaveText(node.data.name);
             }
 

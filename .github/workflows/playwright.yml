@@ -824,7 +824,8 @@ jobs:
           timeout 90s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
       - name: Run smoke Playwright tests against local docker build
         run: |
-          npx playwright test \
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/shipped-image \
+            npx playwright test \
             --project="[Smoke] - Chromium" \
             --workers=1 \
             --reporter=dot,list,html
@@ -857,6 +858,7 @@ jobs:
       - name: Record existing docker smoke tests
         run: |
           E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e-docker-browser" \
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/coverage-image \
             npx playwright test --project="[Smoke] - Chromium" --workers=1 --reporter=dot,list,html
       - name: Collect docker coverage and exact build artifacts
         if: ${{ !cancelled() && steps.docker-coverage.outcome == 'success' }}

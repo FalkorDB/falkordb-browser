@@ -144,9 +144,9 @@ test.describe('@browser Browser Settings tests', () => {
         // Search for "gpt" - should only show OpenAI models
         await settingsBrowserPage.searchModels("gpt");
 
-        // Poll: the search filter is debounced
-        await expect.poll(() => settingsBrowserPage.isModelVisible(openaiModel)).toBe(true);
-        await expect.poll(() => settingsBrowserPage.isModelVisible(anthropicModel)).toBe(false);
+        // Poll: the search filter is debounced and auto-expands matching categories
+        await expect.poll(() => settingsBrowserPage.isModelShown(openaiModel)).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelShown(anthropicModel)).toBe(false);
     });
 
     test('@readwrite Verify search shows only matching category', async () => {
@@ -164,9 +164,9 @@ test.describe('@browser Browser Settings tests', () => {
         // Search for "claude" - should only show Anthropic category
         await settingsBrowserPage.searchModels("claude");
 
-        // Poll: the search filter is debounced
-        await expect.poll(() => settingsBrowserPage.isModelVisible(anthropicModel)).toBe(true);
-        await expect.poll(() => settingsBrowserPage.isModelVisible(openaiModel)).toBe(false);
+        // Poll: the search filter is debounced and auto-expands matching categories
+        await expect.poll(() => settingsBrowserPage.isModelShown(anthropicModel)).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelShown(openaiModel)).toBe(false);
     });
 
     test('@readwrite Verify empty search state displays correctly', async () => {
@@ -310,7 +310,7 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.searchModels("gpt");
 
         // Verify filtered state (debounced) - Anthropic model should not be visible
-        await expect.poll(() => settingsBrowserPage.isModelVisible(anthropicModel)).toBe(false);
+        await expect.poll(() => settingsBrowserPage.isModelShown(anthropicModel)).toBe(false);
 
         // Clear search
         await settingsBrowserPage.clearModelSearch();

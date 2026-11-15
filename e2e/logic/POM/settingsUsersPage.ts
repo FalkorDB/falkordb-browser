@@ -1,4 +1,4 @@
-import { Locator } from "@playwright/test";
+import { expect, Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { interactWhenVisible, waitForElementToBeVisible, waitForElementToNotBeVisible } from "../../infra/utils";
 
@@ -21,6 +21,14 @@ export default class SettingsUsersPage extends BasePage {
 
   private get submitEditUser(): Locator {
     return this.page.getByRole("button", { name: "Save", exact: true });
+  }
+
+  private get addUserDrawer(): Locator {
+    return this.page.getByRole("dialog", { name: "Add User" });
+  }
+
+  private get editUserDrawer(): Locator {
+    return this.page.getByRole("dialog", { name: "Edit User" });
   }
 
   private get selectRoleBtn(): Locator {
@@ -230,8 +238,10 @@ export default class SettingsUsersPage extends BasePage {
       await this.clickOnSelectUserRole(userDetails.role);
     }
     await this.clickOnSubmitUserAddition();
-    // Invalid input is rejected client-side; valid input sends POST /api/user then /api/user/save.
-    await this.waitForPageIdle();
+    // Invalid input is rejected client-side with a field alert; valid input closes
+    // the drawer only after POST /api/user and the ACL save have resolved.
+    const fieldError = this.addUserDrawer.getByRole("alert").first();
+    await expect.poll(async () => !(await this.addUserDrawer.isVisible()) || fieldError.isVisible()).toBe(true);
   }
 
   async getUserRole(selectedUser: string): Promise<string | null> {
@@ -249,7 +259,7 @@ export default class SettingsUsersPage extends BasePage {
     await this.clickOnSelectUserRole(role);
     await this.clickOnSubmitEditUser();
     // The drawer closes only once the PATCH and the ACL save have resolved.
-    await waitForElementToNotBeVisible(this.submitEditUser);
+    await expect(this.editUserDrawer).toBeHidden();
   }
 
   async editUser(selectedUser: string, options: { role?: string, keys?: string, password?: string, confirmPassword?: string }): Promise<void> {
@@ -270,7 +280,7 @@ export default class SettingsUsersPage extends BasePage {
     }
     await this.clickOnSubmitEditUser();
     // The drawer closes only once the PATCH and the ACL save have resolved.
-    await waitForElementToNotBeVisible(this.submitEditUser);
+    await expect(this.editUserDrawer).toBeHidden();
   }
 
   async clickOnEditUserBtn(): Promise<void> {

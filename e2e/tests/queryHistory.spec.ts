@@ -70,6 +70,7 @@ test.describe('Query history Tests', () => {
         const searchQuery = `Alice`;
         await graph.searchElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
+        await expect(graph.nodeCanvasToolTip).toBeVisible();
         await expect(graph.nodeCanvasToolTip).toHaveText(searchQuery);
         await apicalls.removeGraph(graphName);        
     });
