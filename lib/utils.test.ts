@@ -128,14 +128,61 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
     }
   });
 
-  it("does not wrap UNION branches beginning with WITH", () => {
+  it("wraps UNION branches beginning with WITH behind an empty import", () => {
+    for (const [query, body] of [
+      ["MATCH (n) RETURN n UNION WITH 1 AS x RETURN x", "MATCH (n) RETURN n UNION WITH * WITH 1 AS x RETURN x"],
+      ["WITH 1 AS x RETURN x union WITH 2 AS x RETURN x", "WITH * WITH 1 AS x RETURN x union WITH * WITH 2 AS x RETURN x"],
+      ["RETURN 1 AS x UNION ALL /* c */ with 2 AS x RETURN x", "RETURN 1 AS x UNION ALL /* c */ WITH * with 2 AS x RETURN x"],
+      ["RETURN 1 AS x UNION MATCH (n) WITH n RETURN 2 AS x", "RETURN 1 AS x UNION MATCH (n) WITH n RETURN 2 AS x"],
+      ["RETURN 1 AS x UNION WITH 2 AS x RETURN x LIMIT 5", "RETURN 1 AS x UNION WITH * WITH 2 AS x RETURN x LIMIT 5"],
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${body}\n} RETURN * LIMIT 1`, 1]);
+    }
+    assert.deepEqual(
+      getQueryWithLimit("CYPHER p=1 WITH $p AS x RETURN x UNION RETURN 2 AS x", 1),
+      ["CYPHER p=1 CALL { WITH * WITH $p AS x RETURN x UNION RETURN 2 AS x\n} RETURN * LIMIT 1", 1],
+    );
+  });
+
+  it("only takes UNION as a clause at the end of a RETURN", () => {
     for (const query of [
-      "WITH 1 AS x RETURN x union WITH 2 AS x RETURN x",
-      "RETURN 1 AS x UNION ALL WITH 2 AS x RETURN x",
-      "CYPHER p=1 WITH $p AS x RETURN x UNION RETURN 2 AS x",
+      "MATCH (n), (union) WHERE n.name CONTAINS union RETURN n LIMIT 5",
+      "UNWIND [1] AS union WITH union ORDER BY union RETURN union LIMIT 5",
+      "UNWIND [1] AS union WITH union SKIP union RETURN union LIMIT 5",
+      "MATCH (union) DETACH DELETE union WITH 1 AS x RETURN x LIMIT 5",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 300), [query, 5]);
+    }
+    for (const query of [
+      "MATCH (union) RETURN union ORDER BY union UNION RETURN 2 AS union",
+      "RETURN 1 AS x ORDER BY x SKIP 0 LIMIT 2 UNION RETURN 2 AS x",
+      "MATCH (n:Return) RETURN n.x AS x UNION RETURN 1 AS x",
+    ]) {
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
+  });
+
+  it("does not wrap EXPLAIN or PROFILE UNION queries", () => {
+    for (const query of [
+      "explain MATCH (n) RETURN n UNION MATCH (m) RETURN m",
+      "PROFILE RETURN 1 AS x UNION RETURN 2 AS x",
+      "CYPHER p=1 profile RETURN $p AS x UNION RETURN 2 AS x",
     ]) {
       assert.deepEqual(getQueryWithLimit(query, 1), [`${query} LIMIT 1`, 1]);
     }
+  });
+
+  it("scans many UNION branches promptly", () => {
+    const script = `
+      import assert from "node:assert/strict";
+      import { getQueryWithLimit } from ${JSON.stringify(new URL("./utils.ts", import.meta.url).href)};
+      const query = Array.from({ length: 20000 }, (_, i) => "RETURN " + i + " AS x").join(" UNION ");
+      assert.deepEqual(getQueryWithLimit(query, 1), ["CALL { " + query + "\\n} RETURN * LIMIT 1", 1]);
+    `;
+    execFileSync(process.execPath, ["--input-type=module", "--eval", script], {
+      timeout: 8000,
+      stdio: "pipe",
+    });
   });
 
   it("recognises UNION after a backtick-quoted property", () => {
@@ -216,11 +263,11 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
     ]) {
       assert.deepEqual(getQueryWithLimit(header + body, 300), [`${header}CALL { ${body}\n} RETURN * LIMIT 300`, 300]);
     }
-    for (const query of [
-      "CYPHER match=1 WITH $match AS x RETURN x UNION RETURN 2 AS x",
-      "CYPHER return=1 WITH $return AS x RETURN x UNION RETURN 2 AS x",
+    for (const [header, body] of [
+      ["CYPHER match=1 ", "WITH $match AS x RETURN x UNION RETURN 2 AS x"],
+      ["CYPHER return=1 ", "WITH $return AS x RETURN x UNION RETURN 2 AS x"],
     ]) {
-      assert.deepEqual(getQueryWithLimit(query, 1), [`${query} LIMIT 1`, 1]);
+      assert.deepEqual(getQueryWithLimit(header + body, 1), [`${header}CALL { WITH * ${body}\n} RETURN * LIMIT 1`, 1]);
     }
   });
 
@@ -323,6 +370,8 @@ describe("getQueryWithLimit keyword detection (#2203)", () => {
       ["RETURN 1\nCALL p() RETURN 2 LIMIT 20", 20],
       ["RETURN CALL LIMIT 30", 30],
       ["RETURN 1\n  LIMIT 40", 40],
+      ["RETURN 1 RETURN 2; RETURN 3 LIMIT 50", 50],
+      ["RETURN 1; RETURN 2", 0],
     ] as const) {
       assert.deepEqual(getQueryWithLimit(query, 0), [query, expected]);
     }
