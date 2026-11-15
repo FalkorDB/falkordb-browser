@@ -185,6 +185,8 @@ jobs:
           export CSV_LOCAL_TEMP_DIR=/tmp/fdb-import
           export CSV_LOCAL_LOAD_URI_MODE=file
           export CSV_TEMP_SIGNING_SECRET=SECRET
+          # 3 parallel workers exceed the default 200 req/min per API path.
+          export RATE_LIMIT_MAX_REQUESTS=0
           export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
           NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
@@ -196,7 +198,7 @@ jobs:
             --project="[Admin: Settings - Chromium]" \
             --project="[Admin: Mobile] Chromium" \
             --shard=${{ matrix.shard }}/6 \
-            --workers=2 \
+            --workers=3 \
             --reporter=dot,list
       - name: Stop the server
         if: ${{ !cancelled() }}
