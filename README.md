@@ -70,7 +70,9 @@ Access the Browser: (https://browser.falkordb.com)
   deleted, even after a timeout or reload.
 - Graph selection and saved-tab loads wait for recovery. Setup and Replay waits
   are bounded; a late creation remains tracked. Switching connections or closing
-  on mobile cannot publish an old tutorial into a newer one. Background sample
+  on mobile cannot publish an old tutorial into a newer one; switching while the
+  tutorial is open restarts it with samples on the new connection, leaving the
+  old connection's samples recorded for its own cleanup. Background sample
   reads cannot recreate deleted graphs; explicit editor writes retain their
   normal permissions. Closing restores only user graphs verified to still exist.
 

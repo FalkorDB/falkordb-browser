@@ -85,6 +85,7 @@ const TUTORIAL_DEMO_OWNER_ID_SESSION_KEY = "tutorialDemoOwnerId";
 const TUTORIAL_DEMO_OWNER_LOCK_PREFIX = "falkordb-browser:tutorialDemoOwner:";
 
 type TutorialConnection = { cid: string | null; scope: string };
+type TutorialActivation = { open: boolean; connectionGen: number; id: number };
 
 const TUTORIAL_CONNECTION_POLL_MS = 100;
 const TUTORIAL_CONNECTION_TIMEOUT_MS = 30_000;
@@ -517,9 +518,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const viewportResolved = useViewportResolved();
   const isMobile = useIsMobile();
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const tutorialActivationRef = useRef({ open: tutorialOpen, id: 0 });
-  const tutorialSampleActivationRef = useRef<{ open: boolean; id: number } | null>(null);
-  if (tutorialActivationRef.current.open !== tutorialOpen) tutorialActivationRef.current = { open: tutorialOpen, id: tutorialActivationRef.current.id + 1 };
+  // Bumped when the connection changes under an open tutorial: its samples,
+  // steps and snapshots belong to the old server, so it restarts on the new one.
+  const [tutorialConnectionGen, setTutorialConnectionGen] = useState(0);
+  const tutorialActivationRef = useRef<TutorialActivation>({ open: tutorialOpen, connectionGen: tutorialConnectionGen, id: 0 });
+  const tutorialSampleActivationRef = useRef<TutorialActivation | null>(null);
+  // The activation whose Skip cleanup is running; a switch then must not restart it.
+  const tutorialClosingActivationRef = useRef<TutorialActivation | null>(null);
+  if (tutorialActivationRef.current.open !== tutorialOpen || tutorialActivationRef.current.connectionGen !== tutorialConnectionGen) {
+    tutorialActivationRef.current = { open: tutorialOpen, connectionGen: tutorialConnectionGen, id: tutorialActivationRef.current.id + 1 };
+  }
   // Set once the settings effect has decided whether the tour runs, so other
   // first-visit popups can wait for that answer instead of racing it.
   const [tutorialDecided, setTutorialDecided] = useState(false);
@@ -2753,6 +2761,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setLabels([]);
     setRelationships([]);
 
+    // An open tutorial is remounted (keyed by its activation) so it loads its
+    // own samples here instead of walking the new server through the old ones.
+    // The old server's samples stay recorded there for its next recovery.
+    const tutorialActivation = tutorialActivationRef.current;
+    if (tutorialActivation.open && tutorialClosingActivationRef.current !== tutorialActivation) {
+      tutorialConnectionRef.current = null;
+      setUserGraphsBeforeTutorial([]);
+      setUserGraphBeforeTutorial("");
+      setUrlParamsBeforeTutorial("");
+      setTutorialConnectionGen(gen => gen + 1);
+    }
+
     // Re-fetch graph list for the new connection (clearing the old list).
     connectionSwitchFetchedRef.current = true;
     handleFetchOptions({ clear: true });
@@ -3394,9 +3414,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     }
   }, [graphName, toast, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, handleSetGraphName, setHistoryQuery, waitForTutorialConnection, isTutorialConnectionCurrent, reclaimAbandonedTutorialGraphs, fetchTutorialGraphList]);
 
-  const handleCleanupDemoGraphs = useCallback(async () => {
+  const cleanupDemoGraphs = useCallback(async (activation: TutorialActivation) => {
     const startEpoch = getConnectionEpoch();
-    const activation = tutorialActivationRef.current;
     const connection = tutorialConnectionRef.current;
     tutorialConnectionRef.current = null;
     let restoredGraphs: string[] | undefined;
@@ -3494,6 +3513,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setUrlParamsBeforeTutorial("");
   }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial, supersedeGraphRefreshes, cleanupAndPersistTutorialGraphs, fetchTutorialGraphList, handleSetGraphName, setHistoryQuery, reclaimAbandonedTutorialGraphs, notifyPendingTutorialOwnership]);
 
+  const handleCleanupDemoGraphs = useCallback(async () => {
+    const activation = tutorialActivationRef.current;
+    tutorialClosingActivationRef.current = activation;
+    try {
+      await cleanupDemoGraphs(activation);
+    } finally {
+      if (tutorialClosingActivationRef.current === activation) tutorialClosingActivationRef.current = null;
+    }
+  }, [cleanupDemoGraphs]);
+
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>
       <LoginVerification>
@@ -3519,6 +3548,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                             customizingLabel={customizingLabel}
                                             setCustomizingLabel={setCustomizingLabel}
                                             tutorialOpen={tutorialOpen}
+                                            tutorialKey={tutorialActivationRef.current.id}
                                             tutorialDecided={tutorialDecided}
                                             onCloseTutorial={handleCloseTutorial}
                                             onLoadDemoGraphs={handleLoadDemoGraphs}

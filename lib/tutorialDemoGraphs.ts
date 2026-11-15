@@ -37,7 +37,7 @@ export function tutorialDemoOwnershipKey(ownerId: string): string {
   return `${TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX}${ownerId}`;
 }
 
-export function parseTutorialDemoOwnership(stored: string, scope: string, ownerId: string): TutorialDemoOwnership {
+export function parseTutorialDemoOwnership(stored: string, scope: string, ownerId: string): TutorialDemoOwnership & { pendingNames: string[] } {
   const parsed: unknown = JSON.parse(stored);
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error("Stored tutorial graph ownership is invalid; refusing to delete unverified graphs");
@@ -88,7 +88,7 @@ export function completeTutorialDemoGraphSetup(
   const completed = new Set(completedNames);
   return {
     ...ownership,
-    pendingNames: (ownership.pendingNames ?? ownership.names).filter(name => !completed.has(name)),
+    pendingNames: ownership.pendingNames.filter(name => !completed.has(name)),
   };
 }
 

@@ -1,6 +1,7 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import type { Session, SessionConnection } from "next-auth";
 import urls from "../config/urls.json";
+import { expect, test } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
 import AppDownloadComponent from "../logic/POM/appDownloadComponent";
@@ -1201,6 +1202,58 @@ test.describe("Tutorial", () => {
                 expect(message).toMatch(/deleted|empty key/);
             }
         }
+    });
+
+    test("@admin switching connections after Welcome restarts the tutorial on the new connection's samples", async () => {
+        test.setTimeout(120_000);
+        const tutorial = await browser.createNewPage(TutorialPanel);
+        await browser.setPageToFullScreen();
+        const page = await browser.getPage();
+        const connections = await mockTutorialConnectionSwitches(page);
+        const scopeOf = (connection: SessionConnection) => `${connection.host}:${connection.port}:${connection.username || "default"}:`;
+        const ownedNames = (scope: string) => page.evaluate(scope => {
+            const ownerId = sessionStorage.getItem("tutorialDemoOwnerId");
+            const stored = ownerId ? localStorage.getItem(`${scope}tutorialDemoGraphOwnership:${ownerId}`) : null;
+            return stored ? (JSON.parse(stored) as { names: string[] }).names : [];
+        }, scope);
+        await page.addInitScript(() => localStorage.setItem("tutorial", "true"));
+        await page.goto(urls.graphUrl);
+        await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+        const firstNames = await ownedNames(scopeOf(connections.first));
+        expect(firstNames).toHaveLength(2);
+
+        // Anything the tutorial asks of the first connection's samples from now
+        // on would be the stale tutorial walking the new server.
+        const staleRequests: string[] = [];
+        page.on("request", request => {
+            const { pathname } = new URL(request.url());
+            if (firstNames.some(name => pathname === `/api/graph/${name}` || pathname.startsWith(`/api/graph/${name}/`))) staleRequests.push(request.url());
+        });
+
+        await connections.switchTo(connections.second, true);
+        await expect.poll(() => ownedNames(scopeOf(connections.second)), { timeout: 30000 }).toHaveLength(2);
+        const secondNames = await ownedNames(scopeOf(connections.second));
+        expect(secondNames.filter(name => firstNames.includes(name))).toEqual([]);
+        // The old samples stay recorded where they were made, for that
+        // connection's next recovery to reclaim.
+        expect(await ownedNames(scopeOf(connections.first))).toEqual(firstNames);
+
+        await tutorial.waitForStep("Welcome to FalkorDB Browser", 30000);
+        await tutorial.clickNextButton();
+        await tutorial.waitForStep("Select a Graph");
+        await tutorial.clickTutorialTarget('[data-testid="selectGraph"]');
+        await tutorial.waitForStep("Manage Graphs");
+        await expect(page.getByTestId(`selectGraph${secondNames[0]}Button`)).toBeVisible();
+        await expect(page.getByTestId(`selectGraph${firstNames[0]}Button`)).toHaveCount(0);
+        await tutorial.clickTutorialTarget('[data-testid="manageGraphs"]');
+        await tutorial.waitForStep("Manage Graphs Window");
+        await tutorial.clickNextButton();
+        await tutorial.waitForStep("Close Manage Graphs Window");
+        await tutorial.clickTutorialTarget('[data-testid="closeManage"]');
+        await tutorial.waitForStep("Select a Demo Graph");
+        await tutorial.clickTutorialTarget(`[data-testid="selectGraph${secondNames[0]}Button"]`);
+        await tutorial.waitForStep("Graph Info Panel");
+        expect(staleRequests).toEqual([]);
     });
 
     test("@admin closing retains pending ownership while reclaiming confirmed abandoned samples", async () => {

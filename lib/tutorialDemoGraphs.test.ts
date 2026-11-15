@@ -164,6 +164,8 @@ describe("tutorial demo graph ownership (#2202)", () => {
       ownerId,
     );
     assert.deepEqual(getTutorialDemoReclaimableNames(partiallyCreated), ["tutorial-social-demo-x"]);
+    // An ownership built without a completion list is treated as all pending.
+    assert.deepEqual(getTutorialDemoReclaimableNames({ scope, ownerId, names }), []);
     assert.throws(() => parseTutorialDemoOwnership(
       stored({ scope, ownerId, names, pendingNames: ["tutorial-social-demo-other"] }),
       scope,
