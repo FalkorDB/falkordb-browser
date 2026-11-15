@@ -704,7 +704,7 @@ export default class GraphPage extends BasePage {
   }
 
   // TABS
-  private get graphTab(): Locator {
+  public get graphTab(): Locator {
     return this.page.getByTestId("graphTab");
   }
 
