@@ -154,7 +154,7 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.maxQueuedQueries, Data.roleModificationData[0].input);
-        await settingsConfigPage.isUndoBtnInToastMsg();
+        await settingsConfigPage.expectConfigSavedToast();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.maxQueuedQueries)).config[1]);
         expect(value === Data.roleModificationData[0].input).toBe(true);
@@ -165,7 +165,7 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.TimeOut, Data.roleModificationData[1].input);
-        await settingsConfigPage.isUndoBtnInToastMsg();
+        await settingsConfigPage.expectConfigSavedToast();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.TimeOut)).config[1]);
         expect(value === Data.roleModificationData[1].input).toBe(true);
@@ -176,7 +176,7 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.maxTimeOut, Data.roleModificationData[2].input);
-        await settingsConfigPage.isUndoBtnInToastMsg();
+        await settingsConfigPage.expectConfigSavedToast();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
         expect(value === Data.roleModificationData[2].input).toBe(true);
@@ -187,7 +187,7 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.defaultTimeOut, Data.roleModificationData[3].input);
-        await settingsConfigPage.isUndoBtnInToastMsg();
+        await settingsConfigPage.expectConfigSavedToast();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.defaultTimeOut)).config[1]);
         expect(value === Data.roleModificationData[3].input).toBe(true);
@@ -198,7 +198,7 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.resultSetSize, Data.roleModificationData[4].input);
-        await settingsConfigPage.isUndoBtnInToastMsg();
+        await settingsConfigPage.expectConfigSavedToast();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.resultSetSize)).config[1]);
         expect(value === Data.roleModificationData[4].input).toBe(true);
@@ -209,7 +209,7 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.queryMemCapacity, Data.roleModificationData[5].input);
-        await settingsConfigPage.isUndoBtnInToastMsg();
+        await settingsConfigPage.expectConfigSavedToast();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.queryMemCapacity)).config[1]);
         expect(value === Data.roleModificationData[5].input).toBe(true);
@@ -220,7 +220,7 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.vKeyMaxEntityCount, Data.roleModificationData[6].input);
-        await settingsConfigPage.isUndoBtnInToastMsg();
+        await settingsConfigPage.expectConfigSavedToast();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.vKeyMaxEntityCount)).config[1]);
         expect(value === Data.roleModificationData[6].input).toBe(true);
@@ -231,7 +231,7 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.cmdInfo, Data.roleModificationData[7].input);
-        await settingsConfigPage.isUndoBtnInToastMsg();
+        await settingsConfigPage.expectConfigSavedToast();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.cmdInfo)).config[1]);
         let modifiedValue;
@@ -250,7 +250,7 @@ test.describe('@config Settings config tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, Data.roleModificationData[8].input);
-        await settingsConfigPage.isUndoBtnInToastMsg();
+        await settingsConfigPage.expectConfigSavedToast();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
         expect(value).toBe(Data.roleModificationData[8].input);
@@ -336,7 +336,7 @@ test.describe('@config Settings config tests', () => {
         try {
             await settingsConfigPage.navigateToDBConfigurationTab();
             await settingsConfigPage.modifyRoleValue(roles.effectsThreshold, Data.roleModificationData[9].input);
-            await settingsConfigPage.isUndoBtnInToastMsg();
+            await settingsConfigPage.expectConfigSavedToast();
             await settingsConfigPage.waitForPageIdle();
             const value = String((await apiCall.getSettingsRoleValue(roles.effectsThreshold)).config[1]);
             expect(value).toBe(Data.roleModificationData[9].input);
@@ -350,7 +350,7 @@ test.describe('@config Settings config tests', () => {
         try {
             await settingsConfigPage.navigateToDBConfigurationTab();
             await settingsConfigPage.modifyRoleValue(roles.deltaMaxPendingChanges, Data.roleModificationData[10].input);
-            await settingsConfigPage.isUndoBtnInToastMsg();
+            await settingsConfigPage.expectConfigSavedToast();
             await settingsConfigPage.waitForPageIdle();
             const value = String((await apiCall.getSettingsRoleValue(roles.deltaMaxPendingChanges)).config[1]);
             expect(value).toBe(Data.roleModificationData[10].input);
@@ -364,7 +364,7 @@ test.describe('@config Settings config tests', () => {
         try {
             await settingsConfigPage.navigateToDBConfigurationTab();
             await settingsConfigPage.modifyRoleValue(roles.jsHeapSize, Data.roleModificationData[11].input);
-            await settingsConfigPage.isUndoBtnInToastMsg();
+            await settingsConfigPage.expectConfigSavedToast();
             await settingsConfigPage.waitForPageIdle();
             const value = String((await apiCall.getSettingsRoleValue(roles.jsHeapSize)).config[1]);
             expect(value).toBe(Data.roleModificationData[11].input);
@@ -378,7 +378,7 @@ test.describe('@config Settings config tests', () => {
         try {
             await settingsConfigPage.navigateToDBConfigurationTab();
             await settingsConfigPage.modifyRoleValue(roles.jsStackSize, Data.roleModificationData[12].input);
-            await settingsConfigPage.isUndoBtnInToastMsg();
+            await settingsConfigPage.expectConfigSavedToast();
             await settingsConfigPage.waitForPageIdle();
             const value = String((await apiCall.getSettingsRoleValue(roles.jsStackSize)).config[1]);
             expect(value).toBe(Data.roleModificationData[12].input);

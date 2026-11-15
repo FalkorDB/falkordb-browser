@@ -1,6 +1,6 @@
-import { Locator } from "@playwright/test";
+import { expect, Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
+import { interactWhenVisible } from "@/e2e/infra/utils";
 
 export default class SettingsConfigPage extends BasePage {
 
@@ -44,8 +44,8 @@ export default class SettingsConfigPage extends BasePage {
         return this.page.locator("//table//tbody//tr");
     }
 
-    private get undoBtnInToastMsg(): Locator {
-        return this.page.locator("//button[contains(text(), 'Undo')]");
+    private get configSavedToast(): Locator {
+        return this.page.getByText("Configuration value set successfully").first();
     }
 
     private get searchForConfigInput(): Locator {
@@ -98,9 +98,6 @@ export default class SettingsConfigPage extends BasePage {
         return interactWhenVisible(this.roleContentValue(role), (el) => el.textContent(), `role content value ${role}`);
     }
     
-    async clickOnUndoBtnInToastMsg(): Promise<void> {
-        await interactWhenVisible(this.undoBtnInToastMsg, (el) => el.click(), "undo button in toast");
-    }
 
     async clickToastCloseBtn(): Promise<void> {
         await interactWhenVisible(this.toastCloseBtn, (el) => el.click(), "toast close button");
@@ -114,8 +111,8 @@ export default class SettingsConfigPage extends BasePage {
         await interactWhenVisible(this.searchForConfigInput, (el) => el.fill(value), "search input");
     }
     
-    async isUndoBtnInToastMsg(): Promise<boolean> {
-        return waitForElementToBeVisible(this.undoBtnInToastMsg);
+    async expectConfigSavedToast(): Promise<void> {
+        await expect(this.configSavedToast).toBeVisible();
     }
 
     async modifyRoleValue(role: string, input: string): Promise<string | null> {

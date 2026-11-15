@@ -1,6 +1,6 @@
 import { expect, Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForElementToBeVisible, waitForElementToNotBeVisible } from "../../infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible } from "../../infra/utils";
 
 export default class SettingsUsersPage extends BasePage {
   private get usersTabBtn(): Locator {
@@ -369,8 +369,8 @@ export default class SettingsUsersPage extends BasePage {
     await this.clickUserCheckboxBtn(selectedUser2);
     await this.clickDeleteUsersBtn();
     await this.clickConfirmUserDeleteMsg();
-    await waitForElementToNotBeVisible(this.userRow(selectedUser1));
-    await waitForElementToNotBeVisible(this.userRow(selectedUser2));
+    await expect(this.userRow(selectedUser1)).toBeHidden();
+    await expect(this.userRow(selectedUser2)).toBeHidden();
   }
 
   async removeUser(selectedUser: string): Promise<void> {

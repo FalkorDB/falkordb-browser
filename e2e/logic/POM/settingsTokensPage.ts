@@ -308,7 +308,7 @@ export default class SettingsTokensPage extends HeaderComponent {
   async revokeToken(name: string): Promise<void> {
     await this.clickRevokeButtonByName(name);
     await this.clickRevokeConfirmButton();
-    await waitForElementToNotBeVisible(this.tokenRowByName(name));
+    await expect(this.tokenRowByName(name)).toBeHidden();
   }
 
   async cancelRevokeToken(): Promise<void> {

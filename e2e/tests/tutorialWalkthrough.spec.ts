@@ -2071,8 +2071,9 @@ test.describe("Tutorial", () => {
         // 4. Cleanup is async: this tutorial's demo graphs are deleted, the user's graph is kept
         await expect.poll(async () => {
             const graphs = await tutorial.getGraphList();
-            return activeDemoGraphs.every((g) => !graphs.includes(g)) && graphs.includes(userGraph);
-        }, { timeout: 10_000 }).toBe(true);
+            return activeDemoGraphs.filter((g) => graphs.includes(g));
+        }, { timeout: 10_000 }).toEqual([]);
+        expect(await tutorial.getGraphList()).toContain(userGraph);
 
         // 5. Verify the user's own tabs came back with them
         await expect.poll(() => tutorial.getStripTabCount()).toBe(userTabs);
