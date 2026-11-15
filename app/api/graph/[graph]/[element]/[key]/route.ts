@@ -27,6 +27,14 @@ export async function POST(
     const { client, user } = session;
     const { graph: graphId, element, key: routeKey } = await params;
     const key = request.nextUrl.searchParams.get("propertyKey") ?? routeKey;
+
+    if (!key) {
+      return NextResponse.json(
+        { message: "Property key must not be empty" },
+        { status: 400, headers: getCorsHeaders(request) }
+      );
+    }
+
     const elementId = Number(element);
     const isReadOnly = resolveReadOnly(request, user.role);
 
@@ -103,6 +111,14 @@ export async function DELETE(
 
     const { graph: graphId, element, key: routeKey } = await params;
     const key = request.nextUrl.searchParams.get("propertyKey") ?? routeKey;
+
+    if (!key) {
+      return NextResponse.json(
+        { message: "Property key must not be empty" },
+        { status: 400, headers: getCorsHeaders(request) }
+      );
+    }
+
     const elementId = Number(element);
     const isReadOnly = resolveReadOnly(request, user.role);
 

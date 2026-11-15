@@ -1,7 +1,7 @@
 'use client';
 
 import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Trash2, X } from "lucide-react";
-import getPropertyUrl from "@/lib/propertyUrl";
+import { getPropertyUrl } from "@/lib/graphUrls";
 import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
 import { formatValue, getDefaultValue, inferValueType, isGeoPoint, parseValue, VALUE_PLACEHOLDERS, VALUE_TYPES, type ValueType } from "@/lib/graphValues";
 import { useToast } from "@/components/ui/use-toast";

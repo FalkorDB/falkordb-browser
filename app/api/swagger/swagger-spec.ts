@@ -1354,8 +1354,8 @@ const swaggerSpec = {
             in: "query",
             name: "propertyKey",
             required: false,
-            schema: { type: "string" },
-            description: "Exact property name to set; overrides the key in the path"
+            schema: { type: "string", minLength: 1 },
+            description: "Exact property name to set; overrides the key in the path. An empty value is rejected with 400"
           }
         ],
         requestBody: {
@@ -1423,8 +1423,8 @@ const swaggerSpec = {
             in: "query",
             name: "propertyKey",
             required: false,
-            schema: { type: "string" },
-            description: "Exact property name to remove; overrides the key in the path"
+            schema: { type: "string", minLength: 1 },
+            description: "Exact property name to remove; overrides the key in the path. An empty value is rejected with 400"
           }
         ],
         requestBody: {
