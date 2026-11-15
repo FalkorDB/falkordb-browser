@@ -105,8 +105,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       );
       await settingsTokensPage.navigateToTokensTab();
 
-      // Wait for the token to appear in the table (this ensures data has loaded)
-      await settingsTokensPage.waitFor(1500);
       expect(await settingsTokensPage.verifyTokenExists(tokenName)).toBe(true);
       
       // Admin should see Username and Role columns
@@ -141,8 +139,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       await settingsTokensPage.fillTokenName("");
       
       // Generate token confirm button should be disabled without name
-      await settingsTokensPage.waitFor(300);
-      expect(await settingsTokensPage.isGenerateTokenConfirmButtonDisabled()).toBe(true);
+      await expect.poll(() => settingsTokensPage.isGenerateTokenConfirmButtonDisabled()).toBe(true);
     });
 
     test("@readonly Copy token to clipboard", async () => {
@@ -232,9 +229,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       );
       await settingsTokensPage.navigateToTokensTab();
 
-      // Wait for tokens to load in the UI
-      await settingsTokensPage.waitFor(1500);
-
       // Verify token appears in UI
       expect(await settingsTokensPage.verifyTokenExists(tokenName)).toBe(true);
 
@@ -242,9 +236,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokensBefore = await settingsTokensPage.getTokenCount();
 
       await settingsTokensPage.revokeToken(tokenName);
-      
-      // Wait for token to be removed from list
-      await settingsTokensPage.waitFor(1000);
 
       // Verify token count decreased
       const tokensAfter = await settingsTokensPage.getTokenCount();
@@ -263,12 +254,12 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       );
   
       await settingsTokensPage.navigateToTokensTab();
+      expect(await settingsTokensPage.verifyTokenExists(tokenName2)).toBe(true);
       const tokensBefore = await settingsTokensPage.getTokenCount();
       await settingsTokensPage.revokeToken(tokenName1);
       await settingsTokensPage.revokeToken(tokenName2);
-      const tokensAfter = await settingsTokensPage.getTokenCount();
-      
-      expect(tokensAfter).toBe(tokensBefore - 2);
+      // The table re-renders after each revoke; poll until it settles.
+      await expect.poll(() => settingsTokensPage.getTokenCount()).toBe(tokensBefore - 2);
     });
   });
 
@@ -692,9 +683,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokensBefore = await settingsTokensPage.getTokenCount();
 
       await settingsTokensPage.revokeToken(tokenName);
-      
-      // Wait for token to be removed from list
-      await settingsTokensPage.waitFor(1000);
 
       // Verify token count decreased
       const tokensAfter = await settingsTokensPage.getTokenCount();
@@ -725,9 +713,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokensBefore = await settingsTokensPage.getTokenCount();
 
       await settingsTokensPage.revokeToken(tokenName);
-      
-      // Wait for token to be removed from list
-      await settingsTokensPage.waitFor(1000);
 
       // Verify token count decreased
       const tokensAfter = await settingsTokensPage.getTokenCount();
