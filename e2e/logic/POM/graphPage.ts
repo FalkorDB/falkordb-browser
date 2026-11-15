@@ -7,8 +7,10 @@ import {
   waitForElementToNotBeVisible,
   interactWhenVisible,
   waitForElementToBeEnabled,
+  waitForURL,
 } from "@/e2e/infra/utils";
 import BasePage from "@/e2e/infra/ui/basePage";
+import urls from "../../config/urls.json";
 
 export type Element = "Node" | "Relation";
 
@@ -24,6 +26,13 @@ export type ElementLabel = "Relationships" | "Labels";
 export type Type = "Graph" | "Role" | "Type" | "Model" | "Theme" | "Query";
 
 export type UploadMode = "dump" | "csv" | "cypher";
+
+export interface RelationshipStyle {
+  color: string;
+  width: number;
+  fontSize: number;
+  arrowSize: number;
+}
 
 export default class GraphPage extends BasePage {
   // CREATE
@@ -248,6 +257,20 @@ export default class GraphPage extends BasePage {
     });
   }
 
+  /** The style each canvas link is drawn with, read without waiting out the force simulation. */
+  async readRelationshipStyles(relationship: string): Promise<RelationshipStyle[]> {
+    return this.page.evaluate((type) => {
+      const links: (RelationshipStyle & { relationship: string })[] = (window as any).graph?.()?.links ?? [];
+      return links
+        .filter((link) => link.relationship === type)
+        .map(({ color, width, fontSize, arrowSize }) => ({ color, width, fontSize, arrowSize }));
+    }, relationship);
+  }
+
+  async readNodeStyles(): Promise<{ id: number; color: string; size: number }[]> {
+    return (await this.readNodesScreenPositions()).map(({ id, color, size }) => ({ id, color, size }));
+  }
+
   // DELETE ELEMENT
   public get deleteElement(): (type?: Element | "Graph") => Locator {
     return (type: Element | "Graph" = "Graph") =>
@@ -339,6 +362,10 @@ export default class GraphPage extends BasePage {
 
   public get errorToast(): Locator {
     return this.page.getByTestId("toast-destructive");
+  }
+
+  private get errorToastGoToSettingsButton(): Locator {
+    return this.errorToast.getByRole("button", { name: "Go to Settings", exact: true });
   }
 
   public get toastUnDoButton(): Locator {
@@ -580,6 +607,15 @@ export default class GraphPage extends BasePage {
     );
   }
 
+  async clickErrorToastGoToSettings(): Promise<void> {
+    await interactWhenVisible(
+      this.errorToastGoToSettingsButton,
+      (el) => el.click(),
+      "Error toast Go to Settings"
+    );
+    await waitForURL(this.page, urls.settingsUrl);
+  }
+
   /** Rendered height of the toast against the viewport, and whether its body overflows. */
   async getErrorToastSizing(): Promise<{
     toastHeight: number;
@@ -713,7 +749,7 @@ export default class GraphPage extends BasePage {
   }
 
   // TABS
-  private get graphTab(): Locator {
+  public get graphTab(): Locator {
     return this.page.getByTestId("graphTab");
   }
 
@@ -811,6 +847,10 @@ export default class GraphPage extends BasePage {
 
   private get duplicateGraphInput(): Locator {
     return this.page.getByTestId("duplicateGraphInput");
+  }
+
+  private get searchInputGraphs(): Locator {
+    return this.page.getByTestId("searchInputGraphs");
   }
 
   private get duplicateGraphConfirm(): Locator {
@@ -1257,6 +1297,14 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("graphTabAdd");
   }
 
+  public get firstTabSelect(): Locator {
+    return this.page.locator('[data-testid^="graphTabSelect-"]').first();
+  }
+
+  public tabSelect(testId: string): Locator {
+    return this.page.getByTestId(testId);
+  }
+
   public stripTab(label: string): Locator {
     // Labels are user-supplied: quote them so a `"` or `\` cannot break out of
     // the attribute selector.
@@ -1414,15 +1462,45 @@ export default class GraphPage extends BasePage {
   }
 
   async clickDuplicateGraphConfirm(): Promise<void> {
+    await this.submitDuplicateGraph();
+    // Wait until the confirmation dialog disappears
+    await waitForElementToNotBeVisible(this.duplicateGraphConfirm);
+    // And wait for the success toast to show up
+    await this.isVisibleToast();
+  }
+
+  async submitDuplicateGraph(): Promise<void> {
     await interactWhenVisible(
       this.duplicateGraphConfirm,
       (el) => el.click(),
       `Confirm Duplicate Graph`
     );
-    // Wait until the confirmation dialog disappears
-    await waitForElementToNotBeVisible(this.duplicateGraphConfirm);
-    // And wait for the success toast to show up
-    await this.isVisibleToast();
+  }
+
+  async searchManagedGraphs(name: string): Promise<void> {
+    await this.searchInputGraphs.fill(name);
+  }
+
+  private managedGraphRow(name: string): Locator {
+    return this.page.getByRole("row").filter({ has: this.tableCheckboxByName(name) });
+  }
+
+  graphNameEditor(name: string): Locator {
+    return this.managedGraphRow(name).getByTestId("inputGraphs");
+  }
+
+  async editManagedGraph(name: string): Promise<void> {
+    const row = this.managedGraphRow(name);
+    await row.hover();
+    await row.getByTestId("editButtonGraphs").click();
+  }
+
+  async submitManagedGraphName(name: string): Promise<void> {
+    await this.managedGraphRow(name).getByTestId("saveButtonGraphs").click();
+  }
+
+  async expectEmptyGraphNameError(): Promise<void> {
+    await expect(this.page.getByText("Graph name cannot be empty", { exact: true })).toBeVisible();
   }
 
   async clickSaveButton(): Promise<void> {
@@ -1639,17 +1717,17 @@ export default class GraphPage extends BasePage {
     await waitForElementToNotBeVisible(this.deleteConfirm);
   }
 
-  async insertQuery(query: string): Promise<void> {
-    await this.clickEditorInput();
+  async insertQuery(query: string, { focus = true }: { focus?: boolean } = {}): Promise<void> {
+    if (focus) await this.clickEditorInput();
     // Set editor content through Monaco to avoid flaky keyboard-based replacement
     // when previous content exists or keybindings intercept keystrokes.
-    await this.page.waitForFunction(() => {
+    await expect.poll(() => this.page.evaluate(() => {
       const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
       const container = document.querySelector('[data-testid="editorContainer"]');
       return !!m
         && !!container
         && m.editor.getEditors().some((e) => container.contains(e.getContainerDomNode()));
-    });
+    }), { timeout: 10000 }).toBe(true);
     await this.page.evaluate((text) => {
       const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
       const container = document.querySelector('[data-testid="editorContainer"]');
@@ -1858,6 +1936,20 @@ export default class GraphPage extends BasePage {
     await this.clickSelectItem(graphName); // selecting the first item in list after search
   }
 
+  /** The graph page writes the selection, view and layout to the URL once the selection settles. */
+  async waitForSelectedGraphInUrl(graphName: string): Promise<void> {
+    await this.page.waitForURL((url) =>
+      url.searchParams.get("graph") === graphName && url.searchParams.has("view") && url.searchParams.has("layout"));
+  }
+
+  /** The connection ID browser requests must carry in `X-Connection-Id`. */
+  async getActiveConnectionId(): Promise<string | undefined> {
+    const response = await this.page.request.get(new URL("/api/auth/session", urls.localHost).href);
+    if (!response.ok()) throw new Error(`Session request failed with status ${response.status()}`);
+    const { activeConnectionId } = await response.json();
+    return activeConnectionId;
+  }
+
   async deleteElementsByPosition(
     positions: { x: number; y: number }[]
   ): Promise<void> {
@@ -2051,7 +2143,7 @@ export default class GraphPage extends BasePage {
       panel: await GraphPage.boxOf(this.manageContent, "Manage Graphs panel"),
       actions,
       search: await GraphPage.boxOf(
-        this.page.getByTestId("searchInputGraphs"),
+        this.searchInputGraphs,
         "Graphs search box",
       ),
     };

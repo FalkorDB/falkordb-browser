@@ -163,6 +163,11 @@ type GraphContextType = {
   handleSetGraphName: (name: string) => void;
   setGraphInfo: (gi: GraphInfo) => void;
   graphNames: string[] | undefined;
+  // The first graph-list request failed and no list has been fetched since, so
+  // only names added to `graphNames` locally (a created graph) are confirmed.
+  graphNamesUnknown: boolean;
+  // A successfully fetched list confirms every name, even when it is unchanged.
+  markGraphNamesKnown: () => void;
   setGraphNames: Dispatch<SetStateAction<string[] | undefined>>;
   labels: Label[];
   setLabels: Dispatch<SetStateAction<Label[]>>;
@@ -170,7 +175,7 @@ type GraphContextType = {
   setRelationships: Dispatch<SetStateAction<Relationship[]>>;
   currentTab: Tab;
   setCurrentTab: Dispatch<SetStateAction<Tab>>;
-  runQuery: (query: string, name?: string) => Promise<void>;
+  runQuery: (query: string, name?: string, options?: { readOnly?: boolean; silent?: boolean; allowTutorialCreation?: boolean }) => Promise<void>;
   fetchCount: (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number }) => Promise<void>;
   handleCooldown: (ticks?: number, isSetLoading?: boolean) => void;
   cooldownTicks: number | undefined;
@@ -251,9 +256,16 @@ type QueryLoadingContextType = {
 };
 
 type GraphTabsContextType = {
+  recoveryReady: boolean;
   /** Working contexts for the current connection, ordered left to right. */
   tabs: GraphTab[];
   activeTabId: string;
+  /** Whether restored tabs and the query timeout are ready for interaction. */
+  tabsReady: boolean;
+  /** Whether the graph list has settled for the active connection. */
+  graphNamesReady: boolean;
+  /** Whether the strip restored for the current readiness has been committed. */
+  restored: boolean;
   /** The user's tab limit, also used to size the tab strip. */
   maxTabs: number;
   selectTab: (id: string) => void;
@@ -521,6 +533,8 @@ export const GraphContext = createContext<GraphContextType>({
   handleSetGraphName: () => { },
   setGraphInfo: () => { },
   graphNames: undefined,
+  graphNamesUnknown: false,
+  markGraphNamesKnown: () => { },
   setGraphNames: () => { },
   labels: [],
   setLabels: () => { },
@@ -600,8 +614,12 @@ export const QueryLoadingContext = createContext<QueryLoadingContextType>({
 });
 
 export const GraphTabsContext = createContext<GraphTabsContextType>({
+  recoveryReady: false,
   tabs: [],
   activeTabId: "",
+  tabsReady: false,
+  graphNamesReady: false,
+  restored: false,
   maxTabs: DEFAULT_GRAPH_TABS,
   selectTab: () => { },
   addTab: () => { },

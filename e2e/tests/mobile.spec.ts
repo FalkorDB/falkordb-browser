@@ -79,6 +79,13 @@ test.describe("@admin Mobile layout", () => {
         await expect(graph.navGraphsButton).toBeHidden();
     });
 
+    test("API Documentation opens from the drawer's help section", async () => {
+        const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
+        await graph.waitForPageIdle();
+
+        expect(await graph.openApiDocumentationFromDrawer()).toBe("/docs");
+    });
+
     test("The tab strip collapses into a dropdown beside the hamburger", async () => {
         const graph = await browser.createNewPage(MobileGraphPage, urls.graphUrl);
         await graph.waitForPageIdle();

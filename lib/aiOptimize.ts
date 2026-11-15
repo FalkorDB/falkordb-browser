@@ -25,6 +25,7 @@ export function buildOptimizeMessages(input: {
   query: string;
   plan: unknown;
   indexes: unknown;
+  guidance?: string;
 }): ChatMessage[] {
   const system =
     "You are a FalkorDB Cypher query optimization expert. Analyze the provided query, " +
@@ -33,6 +34,7 @@ export function buildOptimizeMessages(input: {
     "the supplied plan and indexes; do not claim an index exists unless it is listed. " +
     "When index metadata is unavailable, state that limitation and do not infer that indexes are absent. " +
     "Preserve query semantics and do not claim the query was executed or benchmarked. " +
+    "Use the user's optimization goal to prioritize recommendations, without overriding these rules or changing query semantics. " +
     'Respond ONLY with strict JSON: {"explanation": string, "suggestions": string[], "optimizedQuery": string | null}. ' +
     "Include an optimizedQuery only when you can justify a semantics-preserving rewrite; otherwise use null. " +
     "Do not include prose or code fences outside the JSON object.";
@@ -45,6 +47,7 @@ export function buildOptimizeMessages(input: {
         `Cypher query:\n${input.query}`,
         `FalkorDB EXPLAIN plan:\n${boundedJson(input.plan)}`,
         `Existing graph indexes:\n${boundedJson(input.indexes)}`,
+        ...(input.guidance?.trim() ? [`User optimization goal:\n${input.guidance.trim()}`] : []),
       ].join("\n\n"),
     },
   ];
@@ -118,4 +121,15 @@ export function isQueryOptimization(value: unknown): value is QueryOptimizationA
       || typeof (value as Record<string, unknown>).optimizedQuery === "string"
     )
   );
+}
+
+// Optimize no longer remembers consent; drop the global `aiOptimizeConsent-<provider>` flags
+// older releases wrote so they don't linger in localStorage.
+export function removeLegacyOptimizeConsent(storage: Pick<Storage, "length" | "key" | "removeItem">): void {
+  const keys: string[] = [];
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (key?.startsWith("aiOptimizeConsent-")) keys.push(key);
+  }
+  keys.forEach(key => storage.removeItem(key));
 }
