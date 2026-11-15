@@ -76,6 +76,33 @@ for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
   });
 }
 
+for (const invalidation of ["edit", "tab-switch"] as const) {
+  test(`@admin stale Fix with AI action clears on ${invalidation}`, async ({ page }) => {
+    const graphName = getRandomString("fixFailureOwner");
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    try {
+      await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+      const ai = new AiAssistComponent(page);
+      await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+      await ai.insertQuery("RETRUN 1");
+      await expect.poll(() => ai.hasEditorErrorMarker()).toBe(true);
+      await ai.clickRunQuery(false);
+      await expect(ai.fixWithAiButton).toBeVisible();
+
+      if (invalidation === "edit") {
+        await ai.insertQuery("RETURN 99");
+        await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 99");
+      } else {
+        await ai.addTabButton.click();
+      }
+
+      await expect(ai.fixWithAiButton).toHaveCount(0);
+    } finally {
+      expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    }
+  });
+}
+
 for (const staleStatus of [200, 422, 401]) {
   test(`@admin stale Fix with AI ${staleStatus} cannot replace a newer result`, async ({ page }) => {
     // Simulate a transport that completes despite cancellation to exercise ownership.
