@@ -266,15 +266,17 @@ export default class SettingsUsersPage extends BasePage {
     if (options.keys !== undefined) {
       await this.fillEditKeysField(options.keys);
     }
-    const updateResponse = this.page.waitForResponse((response) =>
-      response.request().method() === "PATCH"
-      && new URL(response.url()).pathname === `/api/user/${encodeURIComponent(selectedUser)}`
-    );
-    await this.clickOnSubmitEditUser();
-    const response = await updateResponse;
+    const [response] = await Promise.all([
+      this.page.waitForResponse((res) =>
+        res.request().method() === "PATCH"
+        && new URL(res.url()).pathname === `/api/user/${encodeURIComponent(selectedUser)}`
+      ),
+      this.clickOnSubmitEditUser(),
+    ]);
     if (!response.ok()) {
       throw new Error(`Updating user "${selectedUser}" failed with HTTP ${response.status()}`);
     }
+    await this.submitEditUser.waitFor({ state: "hidden" });
   }
 
   async clickOnEditUserBtn(): Promise<void> {

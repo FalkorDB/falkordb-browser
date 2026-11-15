@@ -156,6 +156,42 @@ test.describe('@Config Settings users tests', () => {
         await apiCall.deleteUsers({ users: [{ username }] });
     });
 
+    test("@admin Edit user waits for ACL persistence before returning", async () => {
+        const username = getRandomString('user');
+        await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
+        let releaseSave: (() => void) | undefined;
+        const saveGate = new Promise<void>((resolve) => {
+            releaseSave = resolve;
+        });
+        let saveRequested = false;
+        let editCompleted = false;
+        let editPromise: Promise<void> | undefined;
+
+        try {
+            const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+            await settingsUsersPage.navigateToUserTab();
+            const page = await browser.getPage();
+            await page.route("**/api/user/save", async (route) => {
+                saveRequested = true;
+                await saveGate;
+                await route.continue();
+            });
+
+            editPromise = settingsUsersPage.editUser(username, { role: user.ReadOnly }).then(() => {
+                editCompleted = true;
+            });
+            void editPromise.catch(() => undefined);
+            await expect.poll(() => saveRequested).toBe(true);
+            expect(editCompleted).toBe(false);
+            releaseSave?.();
+            await editPromise;
+        } finally {
+            releaseSave?.();
+            await editPromise?.catch(() => undefined);
+            await apiCall.deleteUsers({ users: [{ username }] });
+        }
+    });
+
     test("@admin Edit user -> change key permissions via edit form -> Validate keys changed", async () => {
         const username = getRandomString('user');
         await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
