@@ -39,6 +39,19 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 |---------------------------------------------------|---------------------------------------------------|
 
 
+## Automatic query limiting
+
+When the result limit in Settings is above 0, the browser adds `LIMIT <n>` to a query
+whose final `RETURN` has none. A limit of 0 (shown as ∞) leaves queries unchanged.
+
+- Trailing semicolons are removed before the limit is added.
+- A non-`UNION` query whose final `RETURN` already has a `LIMIT` keeps it.
+- `UNION` queries are wrapped as `CALL { … } RETURN * LIMIT <n>`, even when a branch has its
+  own `LIMIT`, so the limit applies to the combined result. A leading `CYPHER` parameter
+  header stays outside the wrapper.
+- Known limitation: `UNION` queries that contain a `CALL` clause, or start with `EXPLAIN` or
+  `PROFILE`, are not wrapped; the limit is added to the last branch only.
+
 ## Get Started & Demo
 
 Access the Browser: (https://browser.falkordb.com)

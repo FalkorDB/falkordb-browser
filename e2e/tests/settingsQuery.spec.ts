@@ -43,6 +43,7 @@ test.describe.serial("Query Settings", () => {
   const limitQueries = [
     `UNWIND range(1, 10) AS x CREATE (n) RETURN n`,
     `UNWIND range(1, 10) AS x CREATE (n) RETURN n UNION UNWIND range(1, 10) AS x CREATE (n) RETURN n`,
+    `WITH 1 AS y UNWIND range(1, 10) AS x CREATE (n) RETURN n UNION WITH 2 AS y UNWIND range(1, 10) AS x CREATE (n) RETURN n`,
     `CALL { UNWIND range(1, 10) AS x CREATE (n) RETURN n UNION UNWIND range(1, 10) AS x CREATE (n) RETURN n } RETURN n`,
   ];
 
