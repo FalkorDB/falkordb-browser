@@ -9,7 +9,7 @@ import { ChevronDown, ChevronRight, Share2, Loader2, Search, X, Sparkles } from 
 import { Chat as ChatPanel, ChatAvatar, ChatFooter, ChatHeader, ChatInput, ChatInputField, ChatMessage, ChatMessages, ChatSendButton, ChatTitle } from "@falkordb/ui";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import Link from "next/link";
 import Button from "../components/ui/Button";
 import { GraphContext, GraphTabsContext, HistoryQueryContext, IndicatorContext, BrowserSettingsContext, ConnectionContext, UDFContext } from "../components/provider";
@@ -78,7 +78,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graphName } = useContext(GraphContext);
     const { setHistoryQuery } = useContext(HistoryQueryContext);
-    const { activeTabId } = useContext(GraphTabsContext);
+    const { activeTabId, tabsReady } = useContext(GraphTabsContext);
     const { activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
@@ -109,6 +109,12 @@ export default function Chat({ onClose }: Props) {
     const draftScope = `${getConnectionPrefix()}${draftKey}`;
     const loadedDraftScopeRef = useRef<string | null>(null);
     const draftRevisionsRef = useRef(new Map<string, number>());
+    const draftOwnerRef = useRef<object | null>(null);
+
+    useLayoutEffect(() => {
+        draftOwnerRef.current = {};
+        return () => { draftOwnerRef.current = null; };
+    }, []);
 
     useLayoutEffect(() => {
         if (!getConnectionPrefix() || activeConnectionId !== prefixConnectionId) {
@@ -203,9 +209,11 @@ export default function Chat({ onClose }: Props) {
         // and only this conversation's loading state may be settled by it.
         const submittedKey = historyKey;
         const submittedScope = draftScope;
+        const submittedOwner = draftOwnerRef.current;
         const submittedDraft = { text: newMessage, revision: draftRevisionsRef.current.get(submittedScope) ?? 0 };
-        const isStale = () => historyKeyRef.current !== submittedKey || loadedDraftScopeRef.current !== submittedScope;
-        const draftUnchanged = () => isUnchangedChatDraft(submittedDraft, localStorage.getItem(submittedScope), draftRevisionsRef.current.get(submittedScope) ?? 0);
+        const ownsDraft = () => submittedOwner !== null && draftOwnerRef.current === submittedOwner;
+        const isStale = () => !ownsDraft() || historyKeyRef.current !== submittedKey || loadedDraftScopeRef.current !== submittedScope;
+        const draftUnchanged = () => ownsDraft() && isUnchangedChatDraft(submittedDraft, localStorage.getItem(submittedScope), draftRevisionsRef.current.get(submittedScope) ?? 0);
         const showRequestError = (content: string) => {
             if (isStale()) return;
             if (draftUnchanged()) setNewMessage(submittedDraft.text);
@@ -413,6 +421,7 @@ export default function Chat({ onClose }: Props) {
                     <SuggestedQuery
                         query={message.content}
                         onInsert={query => setHistoryQuery(prev => withQuery(prev, query))}
+                        insertDisabled={!tabsReady}
                         collapsible
                         testIds={{ query: "chatSuggestedQuery", copy: "chatCopyQueryButton", insert: "chatInsertQueryButton" }}
                     />
@@ -429,7 +438,7 @@ export default function Chat({ onClose }: Props) {
                     <div className="flex flex-col gap-1">
                         <MarkdownMessage content={message.content} />
                         {message.type === "Error" && isChatConfigurationError(message.content) && (
-                            <Link href="/settings" className="text-sm underline">
+                            <Link href="/settings" onNavigate={event => { event.preventDefault(); route.push("/settings"); }} className="text-sm underline">
                                 Go to Settings
                             </Link>
                         )}

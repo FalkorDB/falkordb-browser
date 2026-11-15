@@ -132,6 +132,9 @@ Rules for every change:
 ### Client code
 
 - `securedFetch` (`lib/utils.ts`) **resolves** on HTTP errors — always check `response.ok`.
+- Navigate with `useAppRouter` (`lib/useAppRouter.tsx`), never `next/navigation`'s `useRouter` (lint
+  enforces it); internal `Link`s route through it with `onNavigate`. It holds a navigation token so
+  deferred graph URL sync cannot cancel the navigation.
 - Async effects in `app/providers.tsx` need a `cancelled` guard + cleanup. React StrictMode is on:
   effects must tolerate setup → cleanup → setup.
 - Stale-result protection (connection / graph / query ownership tokens, connection epoch) is

@@ -1,5 +1,6 @@
 import { interactWhenVisible, waitForElementToBeEnabled } from "@/e2e/infra/utils";
 import { Locator } from "@playwright/test";
+import { readFile } from "fs/promises";
 import GraphPage from "./graphPage";
 
 export default class TableView extends GraphPage {
@@ -8,12 +9,20 @@ export default class TableView extends GraphPage {
         return this.page.getByTestId("tableTab");
     }
 
-    private get tableViewTabPanel(): Locator {
+    public get tableViewTabPanel(): Locator {
         return this.page.getByRole('tabpanel', { name: 'Table' });
     }
 
-    private get tableViewTableRows(): Locator {
+    public get tableViewTableRows(): Locator {
         return this.tableViewTabPanel.locator('tbody tr');
+    }
+
+    public get lastColumnCells(): Locator {
+        return this.tableViewTableRows.locator('td:last-child');
+    }
+
+    columnHeader(name: RegExp): Locator {
+        return this.tableViewTabPanel.getByRole('columnheader').filter({ hasText: name });
     }
 
     public async clickTableViewTab(): Promise<void> {
@@ -56,6 +65,19 @@ export default class TableView extends GraphPage {
         await interactWhenVisible(this.exportTableViewButton, async (el: Locator) => {
             await el.click();
         }, 'Export Table View Button');
+    }
+
+    /** Must run before navigation: without the File System Access API the export falls back to a browser download. */
+    public async disableSaveFilePicker(): Promise<void> {
+        await this.page.addInitScript(() => { Reflect.deleteProperty(window, 'showSaveFilePicker'); });
+    }
+
+    public async exportTableAsDownload(): Promise<{ filename: string; content: string }> {
+        const downloadPromise = this.page.waitForEvent('download');
+        await this.clickExportButton();
+        const download = await downloadPromise;
+        const file = await download.path();
+        return { filename: download.suggestedFilename(), content: await readFile(file, 'utf8') };
     }
 
     private get expandAllCellsButton(): Locator {

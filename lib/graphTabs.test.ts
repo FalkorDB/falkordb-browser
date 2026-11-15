@@ -4,6 +4,7 @@ import {
     clampMaxTabs,
     createTab,
     forStorage,
+    isGraphUnconfirmed,
     normalizeDimension,
     normalizeDirection,
     normalizeLayout,
@@ -683,4 +684,19 @@ test("resolveEntryTabs lets a blank tab of the user's own take the share params"
 test("resolveEntryTabs reopens a blank tab of the user's own when nothing is shared", () => {
     const tabs = [tab({ id: "a" }), tab({ id: "b", graphName: "", query: "" })];
     assert.equal(resolveEntryTabs({ tabs, activeTabId: "a" }, "b", null, tab())?.activeTabId, "b");
+});
+
+test("isGraphUnconfirmed holds a graph the list has not confirmed", () => {
+    // Nothing selected, or the list names the graph: safe to query.
+    assert.equal(isGraphUnconfirmed("", undefined, true, false), false);
+    assert.equal(isGraphUnconfirmed("g", ["g"], true, true), false);
+    // A failed list cannot vouch for the graph.
+    assert.equal(isGraphUnconfirmed("g", undefined, true, false), true);
+    assert.equal(isGraphUnconfirmed("g", ["other"], true, true), true);
+    // A known list that omits it: the graph was dropped.
+    assert.equal(isGraphUnconfirmed("g", ["other"], false, true), true);
+    assert.equal(isGraphUnconfirmed("g", [], false, true), true);
+    // No list fetched yet (e.g. during the tutorial): nothing to contradict it.
+    assert.equal(isGraphUnconfirmed("g", undefined, false, true), false);
+    assert.equal(isGraphUnconfirmed("g", ["other"], false, false), false);
 });
