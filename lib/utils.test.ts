@@ -1,10 +1,24 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
+import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, prepareArg, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
+
+describe("prepareArg (#2209)", () => {
+  it("keeps leading and trailing whitespace so 'trail ' is not sent as 'trail'", () => {
+    assert.equal(prepareArg("trail "), "trail%20");
+    assert.equal(prepareArg(" trail"), "%20trail");
+    assert.notEqual(prepareArg("trail "), prepareArg("trail"));
+  });
+
+  it("round-trips names with whitespace and reserved URL characters", () => {
+    for (const name of ["trail ", "a#b/c%", " ?x& ", "\tname\n"]) {
+      assert.equal(decodeURIComponent(prepareArg(name)), name);
+    }
+  });
+});
 
 describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
   it("does not wrap a query whose string or comment mentions UNION", () => {

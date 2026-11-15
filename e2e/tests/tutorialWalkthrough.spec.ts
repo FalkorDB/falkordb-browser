@@ -179,9 +179,10 @@ test.describe("Tutorial", () => {
     test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
         test.setTimeout(120_000);
 
-        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
+        await apiCall.addGraph(userGraph);
+        const tutorial = await browser.createNewPage(TutorialPanel);
         const page = await browser.getPage();
+        await browser.setPageToFullScreen();
         await page.addInitScript(() => {
             const nativeInterval = window.setInterval.bind(window);
             Object.defineProperty(window, "setInterval", {
@@ -189,6 +190,11 @@ test.describe("Tutorial", () => {
                     nativeInterval(handler, timeout === 60000 ? 1000 : timeout, ...args),
             });
         });
+        const graphList = (url: URL) => /^\/api\/graph\/?$/.test(url.pathname);
+        await page.route(graphList, route => route.fulfill({ json: { opts: [userGraph] } }));
+        await page.goto(urls.graphUrl);
+        await expect.poll(() => new URL(page.url()).searchParams.get("graph")).toBe(userGraph);
+        await page.unroute(graphList);
 
         const demoNames: string[] = [];
         const countPeople = async () => {
@@ -225,7 +231,7 @@ test.describe("Tutorial", () => {
 
         try {
             await tutorial.changeLocalStorage("true");
-            await tutorial.refreshPage();
+            await browser.navigateTo(urls.graphUrl);
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
             const heartbeat = () => page.evaluate(() => {
@@ -1736,7 +1742,7 @@ test.describe("Tutorial", () => {
             // it open, and the init script only fills in a missing one.
             await app.evaluate(() => localStorage.setItem("appDownloadPrompt", "true"));
             await tutorial.changeLocalStorage("true");
-            await tutorial.refreshPage();
+            await browser.navigateTo(urls.graphUrl);
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
 
             // Both are first-visit popups: the tour goes first, alone.
@@ -1770,14 +1776,14 @@ test.describe("Tutorial", () => {
         await tutorial.addStripTab();
         const userTabs = await tutorial.getStripTabCount();
         expect(userTabs).toBe(2);
-        // The address bar follows the new blank tab after a short debounce.
-        // Reloading earlier would reload the first tab's share link, and a
-        // share link holds the tutorial back.
+        // The address bar follows the new blank tab after a short debounce, so the
+        // blank tab is the persisted active one; opening the page while a share
+        // link is still active would hold the tutorial back.
         await expect(await browser.getPage()).toHaveURL(url => !url.searchParams.has("graph"));
 
-        // 2. Start the tutorial by setting localStorage and refreshing
+        // 2. Start the tutorial by setting localStorage and reopening the graph page
         await tutorial.changeLocalStorage("true");
-        await tutorial.refreshPage();
+        await browser.navigateTo(urls.graphUrl);
         await tutorial.waitForTimeout(2000);
 
         // Step 0: "Preparing Tutorial..." — auto-advances after loading demo graphs
@@ -2089,7 +2095,7 @@ test.describe("Tutorial", () => {
     test("@admin validate that clicking away doesn't dismiss the tutorial", async () => {
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         await tutorial.changeLocalStorage("true");
-        await tutorial.refreshPage();
+        await browser.navigateTo(urls.graphUrl);
         await tutorial.clickAtTopLeftCorner();
         // Nothing to await on: the assertion is that a dismissal the click could
         // have triggered has had time to happen and did not.
