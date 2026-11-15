@@ -158,17 +158,11 @@ export default class HeaderComponent extends BasePage {
         return newPage;
     }
 
-    async getApiDocumentationLinkHref(): Promise<string | null> {
-        await this.waitForPageIdle();
-        await this.clickOnHelpBtn();
-        return await this.apiDocumentationButton.getAttribute('href');
-    }
-
     async clickOnApiDocumentation(): Promise<Page> {
         await this.waitForPageIdle();
         await this.clickOnHelpBtn();
         await this.clickOnApiDocumentationBtn();
-        await this.page.waitForURL('**/docs**', { timeout: 5000 });
+        await this.page.waitForURL('**/docs**');
         return this.page;
     }
 

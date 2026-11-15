@@ -1233,6 +1233,14 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("graphTabAdd");
   }
 
+  public get firstTabSelect(): Locator {
+    return this.page.locator('[data-testid^="graphTabSelect-"]').first();
+  }
+
+  public tabSelect(testId: string): Locator {
+    return this.page.getByTestId(testId);
+  }
+
   public stripTab(label: string): Locator {
     // Labels are user-supplied: quote them so a `"` or `\` cannot break out of
     // the attribute selector.
@@ -1615,17 +1623,17 @@ export default class GraphPage extends BasePage {
     await waitForElementToNotBeVisible(this.deleteConfirm);
   }
 
-  async insertQuery(query: string): Promise<void> {
-    await this.clickEditorInput();
+  async insertQuery(query: string, { focus = true }: { focus?: boolean } = {}): Promise<void> {
+    if (focus) await this.clickEditorInput();
     // Set editor content through Monaco to avoid flaky keyboard-based replacement
     // when previous content exists or keybindings intercept keystrokes.
-    await this.page.waitForFunction(() => {
+    await expect.poll(() => this.page.evaluate(() => {
       const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
       const container = document.querySelector('[data-testid="editorContainer"]');
       return !!m
         && !!container
         && m.editor.getEditors().some((e) => container.contains(e.getContainerDomNode()));
-    });
+    }), { timeout: 10000 }).toBe(true);
     await this.page.evaluate((text) => {
       const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
       const container = document.querySelector('[data-testid="editorContainer"]');

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { chatDraftKey, isUnchangedChatDraft, isChatConfigurationError } from "./chatDraft.ts";
+import { normalizeLocalEndpoint } from "../../lib/local-llm-utils.ts";
 
 describe("chat drafts", () => {
   it("uses a namespace separate from graph history, including suffix-like graph names", () => {
@@ -24,6 +25,13 @@ describe("chat drafts", () => {
     }
     for (const message of ["Failed to parse server response", "Failed to fetch", "Internal server error", "Syntax error", "An error occurred"]) {
       assert.equal(isChatConfigurationError(message), false, message);
+    }
+  });
+
+  it("offers Settings for every local endpoint validation failure", () => {
+    for (const endpoint of ["not a URL", "https://localhost:11434", "http://example.com:11434"]) {
+      assert.throws(() => normalizeLocalEndpoint("ollama", endpoint), (error: unknown) =>
+        error instanceof Error && isChatConfigurationError(error.message));
     }
   });
 });

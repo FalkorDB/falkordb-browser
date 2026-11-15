@@ -182,6 +182,13 @@ export default class MobileGraphPage extends GraphPage {
     return this.page.getByTestId("settings");
   }
 
+  async openApiDocumentationFromDrawer(): Promise<string> {
+    await this.navToggle.click();
+    await this.page.getByRole("link", { name: "API Documentation" }).click();
+    await this.page.waitForURL("**/docs");
+    return new URL(this.page.url()).pathname;
+  }
+
   /** The popover panel holding the tab rows. Only present while the menu is open. */
   public get tabsMenu(): Locator {
     return this.page.getByTestId("graphTabsMenuContent");
