@@ -3111,12 +3111,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       try {
         const ownerId = await getTutorialDemoOwnerId();
         if (cancelled) return;
-        const connection = readTutorialConnection(false);
-        if (!connection) return;
+        // The session sync may still be running; keep renewing once the connection is readable.
+        let connection: TutorialConnection | null = null;
         const renew = () => {
           if (tutorialSampleActivationRef.current !== tutorialActivationRef.current) return;
           const current = readTutorialConnection(false);
-          if (!current || current.scope !== connection.scope || current.cid !== connection.cid) return;
+          if (!current) return;
+          connection ??= current;
+          if (current.scope !== connection.scope || current.cid !== connection.cid) return;
           const ownership = readTutorialDemoOwnership(connection.scope, ownerId);
           if (ownership.names.length > 0) writeTutorialDemoOwnership(connection.scope, ownerId, ownership.names);
         };

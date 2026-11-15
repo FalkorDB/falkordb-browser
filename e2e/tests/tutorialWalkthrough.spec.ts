@@ -1133,7 +1133,8 @@ test.describe("Tutorial", () => {
             await expect.poll(async () => (await apiCall.getGraphs()).opts.some(name => oldNames.includes(name)), { timeout: 30000 }).toBe(false);
             await tutorial.clickNextButton();
             await tutorial.waitForStep("Select a Graph");
-            expect(await page.evaluate(() => localStorage.getItem("tutorial"))).toBe("true");
+            // Replay clears the flag; the late Skip cleanup must not mark the tutorial as seen.
+            expect(await page.evaluate(() => localStorage.getItem("tutorial"))).not.toBe("false");
         } finally {
             release();
             await Promise.all(routes);
