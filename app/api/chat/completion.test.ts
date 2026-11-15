@@ -54,8 +54,8 @@ describe("shared AI completion transport", () => {
     if (result.ok) assert.equal(parseFixResponse(result.reply, "RETRUN 1").correctedQuery, "RETURN 1");
   });
 
-  for (const model of ["gpt-5", "openai:gpt-5-mini", "openai::gpt-5-pro-2025-10-06", "gpt-5.1", "o1", "o3-pro", "o4-mini"]) {
-    it(`uses Responses without sampling options for reasoning model ${model}`, async (t) => {
+  for (const model of ["gpt-5", "openai:gpt-5-mini", "openai::gpt-5-pro-2025-10-06", "gpt-5.1", "o1", "o3-pro", "o4-mini", "gpt-6-preview", "o5-mini", "codex-mini-latest"]) {
+    it(`uses Responses without sampling options for hosted OpenAI model ${model}`, async (t) => {
       const timeout = t.mock.method(AbortSignal, "timeout", () => new AbortController().signal);
       t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
         assert.equal(url, "https://api.openai.com/v1/responses");
@@ -67,8 +67,8 @@ describe("shared AI completion transport", () => {
     });
   }
 
-  for (const model of ["gpt-4o-mini", "gpt-audio", "gpt-audio-1.5", "gpt-audio-mini", "gpt-6-preview", "o5-mini", "codex-mini-latest"]) {
-    it(`preserves Chat Completions for hosted OpenAI model ${model}`, async (t) => {
+  for (const model of ["gpt-4o-mini", "openai::gpt-4.1", "gpt-4-turbo", "gpt-3.5-turbo", "chatgpt-4o-latest", "openai::ft:gpt-4o-mini-2024-07-18:org::abc123", "gpt-audio", "gpt-audio-1.5", "gpt-audio-mini"]) {
+    it(`preserves Chat Completions for Chat Completions-era OpenAI model ${model}`, async (t) => {
       const timeout = t.mock.method(AbortSignal, "timeout", () => new AbortController().signal);
       t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
         assert.equal(url, "https://api.openai.com/v1/chat/completions");
@@ -138,6 +138,14 @@ describe("shared AI completion transport", () => {
       assert.equal((await requestAiCompletion(input)).ok, false);
     });
   }
+
+  it("ignores assistant Responses messages without a content array", async (t) => {
+    t.mock.method(globalThis, "fetch", async () => Response.json({
+      status: "completed",
+      output: [{ type: "message", role: "assistant" }, ...responsesBody("RETURN 1").output],
+    }));
+    assert.deepEqual(await requestAiCompletion(input), { ok: true, reply: "RETURN 1" });
+  });
 
   for (const status of [200, 400, 429, 503]) {
     it(`caps oversized streamed provider bodies with HTTP ${status}`, async (t) => {

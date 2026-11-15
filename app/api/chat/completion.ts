@@ -5,6 +5,12 @@ type CompletionResult =
   | { ok: true; reply: string }
   | { ok: false; error: string; status: number };
 
+// Hosted OpenAI defaults to Responses so new reasoning families (gpt-5*, gpt-6*, o-series,
+// codex-*) work without a code change. Only these Chat Completions-era families, including
+// fine-tunes of them, keep Chat Completions with deterministic `temperature: 0`; the audio
+// models are not available on Responses at all.
+const CHAT_COMPLETIONS_OPENAI_MODEL = /^(?:ft:)?(?:gpt-3\.5|gpt-4|chatgpt-|gpt-audio)/;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -32,7 +38,7 @@ export async function requestAiCompletion(input: {
   const model = getProviderModelName(input.model);
   const responses = input.target.source === "api-key"
     && input.target.provider === "openai"
-    && /^(?:gpt-5(?:[.-]|$)|o[134](?:-|$))/.test(model);
+    && !CHAT_COMPLETIONS_OPENAI_MODEL.test(model);
   const url = responses ? "https://api.openai.com/v1/responses" : getChatCompletionsUrl(input.target);
   const response = await fetch(url, {
     method: "POST",

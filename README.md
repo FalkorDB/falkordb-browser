@@ -293,10 +293,15 @@ Before each analysis, optionally describe what to optimize, such as reducing sca
 or improving a specific join. This guidance is included only in that request's
 prompt and is not saved or reused. Leave it blank for a general review.
 Each analysis requires clicking **Analyze**; there is no remembered-consent checkbox.
-Optimize and Fix with AI use the Responses API for hosted OpenAI GPT-5 and o1/o3/o4
-models, without unsupported temperature settings. Other OpenAI models and supported
-providers retain Chat Completions and the 30-second timeout. Responses requests allow
-up to four minutes to finish. Closing Optimize
+Optimize and Fix with AI use the Responses API for hosted OpenAI models, including
+GPT-5, the o-series and newer reasoning models, without unsupported temperature
+settings. Older OpenAI families (GPT-3.5, GPT-4/GPT-4o/GPT-4.1, `chatgpt-*`,
+`gpt-audio*` and their fine-tunes) and the other supported providers keep Chat
+Completions with `temperature: 0` and the 30-second timeout. Responses requests allow
+up to four minutes to finish. Reverse proxies, Kubernetes ingress controllers (often
+60 seconds by default, e.g. `nginx.ingress.kubernetes.io/proxy-read-timeout` set via the
+Helm chart's `ingress.annotations`) and serverless platforms must allow that long;
+otherwise a slow reply surfaces as a generic Fix/Optimize error. Closing Optimize
 cancels the request.
 Fix with AI also offers **Cancel** while loading. Cancelling, changing the query,
 tab, graph, connection, or page discards the old request; late replies cannot

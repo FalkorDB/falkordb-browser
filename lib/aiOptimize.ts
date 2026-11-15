@@ -122,3 +122,14 @@ export function isQueryOptimization(value: unknown): value is QueryOptimizationA
     )
   );
 }
+
+// Optimize no longer remembers consent; drop the global `aiOptimizeConsent-<provider>` flags
+// older releases wrote so they don't linger in localStorage.
+export function removeLegacyOptimizeConsent(storage: Pick<Storage, "length" | "key" | "removeItem">): void {
+  const keys: string[] = [];
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (key?.startsWith("aiOptimizeConsent-")) keys.push(key);
+  }
+  keys.forEach(key => storage.removeItem(key));
+}

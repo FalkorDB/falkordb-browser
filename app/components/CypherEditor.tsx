@@ -22,7 +22,7 @@ import { createFalkorCypherEngine, attachGrammarLinting, registerGrammarCodeActi
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { isAiFixSupported } from "@/lib/aiFix";
-import { isQueryOptimization } from "@/lib/aiOptimize";
+import { isQueryOptimization, removeLegacyOptimizeConsent } from "@/lib/aiOptimize";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
@@ -502,6 +502,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [historyQuery.counter, setHistoryQuery]);
+
+    useEffect(() => {
+        removeLegacyOptimizeConsent(localStorage);
+    }, []);
 
     useEffect(() => {
         tutorialOpenRef.current = tutorialOpen;

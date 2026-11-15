@@ -1,6 +1,7 @@
 import { expect, test } from "../infra/coverage";
 import { createServer } from "node:http";
 import GraphPage from "../logic/POM/graphPage";
+import AiAssistComponent from "../logic/POM/aiAssistComponent";
 import { getRandomString, initializeLocalStorage } from "../infra/utils";
 import configuredUrls from "../config/urls.json";
 
@@ -21,12 +22,12 @@ test("@admin Optimize identifies LM Studio as the local data recipient", async (
   expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
   try {
     await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
-    await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
-    await page.getByTestId("editorOptimize").click();
-    const dialog = page.getByTestId("aiOptimizeContent");
-    await expect(dialog).toContainText("will be sent to LM Studio");
-    await expect(dialog).not.toContainText("will be sent to OpenAI");
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    const ai = new AiAssistComponent(page);
+    await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+    await ai.openOptimize();
+    await expect(ai.optimizeDialog).toContainText("will be sent to LM Studio");
+    await expect(ai.optimizeDialog).not.toContainText("will be sent to OpenAI");
+    await ai.optimizeCancelButton.click();
   } finally {
     expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
   }
@@ -94,19 +95,20 @@ test("@admin optimize asks for per-request guidance without a remembered-consent
   expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
   try {
     await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
-    await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+    const ai = new AiAssistComponent(page);
+    await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
     for (const guidance of ["Prioritize latency.", ""]) {
-      await page.getByTestId("editorOptimize").click();
-      await expect(page.getByTestId("aiOptimizeGuidance")).toHaveValue("");
-      await expect(page.getByTestId("aiOptimizeDontAskAgain")).toHaveCount(0);
-      await page.getByTestId("aiOptimizeGuidance").fill(guidance);
+      await ai.openOptimize();
+      await expect(ai.optimizeGuidance).toHaveValue("");
+      await expect(ai.optimizeDontAskAgain).toHaveCount(0);
+      await ai.optimizeGuidance.fill(guidance);
       const requestCount = requests.length;
-      await page.getByTestId("aiOptimizeConsentConfirm").click();
-      await expect(page.getByTestId("aiOptimizeExplanation")).toHaveText("Review complete.");
+      await ai.optimizeAnalyzeButton.click();
+      await expect(ai.optimizeExplanation).toHaveText("Review complete.");
       expect(requests).toHaveLength(requestCount + 1);
       expect(requests.at(-1)?.guidance).toBe(guidance || undefined);
       expect(await page.evaluate(() => localStorage.getItem("aiOptimizeConsent-openai"))).toBeNull();
-      await page.getByTestId("closeAiOptimize").click();
+      await ai.optimizeCloseButton.click();
     }
   } finally {
     expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
@@ -182,16 +184,16 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
               && decodeURIComponent(url.pathname) === `/api/graph/${graphName}`
               && [query, suggestion, invalidQuery].some(testedQuery => executedQuery.includes(testedQuery))) queryRequests += 1;
           });
+          const ai = new AiAssistComponent(page);
           if (feature === "optimize") {
             if (viewport.width < 1100) await page.getByTestId("editorMore").click();
             await page.getByTestId("editorOptimize").click();
             const result = page.getByTestId("aiOptimizeContent");
-            const guidance = page.getByTestId("aiOptimizeGuidance");
-            await expect(guidance).toHaveValue("");
-            await expect(guidance).toBeInViewport();
+            await expect(ai.optimizeGuidance).toHaveValue("");
+            await expect(ai.optimizeGuidance).toBeInViewport();
             expect(providerPrompt).toBe("");
-            await guidance.fill("Focus on reducing scans without changing the returned rows.");
-            await page.getByTestId("aiOptimizeConsentConfirm").click();
+            await ai.optimizeGuidance.fill("Focus on reducing scans without changing the returned rows.");
+            await ai.optimizeAnalyzeButton.click();
             await expect(page.getByTestId("aiOptimizeQuery")).toHaveText(suggestion);
             await page.getByTestId("aiOptimizePlan").getByText("EXPLAIN execution plan", { exact: true }).click();
             await expect(page.getByTestId("aiOptimizePlanText")).toContainText("Results");
@@ -208,19 +210,17 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             expect(await page.evaluate(() => sessionStorage.getItem("copiedQuery"))).toBe(suggestion);
             await expect(editor).toHaveAttribute("data-value", query);
             await page.getByTestId("aiOptimizeApply").click();
-            if (viewport.width < 1100) await page.getByTestId("editorMore").click();
-            await page.getByTestId("editorOptimize").click();
-            await expect(page.getByTestId("aiOptimizeGuidance")).toHaveValue("");
-            await page.getByTestId("aiOptimizeGuidance").fill("Discard this goal on cancel");
-            await page.getByRole("button", { name: "Cancel", exact: true }).click();
-            if (viewport.width < 1100) await page.getByTestId("editorMore").click();
-            await page.getByTestId("editorOptimize").click();
-            await expect(page.getByTestId("aiOptimizeGuidance")).toHaveValue("");
-            await page.getByTestId("aiOptimizeConsentConfirm").click();
-            await expect(page.getByTestId("aiOptimizeExplanation")).toContainText("This query already has a simple execution plan.");
+            await ai.openOptimize(viewport.width < 1100);
+            await expect(ai.optimizeGuidance).toHaveValue("");
+            await ai.optimizeGuidance.fill("Discard this goal on cancel");
+            await ai.optimizeCancelButton.click();
+            await ai.openOptimize(viewport.width < 1100);
+            await expect(ai.optimizeGuidance).toHaveValue("");
+            await ai.optimizeAnalyzeButton.click();
+            await expect(ai.optimizeExplanation).toContainText("This query already has a simple execution plan.");
             expect(providerPrompt).not.toContain("User optimization goal:");
             expect(providerPrompt).not.toContain("Discard this goal on cancel");
-            await page.getByTestId("closeAiOptimize").click();
+            await ai.optimizeCloseButton.click();
           } else if (feature === "fix") {
             const graph = new GraphPage(page);
             await graph.insertQuery(invalidQuery);
@@ -232,11 +232,10 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             await expect(page.getByTestId("aiFixCopy")).toHaveText("Copied!");
             expect(await page.evaluate(() => sessionStorage.getItem("copiedQuery"))).toBe(suggestion);
             await expect(editor).toHaveAttribute("data-value", invalidQuery);
-            await page.getByTestId("aiFixInsert").scrollIntoViewIfNeeded();
-            await expect(page.getByTestId("aiFixInsert")).toBeInViewport();
-            const card = page.getByTestId("aiFixInsert").locator("xpath=ancestor::section");
-            expect(await card.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
-            await page.getByTestId("aiFixInsert").click();
+            await ai.fixInsertButton.scrollIntoViewIfNeeded();
+            await expect(ai.fixInsertButton).toBeInViewport();
+            expect(await ai.fixResultCard.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
+            await ai.fixInsertButton.click();
           } else {
             await page.getByTestId("chatToggleButton").click();
             await page.getByTestId("chatInput").fill("Suggest a query");
@@ -315,7 +314,7 @@ for (const { feature, scenario } of cases) {
         await page.getByTestId("fix-with-ai").click();
       } else {
         await page.getByTestId("editorOptimize").click();
-        if (scenario === "provider-error") await page.getByTestId("aiOptimizeConsentConfirm").click();
+        if (scenario === "provider-error") await new AiAssistComponent(page).optimizeAnalyzeButton.click();
       }
 
       if (scenario === "missing-key") {

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildOptimizeMessages, isQueryOptimization, parseOptimizeResponse } from "./aiOptimize.ts";
+import { buildOptimizeMessages, isQueryOptimization, parseOptimizeResponse, removeLegacyOptimizeConsent } from "./aiOptimize.ts";
 
 describe("buildOptimizeMessages", () => {
   it("includes optional per-request guidance without relaxing semantic safeguards", () => {
@@ -82,5 +82,23 @@ describe("parseOptimizeResponse", () => {
     assert.equal(parseOptimizeResponse("plain text", "RETURN 1"), null);
     assert.equal(parseOptimizeResponse('{"explanation":"x"}', "RETURN 1"), null);
     assert.equal(parseOptimizeResponse('{"explanation":" ","suggestions":[]}', "RETURN 1"), null);
+  });
+});
+
+describe("removeLegacyOptimizeConsent", () => {
+  it("removes only the retired Optimize consent flags", () => {
+    const entries = new Map([
+      ["aiOptimizeConsent-openai", "true"],
+      ["aiOptimizeConsent-groq", "true"],
+      ["aiFixConsent-openai", "true"],
+      ["localhost:6379:default:chat-graph", "[]"],
+    ]);
+    const storage = {
+      get length() { return entries.size; },
+      key: (index: number) => [...entries.keys()][index] ?? null,
+      removeItem: (key: string) => { entries.delete(key); },
+    };
+    removeLegacyOptimizeConsent(storage);
+    assert.deepEqual([...entries.keys()], ["aiFixConsent-openai", "localhost:6379:default:chat-graph"]);
   });
 });
