@@ -238,6 +238,28 @@ export default class ApiCalls {
     }
   }
 
+  /** Raw multipart POST to /api/upload with the given request context's session; hands back the status for asserting refusals. */
+  async uploadFile(
+    request: APIRequestContext,
+    multipart: Record<string, string | { name: string; mimeType: string; buffer: Buffer }>
+  ): Promise<{ status: number; body: any }> {
+    const result = await request.post(`${urls.localHost}/api/upload`, { multipart });
+    return { status: result.status(), body: await result.json() };
+  }
+
+  /** Raw POST to the graph's load-csv route; hands back the status for asserting refusals. */
+  async loadCsv(
+    request: APIRequestContext,
+    graph: string,
+    key: string,
+    body: string
+  ): Promise<{ status: number; body: any }> {
+    const result = await request.post(`${urls.api.graphUrl}${encodeURIComponent(graph)}/load-csv`, {
+      data: { key, body },
+    });
+    return { status: result.status(), body: await result.json() };
+  }
+
   async getGraphCount(
     graph: string,
   ): Promise<GraphCountResponse> {

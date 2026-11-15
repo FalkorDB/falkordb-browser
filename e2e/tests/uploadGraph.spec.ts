@@ -12,6 +12,13 @@ const FIXTURES_DIR = path.join(__dirname, "../config/fixtures");
 const CYPHER_FIXTURE = path.join(FIXTURES_DIR, "upload-people.cypher");
 const CYPHER_FILE_NAME = path.basename(CYPHER_FIXTURE);
 const CSV_FIXTURE = path.join(FIXTURES_DIR, "upload-people.csv");
+const CSV_FILE_NAME = path.basename(CSV_FIXTURE);
+const CSV_LOAD_BODY = "CREATE (:Person {name: row.name, age: toInteger(row.age), city: row.city})";
+
+const countPeople = async (apiCall: ApiCalls, graphName: string): Promise<number> => {
+  const result = await apiCall.runQuery(graphName, "MATCH (n:Person) RETURN count(n) AS cnt");
+  return Number(result.data[0]?.cnt ?? result.data[0]?.["count(n)"]);
+};
 
 const multipartFileNames = (request: Request): string[] =>
   Array.from((request.postDataBuffer()?.toString() ?? "").matchAll(/filename="([^"]*)"/g), (match) => match[1]);
@@ -191,6 +198,103 @@ test.describe("Upload Graph – Load CSV", () => {
     }
   });
 
+  test(`@admin Validate an unsupported file is rejected on the Load CSV step and a valid CSV can still be chosen`, async () => {
+    const graphName = getRandomString("csvRejected");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.openUploadDialog(graphName);
+      await graph.selectUploadTab("csv");
+      await graph.setUploadFile({
+        name: "people.json", mimeType: "application/json", buffer: Buffer.from('{"name":"Alice"}'),
+      });
+      await expect(graph.errorToast).toContainText("Please choose a .csv file.");
+      await expect(graph.csvUploadTempConfirm).toBeDisabled();
+      await expect(graph.uploadDialog).not.toContainText("people.json");
+      await expect(graph.loadCsvRunConfirm).toBeHidden();
+
+      await graph.setUploadFile(CSV_FIXTURE);
+      await expect(graph.csvUploadTempConfirm).toBeEnabled();
+      await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+    } finally {
+      await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
+  });
+
+  test(`@admin Validate cancelling after the temp upload and reopening starts clean on the first step`, async () => {
+    const graphName = getRandomString("csvCancel");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      const [tempUpload] = await Promise.all([
+        page.waitForResponse((response) =>
+          response.request().method() === "POST" && new URL(response.url()).pathname === "/api/csv-temp"),
+        graph.uploadCsvToTemp(graphName, CSV_FIXTURE),
+      ]);
+      const { key } = await tempUpload.json() as { key: string };
+
+      const [cleanup] = await Promise.all([
+        page.waitForResponse((response) =>
+          response.request().method() === "DELETE" && new URL(response.url()).pathname.startsWith("/api/csv-temp/")),
+        graph.clickUploadCancel(),
+      ]);
+      expect(new URL(cleanup.url()).pathname.endsWith(`/${encodeURIComponent(key)}`)).toBe(true);
+      expect(cleanup.status()).toBe(204);
+
+      // The temp CSV is really gone: LOAD CSV with its key no longer finds it.
+      const reload = await apiCall.loadCsv(page.request, graphName, key, "RETURN 1");
+      expect(reload.status).toBe(404);
+      expect(reload.body.message).toBe("Uploaded CSV not found. Please re-upload and try again.");
+      await expect(graph.loadCsvRunConfirm).toBeHidden();
+
+      await graph.clickUploadButton();
+      await graph.selectUploadTab("csv");
+      await expect(graph.csvUploadTempConfirm).toBeDisabled();
+      await expect(graph.loadCsvRunConfirm).toBeHidden();
+      await expect(graph.uploadDialog).not.toContainText(CSV_FILE_NAME);
+    } finally {
+      await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
+  });
+
+  // 422 rather than 500: a 5xx flips the app's connection indicator to offline,
+  // which disables Run until the next 30s status poll and would block the retry.
+  test(`@admin Validate a failed LOAD CSV keeps the uploaded CSV and a retry imports the rows`, async ({ }, testInfo) => {
+    testInfo.setTimeout(90000);
+    const graphName = getRandomString("csvRetry");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      let loadCsvCalls = 0;
+      await page.route(`**/api/graph/${graphName}/load-csv`, async (route) => {
+        loadCsvCalls += 1;
+        if (loadCsvCalls === 1) {
+          await route.fulfill({ status: 422, json: { message: "Failed to process the CSV file." } });
+          return;
+        }
+        await route.continue();
+      });
+      await graph.uploadCsvToTemp(graphName, CSV_FIXTURE);
+      await graph.setLoadCsvBody(CSV_LOAD_BODY);
+      await graph.clickLoadCsvRun();
+
+      await expect(graph.errorToast).toContainText("Failed to process the CSV file.");
+      await expect(graph.loadCsvRunConfirm).toBeEnabled();
+      await expect(graph.csvUploadTempConfirm).toBeHidden();
+      expect(await countPeople(apiCall, graphName)).toBe(0);
+
+      await graph.clickLoadCsvRun();
+      await expect(graph.toast).toContainText("LOAD CSV completed");
+      await expect(graph.loadCsvRunConfirm).toBeHidden();
+      expect(loadCsvCalls).toBe(2);
+      expect(await countPeople(apiCall, graphName)).toBe(3);
+    } finally {
+      await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
+  });
+
   test(`@admin Upload CSV button is disabled until a CSV file is selected`, async () => {
     const graphName = getRandomString("csvNoInput");
     await apiCall.addGraph(graphName);
@@ -203,6 +307,43 @@ test.describe("Upload Graph – Load CSV", () => {
     } finally {
       await apiCall.removeGraph(graphName).catch(() => undefined);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/upload: multipart validation and the read-only guard
+// ---------------------------------------------------------------------------
+test.describe("Upload API – /api/upload", () => {
+  const apiCall = new ApiCalls();
+  const cypherPart = (overrides: { name?: string; mimeType?: string } = {}) => ({
+    name: "valid.cypher",
+    mimeType: "text/plain",
+    buffer: Buffer.from("CREATE (:City {name: 'Rome'});"),
+    ...overrides,
+  });
+
+  test(`@admin Validate a request whose only part uses the wrong field name is rejected as having no file`, async ({ request }) => {
+    // The route only reads the "file" field and ignores any other part, so no file is seen.
+    const { status, body } = await apiCall.uploadFile(request, { attachment: cypherPart() });
+    expect(status).toBe(400);
+    expect(body.error).toBe("No file uploaded.");
+  });
+
+  for (const [description, part] of [
+    ["an extension that is not allowed", cypherPart({ name: "people.json", mimeType: "application/json" })],
+    ["a MIME type that does not match the extension", cypherPart({ mimeType: "image/png" })],
+  ] as const) {
+    test(`@admin Validate a file with ${description} is rejected`, async ({ request }) => {
+      const { status, body } = await apiCall.uploadFile(request, { file: part });
+      expect(status).toBe(400);
+      expect(body.error).toBe("Invalid file type.");
+    });
+  }
+
+  test(`@readonly Validate a read-only user cannot upload a file`, async ({ request }) => {
+    const { status, body } = await apiCall.uploadFile(request, { file: cypherPart() });
+    expect(status).toBe(403);
+    expect(body.error).toBe("You do not have permission to upload files.");
   });
 });
 

@@ -1866,13 +1866,7 @@ export default class GraphPage extends BasePage {
     body: string,
     withHeaders = true
   ): Promise<void> {
-    await this.openUploadDialog(graphName);
-    await interactWhenVisible(this.loadCsvTabTrigger, (el) => el.click(), "Load CSV Tab");
-    await this.setUploadFile(absoluteFilePath);
-    await interactWhenVisible(this.csvUploadTempConfirm, (el) => el.click(), "Upload CSV Button");
-
-    // Step 2 (query editor + Run) appears once the CSV is stored.
-    await waitForElementToBeVisible(this.loadCsvRunConfirm);
+    await this.uploadCsvToTemp(graphName, absoluteFilePath);
 
     if (!withHeaders) {
       await this.loadCsvWithHeadersCheckbox.uncheck();
@@ -1883,8 +1877,23 @@ export default class GraphPage extends BasePage {
     // binds Enter to submit. `window.monaco` is exposed by EditorComponent.
     await this.setLoadCsvBody(body);
 
-    await interactWhenVisible(this.loadCsvRunConfirm, (el) => el.click(), "Run LOAD CSV");
+    await this.clickLoadCsvRun();
     await waitForElementToBeVisible(this.toast);
+  }
+
+  /** Open the dialog on the Load CSV tab and upload the file to temp storage (step 1), landing on the query step. */
+  async uploadCsvToTemp(graphName: string, absoluteFilePath: string): Promise<void> {
+    await this.openUploadDialog(graphName);
+    await this.selectUploadTab("csv");
+    await this.setUploadFile(absoluteFilePath);
+    await interactWhenVisible(this.csvUploadTempConfirm, (el) => el.click(), "Upload CSV Button");
+
+    // Step 2 (query editor + Run) appears once the CSV is stored.
+    await waitForElementToBeVisible(this.loadCsvRunConfirm);
+  }
+
+  async clickLoadCsvRun(): Promise<void> {
+    await interactWhenVisible(this.loadCsvRunConfirm, (el) => el.click(), "Run LOAD CSV");
   }
 
   /**
