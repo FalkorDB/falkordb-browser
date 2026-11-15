@@ -266,8 +266,15 @@ export default class SettingsUsersPage extends BasePage {
     if (options.keys !== undefined) {
       await this.fillEditKeysField(options.keys);
     }
+    const updateResponse = this.page.waitForResponse((response) =>
+      response.request().method() === "PATCH"
+      && new URL(response.url()).pathname === `/api/user/${encodeURIComponent(selectedUser)}`
+    );
     await this.clickOnSubmitEditUser();
-    await waitForTimeOut(this.page, 1500);
+    const response = await updateResponse;
+    if (!response.ok()) {
+      throw new Error(`Updating user "${selectedUser}" failed with HTTP ${response.status()}`);
+    }
   }
 
   async clickOnEditUserBtn(): Promise<void> {

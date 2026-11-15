@@ -1809,14 +1809,17 @@ export default class GraphPage extends BasePage {
     // Wait for graph selector to be enabled (graphs loaded from API)
     let isEnabled = await waitForElementToBeEnabled(this.select("Graph"), 1000, 15);
     if (!isEnabled) {
-      await interactWhenVisible(
-        this.reloadList,
-        (el) => el.click(),
-        "Reload Graphs List"
-      );
-      isEnabled = await waitForElementToBeEnabled(this.select("Graph"), 1000, 30);
+      const [selectorEnabled, reloadAvailable] = await Promise.all([
+        waitForElementToBeEnabled(this.select("Graph")),
+        waitForElementToBeVisible(this.reloadList),
+      ]);
+      isEnabled = selectorEnabled;
+      if (!isEnabled && reloadAvailable) {
+        await this.reloadList.click();
+        isEnabled = await waitForElementToBeEnabled(this.select("Graph"), 1000, 30);
+      }
     }
-    if (!isEnabled) throw new Error("Graph selector is not enabled after reloading the graph list");
+    if (!isEnabled) throw new Error("Graph selector did not load or expose a reload action");
 
     const graphListResponse = this.page.waitForResponse(
       (response) => {
