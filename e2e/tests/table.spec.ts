@@ -1,5 +1,4 @@
 import { test, expect } from "../infra/coverage";
-import { readFile } from "fs/promises";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import urls from '../config/urls.json';
 import ApiCalls from "../logic/api/apiCalls";
@@ -113,20 +112,15 @@ test.describe('Table View Tests', () => {
         await apiCalls.addGraph(graphName);
         cleanupGraph = graphName;
         const tableView = await browser.createNewPage(TableView);
-        const page = await browser.getPage();
-        await page.addInitScript(() => { Reflect.deleteProperty(window, 'showSaveFilePicker'); });
+        await tableView.disableSaveFilePicker();
         await browser.navigateTo(urls.graphUrl);
         await tableView.selectGraphByName(graphName);
         await tableView.insertQuery(`RETURN null AS missing, 'Alice, "Bob"' AS quoted, {nested: [1, 2]} AS object, true AS enabled`);
         await tableView.clickRunQuery(false);
         await tableView.clickTableTab();
-        const downloadPromise = page.waitForEvent('download');
-        await tableView.clickExportButton();
-        const download = await downloadPromise;
-        expect(download.suggestedFilename()).toBe(`${graphName}_table_export.csv`);
-        const file = await download.path();
-        expect(file).not.toBeNull();
-        expect(await readFile(file!, 'utf8')).toBe(
+        const { filename, content } = await tableView.exportTableAsDownload();
+        expect(filename).toBe(`${graphName}_table_export.csv`);
+        expect(content).toBe(
             '"missing","quoted","object","enabled"\n"","Alice, ""Bob""","{""nested"":[1,2]}","true"'
         );
     });
