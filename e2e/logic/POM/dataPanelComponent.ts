@@ -84,14 +84,8 @@ export default class DataPanel extends GraphPage {
     return this.page.getByTestId("DataPanelSetAttributeValue");
   }
 
-  public get dataPanelSetAttributeConfirm(): Locator {
+  private get dataPanelSetAttributeConfirm(): Locator {
     return this.page.getByTestId("DataPanelSetAttributeConfirm");
-  }
-
-  attributeValueForKey(key: string): Locator {
-    return this.dataPanelAttribute(key)
-      .filter({ has: this.page.locator(":scope > p") })
-      .locator("xpath=following-sibling::div[1]");
   }
 
   private get dataPanelSetAttributeCancel(): Locator {
@@ -209,6 +203,14 @@ export default class DataPanel extends GraphPage {
     await interactWhenVisible(
       this.dataPanelSetAttributeValue,
       (el) => el.fill(value),
+      "Data Panel Set Attribute Value"
+    );
+  }
+
+  async getDataPanelSetAttributeValue(): Promise<string> {
+    return interactWhenVisible(
+      this.dataPanelSetAttributeValue,
+      (el) => el.inputValue(),
       "Data Panel Set Attribute Value"
     );
   }
@@ -355,6 +357,10 @@ export default class DataPanel extends GraphPage {
    */
   async isEditingAttribute(): Promise<boolean> {
     return waitForElementToBeVisible(this.dataPanelSetAttributeConfirm);
+  }
+
+  async isNotEditingAttribute(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.dataPanelSetAttributeConfirm);
   }
 
   async clickDataPanelDeleteAttribute(): Promise<void> {

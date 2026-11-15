@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-plusplus */
 /* eslint-disable no-await-in-loop */
-import { expect, test } from "../infra/coverage";
+import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import DataPanel from "../logic/POM/dataPanelComponent";
@@ -18,87 +18,26 @@ test.describe("Data panel Tests", () => {
   let browser: BrowserWrapper;
   let apicalls: ApiCalls;
 
+  // Set by tests that rely on afterEach to drop their graph strictly; the
+  // older tests in this file still remove theirs inline.
+  let graphToRemove: string | undefined;
+
   test.beforeEach(async () => {
     browser = new BrowserWrapper();
     apicalls = new ApiCalls();
+    graphToRemove = undefined;
   });
 
   test.afterEach(async () => {
+    // Close first: a live graph page polls graph info, and that poll
+    // re-creates a graph deleted out from under it.
     await browser.closeBrowser();
-  });
 
-  test("@readwrite cancelling a property edit leaves the displayed and stored value unchanged", async () => {
-    const graphName = getRandomString("propertyCancel");
-    await apicalls.addGraph(graphName);
-    try {
-      await apicalls.runQuery(graphName, "CREATE (:Person {name: 'edit-target', age: 30})");
-      const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-      await browser.setPageToFullScreen();
-      const page = await browser.getPage();
-      await graph.selectGraphByName(graphName);
-      await graph.insertQuery("MATCH (n) RETURN n");
-      await graph.clickRunQuery();
-      await graph.searchElementInCanvas("edit-target");
-      let writes = 0;
-      await page.route(`**/api/graph/${graphName}/*/age`, async (route) => {
-        writes += 1;
-        await route.continue();
-      });
-      await graph.hoverDataPanelAttribute("age");
-      await graph.clickDataPanelSetAttribute();
-      await graph.fillDataPanelSetAttributeValue("99");
-      await graph.clickDataPanelSetAttributeCancel();
-      await expect(graph.dataPanelSetAttributeConfirm).toBeHidden();
-      await expect(graph.attributeValueForKey("age")).toHaveText("30");
-      await page.waitForLoadState("networkidle");
-      const result = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
-      await page.waitForLoadState("networkidle");
-      expect(writes).toBe(0);
-      expect(Number(result.data[0].age)).toBe(30);
-    } finally {
-      await browser.closeBrowser();
-      await apicalls.removeGraph(graphName, "admin");
-    }
-  });
-
-  test("@readwrite rejected property edits preserve the old value and support retry", async () => {
-    const graphName = getRandomString("propertyRetry");
-    await apicalls.addGraph(graphName);
-    try {
-      await apicalls.runQuery(graphName, "CREATE (:Person {name: 'retry-target', age: 30})");
-      const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-      await browser.setPageToFullScreen();
-      const page = await browser.getPage();
-      await graph.selectGraphByName(graphName);
-      await graph.insertQuery("MATCH (n) RETURN n");
-      await graph.clickRunQuery();
-      await graph.searchElementInCanvas("retry-target");
-      let attempts = 0;
-      await page.route(`**/api/graph/${graphName}/*/age`, async (route) => {
-        attempts += 1;
-        if (attempts === 1) {
-          await route.fulfill({ status: 400, json: { message: "Invalid value: age update rejected" } });
-        } else {
-          await route.continue();
-        }
-      });
-      await graph.hoverDataPanelAttribute("age");
-      await graph.clickDataPanelSetAttribute();
-      await graph.fillDataPanelSetAttributeValue("31");
-      await graph.clickDataPanelSetAttributeConfirm();
-      await expect(page.getByText("Invalid value: age update rejected", { exact: true })).toBeVisible();
-      await expect(graph.dataPanelSetAttributeConfirm).toBeEnabled();
-      const rejected = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
-      expect(Number(rejected.data[0].age)).toBe(30);
-      await graph.clickDataPanelSetAttributeConfirm();
-      await expect(graph.dataPanelSetAttributeConfirm).toBeHidden();
-      await expect(graph.attributeValueForKey("age")).toHaveText("31");
-      const saved = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
-      expect(Number(saved.data[0].age)).toBe(31);
-      expect(attempts).toBe(2);
-    } finally {
-      await browser.closeBrowser();
-      await apicalls.removeGraph(graphName, "admin");
+    if (graphToRemove) {
+      const { message } = await apicalls.removeGraph(graphToRemove, "admin");
+      if (!message.includes("deleted")) {
+        throw new Error(`Failed to remove ${graphToRemove}: ${message}`);
+      }
     }
   });
 
@@ -304,6 +243,75 @@ test.describe("Data panel Tests", () => {
     await graph.searchElementInCanvas("Alice");
     expect(await graph.getAttributeValueByName("35")).toContain("35");
     await apicalls.removeGraph(graphName);
+  });
+
+  test("@readwrite cancelling a property edit leaves the displayed and stored value unchanged", async () => {
+    const graphName = getRandomString("propertyCancel");
+    await apicalls.addGraph(graphName);
+    graphToRemove = graphName;
+    await apicalls.runQuery(graphName, "CREATE (:Person {name: 'edit-target', age: 30})");
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+    await graph.searchElementInCanvas("edit-target");
+    let writes = 0;
+    await page.route(`**/api/graph/${graphName}/*/age`, async (route) => {
+      writes += 1;
+      await route.continue();
+    });
+    await graph.hoverDataPanelAttribute("age");
+    await graph.clickDataPanelSetAttribute();
+    await graph.fillDataPanelSetAttributeValue("99");
+    await graph.clickDataPanelSetAttributeCancel();
+    expect(await graph.isNotEditingAttribute()).toBe(true);
+    expect(await graph.getAttributeValueByName("30")).toBe("30");
+    expect(await graph.isAttributeValueByNameVisible("99")).toBe(false);
+    const result = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
+    expect(Number(result.data[0].age)).toBe(30);
+    expect(writes).toBe(0);
+  });
+
+  test("@readwrite rejected property edits preserve the old value and support retry", async () => {
+    const graphName = getRandomString("propertyRetry");
+    await apicalls.addGraph(graphName);
+    graphToRemove = graphName;
+    await apicalls.runQuery(graphName, "CREATE (:Person {name: 'retry-target', age: 30})");
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+    await graph.searchElementInCanvas("retry-target");
+    let attempts = 0;
+    await page.route(`**/api/graph/${graphName}/*/age`, async (route) => {
+      attempts += 1;
+      if (attempts === 1) {
+        await route.fulfill({ status: 400, json: { message: "Invalid value: age update rejected" } });
+      } else {
+        await route.continue();
+      }
+    });
+    await graph.hoverDataPanelAttribute("age");
+    await graph.clickDataPanelSetAttribute();
+    await graph.fillDataPanelSetAttributeValue("31");
+    await graph.clickDataPanelSetAttributeConfirm();
+    expect(await graph.getErrorToastText()).toContain("Invalid value: age update rejected");
+    expect(await graph.isEditingAttribute()).toBe(true);
+    expect(await graph.getDataPanelSetAttributeValue()).toBe("31");
+    // The mock keeps the write from the backend, so what can regress is the
+    // panel adopting the rejected value; its value cell is keyed by the value.
+    expect(await graph.isAttributeValueByNameVisible("30")).toBe(true);
+    expect(await graph.isAttributeValueByNameVisible("31")).toBe(false);
+    await graph.clickDataPanelSetAttributeConfirm();
+    expect(await graph.isNotEditingAttribute()).toBe(true);
+    expect(await graph.getAttributeValueByName("31")).toBe("31");
+    const saved = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
+    expect(Number(saved.data[0].age)).toBe(31);
+    expect(attempts).toBe(2);
   });
 
   test(`@readwrite Validate delete node via ui and validation via API`, async () => {
