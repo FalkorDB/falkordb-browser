@@ -36,6 +36,7 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
             toast({
                 title: "Error",
                 description: "Graph name cannot be empty",
+                variant: "destructive",
             });
             return;
         }

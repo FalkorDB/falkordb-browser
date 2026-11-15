@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, Loader2, Settings, X } from "lucide-react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, BrowserSettingsContext, ConnectionContext, GraphTabsContext } from "../components/provider";
+import { IndicatorContext, BrowserSettingsContext, ConnectionContext, GraphContext, GraphTabsContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
@@ -45,6 +45,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { markGraphNamesKnown } = useContext(GraphContext);
     const { recoveryReady } = useContext(GraphTabsContext);
     const isMobile = useIsMobile();
     const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
@@ -182,8 +183,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         const prev = optionsRef.current;
         const unchanged = prev !== undefined && prev.length === res.opts.length && prev.every((name, i) => name === res.opts[i]);
         if (!unchanged) setOptions(res.opts);
+        // Even an unchanged list confirms the graphs after a failed first list.
+        markGraphNamesKnown();
         if (res.autoSelect) setSelectedValue(res.autoSelect);
-    }, [toast, setIndicator, indicator, setSelectedValue, setOptions, refreshOffloadedGraphs]);
+    }, [toast, setIndicator, indicator, setSelectedValue, setOptions, refreshOffloadedGraphs, markGraphNamesKnown]);
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
@@ -256,7 +259,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         if (input === optionName) return true;
         const option = input.trim();
         if (!option) {
-            toast({ title: "Error", description: "Graph name cannot be empty" });
+            toast({ title: "Error", description: "Graph name cannot be empty", variant: "destructive" });
             return false;
         }
         if (option === optionName) return true;
