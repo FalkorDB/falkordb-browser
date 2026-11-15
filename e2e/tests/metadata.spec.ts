@@ -1,5 +1,6 @@
 import test, { expect } from "playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
+import { closeBrowserThenCleanup } from "../infra/closeBrowserThenCleanup";
 import MetadataView from "../logic/POM/metadataView";
 import urls from "../config/urls.json";
 import APICalls from "../logic/api/apiCalls";
@@ -22,13 +23,17 @@ test.describe('Metadata Tests', () => {
     test.afterEach(async () => {
         // Close first: a live graph page polls graph info, and that poll
         // re-creates a graph deleted out from under it.
-        await browser.closeBrowser();
-        await Promise.all(graphsToRemove.map(async (name) => {
-            const { message } = await apiCalls.removeGraph(name, "admin");
-            if (!message.includes("deleted") && !message.includes("empty key")) {
-                throw new Error(`Failed to remove ${name}: ${message}`);
-            }
-        }));
+        await closeBrowserThenCleanup(
+            () => browser.closeBrowser(),
+            async () => {
+                await Promise.all(graphsToRemove.map(async (name) => {
+                    const { message } = await apiCalls.removeGraph(name, "admin");
+                    if (!message.includes("deleted") && !message.includes("empty key")) {
+                        throw new Error(`Failed to remove ${name}: ${message}`);
+                    }
+                }));
+            },
+        );
     });
 
     test('@admin check metadata view tab is disabled when there is no metadata', async () => {
@@ -60,6 +65,19 @@ test.describe('Metadata Tests', () => {
         await metadataView.clickRunQuery();
         const isMetadataViewTabEnabled = await metadataView.GetIsMetadataViewTabEnabled();
         expect(isMetadataViewTabEnabled).toBe(true);
+    });
+
+    test('@admin graph cleanup runs when browser closing rejects', async () => {
+        let cleanupRan = false;
+        await expect(closeBrowserThenCleanup(
+            async () => {
+                throw new Error("browser close failed");
+            },
+            async () => {
+                cleanupRan = true;
+            },
+        )).rejects.toThrow("browser close failed");
+        expect(cleanupRan).toBe(true);
     });
 
     test('@admin metadata replaces mutation statistics after a read query', async () => {
