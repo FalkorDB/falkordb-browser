@@ -1398,15 +1398,45 @@ export default class GraphPage extends BasePage {
   }
 
   async clickDuplicateGraphConfirm(): Promise<void> {
+    await this.submitDuplicateGraph();
+    // Wait until the confirmation dialog disappears
+    await waitForElementToNotBeVisible(this.duplicateGraphConfirm);
+    // And wait for the success toast to show up
+    await this.isVisibleToast();
+  }
+
+  async submitDuplicateGraph(): Promise<void> {
     await interactWhenVisible(
       this.duplicateGraphConfirm,
       (el) => el.click(),
       `Confirm Duplicate Graph`
     );
-    // Wait until the confirmation dialog disappears
-    await waitForElementToNotBeVisible(this.duplicateGraphConfirm);
-    // And wait for the success toast to show up
-    await this.isVisibleToast();
+  }
+
+  async searchManagedGraphs(name: string): Promise<void> {
+    await this.page.getByTestId("searchInputGraphs").fill(name);
+  }
+
+  private managedGraphRow(name: string): Locator {
+    return this.page.getByRole("row").filter({ has: this.tableCheckboxByName(name) });
+  }
+
+  graphNameEditor(name: string): Locator {
+    return this.managedGraphRow(name).getByTestId("inputGraphs");
+  }
+
+  async editManagedGraph(name: string): Promise<void> {
+    const row = this.managedGraphRow(name);
+    await row.hover();
+    await row.getByTestId("editButtonGraphs").click();
+  }
+
+  async submitManagedGraphName(name: string): Promise<void> {
+    await this.managedGraphRow(name).getByTestId("saveButtonGraphs").click();
+  }
+
+  async expectEmptyGraphNameError(): Promise<void> {
+    await expect(this.page.getByText("Graph name cannot be empty", { exact: true })).toBeVisible();
   }
 
   async clickSaveButton(): Promise<void> {

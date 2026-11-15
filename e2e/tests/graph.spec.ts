@@ -464,7 +464,7 @@ test.describe("Graph Tests", () => {
       await browser.setPageToFullScreen();
       await graph.clickSelect();
       await graph.clickManage();
-      await page.getByTestId("searchInputGraphs").fill(source);
+      await graph.searchManagedGraphs(source);
       await graph.clickTableCheckboxByName(source);
       await graph.clickDuplicateGraphBtn();
       const writes: string[] = [];
@@ -472,15 +472,15 @@ test.describe("Graph Tests", () => {
         if (request.method() === "PATCH" && new URL(request.url()).pathname.endsWith("/duplicate")) writes.push(request.url());
       });
       await graph.insertDuplicateGraphInput("   ");
-      await page.getByTestId("duplicateGraphConfirm").click();
-      await expect(page.getByText("Graph name cannot be empty", { exact: true })).toBeVisible();
+      await graph.submitDuplicateGraph();
+      await graph.expectEmptyGraphNameError();
       expect(writes).toEqual([]);
       await graph.insertDuplicateGraphInput(` ${target} `);
       const duplicateResponsePromise = page.waitForResponse(response =>
         response.request().method() === "PATCH" &&
         new URL(response.url()).pathname.endsWith("/duplicate")
       );
-      await page.getByTestId("duplicateGraphConfirm").click();
+      await graph.submitDuplicateGraph();
       const duplicateResponse = await duplicateResponsePromise;
       expect(duplicateResponse.status()).toBe(200);
       const { result: duplicatedName } = await duplicateResponse.json();
@@ -514,17 +514,15 @@ test.describe("Graph Tests", () => {
         await browser.setPageToFullScreen();
         await graph.clickSelect();
         await graph.clickManage();
-        await page.getByTestId("searchInputGraphs").fill(trimmed);
-        const row = page.getByRole("row").filter({ has: page.getByTestId(`tableCheckboxGraphs${source}`) });
-        await row.hover();
-        await row.getByTestId("editButtonGraphs").click();
-        const input = row.getByTestId("inputGraphs");
+        await graph.searchManagedGraphs(trimmed);
+        await graph.editManagedGraph(source);
+        const input = graph.graphNameEditor(source);
         await expect(input).toHaveValue(source);
         const writes: string[] = [];
         page.on("request", request => {
           if (request.method() === "PATCH" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
         });
-        await row.getByTestId("saveButtonGraphs").click();
+        await graph.submitManagedGraphName(source);
         await expect(input).toHaveCount(0);
         expect(writes).toEqual([]);
         const { opts } = await apiCall.getGraphs("admin");
@@ -554,17 +552,15 @@ test.describe("Graph Tests", () => {
       await browser.setPageToFullScreen();
       await graph.clickSelect();
       await graph.clickManage();
-      await page.getByTestId("searchInputGraphs").fill(source);
-      const row = page.getByRole("row").filter({ has: page.getByTestId(`tableCheckboxGraphs${source}`) });
-      await row.hover();
-      await row.getByTestId("editButtonGraphs").click();
-      const input = row.getByTestId("inputGraphs");
+      await graph.searchManagedGraphs(source);
+      await graph.editManagedGraph(source);
+      const input = graph.graphNameEditor(source);
       await input.fill(` ${source} `);
       const writes: string[] = [];
       page.on("request", request => {
         if (request.method() === "PATCH" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
       });
-      await row.getByTestId("saveButtonGraphs").click();
+      await graph.submitManagedGraphName(source);
       await expect(input).toHaveCount(0);
       expect(writes).toEqual([]);
       const { opts } = await apiCall.getGraphs("admin");
@@ -587,18 +583,16 @@ test.describe("Graph Tests", () => {
       await browser.setPageToFullScreen();
       await graph.clickSelect();
       await graph.clickManage();
-      await page.getByTestId("searchInputGraphs").fill(source);
-      const row = page.getByRole("row").filter({ has: page.getByTestId(`tableCheckboxGraphs${source}`) });
-      await row.hover();
-      await row.getByTestId("editButtonGraphs").click();
-      const input = row.getByTestId("inputGraphs");
+      await graph.searchManagedGraphs(source);
+      await graph.editManagedGraph(source);
+      const input = graph.graphNameEditor(source);
       const writes: string[] = [];
       page.on("request", request => {
         if (request.method() === "PATCH" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
       });
       await input.fill("   ");
       await input.press("Enter");
-      await expect(page.getByText("Graph name cannot be empty", { exact: true })).toBeVisible();
+      await graph.expectEmptyGraphNameError();
       expect(writes).toEqual([]);
       await expect(input).toBeVisible();
       await input.fill(` ${target} `);
