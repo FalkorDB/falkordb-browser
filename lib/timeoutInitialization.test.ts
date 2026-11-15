@@ -43,3 +43,9 @@ test("session refresh preserves readiness but connection mismatch closes it", ()
     assert.notEqual(timeoutInitializationKey("authenticated", true, session, "connection-b", "connection-b"), key);
     assert.equal(timeoutInitializationKey("authenticated", true, session, "connection-a", null), key);
 });
+
+test("a session user without connection details still gets a stable key", () => {
+    const key = timeoutInitializationKey("authenticated", true, { user: {} }, null);
+    assert.equal(key, JSON.stringify([null, null, null, null, null]));
+    assert.equal(timeoutInitializationKey("authenticated", true, { user: {} }, null), key);
+});

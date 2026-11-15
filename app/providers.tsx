@@ -2466,7 +2466,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // the last good list so a failed/slow refresh can't empty the selector.
     if (options?.clear) setGraphNames(undefined);
 
-    const res = await fetchOptions(gToast, gInd, indicator, cid);
+    // securedFetch rejects on a network error and `json()` on a non-JSON body;
+    // treat both like a failed refresh so readiness still arrives and the
+    // graph page is never left locked.
+    const res = await fetchOptions(gToast, gInd, indicator, cid).catch((error: unknown) => {
+      console.error("Failed to fetch graphs:", error);
+      gToast({ title: "Error", description: "Failed to fetch graphs", variant: "destructive" });
+      return null;
+    });
 
     // GRAPH.LIST omits offloaded graphs and the selector merges the stubs back
     // in, so settle the stubs first: publishing the list on its own would take

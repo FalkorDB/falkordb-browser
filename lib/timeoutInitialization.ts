@@ -23,10 +23,10 @@ export function timeoutInitializationKey(
     ) return null;
 
     return JSON.stringify([
-        session?.user?.id ?? null,
-        session?.user?.host ?? null,
-        session?.user?.port ?? null,
-        session?.user?.username ?? null,
+        session.user.id ?? null,
+        session.user.host ?? null,
+        session.user.port ?? null,
+        session.user.username ?? null,
         prefixConnectionId,
     ]);
 }

@@ -80,6 +80,21 @@ test.describe("@admin Graph tabs", () => {
         }
     });
 
+    test("A failed graph list request still unlocks the graph page", async () => {
+        await browser.createNewPage(GraphPage);
+        const page = await browser.getPage();
+        let requests = 0;
+        await page.route("**/api/graph", route => {
+            requests += 1;
+            return route.abort("connectionreset");
+        });
+        await page.goto(urls.graphUrl);
+        await expect.poll(() => requests, { timeout: 15000 }).toBeGreaterThan(0);
+        await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
+        await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+        await expect(page.getByTestId("editorContainer").locator("xpath=ancestor::*[@inert]")).toHaveCount(0);
+    });
+
     test("A rejected bootstrap sync replaces pending graph lists using the session connection", async () => {
         test.setTimeout(60_000);
         await browser.createNewPage(GraphPage);

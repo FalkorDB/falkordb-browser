@@ -181,16 +181,27 @@ connection epoch + `optionsSeq`); the auto‑select is **graph‑scoped** (also 
 ```ts
 const ctx = contextGenRef.current; const oseq = bumpOptionsSeq();
 const cid = getActiveConnectionIdGlobal(); const epoch = getConnectionEpoch();
-if (opts?.clear) setGraphNames(undefined);            // only the reset effect passes { clear: true }
-const res = await fetchOptions(gToast, gInd, indicator, cid);
+if (opts?.clear) setGraphNames(undefined);            // only the connection-reset fetch passes { clear: true }
+const res = await fetchOptions(gToast, gInd, indicator, cid).catch(() => null); // a rejection is a failed refresh
 if (getConnectionEpoch() === epoch && optionsSeqRef.current === oseq) {
   if (res) setGraphNames(res.opts);                   // on network error keep the last good list
   setGraphNamesLoaded(true);
   if (res?.autoSelect && contextGenRef.current === ctx) commitGraphName(res.autoSelect);
 }
 ```
-Expose `handleFetchOptions` on `GraphContext` (move its declaration above the context memo). The reset
-effect calls `handleFetchOptions({ clear: true })`.
+Expose `handleFetchOptions` on `GraphContext` (move its declaration above the context memo). A
+separate effect, ordered after the reset effect and keyed on `activeConnectionId`, `status` and
+`handleFetchOptions`, calls `handleFetchOptions({ clear: !graphNamesLoadedRef.current })`, so an
+offline/tutorial deferral retries through the callback's dependencies instead of a "fetched" flag.
+`setGraphNamesLoaded(true)` always runs for the current refresh (even when the fetch rejects), because
+restored tabs and the editor wait on it.
+
+The reset effect skips the **same‑connection bootstrap** (`null → A` where discovery confirmed the
+session's existing connection, recorded in `sameConnectionBootstrapRef` with the epoch): the loaded list
+and restored tabs are kept, and a later epoch bump invalidates the record. Restored tabs additionally
+wait for the saved query timeout (`lib/timeoutInitialization.ts`), keyed on the session's user and
+connection details plus the storage prefix's connection, so a reload never re‑runs them with
+`timeout=0`.
 
 ### 3i. `selectGraph.tsx` dropdown refresh (`:75‑77`, `:196‑203`) — the 2nd `fetchOptions` caller
 Replace the direct `fetchOptions` call with the provider's guarded `handleFetchOptions` (now on
