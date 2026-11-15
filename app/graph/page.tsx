@@ -330,15 +330,17 @@ export default function Page() {
 
     const fetchMetaStats = useCallback((name: string, options?: { signal?: AbortSignal; connectionId?: string | null }) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current, options), [setIndicator, toast]);
 
+    // A restored tab keeps its graph while the list is unknown, but the polls
+    // below run GRAPH.QUERY on writable connections — querying a graph that was
+    // dropped would re-create it. Hold them until a list confirms the graph.
+    const graphUnconfirmed = graphNamesUnknown && !graphNames?.includes(graphName);
+
     useEffect(() => {
         if (!graphName) {
             prevGraphNameRef.current = graphName;
             return undefined;
         }
-        // A restored tab keeps its graph while the list is unknown, but these
-        // polls run GRAPH.QUERY on writable connections — querying a graph that
-        // was dropped would re-create it. Wait until a list confirms it.
-        if (graphNamesUnknown) return undefined;
+        if (graphUnconfirmed) return undefined;
 
         const graphNameJustChanged = prevGraphNameRef.current !== graphName;
         prevGraphNameRef.current = graphName;
@@ -408,7 +410,7 @@ export default function Page() {
             clearInterval(interval);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, graphInfoReload, graphNamesUnknown, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
+    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, graphInfoReload, graphUnconfirmed, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
         if (graphName) return;

@@ -6,6 +6,8 @@ import AiAssistComponent from "../logic/POM/aiAssistComponent";
 import ChatComponent from "../logic/POM/chatComponent";
 
 const baseUrl = process.env.E2E_BASE_URL ?? configuredUrls.localHost;
+// Graphs to delete after the test, so a cleanup failure cannot mask the test's own error.
+const createdGraphs: string[] = [];
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(60_000);
@@ -37,6 +39,12 @@ test.beforeEach(async ({ page }) => {
       return response;
     };
   });
+});
+
+test.afterEach(async ({ page }) => {
+  for (const graphName of createdGraphs.splice(0)) {
+    expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  }
 });
 
 for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
@@ -272,6 +280,7 @@ test("@admin optimize result closes when same-connection readiness is lost", asy
     explanation: "Result before readiness loss", suggestions: [], optimizedQuery: "RETURN 2", executionPlan: ["Results"],
   } }));
   expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  createdGraphs.push(graphName);
   let releaseConfig!: () => void;
   const configGate = new Promise<void>(resolve => { releaseConfig = resolve; });
   try {
@@ -315,6 +324,5 @@ test("@admin optimize result closes when same-connection readiness is lost", asy
     await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1");
   } finally {
     releaseConfig();
-    expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
   }
 });

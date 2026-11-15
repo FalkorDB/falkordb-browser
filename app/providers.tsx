@@ -91,9 +91,6 @@ const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
 const LOCAL_LLM_ENDPOINT_STORAGE_KEY = "localLlmEndpoint";
 // Shared instance so an unresolved stub probe hands consumers a stable array.
 const NO_OFFLOADED_GRAPHS: string[] = [];
-// Published when the first list request fails: the selector shows no graphs,
-// but saved tabs must not be validated against it. Any later list is a new array.
-const UNKNOWN_GRAPH_NAMES: string[] = [];
 
 // The graph list waits on the stub probe, so this bounds how long a hung
 // GRAPH.STUBS can hold the selector empty.
@@ -256,7 +253,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Always-current ref so effects can validate graph names without re-running
   // on every graphNames mutation (prevents spurious URL→state rollbacks).
   const graphNamesRef = useRef<string[]>([]);
-  const graphNamesKnown = graphNames !== undefined && graphNames !== UNKNOWN_GRAPH_NAMES;
+  // Set when the first list request fails: the selector shows no graphs, but
+  // saved tabs must not be validated against that. Only a successfully fetched
+  // list clears it — an optimistic edit (create/delete) does not confirm the rest.
+  const [graphNamesUnknown, setGraphNamesUnknown] = useState(false);
+  const markGraphNamesKnown = useCallback(() => setGraphNamesUnknown(false), []);
+  const graphNamesKnown = graphNames !== undefined && !graphNamesUnknown;
   const graphNamesKnownRef = useRef(graphNamesKnown);
   useEffect(() => {
     graphNamesRef.current = graphNames ?? [];
@@ -1438,7 +1440,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     handleSetGraphName,
     setGraphInfo,
     graphNames,
-    graphNamesUnknown: graphNames === UNKNOWN_GRAPH_NAMES,
+    graphNamesUnknown,
+    markGraphNamesKnown,
     setGraphNames,
     labels,
     setLabels,
@@ -1460,7 +1463,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedParam,
     pendingAutoLoadRef,
     graphInfoReload,
-  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam, graphInfoReload]);
+  }), [graph, graphName, handleSetGraphName, graphNames, graphNamesUnknown, markGraphNamesKnown, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam, graphInfoReload]);
 
   // Everything a tab needs to show its results again without querying. Mirrored
   // at render so `captureGraphSession` can read it without a dependency list.
@@ -2499,8 +2502,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (!isCurrent()) return;
     if (res) {
       setGraphNames(res.opts);
+      setGraphNamesUnknown(false);
     } else if (options?.clear) {
-      setGraphNames(UNKNOWN_GRAPH_NAMES);
+      setGraphNames([]);
+      setGraphNamesUnknown(true);
     }
     setGraphNamesLoaded(true);
     // Auto-select is graph-scoped: only apply if the graph context is unchanged.
@@ -2553,6 +2558,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphNamesLoaded(false);
     graphNamesLoadedRef.current = false;
     setGraphNames(undefined);
+    setGraphNamesUnknown(false);
     graphNamesKnownRef.current = false;
 
     // Skip the very first selection (initial mount / login) and null resets

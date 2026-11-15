@@ -98,6 +98,8 @@ setIsQueryLoading(false)`), so a switch/graph‑change can't strand it; a new `r
 
 ### 3a. Central graph‑name commit — `commitGraphName(name)` (new)
 > Shipped as `handleSetGraphName` in `app/providers.tsx`; `commitGraphName` below is the planned name.
+> One intentional exception: the connection-reset effect calls `bumpContextGen()` itself and then
+> `setGraphName("")` directly, because it also clears the graph, query and labels in one step.
 
 Graph name is set at several sites that currently bypass `handleSetGraphName`:
 `providers.tsx:1407`, `:1417`, `:1498` (reset), plus the new auto‑select. Route **all** through:
@@ -194,19 +196,21 @@ const res = await fetchOptions(gToast, gInd, indicator, cid).catch((error: unkno
 });
 if (res) await refreshOffloadedGraphs(cid);           // settle offloaded stubs before publishing the list
 if (!isCurrent()) return;
-if (res) setGraphNames(res.opts);                     // on a failed refresh keep the last good list…
-else if (options?.clear) setGraphNames(UNKNOWN_GRAPH_NAMES); // …or mark a failed first list as unknown
+if (res) { setGraphNames(res.opts); setGraphNamesUnknown(false); } // on a failed refresh keep the last good list…
+else if (options?.clear) { setGraphNames([]); setGraphNamesUnknown(true); } // …or mark a failed first list as unknown
 setGraphNamesLoaded(true);
 if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
 ```
-`gToast`/`gInd` drop toasts and indicator changes once `isCurrent()` is false. `UNKNOWN_GRAPH_NAMES`
-is a sentinel empty list: it settles readiness so the page unlocks, but `graphNamesKnown` stays false
-until a list is actually received. While it is false, restoring a tab keeps its graph name and query
-without running the query, and the "stored tab names a dropped graph" check does not clear the
-selection, so a later successful refresh validates the saved graph instead of discarding it.
-`GraphContext.graphNamesUnknown` (the list is the sentinel) also holds the graph page's info,
-memory and count polls: on a writable connection they run `GRAPH.QUERY`, which would re-create a
-dropped graph, so they start only once a list confirms it.
+`gToast`/`gInd` drop toasts and indicator changes once `isCurrent()` is false. A failed first list
+publishes an empty list with `graphNamesUnknown` set: it settles readiness so the page unlocks, but
+`graphNamesKnown` stays false until a list is actually fetched — by this refresh or by the selector's
+(`markGraphNamesKnown`, which also covers an unchanged empty list). Optimistic edits (a created or
+deleted graph) do not clear it, since they confirm only the names they touch. While it is set,
+restoring a tab keeps its graph name and query without running the query, and the "stored tab names
+a dropped graph" check does not clear the selection, so a later successful refresh validates the
+saved graph instead of discarding it. It also holds the graph page's info, memory and count polls
+for a graph not in the list: on a writable connection they run `GRAPH.QUERY`, which would re-create
+a dropped graph, so they start only once a list confirms it.
 Expose `handleFetchOptions` on `GraphContext` (move its declaration above the context memo). A
 separate effect, ordered after the reset effect and keyed on `activeConnectionId`, `status` and
 `handleFetchOptions`, calls `handleFetchOptions({ clear: !graphNamesLoadedRef.current })`, so an

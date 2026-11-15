@@ -15,6 +15,9 @@ test.describe("@admin Graph tabs", () => {
     let apiCall: ApiCalls;
     let graphOne: string;
     let graphTwo: string;
+    // Graphs a test creates through the UI; deleted after the test so a cleanup
+    // failure cannot mask the test's own error.
+    const createdGraphs: string[] = [];
 
     test.beforeAll(async () => {
         apiCall = new ApiCalls();
@@ -38,6 +41,14 @@ test.describe("@admin Graph tabs", () => {
 
     test.afterEach(async () => {
         await browser.closeBrowser();
+    });
+
+    test.afterEach(async () => {
+        const names = createdGraphs.splice(0);
+        const results = await Promise.all(names.map(graphName => apiCall.removeGraph(graphName, "admin")));
+        for (const [index, result] of results.entries()) {
+            expect(result.message).toBe(`${names[index]} graph deleted`);
+        }
     });
 
     test("A fresh connection opens on a single blank tab", async () => {
@@ -158,6 +169,83 @@ test.describe("@admin Graph tabs", () => {
         const restoredQuery = page.waitForRequest(request => isRestoredQuery(request.url()));
         await page.reload({ waitUntil: "domcontentloaded" });
         await restoredQuery;
+        await expect(graph.stripTab(graphOne)).toBeVisible();
+    });
+
+    test("An empty graph list after a failed one drops the saved tab's graph", async () => {
+        test.setTimeout(60_000);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await graph.selectGraphByName(graphOne);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.clickRunQuery();
+        await graph.waitForPageIdle();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).not.toBe("initial");
+        // Fail every list on load, then answer as if the graph had been dropped.
+        let listPhase: "fail" | "empty" = "fail";
+        let failedLists = 0;
+        await page.route("**/api/graph", async route => {
+            if (listPhase === "empty") {
+                await route.fulfill({ json: { opts: [] } });
+                return;
+            }
+            failedLists += 1;
+            await route.fulfill({ status: 200, contentType: "text/html", body: "<html>not a graph list</html>" });
+        });
+
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await expect.poll(() => failedLists, { timeout: 15000 }).toBeGreaterThan(0);
+        await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
+        await expect(page.getByTestId("selectGraph")).toContainText(graphOne);
+
+        // The selector shows no graphs either way; the unchanged list must still
+        // confirm that the saved graph is gone.
+        listPhase = "empty";
+        await page.getByTestId("selectGraph").click();
+        await page.keyboard.press("Escape");
+        await expect(page.getByTestId("selectGraph")).not.toContainText(graphOne, { timeout: 15000 });
+    });
+
+    test("Creating a graph after a failed graph list keeps another saved tab's graph", async () => {
+        test.setTimeout(60_000);
+        const createdGraph = getRandomString("unknowncreated");
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await graph.selectGraphByName(graphOne);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.clickRunQuery();
+        await graph.waitForPageIdle();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).not.toBe("initial");
+        const graphOneTab = new URL(page.url()).searchParams.get("tab");
+        await graph.addStripTab();
+        await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).not.toBe(graphOneTab);
+        let failedLists = 0;
+        await page.route("**/api/graph", async route => {
+            failedLists += 1;
+            await route.fulfill({ status: 200, contentType: "text/html", body: "<html>not a graph list</html>" });
+        });
+        await page.route(`**/api/graph/${createdGraph}`, async route => {
+            if (route.request().method() === "POST") createdGraphs.push(createdGraph);
+            await route.continue();
+        });
+
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await expect.poll(() => failedLists, { timeout: 15000 }).toBeGreaterThan(0);
+        await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
+        await expect(graph.stripTab(graphOne)).toBeVisible();
+
+        // The created graph is added to the list locally, which must not turn
+        // it into a confirmed list that leaves graphOne out.
+        await graph.create.click();
+        await graph.insertInput.fill(createdGraph);
+        await graph.createConfirm.click();
+        await expect(page.getByTestId("toast-title").filter({ hasText: "Graph created successfully" })).toBeVisible();
+        await expect(page.getByTestId("selectGraph")).toContainText(createdGraph);
+
+        await graph.selectStripTab(graphOne);
+        await expect(page.getByTestId("selectGraph")).toContainText(graphOne);
         await expect(graph.stripTab(graphOne)).toBeVisible();
     });
 
@@ -469,6 +557,7 @@ test.describe("@admin Graph tabs", () => {
                 return;
             }
             createStarted = true;
+            createdGraphs.push(createdGraph);
             await createGate;
             await route.continue();
         });
@@ -517,7 +606,6 @@ test.describe("@admin Graph tabs", () => {
         } finally {
             releaseCreate();
             releaseConfig();
-            await apiCall.removeGraph(createdGraph, "admin");
         }
     });
 

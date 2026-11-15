@@ -163,8 +163,11 @@ type GraphContextType = {
   handleSetGraphName: (name: string) => void;
   setGraphInfo: (gi: GraphInfo) => void;
   graphNames: string[] | undefined;
-  // The last graph-list request failed, so no graph's existence is confirmed.
+  // The first graph-list request failed and no list has been fetched since, so
+  // only names added to `graphNames` locally (a created graph) are confirmed.
   graphNamesUnknown: boolean;
+  // A successfully fetched list confirms every name, even when it is unchanged.
+  markGraphNamesKnown: () => void;
   setGraphNames: Dispatch<SetStateAction<string[] | undefined>>;
   labels: Label[];
   setLabels: Dispatch<SetStateAction<Label[]>>;
@@ -530,6 +533,7 @@ export const GraphContext = createContext<GraphContextType>({
   setGraphInfo: () => { },
   graphNames: undefined,
   graphNamesUnknown: false,
+  markGraphNamesKnown: () => { },
   setGraphNames: () => { },
   labels: [],
   setLabels: () => { },
