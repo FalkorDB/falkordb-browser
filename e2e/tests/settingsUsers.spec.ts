@@ -182,20 +182,23 @@ test.describe('@Config Settings users tests', () => {
     test("@admin Searching before the user list loads selects only the clicked user", async () => {
         const username = getRandomString('user');
         await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
-        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
-        const page = await browser.getPage();
-        let releaseUserList!: () => void;
-        const userListHeld = new Promise<void>((resolve) => { releaseUserList = resolve; });
-        await page.route("**/api/user", async (route) => {
-            if (route.request().method() === "GET") await userListHeld;
-            await route.fallback();
-        });
-        await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.searchForElement(username);
-        releaseUserList();
-        await settingsUsersPage.clickUserCheckboxBtn(username);
-        expect(await settingsUsersPage.isEditUserButtonDisabled()).toBe(false);
-        await apiCall.deleteUsers({ users: [{ username }] });
+        try {
+            const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+            const page = await browser.getPage();
+            let releaseUserList!: () => void;
+            const userListHeld = new Promise<void>((resolve) => { releaseUserList = resolve; });
+            await page.route("**/api/user", async (route) => {
+                if (route.request().method() === "GET") await userListHeld;
+                await route.fallback();
+            });
+            await settingsUsersPage.navigateToUserTab();
+            await settingsUsersPage.searchForElement(username);
+            releaseUserList();
+            await settingsUsersPage.clickUserCheckboxBtn(username);
+            expect(await settingsUsersPage.isEditUserButtonDisabled()).toBe(false);
+        } finally {
+            await apiCall.deleteUsers({ users: [{ username }] });
+        }
     });
 
     test("@admin Searching a selected user out of view clears the selection", async () => {
@@ -203,14 +206,17 @@ test.describe('@Config Settings users tests', () => {
         const other = getRandomString('user');
         await apiCall.createUsers({ username: selected, password: user.password, role: user.ReadWrite });
         await apiCall.createUsers({ username: other, password: user.password, role: user.ReadWrite });
-        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
-        await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.searchForElement(selected);
-        await settingsUsersPage.clickUserCheckboxBtn(selected);
-        expect(await settingsUsersPage.isEditUserButtonDisabled()).toBe(false);
-        await settingsUsersPage.searchForElement(other);
-        await expect.poll(() => settingsUsersPage.isEditUserButtonDisabled()).toBe(true);
-        await apiCall.deleteUsers({ users: [{ username: selected }, { username: other }] });
+        try {
+            const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+            await settingsUsersPage.navigateToUserTab();
+            await settingsUsersPage.searchForElement(selected);
+            await settingsUsersPage.clickUserCheckboxBtn(selected);
+            expect(await settingsUsersPage.isEditUserButtonDisabled()).toBe(false);
+            await settingsUsersPage.searchForElement(other);
+            await expect.poll(() => settingsUsersPage.isEditUserButtonDisabled()).toBe(true);
+        } finally {
+            await apiCall.deleteUsers({ users: [{ username: selected }, { username: other }] });
+        }
     });
 
     test("@admin Edit button disabled when default user is selected", async () => {
