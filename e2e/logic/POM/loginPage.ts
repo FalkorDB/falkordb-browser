@@ -77,6 +77,10 @@ export default class LoginPage extends HeaderComponent {
     return this.page.getByText("Upload Certificate");
   }
 
+  readError(filePath: string): Locator {
+    return this.page.getByText(`Could not read ${basename(filePath)}`, { exact: true });
+  }
+
   private get certificateUploadedStatus(): Locator {
     return this.page.getByTestId("certificate-uploaded-status");
   }
@@ -318,14 +322,14 @@ export default class LoginPage extends HeaderComponent {
     const fileChooserPromise = this.page.waitForEvent("filechooser");
     await interactWhenVisible(trigger, (el) => el.click(), "upload input");
     const fileChooser = await fileChooserPromise;
+    const readError = this.readError(filePath);
+    await readError.waitFor({ state: "hidden", timeout: 10000 });
     await fileChooser.setFiles(filePath);
 
     try {
       await Promise.race([
         status.waitFor({ state: "visible", timeout: 10000 }),
-        this.page
-          .getByText(`Could not read ${basename(filePath)}`, { exact: true })
-          .waitFor({ state: "visible", timeout: 10000 }),
+        readError.waitFor({ state: "visible", timeout: 10000 }),
       ]);
     } catch (error) {
       console.log(

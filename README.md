@@ -55,6 +55,11 @@ docker run -p 3000:3000 -p 6379:6379 -it --rm falkordb/falkordb:latest
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+For TLS connections, upload a CA certificate and, if required, a client certificate
+and key on the login form. Opening the file chooser to retry clears a previous
+read error immediately. When a file selection supersedes an unfinished read,
+its older callbacks are ignored independently for each certificate or key input.
+
 > Note: to run the application with a different URL, set the NEXTAUTH_URL environment variable.
 
 ```

@@ -68,7 +68,7 @@ test.describe(`@tls TLS Login tests`, () => {
         const page = await browser.getPage();
         const certificatePath = testInfo.outputPath('retry-certificate.crt');
         await writeFile(certificatePath, 'test certificate');
-        const readError = page.getByText(`Could not read ${path.basename(certificatePath)}`, { exact: true });
+        const readError = login.readError(certificatePath);
 
         await page.addInitScript(() => {
             const readAsDataURL = FileReader.prototype.readAsDataURL;
@@ -96,14 +96,172 @@ test.describe(`@tls TLS Login tests`, () => {
         await login.uploadCertificate(certificatePath);
         await expect(readError).toBeVisible();
 
-        const retryUpload = login.uploadCertificate(certificatePath);
+        let retryFinished = false;
+        const retryUpload = login.uploadCertificate(certificatePath).then(() => { retryFinished = true; });
         try {
             await expect(readError).toBeHidden();
+            await page.evaluate(() => document.documentElement.getAttribute("data-file-read"));
+            expect(retryFinished).toBe(false);
         } finally {
             await page.evaluate(() => window.dispatchEvent(new Event("complete-file-read")));
             await retryUpload;
         }
 
+        expect(await login.isCertificateUploaded()).toBe(true);
+    });
+
+    test(`ignores an older certificate read error while its retry is pending`, async ({}, testInfo) => {
+        const login = await browser.createNewPage(LoginPage);
+        const page = await browser.getPage();
+        const certificatePath = testInfo.outputPath('overlapping-certificate.crt');
+        await writeFile(certificatePath, 'test certificate');
+        const readError = login.readError(certificatePath);
+
+        await page.addInitScript(() => {
+            const readAsDataURL = FileReader.prototype.readAsDataURL;
+            const reads: { reader: FileReader; file: Blob }[] = [];
+            FileReader.prototype.readAsDataURL = function(file: Blob) {
+                reads.push({ reader: this, file });
+                document.documentElement.dataset.readCount = String(reads.length);
+            };
+            window.addEventListener("fail-first-read", () => reads[0].reader.dispatchEvent(new ProgressEvent("error")));
+            window.addEventListener("complete-second-read", () => readAsDataURL.call(reads[1].reader, reads[1].file));
+        });
+        await browser.navigateTo(urls.loginUrl);
+        await login.clickEnableTLS();
+
+        const firstUpload = login.uploadCertificate(certificatePath);
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
+        const retryUpload = login.uploadCertificate(certificatePath);
+        try {
+            await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
+            await page.evaluate(() => window.dispatchEvent(new Event("fail-first-read")));
+            await expect(readError).toBeHidden();
+        } finally {
+            await page.evaluate(() => window.dispatchEvent(new Event("complete-second-read")));
+            await Promise.all([firstUpload, retryUpload]);
+        }
+        expect(await login.isCertificateUploaded()).toBe(true);
+    });
+
+    test(`waits for a retry that fails immediately`, async ({}, testInfo) => {
+        const login = await browser.createNewPage(LoginPage);
+        const page = await browser.getPage();
+        const certificatePath = testInfo.outputPath('immediate-error.crt');
+        await writeFile(certificatePath, 'test certificate');
+        const readError = login.readError(certificatePath);
+
+        await page.addInitScript(() => {
+            let count = 0;
+            FileReader.prototype.readAsDataURL = function() {
+                document.documentElement.dataset.readCount = String(++count);
+                this.dispatchEvent(new ProgressEvent("error"));
+            };
+        });
+        await browser.navigateTo(urls.loginUrl);
+        await login.clickEnableTLS();
+        await login.uploadCertificate(certificatePath);
+        await expect(readError).toBeVisible();
+        await login.uploadCertificate(certificatePath);
+        expect(await page.evaluate(() => document.documentElement.dataset.readCount)).toBe("2");
+        await expect(readError).toBeVisible();
+    });
+
+    test(`ignores an older successful certificate read while its replacement is pending`, async ({}, testInfo) => {
+        const login = await browser.createNewPage(LoginPage);
+        const page = await browser.getPage();
+        const firstPath = testInfo.outputPath('old-certificate.crt');
+        const secondPath = testInfo.outputPath('new-certificate.crt');
+        await Promise.all([writeFile(firstPath, 'old'), writeFile(secondPath, 'new')]);
+        await page.addInitScript(() => {
+            const readAsDataURL = FileReader.prototype.readAsDataURL;
+            const reads: { reader: FileReader; file: Blob }[] = [];
+            FileReader.prototype.readAsDataURL = function(file: Blob) {
+                reads.push({ reader: this, file });
+                document.documentElement.dataset.readCount = String(reads.length);
+            };
+            window.addEventListener("complete-first-read", () => {
+                reads[0].reader.addEventListener("loadend", () => { document.documentElement.dataset.firstFinished = "true"; });
+                readAsDataURL.call(reads[0].reader, reads[0].file);
+            });
+            window.addEventListener("complete-second-read", () => readAsDataURL.call(reads[1].reader, reads[1].file));
+        });
+        await browser.navigateTo(urls.loginUrl);
+        await login.clickEnableTLS();
+        const firstUpload = login.uploadCertificate(firstPath);
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
+        const secondUpload = login.uploadCertificate(secondPath);
+        try {
+            await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
+            await page.evaluate(() => window.dispatchEvent(new Event("complete-first-read")));
+            await page.waitForFunction(() => document.documentElement.dataset.firstFinished === "true");
+            expect(await login.isCertificateRemoved()).toBe(true);
+        } finally {
+            await page.evaluate(() => window.dispatchEvent(new Event("complete-second-read")));
+            await Promise.all([firstUpload, secondUpload]);
+        }
+        expect(await login.isCertificateUploaded()).toBe(true);
+    });
+
+    test(`independent certificate and key reads can both complete`, async ({}, testInfo) => {
+        const login = await browser.createNewPage(LoginPage);
+        const page = await browser.getPage();
+        const certificatePath = testInfo.outputPath('independent-certificate.crt');
+        const keyPath = testInfo.outputPath('independent-key.pem');
+        await Promise.all([writeFile(certificatePath, 'certificate'), writeFile(keyPath, 'key')]);
+        await page.addInitScript(() => {
+            const readAsDataURL = FileReader.prototype.readAsDataURL;
+            const reads: { reader: FileReader; file: Blob }[] = [];
+            FileReader.prototype.readAsDataURL = function(file: Blob) {
+                reads.push({ reader: this, file });
+                document.documentElement.dataset.readCount = String(reads.length);
+            };
+            window.addEventListener("complete-first-read", () => readAsDataURL.call(reads[0].reader, reads[0].file));
+            window.addEventListener("complete-second-read", () => readAsDataURL.call(reads[1].reader, reads[1].file));
+        });
+        await browser.navigateTo(urls.loginUrl);
+        await login.clickEnableTLS();
+
+        const certificateUpload = login.uploadCertificate(certificatePath);
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
+        const keyUpload = login.uploadClientKey(keyPath);
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
+        await page.evaluate(() => window.dispatchEvent(new Event("complete-second-read")));
+        await keyUpload;
+        await page.evaluate(() => window.dispatchEvent(new Event("complete-first-read")));
+        await certificateUpload;
+
+        expect(await login.isClientKeyUploaded()).toBe(true);
+        expect(await login.isCertificateUploaded()).toBe(true);
+    });
+
+    test(`ignores a pending certificate read after TLS is disabled`, async ({}, testInfo) => {
+        const login = await browser.createNewPage(LoginPage);
+        const page = await browser.getPage();
+        const certificatePath = testInfo.outputPath('disabled-tls.crt');
+        await writeFile(certificatePath, 'certificate');
+        await page.addInitScript(() => {
+            const readAsDataURL = FileReader.prototype.readAsDataURL;
+            const reads: { reader: FileReader; file: Blob }[] = [];
+            FileReader.prototype.readAsDataURL = function(file: Blob) {
+                reads.push({ reader: this, file });
+                document.documentElement.dataset.readCount = String(reads.length);
+            };
+            window.addEventListener("fail-first-read", () => reads[0].reader.dispatchEvent(new ProgressEvent("error")));
+            window.addEventListener("complete-second-read", () => readAsDataURL.call(reads[1].reader, reads[1].file));
+        });
+        await browser.navigateTo(urls.loginUrl);
+        await login.clickEnableTLS();
+        const firstUpload = login.uploadCertificate(certificatePath);
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
+        await login.clickEnableTLS();
+        await page.evaluate(() => window.dispatchEvent(new Event("fail-first-read")));
+        await expect(login.readError(certificatePath)).toBeHidden();
+        await login.clickEnableTLS();
+        const secondUpload = login.uploadCertificate(certificatePath);
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
+        await page.evaluate(() => window.dispatchEvent(new Event("complete-second-read")));
+        await Promise.all([firstUpload, secondUpload]);
         expect(await login.isCertificateUploaded()).toBe(true);
     });
 
