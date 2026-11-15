@@ -49,11 +49,11 @@ test.describe("Graph Tests", () => {
       await graph.fillCreateGraphInput(graphName);
       await graph.clickConfirmCreateGraph();
       await expect(page.getByText("Invalid graph name: retry this operation", { exact: true })).toBeVisible();
-      await expect(page.getByTestId("createGraphInput")).toHaveValue(graphName);
-      await expect(page.getByTestId("createGraphConfirm")).toBeEnabled();
+      await expect(graph.insertInput).toHaveValue(graphName);
+      await expect(graph.createConfirm).toBeEnabled();
       await expect(page.getByText("Graph created successfully", { exact: true })).toHaveCount(0);
       await graph.clickConfirmCreateGraph();
-      await expect(page.getByTestId("createGraphInput")).toBeHidden();
+      await expect(graph.insertInput).toBeHidden();
       await expect.poll(() => graph.getSelectedGraphName()).toBe(graphName);
       await expect(page.getByText("Graph created successfully", { exact: true })).toBeVisible();
       expect(attempts).toBe(2);
@@ -88,7 +88,7 @@ test.describe("Graph Tests", () => {
       await graph.clickTableCheckboxByName(graphName);
       await graph.clickDelete();
       await graph.clickDeleteConfirm();
-      await expect(page.getByTestId("deleteGraphConfirm")).toBeHidden();
+      await expect(graph.deleteConfirm).toBeHidden();
       await expect(page.getByText("Invalid input: deletion rejected", { exact: true })).toBeVisible();
       expect((await apiCall.getGraphs()).opts).toContain(graphName);
       await expect(page.getByText("Graph(s) deleted successfully", { exact: true })).toHaveCount(0);
@@ -96,7 +96,7 @@ test.describe("Graph Tests", () => {
       await graph.clickTableCheckboxByName(graphName);
       await graph.clickDelete();
       await graph.clickDeleteConfirm();
-      await expect(page.getByTestId("deleteGraphConfirm")).toBeHidden();
+      await expect(graph.deleteConfirm).toBeHidden();
       await expect(page.getByText("Graph(s) deleted successfully", { exact: true })).toBeVisible();
       await expect.poll(async () => (await apiCall.getGraphs()).opts).not.toContain(graphName);
       expect(attempts).toBe(2);
