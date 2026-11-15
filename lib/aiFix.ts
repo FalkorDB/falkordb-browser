@@ -2,7 +2,8 @@
 // unit-testable to 100% and reused by the /api/chat/fix endpoint and the UI gating.
 //
 // v1 supports OpenAI-compatible providers only: openai / groq / xai (hosted) and
-// ollama / lmstudio (local) — all speak `POST /v1/chat/completions`.
+// ollama / lmstudio (local). The shared API transport selects Responses for hosted OpenAI
+// models and Chat Completions for older OpenAI families and the other supported providers.
 
 import { detectProviderFromModel, detectProviderFromApiKey, getProviderDisplayName, KNOWN_PROVIDERS, type AIProvider } from "./ai-provider-utils.ts";
 import { normalizeLocalEndpoint } from "./local-llm-utils.ts";

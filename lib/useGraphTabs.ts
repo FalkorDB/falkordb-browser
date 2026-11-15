@@ -164,9 +164,14 @@ export default function useGraphTabs<S>({
     // when `stateRef` still holds the pre-restore strip. Persisting then would write
     // the outgoing connection's tabs under the incoming connection's key.
     const restoredStateRef = useRef<TabsState | null>(null);
+    // The strip the restore effect last settled: the tutorial's (true) or the
+    // user's (false); null while the gate is closed. Compared with `tutorialOpen`
+    // below, it stays false until the strip a reopened gate restores commits.
+    const [settledFor, setSettledFor] = useState<boolean | null>(null);
     const commitRestored = useCallback((next: TabsState) => {
         restoredStateRef.current = next;
         setState(next);
+        setSettledFor(false);
     }, []);
 
     const persist = useCallback(() => {
@@ -214,6 +219,7 @@ export default function useGraphTabs<S>({
         // this effect restore them from storage once the tutorial closes.
         if (!prefixReady || !canRestore || tutorialOpen) {
             restoredKeyRef.current = null;
+            setSettledFor(tutorialOpen ? true : null);
             return;
         }
 
@@ -282,6 +288,7 @@ export default function useGraphTabs<S>({
     }, [prefixReady, persist]);
 
     const selectTab = useCallback((id: string) => {
+        if (!canRestore) return;
         const prev = stateRef.current;
         if (id === prev.activeTabId) return;
 
@@ -291,9 +298,10 @@ export default function useGraphTabs<S>({
         sessionsRef.current.set(prev.activeTabId, captureSessionRef.current());
         setState({ tabs: withLive(prev), activeTabId: id });
         onActivateRef.current(target, sessionsRef.current.get(id));
-    }, [withLive]);
+    }, [canRestore, withLive]);
 
     const addTab = useCallback(() => {
+        if (!canRestore) return;
         const prev = stateRef.current;
         // Lowering the setting never closes tabs, so an existing strip can sit
         // above the cap; it just cannot grow any further.
@@ -304,10 +312,11 @@ export default function useGraphTabs<S>({
         sessionsRef.current.set(prev.activeTabId, captureSessionRef.current());
         setState({ tabs: [...withLive(prev), tab], activeTabId: tab.id });
         onActivateRef.current(tab, undefined);
-    }, [withLive]);
+    }, [canRestore, withLive]);
 
     /** Sets (or clears, when blank) a tab's custom label. */
     const renameTab = useCallback((id: string, name: string) => {
+        if (!canRestore) return;
         const trimmed = name.trim();
 
         setState(prev => ({
@@ -316,9 +325,10 @@ export default function useGraphTabs<S>({
             // otherwise reverts its query and view to the last folded values.
             tabs: withLive(prev).map(t => (t.id === id ? { ...t, name: trimmed || undefined } : t)),
         }));
-    }, [withLive]);
+    }, [canRestore, withLive]);
 
     const closeTab = useCallback((id: string) => {
+        if (!canRestore) return;
         const prev = stateRef.current;
         // The last tab is never closable — there is always one working context.
         if (prev.tabs.length <= 1) return;
@@ -344,7 +354,7 @@ export default function useGraphTabs<S>({
 
         setState({ tabs: remaining, activeTabId: next ? next.id : prev.activeTabId });
         if (next) onActivateRef.current(next, sessionsRef.current.get(next.id));
-    }, [withLive, prefixReady]);
+    }, [canRestore, withLive, prefixReady]);
 
     /**
      * The user ran a query against `graph`, so if that is the active tab's
@@ -376,6 +386,8 @@ export default function useGraphTabs<S>({
         [activeTab, liveLayout],
     );
 
+    const restored = prefixReady && canRestore && settledFor === tutorialOpen;
+
     return useMemo(() => ({
         tabs,
         activeTabId: state.activeTabId,
@@ -386,5 +398,6 @@ export default function useGraphTabs<S>({
         closeTab,
         markRan,
         activeShareParams,
-    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab, markRan, activeShareParams]);
+        restored,
+    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab, markRan, activeShareParams, restored]);
 }

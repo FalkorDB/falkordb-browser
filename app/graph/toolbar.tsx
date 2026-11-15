@@ -8,7 +8,7 @@ import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
 import { filterSearchElements, getSearchMatch } from "./searchElements";
-import { BrowserSettingsContext, ConnectionContext, GraphContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, GraphContext, GraphTabsContext } from "../components/provider";
 import { getNodeDisplayText } from "@falkordb/canvas";
 
 interface Props {
@@ -61,6 +61,10 @@ export default function Toolbar({
     const [hoverIndex, setHoverIndex] = useState(-1);
     const [searchElement, setSearchElement] = useState("");
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const { tabsReady } = useContext(GraphTabsContext);
+    useEffect(() => {
+        if (!tabsReady) setDeleteOpen(false);
+    }, [tabsReady]);
     const [scrollTop, setScrollTop] = useState(0);
 
     const isLoading = isLoadingGraph;
@@ -347,7 +351,7 @@ export default function Toolbar({
                         }
                         {
                             selectedElements.length !== 0 &&
-                            <DeleteElement
+                            tabsReady && <DeleteElement
                                 description="Are you sure you want to delete this element(s)?"
                                 open={deleteOpen}
                                 setOpen={setDeleteOpen}
