@@ -390,3 +390,6 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
+  The Firefox settings project depends on the Chromium settings project because both
+  mutate server-wide configuration. Selecting Firefox also runs Chromium first; do not
+  bypass this dependency when both projects share a server.
