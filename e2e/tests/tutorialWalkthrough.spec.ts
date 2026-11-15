@@ -3,6 +3,7 @@ import type { Session, SessionConnection } from "next-auth";
 import urls from "../config/urls.json";
 import { expect, test } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
+import { readOwnedTutorialGraphs } from "../infra/tutorialGraphs";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
 import AppDownloadComponent from "../logic/POM/appDownloadComponent";
 import ApiCalls from "../logic/api/apiCalls";
@@ -101,26 +102,7 @@ test.describe("Tutorial", () => {
         let teardownError: unknown;
         try {
             if (browser.getContext()?.pages().some(page => !page.isClosed())) {
-                const page = await browser.getPage();
-                const { ownerId, records } = await page.evaluate(() => {
-                    const ownerId = sessionStorage.getItem("tutorialDemoOwnerId");
-                    if (!ownerId) return { ownerId: null, records: [] };
-                    const suffix = `tutorialDemoGraphOwnership:${ownerId}`;
-                    const records = Object.keys(localStorage)
-                        .filter(key => key.endsWith(suffix))
-                        .map(key => ({ key, stored: localStorage.getItem(key) }));
-                    return { ownerId, records };
-                });
-                if (ownerId) {
-                    const suffix = tutorialDemoOwnershipKey(ownerId);
-                    for (const record of records) {
-                        if (!record.stored || !record.key.endsWith(suffix)) continue;
-                        const scope = record.key.slice(0, -suffix.length);
-                        if (!scope) throw new Error("Tutorial graph ownership has no connection scope");
-                        ownedTutorialGraphs.push(...parseTutorialDemoOwnership(record.stored, scope, ownerId).names);
-                    }
-                    ownedTutorialGraphs = [...new Set(ownedTutorialGraphs)];
-                }
+                ownedTutorialGraphs = await readOwnedTutorialGraphs(await browser.getPage());
             }
         } catch (error) {
             teardownError = error;
@@ -674,21 +656,38 @@ test.describe("Tutorial", () => {
                     }));
                 }
             }, { scope, owners });
+            // Verification lists hang until the sweep gives up; the graph list the
+            // page loads afterwards is answered so the tab strip can unlock.
             let requests = 0;
+            let released = false;
+            let release!: () => void;
+            const gate = new Promise<void>(resolve => { release = resolve; });
             await page.route(url => url.pathname === "/api/graph", async route => {
+                if (released) {
+                    await route.continue();
+                    return;
+                }
                 requests += 1;
                 if (failPublication && requests === 1) {
                     await route.fulfill({ json: { opts: [] } });
+                    return;
                 }
+                await gate;
+                // The page has usually abandoned a held verification by now.
+                await route.continue().catch(() => {});
             });
             try {
                 await page.goto(urls.graphUrl);
                 await expect(page.getByTestId("toast-title").filter({ hasText: "Tutorial cleanup failed" })).toBeVisible({ timeout: 25000 });
+                const sweepRequests = requests;
+                released = true;
+                release();
+                expect(sweepRequests).toBeLessThan(5);
                 await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
-                expect(requests).toBeLessThan(5);
                 expect(await page.evaluate(({ scope, owners }) => owners.every(owner =>
                     localStorage.getItem(`${scope}tutorialDemoGraphOwnership:${owner}`) !== null), { scope, owners })).toBe(true);
             } finally {
+                release();
                 await browser.closeBrowser();
             }
     });
@@ -1777,6 +1776,10 @@ test.describe("Tutorial", () => {
         await tutorial.addStripTab();
         const userTabs = await tutorial.getStripTabCount();
         expect(userTabs).toBe(2);
+        // The address bar follows the new blank tab after a short debounce.
+        // Reloading earlier would reload the first tab's share link, and a
+        // share link holds the tutorial back.
+        await expect(await browser.getPage()).toHaveURL(url => !url.searchParams.has("graph"));
 
         // 2. Start the tutorial by setting localStorage and refreshing
         await tutorial.changeLocalStorage("true");
