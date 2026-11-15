@@ -1,7 +1,8 @@
 'use client';
 
 import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Trash2, X } from "lucide-react";
-import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
+import { getPropertyUrl } from "@/lib/graphUrls";
+import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
 import { formatValue, getDefaultValue, inferValueType, isGeoPoint, parseValue, VALUE_PLACEHOLDERS, VALUE_TYPES, type ValueType } from "@/lib/graphValues";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -13,7 +14,7 @@ import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
 import { EMPTY_DISPLAY_NAME } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, IndicatorContext, ConnectionContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, GraphTabsContext, IndicatorContext, ConnectionContext } from "../components/provider";
 import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
@@ -104,7 +105,9 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
 
     const { graph, setGraphInfo } = useContext(GraphContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly: connectionReadOnly } = useContext(ConnectionContext);
+    const { tabsReady } = useContext(GraphTabsContext);
+    const isReadOnly = connectionReadOnly || !tabsReady;
     const { toast } = useToast();
     const isMobile = useIsMobile();
 
@@ -133,6 +136,16 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
      */
     const writtenTypes = useRef<Record<string, ValueType>>({});
     const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        if (isReadOnly) {
+            setEditable("");
+            setIsAddValue(false);
+            setNewKey("");
+            setNewVal("");
+            setNewType("string");
+        }
+    }, [isReadOnly]);
 
     const setValueParagraphRef = useCallback((key: string) => (el: HTMLParagraphElement | null) => {
         if (!el) {
@@ -287,7 +300,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
         }
         try {
             if (actionType === "set") setIsSetLoading(true);
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${isReadOnly ? '?readOnly=true' : ''}`, {
+            const result = await securedFetch(getPropertyUrl(graph.Id, id, key, isReadOnly), {
                 method: "POST",
                 body: JSON.stringify({
                     value: val,
@@ -405,7 +418,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
         try {
             setIsRemoveLoading(true);
             const { id } = object;
-            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${isReadOnly ? '?readOnly=true' : ''}`, {
+            const success = (await securedFetch(getPropertyUrl(graph.Id, id, key, isReadOnly), {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
             }, toast, setIndicator, cid)).ok;
@@ -667,7 +680,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                                         key={`${key}-value`}
                                     >
                                         {
-                                            editable === key ?
+                                            !isReadOnly && editable === key ?
                                                 getCellEditableContent(newType)
                                                 : (
                                                     <div className="flex w-full flex-col gap-1">
@@ -719,7 +732,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
                                     >
-                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{writtenTypes.current[key] ?? inferValueType(value)}</p>}
+                                        {!isReadOnly && editable === key ? getNewTypeInput() : <p className="w-full truncate">{writtenTypes.current[key] ?? inferValueType(value)}</p>}
                                     </div>
                                     <div
                                         className={cellClass}
@@ -822,7 +835,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                         )
                     }
                     {
-                        isAddValue && (
+                        !isReadOnly && isAddValue && (
                             <>
                                 <div className="flex items-center px-2 border-b border-border min-h-14">
                                     <Input
