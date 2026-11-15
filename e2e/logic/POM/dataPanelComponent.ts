@@ -391,7 +391,7 @@ export default class DataPanel extends GraphPage {
     return interactWhenVisible(
       this.attributeValue(attribute),
       (el) => el.textContent(),
-      "Data Panel Delete Attribute Cancel"
+      `Data Panel Attribute Value ${attribute}`
     );
   }
 
