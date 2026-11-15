@@ -104,7 +104,8 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
   });
 
   it("recognises UNION after boolean and comparison expressions ending in keyword-named variables", () => {
-    for (const expression of ["true AND yield", "false OR yield", "true XOR yield", "NOT yield", "1 IN yield", "1 < yield", "1 > yield"]) {
+    for (const expression of ["true AND yield", "false OR yield", "true XOR yield", "NOT yield", "1 IN yield", "1 < yield", "1 > yield",
+      "'ab' STARTS WITH yield", "'ab' ENDS WITH yield", "'ab' CONTAINS yield", "'ab' =~ yield"]) {
       const query = `UNWIND [true,false] AS yield RETURN ${expression} UNION ALL UNWIND [true,false] AS yield RETURN ${expression}`;
       assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
     }
@@ -115,8 +116,10 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
       const query = `MATCH (call) RETURN ${projection} AS y UNION ALL MATCH (call) RETURN ${projection} AS y`;
       assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
     }
-    const subquery = "MATCH (n) WITH n AS `x` CALL { RETURN 1 AS y } RETURN y UNION RETURN 2 AS y";
-    assert.deepEqual(getQueryWithLimit(subquery, 1), [`${subquery} LIMIT 1`, 1]);
+    for (const prefix of ["MATCH (n) WITH n AS `x`", "WITH 1 AS yield", "WITH 1 AS n, 2 AS with", "WITH {a: 1} AS n WITH n.return"]) {
+      const subquery = `${prefix} CALL { RETURN 1 AS y } RETURN y UNION RETURN 2 AS y`;
+      assert.deepEqual(getQueryWithLimit(subquery, 1), [`${subquery} LIMIT 1`, 1]);
+    }
   });
 
   it("does not treat a node variable followed by a map as a CALL clause", () => {

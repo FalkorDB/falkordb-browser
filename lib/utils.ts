@@ -1602,7 +1602,10 @@ function hasCallClause(query: string, code: string, quotedTokenEnds: number[]): 
     const previousWord = /[\p{ID_Continue}\p{Sc}]+$/u.exec(before)?.[0].toUpperCase() ?? "";
     const callStart = match.index;
     const afterQuoted = quotedTokenEnds.some(end => end <= callStart && /^\s*$/.test(code.slice(end, callStart)));
-    const expressionContext = /[.:$,+*/%<>=|&^-]$/.test(before) || UNION_PRECEDING_KEYWORDS.has(previousWord) || previousWord === "BY";
+    const tokenBeforeWord = /(?:[\p{ID_Continue}\p{Sc}]+|\S)$/u.exec(before.slice(0, before.length - previousWord.length).trimEnd())?.[0].toUpperCase() ?? "";
+    const keywordNamedVariable = tokenBeforeWord === "AS" || /^[.:$,+*/%^=<>~-]$/.test(tokenBeforeWord);
+    const expressionContext = /[.:$,+*/%<>=|&^-]$/.test(before) ||
+      ((UNION_PRECEDING_KEYWORDS.has(previousWord) || previousWord === "BY") && !keywordNamedVariable);
     if (depth === 0 && (afterQuoted || !expressionContext) && hasCallTarget(query, match.index + match[0].length)) return true;
     match = callKeyword.exec(code);
   }
@@ -1737,7 +1740,8 @@ function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>, bodyStart:
       const afterQuoted = previous === quoted;
       const wildcardProjection = previous === "*" && afterReturn;
       const keywordIdentifier = UNION_PRECEDING_KEYWORDS.has(previous) &&
-        (/^[.:$,+*/%^=<>-]$/.test(beforePrevious) || ["AS", "AND", "OR", "XOR", "NOT", "IN"].includes(beforePrevious) || afterReturn);
+        (/^[.:$,+*/%^=<>~-]$/.test(beforePrevious) || ["AS", "AND", "OR", "XOR", "NOT", "IN", "CONTAINS"].includes(beforePrevious) ||
+          (beforePrevious === "WITH" && (thirdPrevious === "STARTS" || thirdPrevious === "ENDS")) || afterReturn);
       nextClause.lastIndex = index + text.length;
       if (
         (afterQuoted || wildcardProjection || !/^[.:$,([{/*+%<>=|&^-]$/.test(previous)) &&
