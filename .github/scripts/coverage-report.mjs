@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = process.env.COVERAGE_ROOT
   ? path.resolve(process.env.COVERAGE_ROOT) + path.sep
@@ -165,6 +165,10 @@ async function transpile(entry) {
   entry.sourceMap = { ...JSON.parse(out.sourceMapText), sources: [entry.url] };
 }
 
+function browserSourceFile(dir, url) {
+  return path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
+}
+
 /**
  * One page's coverage as e2e/infra/coverage.ts saved it, each entry given back
  * the chunk source saved beside it. An entry whose source was never saved is
@@ -172,7 +176,7 @@ async function transpile(entry) {
  */
 export function browserEntries(dir, name) {
   return JSON.parse(readFileSync(path.join(dir, name), 'utf8')).filter((entry) => {
-    const sourceFile = path.join(dir, `browser-source-${createHash('sha1').update(entry.url).digest('hex')}.js`);
+    const sourceFile = browserSourceFile(dir, entry.url);
     try {
       entry.source = readFileSync(sourceFile, 'utf8');
       return true;
@@ -183,12 +187,55 @@ export function browserEntries(dir, name) {
   });
 }
 
+export function validateBrowserCoverage(dirs, required = true) {
+  let entries = 0;
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir)) {
+      if (/^browser-error-.*\.json$/.test(name)) {
+        throw new Error(`Browser coverage collection failed: ${readFileSync(path.join(dir, name), 'utf8')}`);
+      }
+      if (/^browser-[^.]+\.json$/.test(name)) {
+        const recorded = JSON.parse(readFileSync(path.join(dir, name), 'utf8'));
+        if (recorded.some(({ url }) => !existsSync(browserSourceFile(dir, url)))) {
+          throw new Error(`Browser coverage is missing chunk sources in ${name}`);
+        }
+        entries += recorded.length;
+      }
+    }
+  }
+  if (required && !entries) throw new Error('No usable browser coverage was recorded');
+}
+
+// Docker's server runs under /app, not the reporting checkout. Its exact
+// .next artifacts must be copied out before resolving these sources.
+export function containerEntries(dir, name, serverRoot) {
+  const data = JSON.parse(readFileSync(path.join(dir, name), 'utf8'));
+  const prefix = pathToFileURL(path.join(serverRoot, '.next/server') + path.sep).href;
+  return data.result.filter((entry) => entry.url.startsWith(prefix)).map((entry) => {
+    const local = path.join(ROOT, '.next/server', fileURLToPath(entry.url).slice(path.join(serverRoot, '.next/server').length));
+    const source = readFileSync(local, 'utf8');
+    let sourceMap = data['source-map-cache']?.[entry.url]?.data;
+    const externalMap = /\/\/# sourceMappingURL=(?!data:)(\S+)\s*$/.exec(source);
+    if (!sourceMap && externalMap) {
+      sourceMap = JSON.parse(readFileSync(new URL(externalMap[1], pathToFileURL(local)), 'utf8'));
+    }
+    return {
+      ...entry,
+      url: pathToFileURL(local).href,
+      source,
+      sourceMap,
+    };
+  });
+}
+
 /** Writes coverage/<flag>/ from the raw coverage in `dirs`. */
 async function main([flag, ...dirs]) {
   if (!flag || !dirs.length) {
     console.error('usage: coverage-report.mjs <flag> <raw dir>...');
     process.exit(2);
   }
+  validateBrowserCoverage(dirs, process.env.REQUIRE_BROWSER_COVERAGE === '1');
   // A source file of this checkout that the flag covers (source maps also
   // name files of dependencies).
   const inScope = (sourcePath) => {
@@ -230,7 +277,14 @@ async function main([flag, ...dirs]) {
     }
     const names = readdirSync(dir);
     // Node processes: NODE_V8_COVERAGE files.
-    if (names.some((n) => n.startsWith('coverage-'))) await report.addFromDir(dir);
+    if (process.env.COVERAGE_SERVER_ROOT) {
+      for (const name of names.filter((n) => /^coverage-.*\.json$/.test(n))) {
+        const entries = containerEntries(dir, name, process.env.COVERAGE_SERVER_ROOT);
+        if (entries.length) await report.add(entries);
+      }
+    } else if (names.some((n) => n.startsWith('coverage-'))) {
+      await report.addFromDir(dir);
+    }
     // Browser pages: what e2e/infra/coverage.ts saves, each page's coverage
     // apart from the chunk sources it ran.
     for (const name of names.filter((n) => /^browser-[^.]+\.json$/.test(n))) {

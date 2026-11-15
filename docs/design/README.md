@@ -24,7 +24,7 @@ Plans predating this convention carry no shipped/status note: verify them agains
 | [clear-cypher-errors-ideas.md](clear-cypher-errors-ideas.md) | Backlog for clearer Cypher error messages |
 | [idea-1-did-you-mean-plan.md](idea-1-did-you-mean-plan.md) | "Did you mean…?" suggestions |
 | [idea-2-editor-diagnostics-plan.md](idea-2-editor-diagnostics-plan.md) | Inline editor diagnostics and quick fixes |
-| [idea-3-ai-fix-plan.md](idea-3-ai-fix-plan.md) | "Fix with AI" |
+| [idea-3-ai-fix-plan.md](idea-3-ai-fix-plan.md) | "Fix with AI" and the shared AI completion transport (also used by Optimize) |
 | [idea-5-coverage-drift-plan.md](idea-5-coverage-drift-plan.md) | More error hints + drift guard against a real FalkorDB |
 | [idea-6-connection-epoch-pinning-plan.md](idea-6-connection-epoch-pinning-plan.md) | Ownership tokens against stale connection/graph/query results |
 

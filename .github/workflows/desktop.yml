@@ -54,7 +54,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -141,7 +141,7 @@ jobs:
         run: node .github/scripts/coverage-report.mjs desktop coverage/raw/desktop
 
       - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name != 'release' }}
+        if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name != 'release' && github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
