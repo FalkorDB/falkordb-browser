@@ -48,8 +48,7 @@ test.describe('@Config Settings users tests', () => {
         const mock = await mockUserRequests(await browser.getPage(), [], rejection);
         await browser.navigateTo(urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.fillAddUserForm({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
-        await settingsUsersPage.clickOnSubmitUserAddition();
+        await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
         expect(await settingsUsersPage.getErrorToastText()).toBe(rejection.message);
         expect(await settingsUsersPage.getUserNameFieldValue()).toBe(username);
         expect(await settingsUsersPage.getPasswordFieldValue()).toBe(user.password);
@@ -71,11 +70,8 @@ test.describe('@Config Settings users tests', () => {
         const mock = await mockUserRequests(await browser.getPage(), [{ username, role: user.ReadWrite, keys: ["reports:*"] }], rejection);
         await browser.navigateTo(urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.clickUserCheckboxBtn(username);
-        await settingsUsersPage.clickOnEditUserBtn();
+        await settingsUsersPage.editUser(username, { role: user.ReadOnly, keys: "analytics:*" });
         expect(await settingsUsersPage.isUserNameFieldDisabled()).toBe(true);
-        await settingsUsersPage.fillEditUserForm({ role: user.ReadOnly, keys: "analytics:*" });
-        await settingsUsersPage.clickOnSubmitEditUser();
         expect(await settingsUsersPage.getErrorToastText()).toBe(rejection.message);
         expect(await settingsUsersPage.getUserRole(username)).toBe(user.ReadWrite);
         expect(await settingsUsersPage.getUserKeysInRow(username)).toBe("reports:*");

@@ -258,7 +258,11 @@ export default class SettingsUsersPage extends BasePage {
 
   // A submitted form closes once the request succeeds; an invalid one stays open showing field errors.
   private async waitForUserFormToSettle(): Promise<void> {
-    await this.userForm.filter({ hasNot: this.page.getByRole("alert") }).waitFor({ state: "hidden" });
+    await Promise.race([
+      this.userForm.waitFor({ state: "hidden" }),
+      this.errorToast.waitFor({ state: "visible" }),
+      this.page.getByRole("alert").waitFor({ state: "visible" }),
+    ]);
   }
 
   async getUserRole(selectedUser: string): Promise<string | null> {
