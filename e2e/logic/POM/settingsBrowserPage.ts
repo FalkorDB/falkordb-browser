@@ -228,6 +228,19 @@ export default class SettingsBrowserPage extends BasePage {
     await this.page.evaluate(() => localStorage.removeItem("chatModelSource"));
   }
 
+  /** Seed a stored model for `source` before the next navigation, as a returning user would have it. */
+  async seedStoredModel(source: string, model: string): Promise<void> {
+    await this.page.addInitScript(({ source: s, model: m }) => {
+      localStorage.setItem("chatModelSource", s);
+      localStorage.setItem("model", m);
+      localStorage.setItem("perSourceModels", JSON.stringify({ [s]: m }));
+    }, { source, model });
+  }
+
+  async getStoredPerSourceModel(source: string): Promise<string | undefined> {
+    return this.page.evaluate((s) => JSON.parse(localStorage.getItem("perSourceModels") ?? "{}")[s], source);
+  }
+
   async getSavedModelFromLocalStorage(): Promise<string | null> {
     return this.page.evaluate(() => localStorage.getItem("model"));
   }

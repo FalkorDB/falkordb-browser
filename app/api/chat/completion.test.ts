@@ -203,6 +203,17 @@ describe("shared AI completion transport", () => {
     await assert.rejects(requestAiCompletion(input), { message: "terminated" });
   });
 
+  for (const name of ["AbortError", "TimeoutError"]) {
+    it(`propagates ${name} when a provider failure body cannot be read`, async (t) => {
+      const bodyError = new DOMException("body read interrupted", name);
+      t.mock.method(globalThis, "fetch", async () => new Response(new ReadableStream({
+        start(controller) { controller.error(bodyError); },
+      }), { status: 401 }));
+
+      await assert.rejects(requestAiCompletion(input), error => error === bodyError);
+    });
+  }
+
   it("rejects malformed success bodies and handles non-JSON provider failures", async (t) => {
     t.mock.method(console, "warn", () => {});
     const mock = t.mock.method(globalThis, "fetch", async () => new Response("not JSON"));

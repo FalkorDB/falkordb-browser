@@ -211,6 +211,28 @@ test.describe('@browser Browser Settings tests', () => {
         expect(noModelsText).toContain("No models found");
     });
 
+    test('@readwrite Verify a saved legacy OpenAI model is preserved when it is not first', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        const testApiKey = `sk-e2e-${getRandomString("key")}`;
+
+        await settingsBrowserPage.seedStoredModel("api-key", "codex-mini-latest");
+        await page.route("**/api/chat/models", route => route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ models: ["openai::gpt-4o-mini", "openai::codex-mini-latest"] }),
+        }));
+        await page.goto(urls.settingsUrl);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.addChatApiKey(testApiKey);
+        await settingsBrowserPage.selectChatApiKey(testApiKey);
+
+        await expect.poll(() => settingsBrowserPage.getStoredPerSourceModel("api-key"))
+            .toBe("openai::codex-mini-latest");
+    });
+
     test('@readwrite Verify API key provider info tooltip displays supported providers', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
