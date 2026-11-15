@@ -178,6 +178,12 @@ export default class LoginPage extends HeaderComponent {
     return this.page.locator("//input[@id='FalkorDB URL']");
   }
 
+  async openApiDocumentation(): Promise<string> {
+    await interactWhenVisible(this.page.getByRole("link", { name: "API Documentation" }), (el) => el.click(), "API Documentation link");
+    await this.page.waitForURL("**/docs");
+    return new URL(this.page.url()).pathname;
+  }
+
   async clickConnect(): Promise<void> {
     await interactWhenVisible(
       this.connectBtn,
