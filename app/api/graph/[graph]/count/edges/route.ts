@@ -1,5 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly } from "@/app/api/utils";
+import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE, resolveGraphReadOnly } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
 
 /**
@@ -33,7 +33,7 @@ export async function GET(
 
     const { client, user } = session;
     const { graph: graphId } = await params;
-    const isReadOnly = resolveReadOnly(request, user.role);
+    const isReadOnly = resolveGraphReadOnly(request, user.role, graphId);
 
     try {
       const graph = client.selectGraph(graphId);
