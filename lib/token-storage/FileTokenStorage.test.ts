@@ -103,6 +103,11 @@ describe("FileTokenStorage", () => {
             assert.equal((await fs.stat(filePath)).mode & 0o777, 0o600);
             assert.equal((await fs.stat(join(dir, "nested"))).mode & 0o777, 0o700);
 
+            // A read ensures the file without rewriting it, so only the chmod branch can restore 0600.
+            await fs.chmod(filePath, 0o644);
+            await storage.fetchTokenById("id-default");
+            assert.equal((await fs.stat(filePath)).mode & 0o777, 0o600);
+
             await fs.chmod(filePath, 0o644);
             await storage.createToken(makeToken({ token_id: "b" }));
             assert.equal((await fs.stat(filePath)).mode & 0o777, 0o600);
@@ -197,16 +202,15 @@ describe("FileTokenStorage", () => {
     });
 
     describe("updateLastUsed", () => {
-        it("stamps last_used with the current unix time", async () => {
+        it("stamps last_used with the current unix time", async (t) => {
             await storage.createToken(makeToken({ token_id: "a" }));
             await storage.createToken(makeToken({ token_id: "b" }));
 
-            const before = Math.floor(Date.now() / 1000);
+            // Only Date is mocked so the read-retry setTimeout stays real.
+            t.mock.timers.enable({ apis: ["Date"], now: 1_700_000_123_999 });
             await storage.updateLastUsed("a");
-            const after = Math.floor(Date.now() / 1000);
 
-            const a = await storage.fetchTokenById("a");
-            assert.ok(a && a.last_used >= before && a.last_used <= after);
+            assert.equal((await storage.fetchTokenById("a"))?.last_used, 1_700_000_123);
             assert.equal((await storage.fetchTokenById("b"))?.last_used, -1);
         });
 
