@@ -47,25 +47,6 @@ test.describe("Connection Manager Tests", () => {
       expect(label).toMatch(/@.*:\d+/);
     }
   });
-
-  test(`@admin Verify cancelling last-connection logout preserves the session`, async () => {
-    const manager = await browser.createNewPage(ConnectionManagerComponent, urls.graphUrl);
-    const page = await browser.getPage();
-    // The shared admin session must survive even if cancel regresses into a sign-out.
-    let signOutRequests = 0;
-    await page.route("**/api/auth/signout", async (route) => {
-      signOutRequests += 1;
-      await route.fulfill({ json: { url: urls.loginUrl } });
-    });
-    await manager.openDropdown();
-    await manager.requestRemoval(ADMIN_USERNAME);
-    await expect(manager.logoutDialog).toContainText("only connection");
-    await manager.cancelRemoval();
-    await expect(manager.logoutDialog).toBeHidden();
-    expect(manager.getCurrentURL()).toContain(urls.graphUrl);
-    expect(signOutRequests).toBe(0);
-    await expect(manager.connectionItems).toHaveCount(1);
-  });
 });
 
 // These tests add and remove connections, so each logs in with its own session
@@ -89,6 +70,25 @@ test.describe("Connection Manager Tests: own session", () => {
     // Reload first: a menu, dialog or toast left open would block the header logout.
     await manager.refreshPage();
     await new LoginPage(page).Logout();
+  });
+
+  test(`@admin Verify cancelling last-connection logout preserves the session`, async ({ page }) => {
+    let signOutRequests = 0;
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/auth/signout") signOutRequests += 1;
+    });
+    await manager.openDropdown();
+    await expect(manager.connectionItems).toHaveCount(1);
+    await manager.requestRemoval(ADMIN_USERNAME);
+    await expect(manager.logoutDialog).toContainText("only connection");
+    await manager.cancelRemoval();
+    await expect(manager.logoutDialog).toBeHidden();
+    expect(manager.getCurrentURL()).toContain(urls.graphUrl);
+    expect(signOutRequests).toBe(0);
+    await expect(manager.connectionItems).toHaveCount(1);
+    const session = await manager.getSession();
+    expect(session.ok()).toBe(true);
+    expect(await session.json()).toMatchObject({ user: { role: "Admin" } });
   });
 
   test(`@admin Verify a rejected additional connection keeps the form editable for retry`, async ({ page }) => {
