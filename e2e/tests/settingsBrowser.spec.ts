@@ -919,16 +919,21 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
         await browser.closeBrowser();
     });
 
-    async function openLocalSettings(settings: SettingsBrowserPage, initialModel = "") {
+    async function openLocalSettings(
+        settings: SettingsBrowserPage,
+        initialModel = "",
+        perSourceModels?: Record<string, string>
+    ) {
         const page = await browser.getPage();
-        await page.addInitScript(({ model, endpoint }) => {
+        await page.addInitScript(({ model, endpoint, perSource }) => {
             localStorage.setItem("chatModelSource", "local");
             localStorage.setItem("localLlmProvider", "ollama");
             localStorage.setItem("localLlmEndpoint", endpoint);
             if (model) localStorage.setItem("model", model);
             else localStorage.removeItem("model");
-            localStorage.removeItem("perSourceModels");
-        }, { model: initialModel, endpoint: LOCAL_LLM_ENDPOINT });
+            if (perSource) localStorage.setItem("perSourceModels", JSON.stringify(perSource));
+            else localStorage.removeItem("perSourceModels");
+        }, { model: initialModel, endpoint: LOCAL_LLM_ENDPOINT, perSource: perSourceModels });
         await browser.navigateTo(urls.settingsUrl);
         await settings.expandChatSection();
     }
@@ -1002,10 +1007,123 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
         await expect.poll(() => settings.getSavedModelFromLocalStorage()).toBe("qwen2.5");
     });
 
-    test('@readwrite Verify an API key is retained after an encryption failure and can be retried', async () => {
+    test('@readwrite Verify Ollama models load and the first one is selected', async () => {
         const settings = await browser.createNewPage(SettingsBrowserPage);
         const page = await browser.getPage();
-        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const requests: Record<string, string>[] = [];
+        await page.route("**/api/chat/models", async (route) => {
+            requests.push(route.request().postDataJSON());
+            await route.fulfill({ json: { models: ["llama3.2", "qwen2.5"] } });
+        });
+        await openLocalSettings(settings);
+
+        await expect(settings.modelsStatusMessage).toHaveText("2 local Ollama models loaded.");
+        expect(await settings.isModelVisible("llama3.2")).toBe(true);
+        expect(await settings.isModelVisible("qwen2.5")).toBe(true);
+        expect(await settings.isModelSelected("llama3.2")).toBe(true);
+        expect(await settings.isModelSelected("qwen2.5")).toBe(false);
+        expect(requests.at(-1)).toEqual({ source: "local", localProvider: "ollama", endpoint: LOCAL_LLM_ENDPOINT });
+        await expect.poll(() => settings.getSavedModelFromLocalStorage()).toBe("llama3.2");
+    });
+
+    test('@readwrite Verify LM Studio loads its models from its default endpoint', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        const requests: Record<string, string>[] = [];
+        await page.route("**/api/chat/models", async (route) => {
+            const request = route.request().postDataJSON();
+            requests.push(request);
+            await route.fulfill({
+                json: { models: request.localProvider === "lmstudio" ? ["qwen2.5", "phi3"] : ["llama3.2"] },
+            });
+        });
+        await openLocalSettings(settings);
+        await expect(settings.modelsStatusMessage).toHaveText(LOCAL_MODELS_LOADED);
+
+        await settings.selectLmStudioProvider();
+
+        await expect(settings.modelsStatusMessage).toHaveText("2 local LM Studio models loaded.");
+        expect(await settings.isLmStudioProviderSelected()).toBe(true);
+        expect(await settings.getLocalLlmEndpointValue()).toBe("http://localhost:1234/v1");
+        expect(requests.at(-1)).toEqual({ source: "local", localProvider: "lmstudio", endpoint: "http://localhost:1234/v1" });
+        expect(await settings.isModelVisible("qwen2.5")).toBe(true);
+        expect(await settings.isModelVisible("llama3.2")).toBe(false);
+    });
+
+    test('@readwrite Verify local model search filters case-insensitively and clears', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models", (route) => route.fulfill({
+            json: { models: ["llama3.2", "qwen2.5", "phi3"] },
+        }));
+        await openLocalSettings(settings);
+        await expect(settings.modelsStatusMessage).toHaveText("3 local Ollama models loaded.");
+
+        await settings.searchModels("QWEN");
+        await expect.poll(() => settings.isModelVisible("llama3.2")).toBe(false);
+        expect(await settings.isModelVisible("qwen2.5")).toBe(true);
+        expect(await settings.isModelVisible("phi3")).toBe(false);
+
+        await settings.searchModels("no-such-model");
+        expect(await settings.getNoModelsFoundText()).toBe("No models found");
+
+        await settings.clearModelSearch();
+        await expect.poll(() => settings.isModelVisible("llama3.2")).toBe(true);
+        expect(await settings.isModelVisible("qwen2.5")).toBe(true);
+        expect(await settings.isModelVisible("phi3")).toBe(true);
+        expect(await settings.isModelSelected("llama3.2")).toBe(true);
+    });
+
+    test('@readwrite Verify a stored model the server no longer offers falls back to the first local model', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models", (route) => route.fulfill({
+            json: { models: ["llama3.2", "qwen2.5"] },
+        }));
+        await openLocalSettings(settings, "ghost-model", { ollama: "ghost-model" });
+        await expect(settings.modelsStatusMessage).toHaveText("2 local Ollama models loaded.");
+
+        expect(await settings.isModelSelected("llama3.2")).toBe(true);
+        await expect.poll(() => settings.getSavedModelFromLocalStorage()).toBe("llama3.2");
+        await expect.poll(() => settings.getStoredPerSourceModel("ollama")).toBe("llama3.2");
+    });
+
+    test('@readwrite Verify key-like stored model values are dropped instead of being persisted again', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models", (route) => route.fulfill({
+            json: { models: ["llama3.2", "qwen2.5"] },
+        }));
+        await openLocalSettings(settings, "sk-not-a-model", { ollama: "sk-not-a-model", lmstudio: "sk-other-secret" });
+        await expect(settings.modelsStatusMessage).toHaveText("2 local Ollama models loaded.");
+
+        await expect.poll(() => settings.getStoredPerSourceModel("ollama")).toBe("llama3.2");
+        expect(await settings.getStoredPerSourceModel("lmstudio")).toBeUndefined();
+        expect(await settings.getSavedModelFromLocalStorage()).toBe("llama3.2");
+    });
+
+    test('@readwrite Verify Cancel Changes discards unsaved local LLM provider and endpoint edits', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: ["llama3.2"] } }));
+        await openLocalSettings(settings);
+        await expect(settings.modelsStatusMessage).toHaveText(LOCAL_MODELS_LOADED);
+        await settings.waitForSaveSettingsButtonHidden();
+
+        await settings.selectLmStudioProvider();
+        await settings.fillLocalLlmEndpoint("http://localhost:9999/v1");
+        expect(await settings.waitForSaveSettingsButton()).toBe(true);
+        await settings.clickCancelSettingsButton();
+
+        await settings.waitForSaveSettingsButtonHidden();
+        expect(await settings.isOllamaProviderSelected()).toBe(true);
+        expect(await settings.getLocalLlmEndpointValue()).toBe(LOCAL_LLM_ENDPOINT);
+        await expect(settings.modelsStatusMessage).toHaveText(LOCAL_MODELS_LOADED);
+        expect(await settings.getStoredLocalLlmEndpoint()).toBe(LOCAL_LLM_ENDPOINT);
+    });
+
+    async function openApiKeySettings(settings: SettingsBrowserPage) {
+        const page = await browser.getPage();
         await page.addInitScript((storageKeys) => {
             localStorage.setItem("chatModelSource", "api-key");
             localStorage.removeItem("secretKey");
@@ -1015,7 +1133,75 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
                 }
             }
         }, [CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY]);
+        let encryptRequests = 0;
+        await page.route("**/api/encrypt", async (route) => {
+            if (route.request().postDataJSON().action === "encrypt") encryptRequests += 1;
+            await route.fallback();
+        });
+        await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: ["gpt-4o-mini"] } }));
+        await browser.navigateTo(urls.settingsUrl);
+        await settings.expandChatSection();
+        return { getEncryptRequests: () => encryptRequests };
+    }
+
+    test('@readwrite Verify empty API keys are not added or saved while editing', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const { getEncryptRequests } = await openApiKeySettings(settings);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const editedApiKey = `sk-e2e-edited-${getRandomString("key")}`;
+
+        await settings.fillChatApiKey("   ");
+        await settings.clickAddChatApiKeyButton();
+        await settings.fillChatApiKey(`  ${apiKey}  `);
+        await settings.clickAddChatApiKeyButton();
+
+        expect(await settings.getMaskedChatApiKeyText(apiKey)).toBe(`${apiKey.slice(0, 6)}••••••••${apiKey.slice(-4)}`);
+        expect(await settings.getChatApiKeyCount()).toBe(1);
+        expect(await settings.getChatApiKeyValue()).toBe("");
+        expect(getEncryptRequests()).toBe(1);
+
+        await settings.showChatApiKey(apiKey);
+        await settings.beginEditChatApiKey(apiKey);
+        await settings.fillChatApiKeyEdit("   ");
+        await settings.clickSaveEditedChatApiKey();
+
+        await settings.fillChatApiKeyEdit(editedApiKey);
+        await settings.clickSaveEditedChatApiKey();
+
+        expect(await settings.getVisibleChatApiKeyText(editedApiKey)).toBe(editedApiKey);
+        expect(await settings.getChatApiKeyCount()).toBe(1);
+        expect(getEncryptRequests()).toBe(2);
+    });
+
+    test('@readwrite Verify cancelling an API key edit keeps the saved key', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const { getEncryptRequests } = await openApiKeySettings(settings);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const discardedApiKey = `sk-e2e-discarded-${getRandomString("key")}`;
+        await settings.addChatApiKey(apiKey);
+        await settings.showChatApiKey(apiKey);
+
+        await settings.beginEditChatApiKey(apiKey);
+        await settings.fillChatApiKeyEdit(discardedApiKey);
+        await settings.cancelEditChatApiKey();
+
+        expect(await settings.getVisibleChatApiKeyText(apiKey)).toBe(apiKey);
+        expect(await settings.isChatApiKeyPresent(discardedApiKey)).toBe(false);
+        expect(await settings.getChatApiKeyCount()).toBe(1);
+
+        await settings.beginEditChatApiKey(apiKey);
+        expect(await settings.getChatApiKeyEditValue()).toBe(apiKey);
+        await settings.cancelEditChatApiKey();
+        expect(getEncryptRequests()).toBe(1);
+    });
+
+    test('@readwrite Verify an API key is retained after an encryption failure and can be retried', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        await openApiKeySettings(settings);
+        const page = await browser.getPage();
         let encryptAttempts = 0;
+        // Registered after the helper's counting route, so it runs first and falls back to it.
         await page.route("**/api/encrypt", async (route) => {
             if (route.request().postDataJSON().action !== "encrypt") {
                 await route.fallback();
@@ -1028,9 +1214,6 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
                 await route.fallback();
             }
         });
-        await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: ["gpt-4o-mini"] } }));
-        await browser.navigateTo(urls.settingsUrl);
-        await settings.expandChatSection();
         await settings.fillChatApiKey(apiKey);
         await settings.clickAddChatApiKeyButton();
 

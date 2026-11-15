@@ -112,6 +112,10 @@ export default class SettingsBrowserPage extends BasePage {
     return waitForElementToBeVisible(this.saveSettingsButton);
   }
 
+  async waitForSaveSettingsButtonHidden(): Promise<void> {
+    await this.saveSettingsButton.waitFor({ state: "hidden", timeout: 10000 });
+  }
+
   // Click Methods
   async clickChatSectionHeader(): Promise<void> {
     await interactWhenVisible(
@@ -241,6 +245,10 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.evaluate((s) => JSON.parse(localStorage.getItem("perSourceModels") ?? "{}")[s], source);
   }
 
+  async getStoredLocalLlmEndpoint(): Promise<string | null> {
+    return this.page.evaluate(() => localStorage.getItem("localLlmEndpoint"));
+  }
+
   async getSavedModelFromLocalStorage(): Promise<string | null> {
     return this.page.evaluate(() => localStorage.getItem("model"));
   }
@@ -259,6 +267,10 @@ export default class SettingsBrowserPage extends BasePage {
 
   async isLmStudioProviderSelected(): Promise<boolean> {
     return (await this.localLlmProviderLmStudioButton.getAttribute("aria-pressed")) === "true";
+  }
+
+  async isOllamaProviderSelected(): Promise<boolean> {
+    return (await this.localLlmProviderOllamaButton.getAttribute("aria-pressed")) === "true";
   }
 
   async isOllamaProviderVisible(): Promise<boolean> {
@@ -414,6 +426,53 @@ export default class SettingsBrowserPage extends BasePage {
       "Save Edited Chat API Key Button"
     );
     await this.getChatApiKeyCard(nextApiKey).waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  // The card being edited shows an input instead of chatApiKeyValue, so it is found through that input.
+  private get editingChatApiKeyCard(): Locator {
+    return this.chatApiKeyCards.filter({ has: this.page.getByTestId("chatApiKeyEditInput") });
+  }
+
+  async beginEditChatApiKey(apiKey: string): Promise<void> {
+    await interactWhenVisible(
+      this.getChatApiKeyCard(apiKey).getByTestId("editChatApiKeyButton"),
+      (el) => el.click(),
+      "Edit Chat API Key Button"
+    );
+    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async fillChatApiKeyEdit(value: string): Promise<void> {
+    await interactWhenVisible(
+      this.page.getByTestId("chatApiKeyEditInput"),
+      (el) => el.fill(value),
+      "Chat API Key Edit Input"
+    );
+  }
+
+  async getChatApiKeyEditValue(): Promise<string> {
+    return interactWhenVisible(
+      this.page.getByTestId("chatApiKeyEditInput"),
+      (el) => el.inputValue(),
+      "Chat API Key Edit Value"
+    );
+  }
+
+  async clickSaveEditedChatApiKey(): Promise<void> {
+    await interactWhenVisible(
+      this.page.getByTestId("saveEditedChatApiKeyButton"),
+      (el) => el.click(),
+      "Save Edited Chat API Key Button"
+    );
+  }
+
+  async cancelEditChatApiKey(): Promise<void> {
+    await interactWhenVisible(
+      this.editingChatApiKeyCard.getByTestId("editChatApiKeyButton"),
+      (el) => el.click(),
+      "Cancel Edit Chat API Key Button"
+    );
+    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "detached", timeout: 5000 });
   }
 
   async deleteChatApiKey(apiKey: string): Promise<void> {
