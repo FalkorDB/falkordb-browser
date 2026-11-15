@@ -389,3 +389,7 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
+
+User-edit page-object regressions cover both the update response and subsequent ACL
+persistence, including failures. Their controlled waits complete fixed delays
+immediately, so a delay cannot substitute for waiting for persistence.

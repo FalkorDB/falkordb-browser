@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { mock } from "node:test";
+import { expect, test } from "../infra/coverage";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
@@ -156,40 +157,77 @@ test.describe('@Config Settings users tests', () => {
         await apiCall.deleteUsers({ users: [{ username }] });
     });
 
-    test("@admin Edit user waits for ACL persistence before returning", async () => {
-        const username = getRandomString('user');
-        await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
-        let releaseSave: (() => void) | undefined;
-        const saveGate = new Promise<void>((resolve) => {
-            releaseSave = resolve;
-        });
-        let saveRequested = false;
-        let editCompleted = false;
-        let editPromise: Promise<void> | undefined;
-
-        try {
-            const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
-            await settingsUsersPage.navigateToUserTab();
-            const page = await browser.getPage();
-            await page.route("**/api/user/save", async (route) => {
-                saveRequested = true;
-                await saveGate;
-                await route.continue();
+    [
+        { patchStatus: 200, saveStatus: 200, error: undefined },
+        { patchStatus: 400, saveStatus: 200, error: 'Updating user "wait-test" failed with HTTP 400' },
+        { patchStatus: 200, saveStatus: 500, error: 'Saving user "wait-test" failed with HTTP 500' },
+    ].forEach(({ patchStatus, saveStatus, error }) => {
+        test(`@admin Edit user waits for ACL persistence even when fixed delays finish immediately (${patchStatus}/${saveStatus})`, async ({ page }) => {
+            await page.route("http://localhost:3003/**", route => route.fulfill({
+                status: route.request().method() === "PATCH" ? patchStatus
+                    : route.request().method() === "POST" ? saveStatus : 200,
+                json: {},
+            }));
+            await page.goto("http://localhost:3003/");
+            const patchResponsePromise = page.waitForResponse(response => response.request().method() === "PATCH");
+            const saveResponsePromise = page.waitForResponse(response => response.request().method() === "POST");
+            await page.evaluate(async () => {
+                await fetch("/api/user/wait-test", { method: "PATCH" });
+                await fetch("/api/user/save", { method: "POST" });
             });
-
-            editPromise = settingsUsersPage.editUser(username, { role: user.ReadOnly }).then(() => {
+            const [patchResponse, saveResponse] = await Promise.all([patchResponsePromise, saveResponsePromise]);
+            const saveGate = Promise.withResolvers<void>();
+            const saveWaitStarted = Promise.withResolvers<void>();
+            const settingsUsersPage = new SettingsUsersPage(page);
+            const mocked = [
+                mock.method(settingsUsersPage, "waitForPageIdle", async () => { }),
+                mock.method(settingsUsersPage, "searchForElement", async () => { }),
+                mock.method(settingsUsersPage, "clickUserCheckboxBtn", async () => { }),
+                mock.method(settingsUsersPage, "clickOnEditUserBtn", async () => { }),
+                mock.method(settingsUsersPage, "clickOnSubmitEditUser", async () => { }),
+                mock.method(page, "waitForTimeout", async () => { }),
+                mock.method(page, "waitForResponse", async (predicate: Parameters<typeof page.waitForResponse>[0]) => {
+                    if (typeof predicate !== "function") throw new Error("Expected a response predicate");
+                    if (!patchResponse.ok() && await predicate(patchResponse)) return patchResponse;
+                    if (await predicate(saveResponse)) {
+                        saveWaitStarted.resolve();
+                        await saveGate.promise;
+                        return saveResponse;
+                    }
+                    if (await predicate(patchResponse)) return patchResponse;
+                    throw new Error("Unexpected response predicate");
+                }),
+            ];
+            let editCompleted = false;
+            let editError: unknown;
+            const editPromise = settingsUsersPage.editUser("wait-test", {}).then(() => {
                 editCompleted = true;
+            }, reason => {
+                editError = reason;
             });
-            void editPromise.catch(() => undefined);
-            await expect.poll(() => saveRequested).toBe(true);
-            expect(editCompleted).toBe(false);
-            releaseSave?.();
-            await editPromise;
-        } finally {
-            releaseSave?.();
-            await editPromise?.catch(() => undefined);
-            await apiCall.deleteUsers({ users: [{ username }] });
-        }
+            try {
+                if (patchResponse.ok()) {
+                    expect(await Promise.race([
+                        editPromise.then(() => "returned"),
+                        saveWaitStarted.promise.then(() => "waiting for persistence"),
+                    ])).toBe("waiting for persistence");
+                    expect(editCompleted).toBe(false);
+                }
+                saveGate.resolve();
+                await editPromise;
+                expect(editCompleted).toBe(error === undefined);
+                if (error) {
+                    if (!(editError instanceof Error)) throw new Error("Expected an edit failure", { cause: editError });
+                    expect(editError.message).toBe(error);
+                } else {
+                    expect(editError).toBeUndefined();
+                }
+            } finally {
+                saveGate.resolve();
+                await editPromise;
+                mocked.forEach(method => method.mock.restore());
+            }
+        });
     });
 
     test("@admin Edit user -> change key permissions via edit form -> Validate keys changed", async () => {
