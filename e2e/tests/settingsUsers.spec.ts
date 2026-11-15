@@ -108,6 +108,23 @@ test.describe('@Config Settings users tests', () => {
         await expect.poll(() => settingsUsersPage.isEditUserButtonEnabled()).toBe(true);
     });
 
+    test("@admin Select two users -> search hides one -> Validate only the visible user stays selected", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const username = getRandomString('user');
+        const hiddenUsername = getRandomString('other');
+        await (await browser.getPage()).route(/\/api\/user$/, route => route.fulfill({
+            json: { result: [{ username, role: user.ReadWrite, keys: ["*"] }, { username: hiddenUsername, role: user.ReadOnly, keys: ["*"] }] },
+        }));
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.clickUserCheckboxBtn(username);
+        await settingsUsersPage.clickUserCheckboxBtn(hiddenUsername);
+        await expect.poll(() => settingsUsersPage.isEditUserButtonEnabled()).toBe(false);
+        await settingsUsersPage.searchForElement(username);
+        // Edit enables only for a single selection, so this proves the hidden user was unselected.
+        await expect.poll(() => settingsUsersPage.isEditUserButtonEnabled()).toBe(true);
+    });
+
     test("@admin Add one new user -> validating user exists in the users list", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
