@@ -91,8 +91,12 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("uploadGraphCancel");
   }
 
+  public get uploadDialog(): Locator {
+    return this.page.getByRole("dialog", { name: "Upload Data", exact: true });
+  }
+
   public get uploadFileInput(): Locator {
-    return this.page.locator('input[type="file"]');
+    return this.uploadDialog.locator('input[type="file"]');
   }
 
   public get loadCsvTabTrigger(): Locator {
@@ -1780,12 +1784,17 @@ export default class GraphPage extends BasePage {
     await this.clickSelect();
     await this.clickManage();
     await this.clickTableCheckboxByName(graphName);
+    await this.clickUploadButton();
+    await waitForElementToBeVisible(this.uploadConfirm);
+  }
+
+  /** Open the Upload Data dialog for the graph already selected in Manage. */
+  async clickUploadButton(): Promise<void> {
     await interactWhenVisible(
       this.uploadBtn,
       (el) => el.click(),
       "Upload Graph Button"
     );
-    await waitForElementToBeVisible(this.uploadConfirm);
   }
 
   /** Switch to the given upload tab (dump / csv / cypher). */
@@ -1797,21 +1806,34 @@ export default class GraphPage extends BasePage {
     );
   }
 
-  /** Attach a file to the Dropzone file input. */
-  async setUploadFile(absoluteFilePath: string): Promise<void> {
-    await this.uploadFileInput.setInputFiles(absoluteFilePath);
+  /** Attach a file (path on disk or in-memory payload) to the Dropzone file input. */
+  async setUploadFile(file: string | { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
+    await this.uploadFileInput.setInputFiles(file);
   }
 
-  /** Submit the upload form and wait for the dialog to close. */
-  async clickUploadConfirm(): Promise<void> {
+  /** Submit the upload form without waiting for the outcome (e.g. a failure that keeps the dialog open). */
+  async submitUpload(): Promise<void> {
     await interactWhenVisible(
       this.uploadConfirm,
       (el) => el.click(),
       "Upload Confirm"
     );
+  }
+
+  /** Submit the upload form and wait for the dialog to close. */
+  async clickUploadConfirm(): Promise<void> {
+    await this.submitUpload();
     // Larger CSV/dump uploads can take well over the default ~5s budget to close
     // the dialog, so wait up to ~15s before falling through to the toast wait.
     await waitForElementToNotBeVisible(this.uploadConfirm, 500, 30);
+  }
+
+  async clickUploadCancel(): Promise<void> {
+    await interactWhenVisible(
+      this.uploadCancel,
+      (el) => el.click(),
+      "Upload Cancel"
+    );
   }
 
   /**
