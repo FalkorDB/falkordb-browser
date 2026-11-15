@@ -339,7 +339,9 @@ export default class SettingsTokensPage extends HeaderComponent {
   async revokeToken(name: string): Promise<void> {
     await this.clickRevokeButtonByName(name);
     await this.clickRevokeConfirmButton();
-    await expect(this.tokenRowByName(name)).toBeHidden();
+    // The open dialog hides the table from role queries, so check the include-hidden row.
+    await expect(this.revokeConfirmButton).toBeHidden();
+    await expect(this.rowBehindDialog(name)).toHaveCount(0);
   }
 
   async cancelRevokeToken(): Promise<void> {
