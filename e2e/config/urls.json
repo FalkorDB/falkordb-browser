@@ -7,6 +7,7 @@
         "settingsUsers": "http://localhost:3000/api/user",
         "settingsUser": "http://localhost:3000/api/user/",
         "tokenUrl": "http://localhost:3000/api/auth/",
+        "chatUrl": "http://localhost:3000/api/chat",
         "chatModelsUrl": "http://localhost:3000/api/chat/models"
     },
   
