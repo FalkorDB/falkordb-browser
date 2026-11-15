@@ -124,7 +124,7 @@ export function Metadata({ query, hideTitle }: {
     return (
         <>
             {!hideTitle && <h1 className="text-2xl font-bold">Metadata</h1>}
-            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs">
+            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs" data-testid="metadataLines">
                 {getStatsLines(query).map((m, i) => (
                     <li key={i}>{m}</li>
                 ))}

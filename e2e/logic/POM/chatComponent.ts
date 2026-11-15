@@ -9,7 +9,7 @@ import GraphPage from "./graphPage";
 
 export default class ChatComponent extends GraphPage {
   // Chat Toggle Button in Header
-  private get chatToggleButton(): Locator {
+  public get chatToggleButton(): Locator {
     return this.page.getByTestId("chatToggleButton");
   }
 
@@ -18,12 +18,12 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatPanel");
   }
 
-  private get chatCloseButton(): Locator {
+  public get chatCloseButton(): Locator {
     return this.page.getByTestId("chatCloseButton");
   }
 
   // Messages
-  private get chatMessagesList(): Locator {
+  public get chatMessagesList(): Locator {
     return this.page.getByTestId("chatMessagesList");
   }
 
@@ -48,11 +48,11 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatForm");
   }
 
-  private get chatInput(): Locator {
+  public get chatInput(): Locator {
     return this.page.getByTestId("chatInput");
   }
 
-  private get chatSendButton(): Locator {
+  public get chatSendButton(): Locator {
     return this.page.getByTestId("chatSendButton");
   }
 
