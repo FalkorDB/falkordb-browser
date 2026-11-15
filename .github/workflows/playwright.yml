@@ -118,13 +118,6 @@ jobs:
         shard: [1, 2, 3, 4, 5, 6]
 
     services:
-      falkordb:
-        image: falkordb/falkordb:v4.18.10
-        ports:
-          - 6379:6379
-        # Shared IMPORT_FOLDER so Load CSV (file:// mode) can hand files to the DB.
-        volumes:
-          - /tmp/fdb-import:/var/lib/FalkorDB/import
       falkordb-pat:
         image: falkordb/falkordb:v4.18.10
         ports:
@@ -155,6 +148,18 @@ jobs:
         with:
           name: nextjs-build-${{ github.run_id }}
           path: .next/
+      - name: Start FalkorDB with ACL persistence
+        id: falkordb-setup
+        run: |
+          sudo mkdir -p /tmp/fdb-import
+          sudo chmod 777 /tmp/fdb-import
+          docker create --name falkordb-e2e \
+            --publish 6379:6379 \
+            --volume /tmp/fdb-import:/var/lib/FalkorDB/import \
+            --env "REDIS_ARGS=--aclfile /tmp/browser-users.acl" \
+            falkordb/falkordb:v4.18.10
+          docker cp e2e/config/users.acl falkordb-e2e:/tmp/browser-users.acl
+          docker start falkordb-e2e
       - name: Wait for FalkorDB services to be ready
         run: |
           echo "Waiting for FalkorDB (port 6379)..."
@@ -163,15 +168,11 @@ jobs:
           echo "Waiting for FalkorDB PAT (port 6380)..."
           timeout 60s bash -c 'until echo PING | nc -w 2 localhost 6380 | grep -q PONG; do sleep 1; done'
           echo "FalkorDB PAT (port 6380) is ready"
+          docker exec falkordb-e2e redis-cli -e ACL SAVE
       - name: Run Playwright tests (shard ${{ matrix.shard }} of 6)
         env:
           OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
-          # Shared IMPORT_FOLDER for Load CSV file:// mode. The falkordb service
-          # bind-mounts /tmp/fdb-import (created by Docker as root); make it
-          # writable by the runner user so the app can stream CSV files there.
-          sudo mkdir -p /tmp/fdb-import
-          sudo chmod 777 /tmp/fdb-import
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
           export NEXTAUTH_SECRET=SECRET
@@ -263,6 +264,9 @@ jobs:
           path: nextjs.log
           retention-days: 3
           if-no-files-found: ignore
+      - name: Stop FalkorDB
+        if: ${{ always() && steps.falkordb-setup.outcome == 'success' }}
+        run: docker stop falkordb-e2e
 
   run-stateless-tests:
     name: Run stateless tests

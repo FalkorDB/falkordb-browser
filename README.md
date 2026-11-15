@@ -390,6 +390,10 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
 
+CI starts each shard's primary FalkorDB with an isolated ACL file initialized from
+`e2e/config/users.acl` and verifies `ACL SAVE` before running tests. Local user-edit
+tests also require a writable ACL file configured when the database starts.
+
 User-edit page-object regressions cover both the update response and subsequent ACL
 persistence, including failures. Their controlled waits complete fixed delays
 immediately, so a delay cannot substitute for waiting for persistence.
