@@ -1,26 +1,20 @@
 import { Locator } from "@playwright/test";
-import type { FalkorDBCanvas, GraphLink } from "@falkordb/canvas";
 import {
   waitForElementToBeVisible,
   interactWhenVisible,
   waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
-import { EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
+import { EMPTY_DISPLAY_NAME, labelStyleKey, relationshipStyleKey } from "@/app/api/graph/model";
 import GraphInfoPage from "./graphInfoPage";
+import type { RelationshipStyle } from "./graphPage";
 
 export default class CustomizeStylePage extends GraphInfoPage {
-  async readRelationshipStyles(): Promise<Pick<GraphLink, "color" | "width" | "fontSize" | "arrowSize">[]> {
-    return this.page.evaluate(() => {
-      const canvas = document.querySelector<FalkorDBCanvas>("falkordb-canvas");
-      if (!canvas) throw new Error("Relationship styles require a mounted canvas");
-      return canvas.getGraphData().links.map(({ color, width, fontSize, arrowSize }) => ({
-        color, width, fontSize, arrowSize,
-      }));
-    });
-  }
-
   private customizeStyleButton(label: string): Locator {
     return this.page.getByTestId(`customizeStyle${label}`);
+  }
+
+  private customizeRelationshipStyleButton(relationship: string): Locator {
+    return this.page.getByTestId(`customizeRelationshipStyle${relationship}`);
   }
 
   private labelButton(label: string): Locator {
@@ -54,7 +48,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return this.page.getByTestId("customizeStyleClose");
   }
 
-  public get saveStyleButton(): Locator {
+  private get saveStyleButton(): Locator {
     return this.page.getByTestId("saveStyleChanges");
   }
 
@@ -101,19 +95,16 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   async clickCustomizeRelationshipStyleButton(relationship: string): Promise<void> {
-    await this.page.getByTestId(`graphInfo${relationship}Edge`).click();
-    await this.page.getByTestId(`customizeRelationshipStyle${relationship}`).click();
-  }
-
-  async getRelationshipStyleFromLocalStorage(relationship: string): Promise<{
-    color: string; width: number; fontSize: number; arrowSize: number;
-  } | null> {
-    return this.page.evaluate((name) => {
-      const suffix = `relationshipStyle_${name}`;
-      const keys = Object.keys(localStorage).filter(key => key.endsWith(suffix));
-      if (keys.length > 1) throw new Error(`Ambiguous scoped relationship style for ${suffix}`);
-      return keys.length === 1 ? JSON.parse(localStorage.getItem(keys[0])!) : null;
-    }, relationship);
+    await interactWhenVisible(
+      this.graphInfoEdgeButton(relationship),
+      (el) => el.click(),
+      `Graph Info Edge Button ${relationship}`
+    );
+    await interactWhenVisible(
+      this.customizeRelationshipStyleButton(relationship),
+      (el) => el.click(),
+      `Customize Relationship Style Button ${relationship}`
+    );
   }
 
   async isPanelVisible(): Promise<boolean> {
@@ -138,6 +129,16 @@ export default class CustomizeStylePage extends GraphInfoPage {
       (el) => el.click(),
       "First Color Button"
     );
+  }
+
+  async getColorByIndex(index: number): Promise<string> {
+    const label = await interactWhenVisible(
+      this.colorButtons.nth(index),
+      (el) => el.getAttribute("aria-label"),
+      `Color Button ${index}`
+    );
+    if (!label) throw new Error(`Color Button ${index} has no aria-label`);
+    return label.replace("Select color ", "");
   }
 
   async selectColorByIndex(index: number): Promise<void> {
@@ -197,26 +198,32 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return color;
   }
 
-  async getLabelStyleFromLocalStorage(label: string): Promise<{
-    color?: string;
-    size?: number;
-  } | null> {
-    const style = await this.page.evaluate((labelName) => {
-      // labelStyle_ is now connection-scoped, so find the key that ends with `labelStyle_{label}`
-      const suffix = `labelStyle_${labelName}`;
+  /** Styles are stored under a connection-scoped prefix, so match the key by its suffix. */
+  private async getScopedStyleFromLocalStorage<T>(suffix: string): Promise<T | null> {
+    return this.page.evaluate((keySuffix) => {
       const matches: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (!key || !key.endsWith(suffix)) continue;
+        if (!key || !key.endsWith(keySuffix)) continue;
         const value = localStorage.getItem(key);
         if (value !== null) matches.push(value);
       }
       if (matches.length > 1) {
-        throw new Error(`Ambiguous scoped label style for ${suffix}`);
+        throw new Error(`Ambiguous scoped style for ${keySuffix}`);
       }
       return matches.length === 1 ? JSON.parse(matches[0]) : null;
-    }, label);
-    return style;
+    }, suffix);
+  }
+
+  async getLabelStyleFromLocalStorage(label: string): Promise<{
+    color?: string;
+    size?: number;
+  } | null> {
+    return this.getScopedStyleFromLocalStorage(labelStyleKey(label));
+  }
+
+  async getRelationshipStyleFromLocalStorage(relationship: string): Promise<RelationshipStyle | null> {
+    return this.getScopedStyleFromLocalStorage(relationshipStyleKey(relationship));
   }
 
   async getSelectedSizeButtonIndex(): Promise<number> {
@@ -272,6 +279,10 @@ export default class CustomizeStylePage extends GraphInfoPage {
 
   async isSaveButtonVisible(): Promise<boolean> {
     return waitForElementToBeVisible(this.saveStyleButton);
+  }
+
+  async isSaveButtonNotVisible(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.saveStyleButton);
   }
 
   async clickRgbPickerButton(): Promise<void> {

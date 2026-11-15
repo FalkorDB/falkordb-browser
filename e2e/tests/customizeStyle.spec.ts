@@ -1,4 +1,4 @@
-import { expect, test } from "../infra/coverage";
+import { expect, test } from "@playwright/test";
 import {
   getRandomString,
   CREATE_QUERY,
@@ -8,122 +8,125 @@ import ApiCalls from "../logic/api/apiCalls";
 import CustomizeStylePage from "../logic/POM/customizeStylePage";
 import DataPanel from "../logic/POM/dataPanelComponent";
 import urls from "../config/urls.json";
-// The package root imports force-graph, which requires window in this Node-side spec.
-import { LINK_WIDTH, LINK_FONT_SIZE, ARROW_SIZE } from "@falkordb/canvas/dist/canvas-utils.js";
 
 test.describe("Customize Style Tests", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
+  let relationshipGraph: string | undefined;
 
   test.beforeEach(async () => {
     browser = new BrowserWrapper();
     apiCall = new ApiCalls();
+    relationshipGraph = undefined;
   });
 
   test.afterEach(async () => {
-    await browser.closeBrowser();
-  });
-
-  test("@readwrite relationship style saves color and all scaled dimensions without changing node styles", async () => {
-    const graphName = getRandomString("relationshipStyle");
-    await apiCall.addGraph(graphName);
+    const graphToRemove = relationshipGraph;
+    relationshipGraph = undefined;
     try {
-      const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
-      const page = await browser.getPage();
-      await browser.setPageToFullScreen();
-      await graph.selectGraphByName(graphName);
-      await graph.insertQuery(CREATE_QUERY);
-      await graph.clickRunQuery();
-      await graph.openGraphInfoButton();
-      const nodeStyleBefore = await graph.getLabelStyleFromLocalStorage("person1");
-      const nodesBefore = (await graph.readNodesScreenPositions()).map(({ id, color, size }) => ({ id, color, size }));
-      expect(nodesBefore).toHaveLength(2);
-      await graph.clickCustomizeRelationshipStyleButton("KNOWS");
-      const colorButton = page.getByRole("button", { name: /^Select color / }).nth(2);
-      const expectedColor = (await colorButton.getAttribute("aria-label"))!.replace("Select color ", "");
-      await colorButton.click();
-      await graph.selectSizeByIndex(0);
-      await graph.clickSaveStyleButton();
-      await expect(graph.saveStyleButton).toBeHidden();
-      const readStyle = () => graph.getRelationshipStyleFromLocalStorage("KNOWS");
-      const baseline = await readStyle();
-      if (!baseline) throw new Error("Saving relationship style did not persist it");
-      await graph.clickCustomizeRelationshipStyleButton("KNOWS");
-      await graph.selectSizeByIndex(5);
-      await graph.clickSaveStyleButton();
-      await expect(graph.saveStyleButton).toBeHidden();
-      const saved = await readStyle();
-      if (!saved) throw new Error("Saving resized relationship style did not persist it");
-      // Size options 0 and 5 use multipliers 0.25 and 1.5, a sixfold increase.
-      const scale = 6;
-      expect(saved).toEqual({
-        color: expectedColor, width: baseline.width * scale, fontSize: baseline.fontSize * scale, arrowSize: baseline.arrowSize * scale,
-      });
-      expect(await graph.getLabelStyleFromLocalStorage("person1")).toEqual(nodeStyleBefore);
-      expect((await graph.readNodesScreenPositions()).map(({ id, color, size }) => ({ id, color, size }))).toEqual(nodesBefore);
-      await graph.refreshPage();
-      await graph.selectGraphByName(graphName);
-      await graph.insertQuery("MATCH (n)-[e]->(m) RETURN n,e,m");
-      await graph.clickRunQuery();
-      const restoredLinks = await graph.getLinksScreenPositions();
-      expect(restoredLinks).toHaveLength(1);
-      expect(restoredLinks[0]).toMatchObject(saved);
-      await graph.openGraphInfoButton();
-      await graph.clickCustomizeRelationshipStyleButton("KNOWS");
-      expect(await graph.getSelectedColorButtonIndex()).toBe(2);
-      expect(await graph.getSelectedSizeButtonIndex()).toBe(5);
-    } finally {
+      // Close first: a live graph page polls graph info, and that poll
+      // re-creates a graph deleted out from under it.
       await browser.closeBrowser();
-      await apiCall.removeGraph(graphName, "admin");
+    } finally {
+      if (graphToRemove) await apiCall.removeGraph(graphToRemove, "admin");
     }
   });
 
-  test("@readwrite cancelling relationship style restores both controls and does not persist previews", async () => {
-    const graphName = getRandomString("relationshipCancel");
-    await apiCall.addGraph(graphName);
-    try {
-      const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
-      await browser.setPageToFullScreen();
-      await graph.selectGraphByName(graphName);
-      await graph.insertQuery(CREATE_QUERY);
-      await graph.clickRunQuery();
-      // Cancelling materializes the same defaults used for omitted canvas dimensions.
-      const linkStyle = async () => (await graph.readRelationshipStyles())
-        .map(({ color, width, fontSize, arrowSize }) => ({
-          color,
-          width: width ?? LINK_WIDTH,
-          fontSize: fontSize ?? LINK_FONT_SIZE,
-          arrowSize: arrowSize ?? ARROW_SIZE,
-        }));
-      const originalLinks = await linkStyle();
-      expect(originalLinks).toHaveLength(1);
-      await graph.openGraphInfoButton();
-      await graph.clickCustomizeRelationshipStyleButton("KNOWS");
-      const originalColor = await graph.getSelectedColorButtonIndex();
-      const originalSize = await graph.getSelectedSizeButtonIndex();
-      await graph.selectColorByIndex(originalColor === 0 ? 1 : 0);
-      const readPersisted = () => graph.getRelationshipStyleFromLocalStorage("KNOWS");
-      expect(await readPersisted()).toBeNull();
-      await graph.selectSizeByIndex(originalSize === 5 ? 2 : 5);
-      expect(await readPersisted()).toBeNull();
-      await expect.poll(async () => {
-        const [preview] = await linkStyle();
-        return preview
-          && preview.color !== originalLinks[0].color
-          && preview.width !== originalLinks[0].width
-          && preview.fontSize !== originalLinks[0].fontSize
-          && preview.arrowSize !== originalLinks[0].arrowSize;
-      }).toBe(true);
-      await graph.clickCancelStyleButton();
-      await expect(graph.saveStyleButton).toBeHidden();
-      expect(await graph.getSelectedColorButtonIndex()).toBe(originalColor);
-      expect(await graph.getSelectedSizeButtonIndex()).toBe(originalSize);
-      expect(await readPersisted()).toBeNull();
-      expect(await linkStyle()).toEqual(originalLinks);
-    } finally {
-      await browser.closeBrowser();
-      await apiCall.removeGraph(graphName, "admin");
-    }
+  test(`@readwrite Validate relationship style saves color and all scaled dimensions without changing node styles`, async () => {
+    relationshipGraph = getRandomString("relationshipStyle");
+    await apiCall.addGraph(relationshipGraph);
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(relationshipGraph);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery();
+    await graph.openGraphInfoButton();
+
+    await graph.clickCustomizeStyleButton("person1");
+    const nodeColor = await graph.getColorByIndex(4);
+    await graph.selectColorByIndex(4);
+    await graph.selectSizeByIndex(2);
+    await graph.clickSaveStyleButton();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    // Size option 2 is 0.75x the canvas default node size of 9.
+    const nodeStyle = { color: nodeColor, size: 6.75 };
+    expect(await graph.getLabelStyleFromLocalStorage("person1")).toEqual(nodeStyle);
+    const nodesBefore = await graph.readNodeStyles();
+    expect(nodesBefore).toHaveLength(2);
+
+    await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+    const color = await graph.getColorByIndex(2);
+    await graph.selectColorByIndex(2);
+    await graph.selectSizeByIndex(5);
+    await graph.clickSaveStyleButton();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    // Size option 5 is 1.5x the canvas defaults: width 1, font size 6, arrow size 8.
+    const saved = { color, width: 1.5, fontSize: 9, arrowSize: 12 };
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+    expect(await graph.getLabelStyleFromLocalStorage("person1")).toEqual(nodeStyle);
+    expect(await graph.readNodeStyles()).toEqual(nodesBefore);
+
+    await graph.refreshPage();
+    await graph.selectGraphByName(relationshipGraph);
+    await graph.insertQuery("MATCH (n)-[e]->(m) RETURN n,e,m");
+    await graph.clickRunQuery();
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+    await graph.openGraphInfoButton();
+    await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+    expect(await graph.isColorSectionVisible()).toBe(true);
+    expect(await graph.getSelectedColorButtonIndex()).toBe(2);
+    expect(await graph.getSelectedSizeButtonIndex()).toBe(5);
+  });
+
+  test(`@readwrite Validate cancelling relationship style restores both controls and does not persist previews`, async () => {
+    relationshipGraph = getRandomString("relationshipCancel");
+    await apiCall.addGraph(relationshipGraph);
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(relationshipGraph);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery();
+    await graph.openGraphInfoButton();
+
+    // Save a known style first, so the checks below compare against it rather than an absent key.
+    await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+    const savedColor = await graph.getColorByIndex(3);
+    await graph.selectColorByIndex(3);
+    await graph.selectSizeByIndex(1);
+    await graph.clickSaveStyleButton();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    // Size option 1 is 0.5x the canvas defaults: width 1, font size 6, arrow size 8.
+    const saved = { color: savedColor, width: 0.5, fontSize: 3, arrowSize: 4 };
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+
+    await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+    expect(await graph.isColorSectionVisible()).toBe(true);
+    expect(await graph.getSelectedColorButtonIndex()).toBe(3);
+    expect(await graph.getSelectedSizeButtonIndex()).toBe(1);
+    const previewColor = await graph.getColorByIndex(0);
+    await graph.selectColorByIndex(0);
+    await graph.selectSizeByIndex(5);
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS"))
+      .toEqual([{ color: previewColor, width: 1.5, fontSize: 9, arrowSize: 12 }]);
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
+
+    await graph.clickCancelStyleButton();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    expect(await graph.getSelectedColorButtonIndex()).toBe(3);
+    expect(await graph.getSelectedSizeButtonIndex()).toBe(1);
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
+    expect(await graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+
+    await graph.closePanel();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    await graph.refreshPage();
+    await graph.selectGraphByName(relationshipGraph);
+    await graph.insertQuery("MATCH (n)-[e]->(m) RETURN n,e,m");
+    await graph.clickRunQuery();
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
   });
 
   test(`@readwrite Validate customize style button is visible for each label`, async () => {
