@@ -59,8 +59,11 @@ test.describe("Graph Tests", () => {
       expect(attempts).toBe(2);
       expect((await apiCall.getGraphs()).opts).toContain(graphName);
     } finally {
-      await browser.closeBrowser();
-      await apiCall.removeGraph(graphName, "admin");
+      try {
+        await browser.closeBrowser();
+      } finally {
+        await apiCall.removeGraph(graphName, "admin");
+      }
     }
   });
 
@@ -101,8 +104,11 @@ test.describe("Graph Tests", () => {
       await expect.poll(async () => (await apiCall.getGraphs()).opts).not.toContain(graphName);
       expect(attempts).toBe(2);
     } finally {
-      await browser.closeBrowser();
-      await apiCall.removeGraph(graphName, "admin");
+      try {
+        await browser.closeBrowser();
+      } finally {
+        await apiCall.removeGraph(graphName, "admin");
+      }
     }
   });
 
