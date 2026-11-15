@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import { getDefaultQuery } from "@/lib/utils";
 import ApiCalls from "../logic/api/apiCalls";
 import BrowserWrapper from "../infra/ui/browserWrapper";
@@ -35,10 +35,12 @@ test.describe.serial("Query Settings", () => {
     await expect(settings.timeoutInput).toHaveValue(timeout);
   }
 
-  // Starts from saved finite values so a later "∞" cannot come from the defaults.
   async function openSettingsWithSavedLimitAndTimeout(): Promise<QuerySettingsPage> {
     const settings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
     await settings.expandQueryExecutionSection();
+    // Limit and timeout start at 0 ("∞") until the stored settings load; filling
+    // earlier would be overwritten by the default limit of 300.
+    await expect(settings.limitInput).toHaveValue("300");
     await saveLimitAndTimeoutAndReload(settings, savedLimit, savedTimeout);
     await expectLimitAndTimeout(settings, `${savedLimit}`, `${savedTimeout} seconds`);
     return settings;
@@ -57,10 +59,15 @@ test.describe.serial("Query Settings", () => {
     await expectLimitAndTimeout(settings, `${savedLimit}`, `${savedTimeout} seconds`);
   });
 
+  // "∞" is also what the inputs show before the stored settings load, so each
+  // "∞" is asserted after a finite value saved with it: limit and timeout load together.
   test(`@admin Validate that a zero limit and timeout are saved as infinity and finite values persist again`, async () => {
     const settings = await openSettingsWithSavedLimitAndTimeout();
-    await saveLimitAndTimeoutAndReload(settings, 0, 0);
-    await expectLimitAndTimeout(settings, "∞", "∞");
+    await saveLimitAndTimeoutAndReload(settings, 0, savedTimeout);
+    await expect(settings.timeoutInput).toHaveValue(`${savedTimeout} seconds`);
+    await expect(settings.limitInput).toHaveValue("∞");
+    await saveLimitAndTimeoutAndReload(settings, savedLimit, 0);
+    await expectLimitAndTimeout(settings, `${savedLimit}`, "∞");
     await saveLimitAndTimeoutAndReload(settings, 1, 1);
     await expectLimitAndTimeout(settings, "1", "1 seconds");
   });
