@@ -38,69 +38,70 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     await settingsTokensPage.clickExpirationSelect();
     await settingsTokensPage.clickExpirationOption("Custom");
     await settingsTokensPage.clickGenerateTokenConfirmButton();
-    await expect(page.getByText("Please select a custom expiration date", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Generate token", exact: true })).toBeEnabled();
-    await page.locator("#custom-date").fill("2000-01-01");
+    await expect(settingsTokensPage.missingDateError).toBeVisible();
+    await expect(settingsTokensPage.generateTokenConfirmButton).toBeEnabled();
+    await settingsTokensPage.customDateInput.fill("2000-01-01");
     await settingsTokensPage.clickGenerateTokenConfirmButton();
-    await expect(page.getByText("Expiration date must be in the future", { exact: true })).toBeVisible();
-    await expect(page.locator("#custom-date")).toHaveValue("2000-01-01");
-    await expect(page.locator("#token-name")).toHaveValue("mock-custom-expiration");
-    await expect(page.getByRole("button", { name: "Generate token", exact: true })).toBeEnabled();
+    await expect(settingsTokensPage.pastDateError).toBeVisible();
+    await expect(settingsTokensPage.customDateInput).toHaveValue("2000-01-01");
+    await expect(settingsTokensPage.tokenNameInput).toHaveValue("mock-custom-expiration");
+    await expect(settingsTokensPage.generateTokenConfirmButton).toBeEnabled();
     expect(mutations).toBe(0);
   });
 
-  test("@admin Failed token generation preserves custom expiration and can be retried", async () => {
-    const settingsTokensPage = await browser.createNewPage(SettingsTokensPage);
-    const page = await browser.getPage();
-    const name = "mock-generate-retry";
-    const submissions: { name: string; expiresAt: string; ttlSeconds: number }[] = [];
-    const requestTimes: number[] = [];
-    const methods: string[] = [];
-    await page.route("**/api/auth/tokens", async route => {
-      if (route.request().method() === "GET") {
-        await route.fulfill({ json: { tokens: [], role: "Admin" } });
-      } else {
-        methods.push(route.request().method());
-        requestTimes.push(Date.now());
-        submissions.push(route.request().postDataJSON() as typeof submissions[number]);
-        await route.fulfill(submissions.length === 1
-          ? { status: 400, json: { message: "Token generation rejected" } }
-          : { json: { token: "mock-token-not-a-real-credential" } });
-      }
+  test.describe("Custom expiration in a western timezone", () => {
+    test.use({ timezoneId: "America/Los_Angeles", locale: "en-US" });
+    [
+      { date: "2030-01-14", expiresAt: "2030-01-15T07:59:59.999Z", label: "Jan 14, 2030" },
+      { date: "2030-03-10", expiresAt: "2030-03-11T06:59:59.999Z", label: "Mar 10, 2030" },
+    ].forEach(({ date, expiresAt, label }) => {
+      test(`@admin Failed token generation preserves custom expiration and can be retried (${date})`,async () => {
+        const settingsTokensPage=await browser.createNewPage(SettingsTokensPage);
+        const page=await browser.getPage();
+        const name="mock-generate-retry";
+        const now = Date.parse("2030-01-01T12:00:00Z");
+        const submissions: { name: string; expiresAt: string; ttlSeconds: number }[]=[];
+        const requestTimes: number[]=[];
+        const methods: string[]=[];
+        await page.route("**/api/auth/tokens",async route => {
+          if(route.request().method()==="GET") {
+            await route.fulfill({ json: { tokens: [],role: "Admin" } });
+          } else {
+            methods.push(route.request().method());
+            requestTimes.push(await page.evaluate(() => Date.now()));
+            submissions.push(route.request().postDataJSON() as typeof submissions[number]);
+            await route.fulfill(submissions.length===1
+              ? { status: 400,json: { message: "Token generation rejected" } }
+              :{ json: { token: "mock-token-not-a-real-credential" } });
+          }
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsTokensPage.navigateToTokensTab();
+        await page.clock.setFixedTime(now);
+        await settingsTokensPage.clickGenerateTokenButton();
+        await settingsTokensPage.fillTokenNameInput(name);
+        await settingsTokensPage.clickExpirationSelect();
+        await settingsTokensPage.clickExpirationOption("Custom");
+        await settingsTokensPage.customDateInput.fill(date);
+        await settingsTokensPage.clickGenerateTokenConfirmButton();
+        await expect(settingsTokensPage.requestErrorToast).toBeVisible();
+        await expect(settingsTokensPage.tokenNameInput).toHaveValue(name);
+        await expect(settingsTokensPage.customDateInput).toHaveValue(date);
+        await expect(settingsTokensPage.generateTokenConfirmButton).toBeEnabled();
+        await settingsTokensPage.clickGenerateTokenConfirmButton();
+        await expect(settingsTokensPage.generatedTokenInput).toHaveValue("mock-token-not-a-real-credential");
+        await expect(settingsTokensPage.expirationLabel(label)).toBeVisible();
+        expect(submissions).toHaveLength(2);
+        expect(methods).toEqual(["POST","POST"]);
+        for(const [index,submission] of submissions.entries()) {
+          expect(submission).toMatchObject({ name,expiresAt });
+          expect(submission.ttlSeconds).toBeGreaterThan(0);
+          expect(submission.ttlSeconds).toBeLessThanOrEqual(31622400);
+          const expectedTtl=Math.floor((Date.parse(expiresAt)-requestTimes[index])/1000);
+          expect(Math.abs(submission.ttlSeconds-expectedTtl)).toBeLessThanOrEqual(5);
+        }
+      });
     });
-    await browser.navigateTo(urls.settingsUrl);
-    const { date, expiresAt } = await page.evaluate(() => {
-      const future = new Date();
-      future.setDate(future.getDate() + 10);
-      const year = future.getFullYear();
-      const month = future.getMonth();
-      const day = future.getDate();
-      return {
-        date: `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-        expiresAt: new Date(year, month, day, 23, 59, 59, 999).toISOString(),
-      };
-    });
-    await settingsTokensPage.navigateToTokensTab();
-    await settingsTokensPage.clickGenerateTokenButton();
-    await settingsTokensPage.fillTokenNameInput(name);
-    await settingsTokensPage.clickExpirationSelect();
-    await settingsTokensPage.clickExpirationOption("Custom");
-    await page.locator("#custom-date").fill(date);
-    await settingsTokensPage.clickGenerateTokenConfirmButton();
-    await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
-    await expect(page.locator("#token-name")).toHaveValue(name);
-    await expect(page.locator("#custom-date")).toHaveValue(date);
-    await expect(page.getByRole("button", { name: "Generate token", exact: true })).toBeEnabled();
-    await settingsTokensPage.clickGenerateTokenConfirmButton();
-    await expect(page.locator("input[readonly]")).toHaveValue("mock-token-not-a-real-credential");
-    expect(submissions).toHaveLength(2);
-    expect(methods).toEqual(["POST", "POST"]);
-    for (const [index, submission] of submissions.entries()) {
-      expect(submission).toMatchObject({ name, expiresAt });
-      expect(submission.ttlSeconds).toBeGreaterThan(0);
-      const expectedTtl = Math.floor((Date.parse(expiresAt) - requestTimes[index]) / 1000);
-      expect(Math.abs(submission.ttlSeconds - expectedTtl)).toBeLessThanOrEqual(5);
-    }
   });
 
   test("@admin Failed token revocation retains the row and confirmation for retry", async () => {
@@ -126,15 +127,15 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     await settingsTokensPage.navigateToTokensTab();
     await settingsTokensPage.clickRevokeButtonByName(name);
     await settingsTokensPage.clickRevokeConfirmButton();
-    await expect(page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." })).toBeVisible();
+    await expect(settingsTokensPage.requestErrorToast).toBeVisible();
     // The modal hides the underlying table from the accessibility tree.
-    await expect(page.getByRole("row", { includeHidden: true }).filter({ hasText: name })).toBeVisible();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Revoke token", exact: true })).toBeEnabled();
+    await expect(settingsTokensPage.rowBehindDialog(name)).toBeVisible();
+    await expect(settingsTokensPage.revokeDialog).toBeVisible();
+    await expect(settingsTokensPage.revokeConfirmButton).toBeEnabled();
     await settingsTokensPage.clickRevokeConfirmButton();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(settingsTokensPage.revokeDialog).toHaveCount(0);
     await expect(settingsTokensPage.getRowByText(name)).toHaveCount(0);
-    await expect(page.getByText("No active tokens. Generate one to get started.")).toBeVisible();
+    await expect(settingsTokensPage.emptyTokenList).toBeVisible();
     expect(attempts).toBe(2);
     expect(methods).toEqual(["DELETE", "DELETE"]);
   });

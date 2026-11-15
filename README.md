@@ -30,6 +30,9 @@ The search bar now indexes schema, nodes, and metadata. Results are ranked more 
 #### Expanded Settings & User Controls  
 New options let you fine-tune database behavior, toggle visual preferences, and manage users without falling back to CLI tools.
 
+Custom personal-access-token expiration dates use the selected local calendar day,
+ending at 23:59:59.999 in the browser's timezone, including daylight-saving transitions.
+
 #### Node Style Customization  
 Customize the visual appearance of nodes per label. Select custom colors from a palette, adjust node sizes, and choose which property to display as the node caption. All customizations are saved per graph and persist across sessions.
 

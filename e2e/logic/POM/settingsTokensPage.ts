@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator } from "@playwright/test";
 import { interactWhenVisible } from "@/e2e/infra/utils";
 import HeaderComponent from "./headerComponent";
@@ -14,7 +13,7 @@ export default class SettingsTokensPage extends HeaderComponent {
     return this.page.getByRole("button", { name: "Generate new token" });
   }
 
-  private get tokenNameInput(): Locator {
+  public get tokenNameInput(): Locator {
     return this.page.locator("#token-name");
   }
 
@@ -22,7 +21,7 @@ export default class SettingsTokensPage extends HeaderComponent {
     return this.page.locator("#expiration");
   }
 
-  private get generateTokenConfirmButton(): Locator {
+  public get generateTokenConfirmButton(): Locator {
     return this.page.getByRole("button", { name: "Generate token" });
   }
 
@@ -31,7 +30,7 @@ export default class SettingsTokensPage extends HeaderComponent {
   }
 
   // Token Display
-  private get generatedTokenInput(): Locator {
+  public get generatedTokenInput(): Locator {
     return this.page.locator('input[readonly]').first();
   }
 
@@ -61,7 +60,7 @@ export default class SettingsTokensPage extends HeaderComponent {
   }
 
   // Revoke Dialog
-  private get revokeConfirmButton(): Locator {
+  public get revokeConfirmButton(): Locator {
     return this.page.getByRole("button", { name: "Revoke token" });
   }
 
@@ -76,6 +75,38 @@ export default class SettingsTokensPage extends HeaderComponent {
 
   private get errorToast(): Locator {
     return this.page.getByText(/error/i);
+  }
+
+  public get customDateInput(): Locator {
+    return this.page.locator("#custom-date");
+  }
+
+  public get missingDateError(): Locator {
+    return this.page.getByText("Please select a custom expiration date", { exact: true });
+  }
+
+  public get pastDateError(): Locator {
+    return this.page.getByText("Expiration date must be in the future", { exact: true });
+  }
+
+  public get requestErrorToast(): Locator {
+    return this.page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." });
+  }
+
+  public get revokeDialog(): Locator {
+    return this.page.getByRole("dialog");
+  }
+
+  public get emptyTokenList(): Locator {
+    return this.page.getByText("No active tokens. Generate one to get started.");
+  }
+
+  expirationLabel(text: string): Locator {
+    return this.page.getByText(text, { exact: true });
+  }
+
+  rowBehindDialog(name: string): Locator {
+    return this.page.getByRole("row", { includeHidden: true }).filter({ hasText: name });
   }
 
   // Helper methods
@@ -426,7 +457,6 @@ export default class SettingsTokensPage extends HeaderComponent {
       // Filter out empty headers
       return headerTexts.filter(h => h.length > 0);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error("Error getting table headers:", error);
       return [];
     }
@@ -437,4 +467,3 @@ export default class SettingsTokensPage extends HeaderComponent {
     return headers.some(h => h.toLowerCase().includes(headerName.toLowerCase()));
   }
 }
-
