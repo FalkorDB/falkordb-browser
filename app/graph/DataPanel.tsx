@@ -6,7 +6,7 @@ import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
-import { IndicatorContext, GraphContext, ConnectionContext } from "../components/provider";
+import { IndicatorContext, GraphContext, GraphTabsContext, ConnectionContext } from "../components/provider";
 import DataTable, { elementKey } from "./DataTable";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
@@ -28,10 +28,11 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
     const { setIndicator } = useContext(IndicatorContext);
     const { graph, setGraphInfo } = useContext(GraphContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { tabsReady } = useContext(GraphTabsContext);
     const isMobile = useIsMobile();
 
     // A schema element is derived, so it is read-only whatever the connection is.
-    const readOnly = isReadOnly || !!schema;
+    const readOnly = isReadOnly || !!schema || !tabsReady;
 
     const lastObjKey = useRef<string | undefined>(undefined);
     const labelsListRef = useRef<HTMLUListElement>(null);
@@ -42,6 +43,10 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [label, setLabel] = useState<string[]>([]);
     const type = !("source" in object);
+
+    useEffect(() => {
+        if (readOnly) setDeleteOpen(false);
+    }, [readOnly]);
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
