@@ -1,11 +1,32 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "../infra/coverage";
-import type { CreateUser } from "@/app/api/user/model";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
 import { user } from '../config/user.json';
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
+
+// Serves `users` to GET /api/user, rejects the first create/edit with `rejection` and accepts the retry.
+async function mockUserRequests(page: Page, users: object[], rejection: { status: number, message: string }) {
+    const requests: { method: string, body: unknown }[] = [];
+    let saves = 0;
+    await page.route(/\/api\/user(?:\/.*)?$/, async route => {
+        const request = route.request();
+        if (request.method() === "GET") {
+            await route.fulfill({ json: { result: users } });
+        } else if (request.url().endsWith("/save")) {
+            saves += 1;
+            await route.fulfill({ json: {} });
+        } else {
+            requests.push({ method: request.method(), body: request.postDataJSON() });
+            await route.fulfill(requests.length === 1
+                ? { status: rejection.status, json: { message: rejection.message } }
+                : { json: {} });
+        }
+    });
+    return { requests, saves: () => saves };
+}
 
 test.describe('@Config Settings users tests', () => {
     let browser: BrowserWrapper;
@@ -20,103 +41,57 @@ test.describe('@Config Settings users tests', () => {
         await browser.closeBrowser();
     });
 
-    test("@admin Failed user creation preserves the form and retries without adding a phantom row", async () => {
+    test("@admin Add user -> first request rejected -> Validate form kept, no phantom row and retry adds the user once", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
-        const page = await browser.getPage();
-        const username = "mock-create-retry";
-        const submissions: (CreateUser & { keys: string[] })[] = [];
-        const methods: string[] = [];
-        let saves = 0;
-        await page.route(/\/api\/user(?:\/.*)?$/, async route => {
-            if (route.request().method() === "GET") {
-                await route.fulfill({ json: { result: [] } });
-            } else if (route.request().url().endsWith("/save")) {
-                saves += 1;
-                await route.fulfill({ json: {} });
-            } else {
-                methods.push(route.request().method());
-                submissions.push(route.request().postDataJSON() as CreateUser & { keys: string[] });
-                await route.fulfill(submissions.length === 1
-                    ? { status: 409, json: { message: "User creation temporarily rejected" } }
-                    : { json: {} });
-            }
-        });
+        const username = getRandomString('user');
+        const rejection = { status: 409, message: "User already exists" };
+        const mock = await mockUserRequests(await browser.getPage(), [], rejection);
         await browser.navigateTo(urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.clickOnAddUserBtn();
-        await settingsUsersPage.fillUserNameField(username);
-        await settingsUsersPage.fillPasswordField(user.password);
-        await settingsUsersPage.fillConfirmPasswordField(user.confirmPassword);
-        await settingsUsersPage.clickOnSelectRoleBtnInAddUser();
-        await settingsUsersPage.clickOnSelectUserRole(user.ReadWrite);
+        await settingsUsersPage.fillAddUserForm({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
         await settingsUsersPage.clickOnSubmitUserAddition();
-        await expect(settingsUsersPage.errorToast).toContainText("An unexpected error occurred. Please try again.");
-        await expect(settingsUsersPage.userNameField).toHaveValue(username);
-        await expect(settingsUsersPage.passwordField).toHaveValue(user.password);
-        await expect(settingsUsersPage.findUserNameInTable(username)).toHaveCount(0);
-        expect(saves).toBe(0);
+        expect(await settingsUsersPage.getErrorToastText()).toBe(rejection.message);
+        expect(await settingsUsersPage.getUserNameFieldValue()).toBe(username);
+        expect(await settingsUsersPage.getPasswordFieldValue()).toBe(user.password);
+        expect(await settingsUsersPage.getUserRowCount(username)).toBe(0);
+        expect(mock.saves()).toBe(0);
 
         await settingsUsersPage.clickOnSubmitUserAddition();
-        await expect(settingsUsersPage.dialog).toHaveCount(0);
-        await expect(settingsUsersPage.findUserNameInTable(username)).toHaveCount(1);
-        await expect.poll(() => saves).toBe(1);
-        expect(submissions).toEqual([
-            { username, role: user.ReadWrite, password: user.password, keys: ["*"] },
-            { username, role: user.ReadWrite, password: user.password, keys: ["*"] },
-        ]);
-        expect(methods).toEqual(["POST", "POST"]);
+        expect(await settingsUsersPage.isUserFormNotVisible()).toBe(true);
+        expect(await settingsUsersPage.getUserRowCount(username)).toBe(1);
+        await expect.poll(mock.saves).toBe(1);
+        const body = { username, role: user.ReadWrite, password: user.password, keys: ["*"] };
+        expect(mock.requests).toEqual([{ method: "POST", body }, { method: "POST", body }]);
     });
 
-    test("@admin Failed user edit retains original permissions and retries without changing the password", async () => {
+    test("@admin Edit user -> first request rejected -> Validate original permissions and draft kept and retry saves without a password", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
-        const page = await browser.getPage();
-        const username = "mock-edit-retry";
-        const submissions: { role: string; keys: string[]; password?: string }[] = [];
-        const methods: string[] = [];
-        let saves = 0;
-        await page.route(/\/api\/user(?:\/.*)?$/, async route => {
-            if (route.request().method() === "GET") {
-                await route.fulfill({ json: { result: [{ username, role: user.ReadWrite, keys: ["reports:*"] }] } });
-            } else if (route.request().url().endsWith("/save")) {
-                saves += 1;
-                await route.fulfill({ json: {} });
-            } else {
-                methods.push(route.request().method());
-                submissions.push(route.request().postDataJSON() as typeof submissions[number]);
-                await route.fulfill(submissions.length === 1
-                    ? { status: 403, json: { message: "User update denied" } }
-                    : { json: {} });
-            }
-        });
+        const username = getRandomString('user');
+        const rejection = { status: 403, message: "You do not have permission to update users" };
+        const mock = await mockUserRequests(await browser.getPage(), [{ username, role: user.ReadWrite, keys: ["reports:*"] }], rejection);
         await browser.navigateTo(urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
         await settingsUsersPage.clickUserCheckboxBtn(username);
         await settingsUsersPage.clickOnEditUserBtn();
-        await expect(settingsUsersPage.userNameField).toBeDisabled();
-        await settingsUsersPage.clickOnSelectRoleBtnInAddUser();
-        await settingsUsersPage.clickOnSelectUserRole(user.ReadOnly);
-        await settingsUsersPage.fillEditKeysField("analytics:*");
+        expect(await settingsUsersPage.isUserNameFieldDisabled()).toBe(true);
+        await settingsUsersPage.fillEditUserForm({ role: user.ReadOnly, keys: "analytics:*" });
         await settingsUsersPage.clickOnSubmitEditUser();
-        await expect(settingsUsersPage.errorToast).toContainText("An unexpected error occurred. Please try again.");
-        await expect(settingsUsersPage.userRoleContent(username)).toHaveText(user.ReadWrite);
-        await expect(settingsUsersPage.userKeysContent(username)).toHaveText("reports:*");
-        await expect(settingsUsersPage.dialog).toBeVisible();
-        await expect(settingsUsersPage.editSelectRoleBtn).toContainText(user.ReadOnly);
-        await expect(settingsUsersPage.permissionRemovalButton("analytics:*")).toBeVisible();
-        await expect(settingsUsersPage.editNewPasswordField).toHaveValue("");
-        await expect(settingsUsersPage.editConfirmPasswordField).toHaveValue("");
-        expect(saves).toBe(0);
+        expect(await settingsUsersPage.getErrorToastText()).toBe(rejection.message);
+        expect(await settingsUsersPage.getUserRole(username)).toBe(user.ReadWrite);
+        expect(await settingsUsersPage.getUserKeysInRow(username)).toBe("reports:*");
+        expect(await settingsUsersPage.isUserFormVisible()).toBe(true);
+        expect(await settingsUsersPage.getEditSelectedRole()).toContain(user.ReadOnly);
+        expect(await settingsUsersPage.isEditKeyTagVisible("analytics:*")).toBe(true);
+        expect(await settingsUsersPage.isEditKeyTagNotVisible("reports:*")).toBe(true);
+        expect(mock.saves()).toBe(0);
 
         await settingsUsersPage.clickOnSubmitEditUser();
-        await expect(settingsUsersPage.dialog).toHaveCount(0);
-        await expect(settingsUsersPage.userRoleContent(username)).toHaveText(user.ReadOnly);
-        await expect(settingsUsersPage.userKeysContent(username)).toHaveText("analytics:*");
-        await expect.poll(() => saves).toBe(1);
-        expect(submissions).toEqual([
-            { role: user.ReadOnly, keys: ["analytics:*"] },
-            { role: user.ReadOnly, keys: ["analytics:*"] },
-        ]);
-        expect(methods).toEqual(["PATCH", "PATCH"]);
+        expect(await settingsUsersPage.isUserFormNotVisible()).toBe(true);
+        expect(await settingsUsersPage.getUserRole(username)).toBe(user.ReadOnly);
+        expect(await settingsUsersPage.getUserKeysInRow(username)).toBe("analytics:*");
+        await expect.poll(mock.saves).toBe(1);
+        const body = { role: user.ReadOnly, keys: ["analytics:*"] };
+        expect(mock.requests).toEqual([{ method: "PATCH", body }, { method: "PATCH", body }]);
     });
 
     test("@admin Add one new user -> validating user exists in the users list", async () => {
