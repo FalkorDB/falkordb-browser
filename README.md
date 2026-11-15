@@ -30,6 +30,9 @@ The search bar now indexes schema, nodes, and metadata. Results are ranked more 
 #### Expanded Settings & User Controls  
 New options let you fine-tune database behavior, toggle visual preferences, and manage users without falling back to CLI tools.
 
+Successful database configuration edits offer **Undo**, which restores the immediately
+preceding value, including zero. Load-time configuration values remain read-only.
+
 #### Node Style Customization  
 Customize the visual appearance of nodes per label. Select custom colors from a palette, adjust node sizes, and choose which property to display as the node caption. All customizations are saved per graph and persist across sessions.
 
@@ -286,6 +289,11 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Personal access tokens
+
+Custom expiration dates use the selected local calendar day, ending at
+23:59:59.999 in the browser's timezone, including daylight-saving transitions.
+
 ### Restoring graph tabs
 
 Graph editing waits for saved tabs and the query timeout to initialize for the
@@ -452,3 +460,6 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
+  The Firefox settings project depends on the Chromium settings project because both
+  mutate server-wide configuration. Selecting Firefox also runs Chromium first; do not
+  bypass this dependency when both projects share a server.

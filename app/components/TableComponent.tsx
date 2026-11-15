@@ -281,14 +281,15 @@ export default function TableComponent({
         }
 
         const timeout = setTimeout(() => {
-            const matches = (row: Row) => row.cells.some(cell => handleSearchFilter(cell));
+            const isHiddenAndChecked = (row: Row) => row.checked && !row.cells.some(cell => handleSearchFilter(cell));
 
-            // Uncheck rows the search hides through the parent, which derives its selection from rows
-            if (setRows && rows.some(row => row.checked && !matches(row))) {
-                setRows(prev => prev.map(row => (row.checked && !matches(row) ? { ...row, checked: false } : row)));
+            setFilteredRows(rows.filter(row => row.cells.some(cell => handleSearchFilter(cell))));
+
+            // Uncheck rows the search hides through setRows, so the parent's
+            // selection-based actions (Edit, Delete) are recomputed.
+            if (setRows && rows.some(isHiddenAndChecked)) {
+                setRows(prev => prev.map(row => (isHiddenAndChecked(row) ? { ...row, checked: false } : row)));
             }
-
-            setFilteredRows(rows.filter(matches));
         }, 500);
 
         return () => {

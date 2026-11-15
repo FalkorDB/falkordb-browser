@@ -12,7 +12,9 @@ import Input from "@/app/components/ui/Input";
 import { IndicatorContext } from "@/app/components/provider";
 import { securedFetch } from "@/lib/utils";
 import useIsMobile from "@/lib/useIsMobile";
+import { toLocalDateInputValue } from "@/lib/localDate";
 import { Copy, Plus, Trash2 } from "lucide-react";
+import { parseISO } from "date-fns";
 
 interface Token {
   token_id: string;
@@ -124,7 +126,7 @@ export default function PersonalAccessTokens() {
             setIsGenerating(false);
             return;
           }
-          const customDate = new Date(customExpirationDate);
+          const customDate = parseISO(customExpirationDate);
           // Set to end of day (23:59:59) for better UX
           customDate.setHours(23, 59, 59, 999);
           const now = new Date();
@@ -234,7 +236,7 @@ export default function PersonalAccessTokens() {
       case "90d": return "90 days";
       case "custom":
         return customDate
-          ? new Date(customDate).toLocaleDateString(undefined, {
+          ? parseISO(customDate).toLocaleDateString(undefined, {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
@@ -523,7 +525,7 @@ export default function PersonalAccessTokens() {
                     value={customExpirationDate}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomExpirationDate(e.target.value)}
                     disabled={isGenerating}
-                    min={new Date().toISOString().slice(0, 10)}
+                    min={toLocalDateInputValue(new Date())}
                     className="text-base h-10"
                   />
                 </div>

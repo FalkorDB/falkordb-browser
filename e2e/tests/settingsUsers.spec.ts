@@ -1,10 +1,32 @@
-import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
 import { user } from '../config/user.json';
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
+
+// Serves `users` to GET /api/user, rejects the first create/edit with `rejection` and accepts the retry.
+async function mockUserRequests(page: Page, users: object[], rejection: { status: number, message: string }) {
+    const requests: { method: string, body: unknown }[] = [];
+    let saves = 0;
+    await page.route(/\/api\/user(?:\/.*)?$/, async route => {
+        const request = route.request();
+        if (request.method() === "GET") {
+            await route.fulfill({ json: { result: users } });
+        } else if (request.url().endsWith("/save")) {
+            saves += 1;
+            await route.fulfill({ json: {} });
+        } else {
+            requests.push({ method: request.method(), body: request.postDataJSON() });
+            await route.fulfill(requests.length === 1
+                ? { status: rejection.status, json: { message: rejection.message } }
+                : { json: {} });
+        }
+    });
+    return { requests, saves: () => saves };
+}
 
 test.describe('@Config Settings users tests', () => {
     let browser: BrowserWrapper;
@@ -17,6 +39,90 @@ test.describe('@Config Settings users tests', () => {
 
     test.afterEach(async () => {
         await browser.closeBrowser();
+    });
+
+    test("@admin Add user -> first request rejected -> Validate form kept, no phantom row and retry adds the user once", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const username = getRandomString('user');
+        const rejection = { status: 409, message: "User already exists" };
+        const mock = await mockUserRequests(await browser.getPage(), [], rejection);
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
+        expect(await settingsUsersPage.getErrorToastText()).toBe(rejection.message);
+        expect(await settingsUsersPage.getUserNameFieldValue()).toBe(username);
+        expect(await settingsUsersPage.getPasswordFieldValue()).toBe(user.password);
+        expect(await settingsUsersPage.getUserRowCount(username)).toBe(0);
+        expect(mock.saves()).toBe(0);
+
+        await settingsUsersPage.clickOnSubmitUserAddition();
+        expect(await settingsUsersPage.isUserFormNotVisible()).toBe(true);
+        expect(await settingsUsersPage.getUserRowCount(username)).toBe(1);
+        await expect.poll(mock.saves).toBe(1);
+        const body = { username, role: user.ReadWrite, password: user.password, keys: ["*"] };
+        expect(mock.requests).toEqual([{ method: "POST", body }, { method: "POST", body }]);
+    });
+
+    test("@admin Edit user -> first request rejected -> Validate original permissions and draft kept and retry saves without a password", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const username = getRandomString('user');
+        const rejection = { status: 403, message: "You do not have permission to update users" };
+        const mock = await mockUserRequests(await browser.getPage(), [{ username, role: user.ReadWrite, keys: ["reports:*"] }], rejection);
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.editUser(username, { role: user.ReadOnly, keys: "analytics:*" });
+        expect(await settingsUsersPage.isUserNameFieldDisabled()).toBe(true);
+        expect(await settingsUsersPage.getErrorToastText()).toBe(rejection.message);
+        expect(await settingsUsersPage.getUserRole(username)).toBe(user.ReadWrite);
+        expect(await settingsUsersPage.getUserKeysInRow(username)).toBe("reports:*");
+        expect(await settingsUsersPage.isUserFormVisible()).toBe(true);
+        expect(await settingsUsersPage.getEditSelectedRole()).toContain(user.ReadOnly);
+        expect(await settingsUsersPage.isEditKeyTagVisible("analytics:*")).toBe(true);
+        expect(await settingsUsersPage.isEditKeyTagNotVisible("reports:*")).toBe(true);
+        expect(mock.saves()).toBe(0);
+
+        await settingsUsersPage.clickOnSubmitEditUser();
+        expect(await settingsUsersPage.isUserFormNotVisible()).toBe(true);
+        expect(await settingsUsersPage.getUserRole(username)).toBe(user.ReadOnly);
+        expect(await settingsUsersPage.getUserKeysInRow(username)).toBe("analytics:*");
+        await expect.poll(mock.saves).toBe(1);
+        const body = { role: user.ReadOnly, keys: ["analytics:*"] };
+        expect(mock.requests).toEqual([{ method: "PATCH", body }, { method: "PATCH", body }]);
+    });
+
+    test("@admin Search before the users load -> select the match -> Validate only that user is selected", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const username = getRandomString('user');
+        const users = [{ username, role: user.ReadWrite, keys: ["*"] }, { username: getRandomString('other'), role: user.ReadOnly, keys: ["*"] }];
+        let releaseUsers!: () => void;
+        const usersReleased = new Promise<void>(resolve => { releaseUsers = resolve; });
+        await (await browser.getPage()).route(/\/api\/user$/, async route => {
+            await usersReleased;
+            await route.fulfill({ json: { result: users } });
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.searchForElement(username);
+        releaseUsers();
+        await settingsUsersPage.clickUserCheckboxBtn(username);
+        await expect.poll(() => settingsUsersPage.isEditUserButtonEnabled()).toBe(true);
+    });
+
+    test("@admin Select two users -> search hides one -> Validate only the visible user stays selected", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const username = getRandomString('user');
+        const hiddenUsername = getRandomString('other');
+        await (await browser.getPage()).route(/\/api\/user$/, route => route.fulfill({
+            json: { result: [{ username, role: user.ReadWrite, keys: ["*"] }, { username: hiddenUsername, role: user.ReadOnly, keys: ["*"] }] },
+        }));
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.clickUserCheckboxBtn(username);
+        await settingsUsersPage.clickUserCheckboxBtn(hiddenUsername);
+        await expect.poll(() => settingsUsersPage.isEditUserButtonEnabled()).toBe(false);
+        await settingsUsersPage.searchForElement(username);
+        // Edit enables only for a single selection, so this proves the hidden user was unselected.
+        await expect.poll(() => settingsUsersPage.isEditUserButtonEnabled()).toBe(true);
     });
 
     test("@admin Add one new user -> validating user exists in the users list", async () => {
