@@ -1142,11 +1142,20 @@ test.describe("Chat Feature Tests", () => {
 
       // A test that fails while a mocked response is pending must not leave
       // its route handler fulfilling into the page being closed.
-      await mockedPage?.unrouteAll({ behavior: "ignoreErrors" });
       // Close first: a live graph page polls graph info, and that poll
       // re-creates a graph deleted out from under it.
-      await browser.closeBrowser();
-      if (graphToRemove) await apiCall.removeGraph(graphToRemove, "admin");
+      try {
+        await mockedPage?.unrouteAll({ behavior: "ignoreErrors" });
+      } finally {
+        try {
+          await browser.closeBrowser();
+        } finally {
+          if (graphToRemove) {
+            const response = await apiCall.removeGraph(graphToRemove, "admin");
+            expect(response.status, "Chat test graph deletion should succeed").toBe(200);
+          }
+        }
+      }
     });
 
     async function openMockedChat(model = DEFAULT_CHAT_MODEL) {

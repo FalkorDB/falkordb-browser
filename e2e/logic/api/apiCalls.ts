@@ -162,7 +162,10 @@ export default class ApiCalls {
         urls.api.graphUrl + graphName,
         headers
       );
-      return await result.json();
+      return {
+        ...(await result.json()),
+        status: result.status(),
+      };
     } catch (error) {
       throw new Error(
         `Failed to remove graph. \n Error: ${(error as Error).message}`
