@@ -11,28 +11,27 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
-import { beginUrlNavigation } from "./urlParams";
+import { createNavigationTracker } from "./urlParams";
 
 const AppRouterContext = createContext<ReturnType<typeof useRouter> | null>(null);
 
 export function AppRouterProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const releaseRef = useRef<(() => void) | null>(null);
-  const release = useCallback(() => {
-    releaseRef.current?.();
-    releaseRef.current = null;
-  }, []);
+  const trackerRef = useRef<ReturnType<typeof createNavigationTracker> | null>(null);
+  trackerRef.current ??= createNavigationTracker();
+  const tracker = trackerRef.current;
+  const generation = tracker.generation;
 
   useEffect(() => {
-    if (!pending) release();
-  }, [pending, release]);
-  useEffect(() => release, [release]);
+    if (!pending) tracker.settle(generation);
+  }, [pending, generation, tracker]);
+  useEffect(() => tracker.dispose, [tracker]);
 
   const navigate = useCallback((action: () => void) => {
-    releaseRef.current ??= beginUrlNavigation();
+    tracker.start();
     startTransition(action);
-  }, [startTransition]);
+  }, [tracker, startTransition]);
 
   const appRouter = useMemo(() => ({
     ...router,

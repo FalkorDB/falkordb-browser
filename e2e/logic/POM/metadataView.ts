@@ -9,7 +9,7 @@ export default class MetadataView extends GraphPage {
     }
 
     private get profileButton(): Locator {
-        return this.page.getByRole('button', { name: 'Profile' });
+        return this.page.getByRole('button', { name: 'Profile', exact: true });
     }
 
     private get metadataViewTabPanel(): Locator {

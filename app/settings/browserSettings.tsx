@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { looksServerEncrypted, serverEncrypt } from "@/lib/server-encryption";
+import { selectStoredModel } from "@/lib/storedModelSelection";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionPrefix, removeConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
@@ -275,9 +276,10 @@ export default function BrowserSettings() {
     useEffect(() => {
         if (modelDisplayNames.length === 0) return;
         const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
-        // Prefer the stored preference for this source; fall back to first available model.
+        // Prefer the stored preference for this source (migrating legacy unprefixed OpenAI IDs);
+        // fall back to the first available model.
         const storedModel = perSourceModels[currentSourceKey] ?? "";
-        const nextModel = modelDisplayNames.includes(storedModel) ? storedModel : modelDisplayNames[0];
+        const nextModel = selectStoredModel(storedModel, modelDisplayNames);
         if (nextModel !== latestModelRef.current) {
             setNewModel(nextModel);
             setModel(nextModel);

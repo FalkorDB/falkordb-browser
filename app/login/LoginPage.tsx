@@ -240,6 +240,7 @@ export default function LoginPage() {
           <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             <Link
               href="/docs"
+              onNavigate={event => { event.preventDefault(); router.push("/docs"); }}
               className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
             >
               <FileText className="w-4 h-4" />

@@ -27,6 +27,33 @@ export function beginUrlNavigation(): () => void {
 }
 
 /**
+ * Shares one navigation token across chained navigations. A settle only releases
+ * it for the generation it observed, so a redirect started from a child effect
+ * before the provider settles the previous navigation stays protected.
+ */
+export function createNavigationTracker(begin: () => () => void = beginUrlNavigation) {
+  let generation = 0;
+  let release: (() => void) | null = null;
+  const dispose = () => {
+    release?.();
+    release = null;
+  };
+  return {
+    get generation() {
+      return generation;
+    },
+    start() {
+      generation += 1;
+      release ??= begin();
+    },
+    settle(observed: number) {
+      if (observed === generation) dispose();
+    },
+    dispose,
+  };
+}
+
+/**
  * Update one or more URL search params via history.replaceState.
  * Pass `null` as a value to delete a param.
  */
