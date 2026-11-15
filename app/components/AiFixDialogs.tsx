@@ -9,8 +9,10 @@ import Button from "./ui/Button";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
 import SuggestedQuery from "./SuggestedQuery";
+import useAppRouter from "@/lib/useAppRouter";
 
 export default function AiFixDialogs() {
+    const router = useAppRouter();
     const { result, pendingConsentProvider, confirmConsent, cancelConsent, dismissResult, insertCorrectedQuery } = useContext(AiFixContext);
     const [dontAskAgain, setDontAskAgain] = useState(false);
     const { size: panelSize, onResize: onPanelResize } = useResizableSize("ai-fix-panel-size", 480, 400, 300, 250);
@@ -57,9 +59,17 @@ export default function AiFixDialogs() {
 
             {/* ── Background loading indicator (non-blocking) ────────────── */}
             {result.status === "loading" && (
-                <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 shadow-lg text-sm text-muted-foreground pointer-events-none select-none">
+                <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 shadow-lg text-sm text-muted-foreground select-none" role="status">
                     <Sparkles size={14} className="animate-pulse text-primary shrink-0" />
                     <span>Asking the AI…</span>
+                    <button
+                        type="button"
+                        onClick={dismissResult}
+                        className="rounded px-2 py-1 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        data-testid="aiFixCancel"
+                    >
+                        Cancel
+                    </button>
                 </div>
             )}
 
@@ -99,7 +109,7 @@ export default function AiFixDialogs() {
                                 {result.status === "error" && (
                                     <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
                                         <p className="text-sm text-destructive" data-testid="aiFixError">{result.error}</p>
-                                        <Link href="/settings" onClick={dismissResult} className="mt-3 inline-block text-sm underline">
+                                        <Link href="/settings" onClick={dismissResult} onNavigate={event => { event.preventDefault(); router.push("/settings"); }} className="mt-3 inline-block text-sm underline">
                                             Go to Settings
                                         </Link>
                                     </div>

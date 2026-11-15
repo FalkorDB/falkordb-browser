@@ -6,7 +6,8 @@ import { ArrowUpRight, FileCode, Info, LogOut, Menu, Monitor, Moon, Sun, Setting
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { cn, getTheme } from "@/lib/utils";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { signOut } from "next-auth/react";
 import pkg from '@/package.json';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -178,7 +179,7 @@ export default function Navbar({ showUDF }: Props) {
                                     <span>Documentation</span>
                                     <ArrowUpRight size={15} className="ml-auto" />
                                 </a>
-                                <Link className={item} href="/docs" onClick={() => setMenuOpen(false)}>
+                                <Link className={item} href="/docs" onClick={() => setMenuOpen(false)} onNavigate={event => { event.preventDefault(); router.push("/docs"); }}>
                                     <FileCode size={20} />
                                     <span>API Documentation</span>
                                     <ArrowUpRight size={15} className="ml-auto" />
@@ -364,7 +365,7 @@ export default function Navbar({ showUDF }: Props) {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="focus:bg-transparent">
-                                    <Link className="flex gap-2 items-center" href="/docs">
+                                    <Link className="flex gap-2 items-center" href="/docs" onNavigate={event => { event.preventDefault(); router.push("/docs"); }}>
                                         <span>
                                             API Documentation
                                         </span>
