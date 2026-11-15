@@ -62,9 +62,9 @@ test.describe('@config Settings config tests', () => {
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.hoverOnRoleContentValue("MAX_QUEUED_QUERIES");
         await expect(settingsConfigPage.editButtonForConfig("MAX_QUEUED_QUERIES")).toBeVisible();
-        const readonlyRow = settingsConfigPage.configRow("THREAD_COUNT");
-        await expect(readonlyRow).toBeVisible();
-        await readonlyRow.hover();
+        await settingsConfigPage.hoverOnRoleContentValue("THREAD_COUNT");
+        await expect(settingsConfigPage.valueTooltip("4")).toHaveCount(1);
+        await expect(settingsConfigPage.editButtonForConfig("MAX_QUEUED_QUERIES")).toHaveCount(0);
         await expect(settingsConfigPage.editButtonForConfig("THREAD_COUNT")).toHaveCount(0);
         await settingsConfigPage.hoverOnRoleContentValue("MAX_QUEUED_QUERIES");
         await settingsConfigPage.clickEditRoleButton();
@@ -124,13 +124,13 @@ test.describe('@config Settings config tests', () => {
         await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue("TIMEOUT_MAX", "1");
         await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("1");
-        await settingsConfigPage.clickOnUndoBtnInToastMsg();
+        await settingsConfigPage.clickOnUndoBtnInToastMsg("TIMEOUT_MAX");
         await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("0");
         await settingsConfigPage.modifyRoleValue("TIMEOUT_MAX", "2");
         await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("2");
         await settingsConfigPage.modifyRoleValue("TIMEOUT_MAX", "3");
         await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("3");
-        await settingsConfigPage.clickOnUndoBtnInToastMsg();
+        await settingsConfigPage.clickOnUndoBtnInToastMsg("TIMEOUT_MAX");
         await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("2");
         expect(submissions).toEqual([
             { value: "1" }, { value: "0" }, { value: "2" }, { value: "3" }, { value: "2" }
@@ -304,8 +304,7 @@ test.describe('@config Settings config tests', () => {
                 const value = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
                 expect(value).toBe(Data.roleModificationData[2].input);
 
-                await settingsConfigPage.clickOnUndoBtnInToastMsg();
-                await settingsConfigPage.waitForPageIdle();
+                await settingsConfigPage.clickOnUndoBtnInToastMsg(roles.maxTimeOut);
                 const restoredValue = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
                 expect(restoredValue).toBe("0");
             } finally {

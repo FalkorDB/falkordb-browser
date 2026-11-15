@@ -64,6 +64,10 @@ export default class SettingsConfigPage extends BasePage {
         return this.page.getByTestId("settingsTabConfigurations");
     }
 
+    valueTooltip(value: string): Locator {
+        return this.page.getByRole("tooltip").filter({ hasText: new RegExp(`^${value}$`) });
+    }
+
     public get errorToast(): Locator {
         return this.page.getByTestId("toast-description");
     }
@@ -126,8 +130,12 @@ export default class SettingsConfigPage extends BasePage {
         return interactWhenVisible(this.roleContentValue(role), (el) => el.textContent(), `role content value ${role}`);
     }
     
-    async clickOnUndoBtnInToastMsg(): Promise<void> {
+    async clickOnUndoBtnInToastMsg(role: string): Promise<void> {
+        const undoSaved = this.page.waitForResponse(response =>
+            response.request().method() === "POST" &&
+            new URL(response.url()).pathname.endsWith(`/api/graph/config/${encodeURIComponent(role)}`));
         await interactWhenVisible(this.undoBtnInToastMsg, (el) => el.click(), "undo button in toast");
+        expect((await undoSaved).ok()).toBe(true);
     }
 
     async clickToastCloseBtn(): Promise<void> {
