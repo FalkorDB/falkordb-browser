@@ -18,11 +18,6 @@
 #### Faster Graph Creation & Querying  
 Quickly create new graphs and run queries with fewer clicks. The UI now guides you through graph setup with smarter defaults and clearer feedback.
 
-Automatic query limiting recognizes Unicode procedure names in `CALL` clauses,
-so they follow the same limiting behavior as ASCII-named procedures in `UNION` queries.
-Keyword-named variables at the end of arithmetic projections also preserve
-automatic limiting across `UNION` branches.
-
 #### Simplified Node Editing  
 Editing node properties is now faster and more intuitive. Fewer modal windows, inline property editing, and immediate updates make this flow significantly more usable.
 
@@ -43,6 +38,13 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 | ![image (4)](https://github.com/user-attachments/assets/658fa59f-5316-475c-8bd7-b26651e9902c) | ![FalkorDB browser 06-25](https://github.com/user-attachments/assets/ee907fa6-038c-462b-9240-456a2d2c2a99) |
 |---------------------------------------------------|---------------------------------------------------|
 
+
+## Automatic query limiting
+
+Automatic query limiting recognizes Unicode procedure names in `CALL` clauses,
+so they follow the same limiting behavior as ASCII-named procedures in `UNION` queries.
+Keyword-named variables at the end of arithmetic projections also preserve
+automatic limiting across `UNION` branches.
 
 ## Get Started & Demo
 
