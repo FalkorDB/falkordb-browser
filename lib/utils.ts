@@ -5,6 +5,7 @@
 "use client";
 
 import { type ClassValue, clsx } from "clsx";
+import { protectTutorialGraphRead } from "./tutorialDemoGraphs.ts";
 import { twMerge } from "tailwind-merge";
 import React, { type RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData, NodeShape } from "@falkordb/canvas";
@@ -382,7 +383,7 @@ export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
-  options?: { query?: string; signal?: AbortSignal; connectionId?: string | null }
+  options?: { query?: string; signal?: AbortSignal; connectionId?: string | null; allowTutorialCreation?: boolean }
 ): Promise<unknown> {
   const signal = options?.signal;
   // Already superseded before we even open the stream.
@@ -396,7 +397,7 @@ export async function getSSEGraphResult(
     const connId = options?.connectionId !== undefined ? options.connectionId : getActiveConnectionIdGlobal();
 
     // EventSource doesn't support headers — inject connectionId as a query param.
-    let effectiveUrl = normalizeApiUrl(url);
+    let effectiveUrl = protectTutorialGraphRead(normalizeApiUrl(url), options?.allowTutorialCreation);
     if (connId) {
       const sep = effectiveUrl.includes("?") ? "&" : "?";
       effectiveUrl += `${sep}connectionId=${encodeURIComponent(connId)}`;
