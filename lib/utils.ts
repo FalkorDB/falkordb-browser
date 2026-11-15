@@ -1583,9 +1583,12 @@ function hasCallTarget(query: string, start: number): boolean {
   return query[index] === "(";
 }
 
-// Comments are whitespace between CALL and its target. Reject punctuation
-// contexts such as labels and properties before checking for a target.
-function hasCallClause(query: string, code: string): boolean {
+const UNION_PRECEDING_KEYWORDS = new Set(["AS", "WITH", "RETURN", "YIELD", "DISTINCT", "WHERE", "NOT", "AND", "OR", "XOR", "IN", "WHEN", "THEN", "ELSE"]);
+
+// Comments are whitespace between CALL and its target. Reject expression
+// contexts such as labels, properties and map projections (`RETURN call {.x}`)
+// before checking for a target.
+function hasCallClause(query: string, code: string, quotedTokenEnds: number[]): boolean {
   const callKeyword = /(?<![\p{ID_Continue}\p{Sc}])CALL(?![\p{ID_Continue}\p{Sc}])/giu;
   let scanned = 0;
   let depth = 0;
@@ -1596,7 +1599,11 @@ function hasCallClause(query: string, code: string): boolean {
       else if (")]}".includes(code[scanned])) depth -= 1;
     }
     const before = code.slice(0, match.index).trimEnd();
-    if (depth === 0 && !/[.:$]$/.test(before) && hasCallTarget(query, match.index + match[0].length)) return true;
+    const previousWord = /[\p{ID_Continue}\p{Sc}]+$/u.exec(before)?.[0].toUpperCase() ?? "";
+    const callStart = match.index;
+    const afterQuoted = quotedTokenEnds.some(end => end <= callStart && /^\s*$/.test(code.slice(end, callStart)));
+    const expressionContext = /[.:$,+*/%<>=|&^-]$/.test(before) || UNION_PRECEDING_KEYWORDS.has(previousWord) || previousWord === "BY";
+    if (depth === 0 && (afterQuoted || !expressionContext) && hasCallTarget(query, match.index + match[0].length)) return true;
     match = callKeyword.exec(code);
   }
   return false;
@@ -1700,18 +1707,18 @@ function withoutTrailingSemicolons(query: string, analysis: ReturnType<typeof an
   return result;
 }
 
-const UNION_PRECEDING_KEYWORDS = new Set(["AS", "WITH", "RETURN", "YIELD", "DISTINCT", "WHERE", "NOT", "AND", "OR", "XOR", "IN", "WHEN", "THEN", "ELSE"]);
-
 // One pass over the masked code. A UNION is a clause only inside a top-level
 // RETURN, which ends every branch, so a variable named `union` that ends any
 // other clause (`ORDER BY union`, `DELETE union`, ...) is never a clause.
-function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>): number[] {
+function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>, bodyStart: number): number[] {
   const { code, quotedTokenEnds } = analysis;
   const quoted = "'";
   const token = /[\p{ID_Continue}\p{Sc}]+|\S/gu;
   const nextClause = /\s+(?:ALL\s+)?(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD|FOREACH)\b/iy;
   const clauses: number[] = [];
-  let quotedIndex = 0;
+  token.lastIndex = bodyStart;
+  let quotedIndex = quotedTokenEnds.findIndex(end => end > bodyStart);
+  if (quotedIndex === -1) quotedIndex = quotedTokenEnds.length;
   let depth = 0;
   let inReturn = false;
   let previous = "";
@@ -1730,7 +1737,7 @@ function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>): number[] 
       const afterQuoted = previous === quoted;
       const wildcardProjection = previous === "*" && afterReturn;
       const keywordIdentifier = UNION_PRECEDING_KEYWORDS.has(previous) &&
-        (/^[.:$,+*/%^=-]$/.test(beforePrevious) || beforePrevious === "AS" || afterReturn);
+        (/^[.:$,+*/%^=<>-]$/.test(beforePrevious) || ["AS", "AND", "OR", "XOR", "NOT", "IN"].includes(beforePrevious) || afterReturn);
       nextClause.lastIndex = index + text.length;
       if (
         (afterQuoted || wildcardProjection || !/^[.:$,([{/*+%<>=|&^-]$/.test(previous)) &&
@@ -1774,14 +1781,13 @@ function hasTopLevelLimit(code: string, quotedTokenEnds: number[]): boolean {
   return false;
 }
 
-// Returns where the query body starts after an optional CYPHER parameter
-// header, or undefined when the body cannot be wrapped in CALL {}: EXPLAIN
-// and PROFILE are not valid inside it.
-function findCypherBodyStart(analysis: ReturnType<typeof analyzeCypher>): number | undefined {
+// Finds where the query body starts after an optional CYPHER parameter
+// header. The body is not wrappable in CALL {} after EXPLAIN or PROFILE.
+function findCypherBody(analysis: ReturnType<typeof analyzeCypher>): { start: number; wrappable: boolean } {
   const { code, quotedTokenEnds } = analysis;
   const explainOrProfile = /(?<![\p{ID_Continue}\p{Sc}])(?:EXPLAIN|PROFILE)$/iu;
   const header = /^\s*CYPHER\b/i.exec(code);
-  if (!header) return /^\s*(?:EXPLAIN|PROFILE)(?![\p{ID_Continue}\p{Sc}])/iu.test(code) ? undefined : 0;
+  if (!header) return { start: 0, wrappable: !/^\s*(?:EXPLAIN|PROFILE)(?![\p{ID_Continue}\p{Sc}])/iu.test(code) };
 
   const clause = /(?<![\p{ID_Continue}\p{Sc}])(?:OPTIONAL\s+MATCH|MATCH|RETURN|WITH|CALL|UNWIND|CREATE|MERGE|LOAD\s+CSV|FOREACH|DELETE|SET|REMOVE)(?![\p{ID_Continue}\p{Sc}])/giu;
   clause.lastIndex = header[0].length;
@@ -1804,11 +1810,11 @@ function findCypherBodyStart(analysis: ReturnType<typeof analyzeCypher>): number
     if (depth === 0 && !/^\s*=/.test(after) &&
       (afterQuotedValue || (!/[.:$=,([{/*+%<>\-|&^]$/.test(before) &&
         !/\b(?:AND|OR|XOR|NOT|IN|WHEN|THEN|ELSE|AS)\s*$/i.test(before)))) {
-      return explainOrProfile.test(before) ? undefined : match.index;
+      return { start: match.index, wrappable: !explainOrProfile.test(before) };
     }
     match = clause.exec(code);
   }
-  return undefined;
+  return { start: code.length, wrappable: false };
 }
 
 // Linear equivalent of /\bRETURN\b(?!\s.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is: the
@@ -1855,19 +1861,21 @@ export function getQueryWithLimit(
   const analysis = withoutTerminators === query ? initialAnalysis : analyzeCypher(withoutTerminators);
   query = withoutTerminators;
   let existingLimit = 0;
+  const body = findCypherBody(analysis);
+  const bodyCode = analysis.code.slice(body.start);
 
-  const finalReturnLimit = findFinalReturnLimit(analysis.code);
+  const finalReturnLimit = findFinalReturnLimit(bodyCode);
   if (finalReturnLimit !== undefined) {
     existingLimit = finalReturnLimit;
   }
 
   if (limit === 0) return [query, existingLimit];
 
-  const unionClauses = findUnionClauses(analysis);
+  const unionClauses = findUnionClauses(analysis, body.start);
   if (unionClauses.length > 0) {
-    const bodyStart = findCypherBodyStart(analysis);
-    if (bodyStart !== undefined && !hasCallClause(query.slice(bodyStart), analysis.code.slice(bodyStart))) {
-      return [wrapUnionQuery(query, analysis.code, bodyStart, unionClauses, limit), limit];
+    if (body.wrappable && !hasCallClause(query.slice(body.start), bodyCode,
+      analysis.quotedTokenEnds.filter(end => end > body.start).map(end => end - body.start))) {
+      return [wrapUnionQuery(query, analysis.code, body.start, unionClauses, limit), limit];
     }
 
     const finalBranchStart = unionClauses[unionClauses.length - 1];
@@ -1878,7 +1886,7 @@ export function getQueryWithLimit(
     }
   }
 
-  if (analysis.code.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
+  if (bodyCode.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
     return [insertLimit(query, analysis, limit), limit];
   }
 

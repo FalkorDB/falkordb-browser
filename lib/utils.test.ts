@@ -103,6 +103,22 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
     }
   });
 
+  it("recognises UNION after boolean and comparison expressions ending in keyword-named variables", () => {
+    for (const expression of ["true AND yield", "false OR yield", "true XOR yield", "NOT yield", "1 IN yield", "1 < yield", "1 > yield"]) {
+      const query = `UNWIND [true,false] AS yield RETURN ${expression} UNION ALL UNWIND [true,false] AS yield RETURN ${expression}`;
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
+  });
+
+  it("does not treat a map projection on a variable named call as a CALL clause", () => {
+    for (const projection of ["call { .name }", "x, call { .name }", "DISTINCT call { .*, n: 1 }"]) {
+      const query = `MATCH (call) RETURN ${projection} AS y UNION ALL MATCH (call) RETURN ${projection} AS y`;
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+    }
+    const subquery = "MATCH (n) WITH n AS `x` CALL { RETURN 1 AS y } RETURN y UNION RETURN 2 AS y";
+    assert.deepEqual(getQueryWithLimit(subquery, 1), [`${subquery} LIMIT 1`, 1]);
+  });
+
   it("does not treat a node variable followed by a map as a CALL clause", () => {
     const query = "MATCH (call {x: 1}) RETURN call UNION MATCH (m) RETURN m AS call";
     assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
@@ -277,6 +293,14 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
       ["CYPHER return=1 ", "WITH $return AS x RETURN x UNION RETURN 2 AS x"],
     ]) {
       assert.deepEqual(getQueryWithLimit(header + body, 1), [`${header}CALL { WITH * ${body}\n} RETURN * LIMIT 1`, 1]);
+    }
+  });
+
+  it("ignores keyword-named CYPHER parameters when finding UNION clauses", () => {
+    const query = "CYPHER return=1 UNWIND range(1,10) AS union WITH union ORDER BY union RETURN union LIMIT 5";
+    assert.deepEqual(getQueryWithLimit(query, 1), [query, 5]);
+    for (const unchanged of ["CYPHER return=1 MATCH (n) DELETE n", "CYPHER return=1 MATCH (n) WITH n LIMIT 5 DELETE n", "CYPHER a=1"]) {
+      assert.deepEqual(getQueryWithLimit(unchanged, 300), [unchanged, 0]);
     }
   });
 
