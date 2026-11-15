@@ -54,7 +54,7 @@ function LibrarySection({
                         onSelect();
                     }}
                 >
-                    <span className="truncate font-bold">{libraryName}</span>
+                    <span className="truncate font-bold" data-testid="udfLibraryName">{libraryName}</span>
                     <span className="text-xs text-muted-foreground ml-auto shrink-0">{libraryFunctionCount}</span>
                 </button>
                 <DeleteUDF iconSize={iconSize} udfName={libraryName} onDelete={onDelete} />
@@ -67,6 +67,7 @@ function LibrarySection({
                             className="text-left min-h-fit text-xs py-0.5 px-1 text-muted-foreground truncate hover:bg-secondary rounded"
                             title={fn}
                             type="button"
+                            data-testid="udfFunctionName"
                             onClick={() => onFunctionSelect(fn)}
                         >
                             {fn}
