@@ -343,6 +343,7 @@ export default function LoginForm({
   // A file the browser cannot read (an unreadable private key, say) never fires
   // `load`, so the failure has to be reported from `onerror`.
   const readPemAsBase64 = (file: File, onRead: (base64: string, name: string) => void) => {
+    clearError();
     const reader = new FileReader();
 
     reader.onload = () => {

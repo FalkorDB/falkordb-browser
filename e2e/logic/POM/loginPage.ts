@@ -6,6 +6,7 @@ import {
   waitForURL,
 } from "@/e2e/infra/utils";
 import { existsSync } from "fs";
+import { basename } from "path";
 import urls from "../../config/urls.json";
 import HeaderComponent from "./headerComponent";
 
@@ -320,10 +321,12 @@ export default class LoginPage extends HeaderComponent {
     await fileChooser.setFiles(filePath);
 
     try {
-      await status.waitFor({
-        state: "visible",
-        timeout: 10000,
-      });
+      await Promise.race([
+        status.waitFor({ state: "visible", timeout: 10000 }),
+        this.page
+          .getByText(`Could not read ${basename(filePath)}`, { exact: true })
+          .waitFor({ state: "visible", timeout: 10000 }),
+      ]);
     } catch (error) {
       console.log(
         "Certificate upload status not visible, it might be already uploaded or the upload failed."
