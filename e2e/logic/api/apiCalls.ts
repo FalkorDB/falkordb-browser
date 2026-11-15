@@ -141,6 +141,38 @@ export default class ApiCalls {
     }
   }
 
+  /** Creates a graph on one of `request`'s own session connections rather than the shared admin one. */
+  async addGraphOnConnection(
+    request: APIRequestContext,
+    graphName: string,
+    connectionId: string
+  ): Promise<void> {
+    const response = await postRequest(
+      urls.api.graphUrl + encodeURIComponent(graphName),
+      undefined,
+      request,
+      { "X-Connection-Id": connectionId }
+    );
+    if (!response.ok()) {
+      throw new Error(
+        `Failed to add graph ${graphName} (${response.status()}): ${await response.text()}`
+      );
+    }
+  }
+
+  /** Deletes a graph from one of `request`'s own session connections; resolves to the HTTP status. */
+  async removeGraphOnConnection(
+    request: APIRequestContext,
+    graphName: string,
+    connectionId: string
+  ): Promise<number> {
+    const response = await request.delete(
+      urls.api.graphUrl + encodeURIComponent(graphName),
+      { headers: { "X-Connection-Id": connectionId } }
+    );
+    return response.status();
+  }
+
   async getGraphs(role?: string): Promise<GetGraphsResponse> {
     try {
       const headers = role === "admin" ? await getAdminToken() : undefined;

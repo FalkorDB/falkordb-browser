@@ -23,6 +23,14 @@ export default class ConnectionManagerComponent extends BasePage {
         return this.addDialog.locator("#Password");
     }
 
+    private get addDialogHost(): Locator {
+        return this.addDialog.locator("#Host");
+    }
+
+    private get addDialogPort(): Locator {
+        return this.addDialog.locator("#Port");
+    }
+
     private get logoutConfirm(): Locator {
         return this.logoutDialog.getByTestId("connectionLogoutConfirm");
     }
@@ -61,6 +69,15 @@ export default class ConnectionManagerComponent extends BasePage {
         return ConnectionManagerComponent.activeMarkerIn(this.connectionForUser(username));
     }
 
+    // Tells connections of the same user apart by the server port in their label.
+    connectionOnPort(port: number): Locator {
+        return this.connectionItems.filter({ hasText: new RegExp(`@[^:]+:${port}`) });
+    }
+
+    activeMarkerOnPort(port: number): Locator {
+        return ConnectionManagerComponent.activeMarkerIn(this.connectionOnPort(port));
+    }
+
     errorToast(text: string): Locator {
         return this.page.getByTestId("toast-destructive").filter({ hasText: text });
     }
@@ -72,10 +89,15 @@ export default class ConnectionManagerComponent extends BasePage {
 
     async closeDropdown(): Promise<void> {
         await this.page.keyboard.press("Escape");
+        await this.dropdownContent.waitFor({ state: "hidden" });
     }
 
     async selectConnection(username: string): Promise<void> {
         await interactWhenVisible(this.connectionForUser(username), (el) => el.click(), `Select connection ${username}`);
+    }
+
+    async selectConnectionOnPort(port: number): Promise<void> {
+        await interactWhenVisible(this.connectionOnPort(port), (el) => el.click(), `Select connection on port ${port}`);
     }
 
     async requestRemoval(username: string): Promise<void> {
@@ -102,9 +124,17 @@ export default class ConnectionManagerComponent extends BasePage {
         await interactWhenVisible(this.addConnectionSubmit, (el) => el.click(), "Submit add connection");
     }
 
-    async submitAdditionalConnection(username: string, password: string): Promise<void> {
+    async submitAdditionalConnection(
+        username: string,
+        password: string,
+        server?: { host: string; port: number }
+    ): Promise<void> {
         await this.openDropdown();
         await interactWhenVisible(this.addConnectionButton, (el) => el.click(), "Add Connection menu item");
+        if (server) {
+            await interactWhenVisible(this.addDialogHost, (el) => el.fill(server.host), "Add connection host");
+            await interactWhenVisible(this.addDialogPort, (el) => el.fill(String(server.port)), "Add connection port");
+        }
         await interactWhenVisible(this.addDialogUsername, (el) => el.fill(username), "Add connection username");
         await this.fillAdditionalPassword(password);
         await this.submitConnectionForm();
@@ -121,11 +151,15 @@ export default class ConnectionManagerComponent extends BasePage {
     }
 
     async getConnectionId(username: string): Promise<string | undefined> {
-        const testId = await interactWhenVisible(
-            this.connectionForUser(username),
-            (el) => el.getAttribute("data-testid"),
-            `Connection ${username}`
-        );
+        return ConnectionManagerComponent.connectionIdOf(this.connectionForUser(username), `Connection ${username}`);
+    }
+
+    async getConnectionIdOnPort(port: number): Promise<string | undefined> {
+        return ConnectionManagerComponent.connectionIdOf(this.connectionOnPort(port), `Connection on port ${port}`);
+    }
+
+    private static async connectionIdOf(connection: Locator, description: string): Promise<string | undefined> {
+        const testId = await interactWhenVisible(connection, (el) => el.getAttribute("data-testid"), description);
         return testId?.replace("connection-item-", "");
     }
 
