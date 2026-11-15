@@ -31,7 +31,7 @@ export default class GraphInfoPage extends GraphPage {
     return this.page.getByTestId(`graphInfo${label}Node`);
   }
 
-  private graphInfoEdgeButton(relationship: string): Locator {
+  protected graphInfoEdgeButton(relationship: string): Locator {
     return this.page.getByTestId(`graphInfo${relationship}Edge`);
   }
 

@@ -25,6 +25,13 @@ export type Type = "Graph" | "Role" | "Type" | "Model" | "Theme" | "Query";
 
 export type UploadMode = "dump" | "csv" | "cypher";
 
+export interface RelationshipStyle {
+  color: string;
+  width: number;
+  fontSize: number;
+  arrowSize: number;
+}
+
 export default class GraphPage extends BasePage {
   // CREATE
   public get create(): Locator {
@@ -237,6 +244,20 @@ export default class GraphPage extends BasePage {
 
       return { nodes: shown(data.nodes ?? []), links: shown(data.links ?? []) };
     });
+  }
+
+  /** The style each canvas link is drawn with, read without waiting out the force simulation. */
+  async readRelationshipStyles(relationship: string): Promise<RelationshipStyle[]> {
+    return this.page.evaluate((type) => {
+      const links: (RelationshipStyle & { relationship: string })[] = (window as any).graph?.()?.links ?? [];
+      return links
+        .filter((link) => link.relationship === type)
+        .map(({ color, width, fontSize, arrowSize }) => ({ color, width, fontSize, arrowSize }));
+    }, relationship);
+  }
+
+  async readNodeStyles(): Promise<{ id: number; color: string; size: number }[]> {
+    return (await this.readNodesScreenPositions()).map(({ id, color, size }) => ({ id, color, size }));
   }
 
   // DELETE ELEMENT
