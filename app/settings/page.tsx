@@ -3,7 +3,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { cn } from "@/lib/utils";
 import { Database, KeyRound, SlidersHorizontal, Users as UsersIcon } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
