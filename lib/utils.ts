@@ -1562,7 +1562,7 @@ function readCypherIdentifierEnd(query: string, start: number): number {
     return -1;
   }
 
-  const match = /^[\w]+/.exec(query.slice(index));
+  const match = /^[\p{ID_Start}\p{Pc}][\p{ID_Continue}\p{Sc}]*/u.exec(query.slice(index));
   return match ? index + match[0].length : -1;
 }
 
@@ -1730,7 +1730,7 @@ function findUnionClauses(analysis: ReturnType<typeof analyzeCypher>): number[] 
       const afterQuoted = previous === quoted;
       const wildcardProjection = previous === "*" && afterReturn;
       const keywordIdentifier = UNION_PRECEDING_KEYWORDS.has(previous) &&
-        (/^[.:$,]$/.test(beforePrevious) || beforePrevious === "AS" || afterReturn);
+        (/^[.:$,+*/%^=-]$/.test(beforePrevious) || beforePrevious === "AS" || afterReturn);
       nextClause.lastIndex = index + text.length;
       if (
         (afterQuoted || wildcardProjection || !/^[.:$,([{/*+%<>=|&^-]$/.test(previous)) &&

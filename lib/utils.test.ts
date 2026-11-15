@@ -94,6 +94,15 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
     }
   });
 
+  it("recognises UNION after expressions ending in keyword-named variables", () => {
+    for (const expression of ["n + yield", "n - yield", "n * yield", "n / yield", "n % yield", "n ^ yield"]) {
+      const query = `UNWIND [1,2] AS n WITH n, 2 AS yield RETURN ${expression} AS x UNION RETURN 2 AS x`;
+      assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
+      const unaliased = `UNWIND [1,2] AS n WITH n, 2 AS yield RETURN ${expression} UNION RETURN 2`;
+      assert.deepEqual(getQueryWithLimit(unaliased, 1), [`CALL { ${unaliased}\n} RETURN * LIMIT 1`, 1]);
+    }
+  });
+
   it("does not treat a node variable followed by a map as a CALL clause", () => {
     const query = "MATCH (call {x: 1}) RETURN call UNION MATCH (m) RETURN m AS call";
     assert.deepEqual(getQueryWithLimit(query, 1), [`CALL { ${query}\n} RETURN * LIMIT 1`, 1]);
@@ -295,6 +304,13 @@ describe("getQueryWithLimit UNION and semicolons (#2204)", () => {
 
     const escapedProcedureQuery = "CALL `db`.`labels`() YIELD label RETURN label UNION MATCH (n) RETURN n";
     assert.deepEqual(getQueryWithLimit(escapedProcedureQuery, 300), [`${escapedProcedureQuery} LIMIT 300`, 300]);
+  });
+
+  it("recognises Unicode procedure-name segments alongside UNION", () => {
+    for (const procedure of ["db.étiquettes", "étiquette.labels", "db.e\u0301tiquettes", "db.name€", "db.undertie‿"]) {
+      const query = `CALL ${procedure}() YIELD label RETURN label UNION MATCH (n) RETURN n`;
+      assert.deepEqual(getQueryWithLimit(query, 300), [`${query} LIMIT 300`, 300]);
+    }
   });
 });
 

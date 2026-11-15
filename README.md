@@ -18,6 +18,11 @@
 #### Faster Graph Creation & Querying  
 Quickly create new graphs and run queries with fewer clicks. The UI now guides you through graph setup with smarter defaults and clearer feedback.
 
+Automatic query limiting recognizes Unicode procedure names in `CALL` clauses,
+so they follow the same limiting behavior as ASCII-named procedures in `UNION` queries.
+Keyword-named variables at the end of arithmetic projections also preserve
+automatic limiting across `UNION` branches.
+
 #### Simplified Node Editing  
 Editing node properties is now faster and more intuitive. Fewer modal windows, inline property editing, and immediate updates make this flow significantly more usable.
 
