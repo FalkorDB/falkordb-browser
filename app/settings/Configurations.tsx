@@ -181,27 +181,22 @@ export default function Configurations() {
 
         if (!result.ok) return false;
 
-        let oldValue: DataCell | undefined;
+        const valueToRestore = configs.find(row => row.cells[0].value === name)?.cells[2].value;
+        setConfigs(currentConfigs => currentConfigs.map((config: Row) => {
+            if (config.cells[0].value !== name) return config;
 
-        setConfigs(currentConfigs => {
-            const configToUpdate = currentConfigs.find(row => row.cells[0].value === name);
-            oldValue = configToUpdate?.cells[2].value;
-
-            return currentConfigs.map((config: Row) => {
-                if (config.cells[0].value !== name) return config;
-
-                const newConfig = { ...config };
-                newConfig.cells[2].value = value;
-                return newConfig;
-            });
-        });
-
-        const valueToRestore = oldValue;
+            const newConfig = { ...config };
+            newConfig.cells[2].value = value;
+            return newConfig;
+        }));
 
         toast({
             title: "Success",
             description: "Configuration value set successfully",
-            action: valueToRestore !== undefined && isUndo ?
+            action: valueToRestore !== undefined &&
+                valueToRestore !== null &&
+                valueToRestore !== "" &&
+                isUndo ?
                 <ToastButton
                     showUndo
                     onClick={() => handleSetConfig(name, String(valueToRestore), false)}
