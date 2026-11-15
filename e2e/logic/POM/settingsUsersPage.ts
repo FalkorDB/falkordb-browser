@@ -1,6 +1,6 @@
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from "../../infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible, waitForElementToNotBeVisible } from "../../infra/utils";
 
 export default class SettingsUsersPage extends BasePage {
   private get usersTabBtn(): Locator {
@@ -230,7 +230,8 @@ export default class SettingsUsersPage extends BasePage {
       await this.clickOnSelectUserRole(userDetails.role);
     }
     await this.clickOnSubmitUserAddition();
-    await waitForTimeOut(this.page, 1500);
+    // Invalid input is rejected client-side; valid input sends POST /api/user then /api/user/save.
+    await this.waitForPageIdle();
   }
 
   async getUserRole(selectedUser: string): Promise<string | null> {
@@ -247,7 +248,8 @@ export default class SettingsUsersPage extends BasePage {
     await this.clickEditSelectRoleBtn();
     await this.clickOnSelectUserRole(role);
     await this.clickOnSubmitEditUser();
-    await waitForTimeOut(this.page, 1500);
+    // The drawer closes only once the PATCH and the ACL save have resolved.
+    await waitForElementToNotBeVisible(this.submitEditUser);
   }
 
   async editUser(selectedUser: string, options: { role?: string, keys?: string, password?: string, confirmPassword?: string }): Promise<void> {
@@ -267,7 +269,8 @@ export default class SettingsUsersPage extends BasePage {
       await this.fillEditKeysField(options.keys);
     }
     await this.clickOnSubmitEditUser();
-    await waitForTimeOut(this.page, 1500);
+    // The drawer closes only once the PATCH and the ACL save have resolved.
+    await waitForElementToNotBeVisible(this.submitEditUser);
   }
 
   async clickOnEditUserBtn(): Promise<void> {
@@ -356,7 +359,8 @@ export default class SettingsUsersPage extends BasePage {
     await this.clickUserCheckboxBtn(selectedUser2);
     await this.clickDeleteUsersBtn();
     await this.clickConfirmUserDeleteMsg();
-    await waitForTimeOut(this.page, 1500);
+    await waitForElementToNotBeVisible(this.userRow(selectedUser1));
+    await waitForElementToNotBeVisible(this.userRow(selectedUser2));
   }
 
   async removeUser(selectedUser: string): Promise<void> {
@@ -374,7 +378,6 @@ export default class SettingsUsersPage extends BasePage {
   }
 
   async getTableRolesCount(): Promise<number> {
-    await this.page.waitForTimeout(1000);
     const count = await this.tableRoles
       .filter({ hasNot: this.fakeRow })
       .count();

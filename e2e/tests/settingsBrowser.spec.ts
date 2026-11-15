@@ -85,9 +85,6 @@ test.describe('@browser Browser Settings tests', () => {
         // Save settings
         await settingsBrowserPage.clickSaveSettingsButton();
 
-        // Wait for save to complete
-        await settingsBrowserPage.waitForTimeout(1000);
-
         // Verify the selected model is highlighted
         const isModelSelected = await settingsBrowserPage.isModelSelected(openaiModel);
         expect(isModelSelected).toBe(true);
@@ -115,7 +112,6 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.selectModel(openaiModel);
         await settingsBrowserPage.fillChatApiKey(testApiKey);
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(1000);
 
         // Reload the page
         await settingsBrowserPage.reloadPage();
@@ -147,15 +143,10 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Search for "gpt" - should only show OpenAI models
         await settingsBrowserPage.searchModels("gpt");
-        await settingsBrowserPage.waitForTimeout(300); // Wait for debounce
 
-        // Verify GPT models are visible
-        const isGptModelVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-        expect(isGptModelVisible).toBe(true);
-
-        // Verify non-GPT models are not visible
-        const isClaudeVisible = await settingsBrowserPage.isModelVisible(anthropicModel);
-        expect(isClaudeVisible).toBe(false);
+        // Poll: the search filter is debounced
+        await expect.poll(() => settingsBrowserPage.isModelVisible(openaiModel)).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelVisible(anthropicModel)).toBe(false);
     });
 
     test('@readwrite Verify search shows only matching category', async () => {
@@ -172,15 +163,10 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Search for "claude" - should only show Anthropic category
         await settingsBrowserPage.searchModels("claude");
-        await settingsBrowserPage.waitForTimeout(300);
 
-        // Verify Anthropic models are visible
-        const isClaudeVisible = await settingsBrowserPage.isModelVisible(anthropicModel);
-        expect(isClaudeVisible).toBe(true);
-
-        // Verify other provider models are not visible
-        const isGptVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-        expect(isGptVisible).toBe(false);
+        // Poll: the search filter is debounced
+        await expect.poll(() => settingsBrowserPage.isModelVisible(anthropicModel)).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelVisible(openaiModel)).toBe(false);
     });
 
     test('@readwrite Verify empty search state displays correctly', async () => {
@@ -204,7 +190,6 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Search for non-existent model
         await settingsBrowserPage.searchModels("nonexistentmodel123");
-        await settingsBrowserPage.waitForTimeout(300);
 
         // Verify "No models found" message is displayed
         const noModelsText = await settingsBrowserPage.getNoModelsFoundText();
@@ -324,19 +309,15 @@ test.describe('@browser Browser Settings tests', () => {
         // Search for specific model
         await settingsBrowserPage.searchModels("gpt");
 
-        // Verify filtered state - Anthropic model should not be visible
-        let isClaudeVisible = await settingsBrowserPage.isModelVisible(anthropicModel);
-        expect(isClaudeVisible).toBe(false);
+        // Verify filtered state (debounced) - Anthropic model should not be visible
+        await expect.poll(() => settingsBrowserPage.isModelVisible(anthropicModel)).toBe(false);
 
         // Clear search
         await settingsBrowserPage.clearModelSearch();
-        await settingsBrowserPage.waitForTimeout(300);
 
         // Verify all models are visible again
-        isClaudeVisible = await settingsBrowserPage.isModelVisible(anthropicModel);
-        const isGptVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-        expect(isClaudeVisible).toBe(true);
-        expect(isGptVisible).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelVisible(anthropicModel)).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelVisible(openaiModel)).toBe(true);
     });
 
     test('@readwrite Verify different models from different categories can be selected', async () => {
@@ -358,9 +339,7 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Select Anthropic model
         await settingsBrowserPage.selectModel(anthropicModel);
-        await settingsBrowserPage.waitForTimeout(500); // Wait for selection to register
-        isSelected = await settingsBrowserPage.isModelSelected(anthropicModel);
-        expect(isSelected).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelSelected(anthropicModel)).toBe(true);
 
         // Verify previous selection is no longer selected
         const isPreviousSelected = await settingsBrowserPage.isModelSelected(openaiModel);
@@ -396,7 +375,6 @@ test.describe('@browser Browser Settings tests', () => {
 
             // Save the settings
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(1000);
 
             // Navigate to graph page using header component
             const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
@@ -460,7 +438,6 @@ test.describe('@browser Browser Settings tests', () => {
 
             // Save the settings
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(1000);
 
             // Navigate to graph page using header component
             const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
@@ -502,10 +479,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.fillMaxSavedMessages(7);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandChatSection();
             await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
@@ -528,10 +503,8 @@ test.describe('@browser Browser Settings tests', () => {
 
         await settingsBrowserPage.fillMaxSavedMessages(3);
         await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
-        await settingsBrowserPage.waitForTimeout(1000);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
@@ -549,10 +522,8 @@ test.describe('@browser Browser Settings tests', () => {
 
         await settingsBrowserPage.fillMaxSavedMessages(15);
         await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
-        await settingsBrowserPage.waitForTimeout(1000);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
@@ -569,10 +540,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setMaxTabsSlider(4);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandUserExperienceSection();
 
             const value = await settingsBrowserPage.getMaxTabsValue();
@@ -600,10 +569,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setGraphsSortOrder('a-z');
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
 
             expect(await settingsBrowserPage.getGraphsSortOrder()).toBe('Name (A-Z)');
         } finally {
@@ -624,10 +591,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setRefreshIntervalSlider(30);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandGraphInfoSection();
 
             const value = await settingsBrowserPage.getRefreshIntervalValue();
@@ -648,10 +613,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setMaxItemsForSearchSlider(25);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandGraphInfoSection();
 
             const value = await settingsBrowserPage.getMaxItemsForSearchValue();
@@ -674,10 +637,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setColumnWidthSlider(50);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandUserExperienceSection();
 
             const value = await settingsBrowserPage.getColumnWidthValue();
@@ -698,10 +659,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setRowHeightSlider(60);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandUserExperienceSection();
 
             const value = await settingsBrowserPage.getRowHeightValue();
@@ -722,10 +681,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setRowHeightExpandMultipleSlider(4);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandUserExperienceSection();
 
         const value = await settingsBrowserPage.getRowHeightExpandMultipleValue();
@@ -747,10 +704,8 @@ test.describe('@browser Browser Settings tests', () => {
         const captionKey = `testkey_${Date.now()}`;
         await settingsBrowserPage.addCaptionKey(captionKey);
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandUserExperienceSection();
 
         const keys = await settingsBrowserPage.getCaptionKeys();
@@ -769,19 +724,15 @@ test.describe('@browser Browser Settings tests', () => {
         const captionKey = `removekey_${Date.now()}`;
         await settingsBrowserPage.addCaptionKey(captionKey);
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandUserExperienceSection();
 
         // Remove the key
         await settingsBrowserPage.removeCaptionKey(captionKey);
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandUserExperienceSection();
 
         const keys = await settingsBrowserPage.getCaptionKeys();
@@ -798,10 +749,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandUserExperienceSection();
 
             const newState = await settingsBrowserPage.getShowPropertyKeyPrefixState();

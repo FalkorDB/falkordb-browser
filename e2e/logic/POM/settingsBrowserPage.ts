@@ -1,5 +1,5 @@
 /* eslint-disable no-await-in-loop */
-import { Locator } from "@playwright/test";
+import { Locator, expect } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import {
   interactWhenVisible,
@@ -582,10 +582,9 @@ export default class SettingsBrowserPage extends BasePage {
       const isExpanded = await toggle.getAttribute('aria-expanded');
       if (isExpanded !== 'true') {
         await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
       }
     }
-    // Allow time for expansion animations / DOM updates
-    await this.page.waitForTimeout(200);
   }
 
   async searchModels(searchText: string): Promise<void> {
@@ -722,7 +721,7 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async reloadPage(): Promise<void> {
-    await this.page.reload();
+    await this.page.reload({ waitUntil: "networkidle" });
   }
 
   /**
@@ -730,9 +729,6 @@ export default class SettingsBrowserPage extends BasePage {
    * Returns the raw model values (data-testid values)
    */
   async getAvailableModels(): Promise<string[]> {
-    // Wait for models to load
-    await this.page.waitForTimeout(500);
-
     // Expand all collapsible categories so model buttons are rendered in the DOM
     await this.expandAllCategories();
 

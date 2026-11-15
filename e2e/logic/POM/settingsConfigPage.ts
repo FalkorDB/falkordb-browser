@@ -1,6 +1,6 @@
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible } from "@/e2e/infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
 
 export default class SettingsConfigPage extends BasePage {
 
@@ -114,9 +114,8 @@ export default class SettingsConfigPage extends BasePage {
         await interactWhenVisible(this.searchForConfigInput, (el) => el.fill(value), "search input");
     }
     
-    async isUndoBtnInToastMsg(): Promise<void> {
-        await this.page.waitForTimeout(500);
-        await this.undoBtnInToastMsg.isVisible();
+    async isUndoBtnInToastMsg(): Promise<boolean> {
+        return waitForElementToBeVisible(this.undoBtnInToastMsg);
     }
 
     async modifyRoleValue(role: string, input: string): Promise<string | null> {
@@ -142,7 +141,6 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     async getTableRolesCount(): Promise<number> {
-        await this.page.waitForTimeout(1500);
         const count = await this.tableRoles.count();
         return count;
     }
