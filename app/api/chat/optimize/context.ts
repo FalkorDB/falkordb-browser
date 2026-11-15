@@ -8,7 +8,7 @@ interface OptimizationGraph {
 export async function getOptimizationContext(graph: OptimizationGraph, query: string) {
   const [explainResult, indexResult] = await Promise.allSettled([
     graph.explain(query),
-    graph.roQuery("CALL db.indexes() YIELD label, types, entitytype RETURN label, types, entitytype"),
+    graph.roQuery(`CALL db.indexes() YIELD label, types, entitytype RETURN label, types, entitytype LIMIT ${MAX_INDEX_ROWS + 1}`),
   ]);
   if (explainResult.status === "rejected") throw explainResult.reason;
   const available = indexResult.status === "fulfilled";

@@ -141,9 +141,10 @@ export default class ApiCalls {
     }
   }
 
-  async getGraphs(): Promise<GetGraphsResponse> {
+  async getGraphs(role?: string): Promise<GetGraphsResponse> {
     try {
-      const result = await getRequest(`${urls.api.graphUrl}`);
+      const headers = role === "admin" ? await getAdminToken() : undefined;
+      const result = await getRequest(`${urls.api.graphUrl}`, headers);
       return await result.json();
     } catch (error) {
       throw new Error(

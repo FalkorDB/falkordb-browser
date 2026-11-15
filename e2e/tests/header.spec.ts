@@ -80,8 +80,8 @@ test.describe(`Header tests`, () => {
 
   test(`@admin Verify clicking on help -> API Documentation redirects to specified URL`, async () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
-    const href = await navBar.getApiDocumentationLinkHref();
-    expect(href).toContain('/docs');
+    const page = await navBar.clickOnApiDocumentation();
+    expect(new URL(page.url()).pathname).toBe('/docs');
   });
 
   test(`@admin Verify clicking on help -> Support redirects to specified URL`, async () => {
