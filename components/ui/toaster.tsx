@@ -15,6 +15,7 @@ import {
   ToastViewport,
 } from "@/components/ui/toast"
 import { useToast } from "@/components/ui/use-toast"
+import useAppRouter from "@/lib/useAppRouter";
 
 export const getQuerySettingsNavigationToast = (
   toast: any,
@@ -117,6 +118,7 @@ function CsvUploadToastAction({ onOpen }: { onOpen: () => void }) {
 
 export function Toaster() {
   const { toasts, dismiss } = useToast()
+  const router = useAppRouter()
 
   return (
     <ToastProvider>
@@ -139,6 +141,7 @@ export function Toaster() {
                       <Link
                         href={hintLink.href}
                         onClick={() => dismiss(id)}
+                        onNavigate={event => { event.preventDefault(); router.push(hintLink.href); }}
                         data-testid="toast-hint-link"
                         className="mt-1 inline-block text-xs underline text-primary hover:opacity-80"
                       >
