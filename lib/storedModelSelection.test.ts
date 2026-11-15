@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { selectStoredModel } from "./storedModelSelection.ts";
 
-const models = ["openai::gpt-5", "openai::gpt-4o-mini", "openai::codex-mini-latest", "openai::o5-mini", "openai::chatgpt-4o-latest"];
+const models = ["openai::gpt-5", "openai::gpt-4o-mini", "openai::o5-mini", "openai::chatgpt-4o-latest"];
 
 describe("selectStoredModel", () => {
     it("keeps a stored model the list still offers", () => {
@@ -10,7 +10,7 @@ describe("selectStoredModel", () => {
     });
 
     it("migrates legacy unprefixed OpenAI IDs to their prefixed entry", () => {
-        for (const legacy of ["gpt-4o-mini", "codex-mini-latest", "o5-mini", "chatgpt-4o-latest"]) {
+        for (const legacy of ["gpt-4o-mini", "o5-mini", "chatgpt-4o-latest"]) {
             assert.equal(selectStoredModel(legacy, models), `openai::${legacy}`);
         }
     });

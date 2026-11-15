@@ -30,6 +30,9 @@ The search bar now indexes schema, nodes, and metadata. Results are ranked more 
 #### Expanded Settings & User Controls  
 New options let you fine-tune database behavior, toggle visual preferences, and manage users without falling back to CLI tools.
 
+Successful database configuration edits offer **Undo**, which restores the immediately
+preceding value, including zero. Load-time configuration values remain read-only.
+
 #### Node Style Customization  
 Customize the visual appearance of nodes per label. Select custom colors from a palette, adjust node sizes, and choose which property to display as the node caption. All customizations are saved per graph and persist across sessions.
 
@@ -39,9 +42,42 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 |---------------------------------------------------|---------------------------------------------------|
 
 
+## Automatic query limiting
+
+When the result limit in Settings is above 0, the browser adds `LIMIT <n>` to a query
+whose final `RETURN` has none. A limit of 0 (shown as ∞) leaves queries unchanged.
+
+- Trailing semicolons are removed before the limit is added.
+- A non-`UNION` query whose final `RETURN` already has a `LIMIT` keeps it.
+- `UNION` queries are wrapped as `CALL { … } RETURN * LIMIT <n>`, even when a branch has its
+  own `LIMIT`, so the limit applies to the combined result. A leading `CYPHER` parameter
+  header stays outside the wrapper.
+- Known limitation: `UNION` queries that contain a `CALL` clause, or start with `EXPLAIN` or
+  `PROFILE`, are not wrapped; the limit is added to the last branch only.
+
 ## Get Started & Demo
 
 Access the Browser: (https://browser.falkordb.com)
+
+### Tutorial samples
+
+- Each tutorial uses unique graph names and records ownership per connection.
+  Cleanup deletes only samples whose creation was confirmed, never user graphs
+  based on their names (including `social-demo`).
+- Completed abandoned samples are reclaimed on app visits and tutorial start/close.
+  Web Locks protect active tabs; without them, other tabs' records must be inactive
+  for 24 hours. Failed cleanup retains ownership for retry without extending that
+  inactivity window. Clearing browser storage removes ownership evidence.
+- Unconfirmed creations are retained for manual verification, with a notice at
+  most once per connection per browser session. They are never automatically
+  deleted, even after a timeout or reload.
+- Graph selection and saved-tab loads wait for recovery. Setup and Replay waits
+  are bounded; a late creation remains tracked. Switching connections or closing
+  on mobile cannot publish an old tutorial into a newer one; switching while the
+  tutorial is open restarts it with samples on the new connection, leaving the
+  old connection's samples recorded for its own cleanup. Background sample
+  reads cannot recreate deleted graphs; explicit editor writes retain their
+  normal permissions. Closing restores only user graphs verified to still exist.
 
 ### Quick start
 
@@ -253,6 +289,18 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Personal access tokens
+
+Custom expiration dates use the selected local calendar day, ending at
+23:59:59.999 in the browser's timezone, including daylight-saving transitions.
+
+### Restoring graph tabs
+
+Graph editing waits for saved tabs and the query timeout to initialize for the
+current connection, while information panels and Chat remain accessible.
+If timeout configuration does not respond within five seconds, restoration uses
+the 60-second fallback.
+
 ### Error help
 
 When a Cypher query fails, the browser shows the database's message together with an
@@ -315,8 +363,14 @@ Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
 mobile screens, and long Chat queries can be collapsed.
 
 Missing AI configuration and provider errors offer **Go to Settings**. Returning
-to the graph preserves the editor query and unsent Chat input. Chat drafts are
-scoped to the connection, tab, and graph, and survive closing and reopening Chat.
+to the graph preserves the editor query and unsent Chat input. Debounced URL
+updates wait for route transitions, so a draft update cannot cancel navigation
+to Settings. Chat drafts are scoped to the connection, tab, and graph, and survive
+closing and reopening Chat.
+The transition guard covers mounted programmatic push/replace/refresh calls.
+History back/forward and toast callbacks retained after unmount use Next's native
+navigation without acquiring a transition token. Deferred URL updates are
+discarded when the destination's path, search, or hash differs from their source.
 Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
@@ -406,3 +460,6 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
+  The Firefox settings project depends on the Chromium settings project because both
+  mutate server-wide configuration. Selecting Firefox also runs Chromium first; do not
+  bypass this dependency when both projects share a server.

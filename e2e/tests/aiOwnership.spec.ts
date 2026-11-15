@@ -1,4 +1,4 @@
-import { type Page, type Route } from "@playwright/test";
+import { type Route } from "@playwright/test";
 import { expect, test } from "../infra/coverage";
 import { getRandomString, initializeLocalStorage } from "../infra/utils";
 import configuredUrls from "../config/urls.json";
@@ -6,27 +6,8 @@ import AiAssistComponent from "../logic/POM/aiAssistComponent";
 import ChatComponent from "../logic/POM/chatComponent";
 
 const baseUrl = process.env.E2E_BASE_URL ?? configuredUrls.localHost;
-const graphsToDelete = new Set<string>();
-
-async function createTrackedGraph(page: Page, prefix: string) {
-  const graphName = getRandomString(prefix);
-  const response = await page.request.post(`${baseUrl}/api/graph/${graphName}`);
-  expect(response.ok()).toBe(true);
-  graphsToDelete.add(graphName);
-  return graphName;
-}
-
-test.afterEach(async ({ page }) => {
-  const graphNames = [...graphsToDelete];
-  graphsToDelete.clear();
-  const responses = await Promise.all(graphNames.map(async graphName => ({
-    graphName,
-    response: await page.request.delete(`${baseUrl}/api/graph/${graphName}`),
-  })));
-  for (const { graphName, response } of responses) {
-    expect(response.ok(), `Failed to delete test graph ${graphName}`).toBe(true);
-  }
-});
+// Graphs to delete after the test, so a cleanup failure cannot mask the test's own error.
+const createdGraphs: string[] = [];
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(60_000);
@@ -60,11 +41,19 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test.afterEach(async ({ page }) => {
+  for (const graphName of createdGraphs.splice(0)) {
+    expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  }
+});
+
 for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
   test(`@admin Fix with AI aborts on ${dismissal}`, async ({ page }) => {
-    const graphName = await createTrackedGraph(page, "fixOwner");
+    const graphName = getRandomString("fixOwner");
     const pending = Promise.withResolvers<Route>();
     await page.route("**/api/chat/fix", route => { pending.resolve(route); });
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    createdGraphs.push(graphName);
     await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const ai = new AiAssistComponent(page);
     await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
@@ -94,13 +83,13 @@ for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
 
 for (const invalidation of ["edit", "tab-switch"] as const) {
   test(`@admin stale Fix with AI action clears on ${invalidation}`, async ({ page }) => {
-    const graphName = await createTrackedGraph(page, "fixFailureOwner");
+    const graphName = getRandomString("fixFailureOwner");
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    createdGraphs.push(graphName);
     await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const ai = new AiAssistComponent(page);
     await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
-    await ai.insertQuery("RETRUN 1");
-    await expect.poll(() => ai.hasEditorErrorMarker()).toBe(true);
-    await ai.clickRunQuery(false);
+    await ai.runInvalidQuery("RETRUN 1");
     await expect(ai.fixWithAiButton).toBeVisible();
 
     if (invalidation === "edit") {
@@ -110,7 +99,11 @@ for (const invalidation of ["edit", "tab-switch"] as const) {
       await ai.addTabButton.click();
     }
 
+    // The toast closes itself after a few seconds, taking the button with it; the toast must
+    // still be open once the button is gone, or this would pass without the invalidation.
+    await expect(ai.errorToast).toBeVisible();
     await expect(ai.fixWithAiButton).toHaveCount(0);
+    await expect(ai.errorToast).toBeVisible();
   });
 }
 
@@ -122,11 +115,13 @@ for (const staleStatus of [200, 422, 401]) {
       window.fetch = (input, init) => originalFetch(input,
         input === "/api/chat/fix" ? { ...init, signal: undefined } : init);
     });
-    const graphName = await createTrackedGraph(page, "fixStale");
+    const graphName = getRandomString("fixStale");
     const first = Promise.withResolvers<Route>();
     const second = Promise.withResolvers<Route>();
     let requests = 0;
     await page.route("**/api/chat/fix", route => { (requests++ === 0 ? first : second).resolve(route); });
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    createdGraphs.push(graphName);
     await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const ai = new AiAssistComponent(page);
     await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
@@ -157,7 +152,7 @@ for (const staleStatus of [200, 422, 401]) {
 
 for (const scenario of ["edited-clear", "new-draft-success", "switch-failure", "session-invalid"] as const) {
   test(`@admin chat protects pending drafts during ${scenario}`, async ({ page }) => {
-    const graphName = await createTrackedGraph(page, "chatDraftRace");
+    const graphName = getRandomString("chatDraftRace");
     const draft = "Find my customers";
     if (scenario === "session-invalid") {
       await page.route("**/api/auth/signout", route => route.fulfill({ json: { url: `${baseUrl}/login` } }));
@@ -165,6 +160,8 @@ for (const scenario of ["edited-clear", "new-draft-success", "switch-failure", "
     }
     const pending = Promise.withResolvers<Route>();
     await page.route("**/api/chat", route => { pending.resolve(route); });
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    createdGraphs.push(graphName);
     await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const chat = new ChatComponent(page);
     await expect(chat.chatToggleButton).toBeEnabled({ timeout: 30_000 });
@@ -206,7 +203,7 @@ for (const scenario of ["edited-clear", "new-draft-success", "switch-failure", "
 }
 
 test("@admin old Chat success cannot clear a resubmitted draft after reopening", async ({ page }) => {
-  const graphName = await createTrackedGraph(page, "chatReopen");
+  const graphName = getRandomString("chatReopen");
   const draft = "Keep this submitted draft";
   const first = Promise.withResolvers<Route>();
   const second = Promise.withResolvers<Route>();
@@ -215,6 +212,8 @@ test("@admin old Chat success cannot clear a resubmitted draft after reopening",
     requests += 1;
     (requests === 1 ? first : second).resolve(route);
   });
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  createdGraphs.push(graphName);
   await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
   const chat = new ChatComponent(page);
   await expect(chat.chatToggleButton).toBeEnabled({ timeout: 30_000 });
@@ -243,9 +242,11 @@ test("@admin old Chat success cannot clear a resubmitted draft after reopening",
 
 for (const dismissal of ["tab-switch", "close"] as const) {
 test(`@admin optimize cancels on ${dismissal} and allows a fresh request`, async ({ page }) => {
-  const graphName = await createTrackedGraph(page, "optimizeOwner");
+  const graphName = getRandomString("optimizeOwner");
   const pending = Promise.withResolvers<Route>();
   await page.route("**/api/chat/optimize", route => { pending.resolve(route); });
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  createdGraphs.push(graphName);
   await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
   const ai = new AiAssistComponent(page);
   await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
@@ -283,3 +284,56 @@ test(`@admin optimize cancels on ${dismissal} and allows a fresh request`, async
   await expect(ai.optimizeQuery).toHaveText("RETURN 3");
 });
 }
+
+test("@admin optimize result closes when same-connection readiness is lost", async ({ page }) => {
+  const graphName = getRandomString("optimizeReady");
+  await page.route("**/api/chat/optimize", route => route.fulfill({ json: {
+    explanation: "Result before readiness loss", suggestions: [], optimizedQuery: "RETURN 2", executionPlan: ["Results"],
+  } }));
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  createdGraphs.push(graphName);
+  let releaseConfig!: () => void;
+  const configGate = new Promise<void>(resolve => { releaseConfig = resolve; });
+  try {
+    await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+    const ai = new AiAssistComponent(page);
+    await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+    await ai.openOptimize();
+    await ai.optimizeAnalyzeButton.click();
+    await expect(ai.optimizeApplyButton).toBeVisible();
+
+    const session = await (await page.request.get(`${baseUrl}/api/auth/session`)).json();
+    await page.evaluate(() => localStorage.removeItem("timeout"));
+    // Only the held config may restore readiness, not the production deadline.
+    await page.evaluate(() => {
+      const timeout = AbortSignal.timeout.bind(AbortSignal);
+      AbortSignal.timeout = milliseconds => timeout(milliseconds === 5000 ? 60000 : milliseconds);
+    });
+    let configRequested = false;
+    await page.route("**/api/graph/config", async route => {
+      configRequested = true;
+      await configGate;
+      await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
+    });
+    await page.route("**/api/auth/session", route => route.fulfill({
+      json: { ...session, user: { ...session.user, id: `${session.user.id}-restoration` } },
+    }));
+    await page.evaluate(() => {
+      const channel = new BroadcastChannel("next-auth");
+      channel.postMessage({ event: "session", data: { trigger: "getSession" } });
+      channel.close();
+    });
+    await expect.poll(() => configRequested, { timeout: 15_000 }).toBe(true);
+    await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "true");
+    await expect(ai.optimizeDialog).toHaveCount(0);
+    await expect(ai.optimizeApplyButton).toHaveCount(0);
+    await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1");
+
+    releaseConfig();
+    await expect(page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "false");
+    await expect(ai.optimizeDialog).toHaveCount(0);
+    await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1");
+  } finally {
+    releaseConfig();
+  }
+});

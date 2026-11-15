@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server, Minus, Plus } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
@@ -1105,7 +1105,7 @@ export default function BrowserSettings() {
                                                     <label className="text-sm font-medium">
                                                         {isLoadingModels ? "Live models" : "Model"}
                                                     </label>
-                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <span data-testid="modelsStatusMessage" className="flex items-center gap-1 text-xs text-muted-foreground">
                                                         {isLoadingModels && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                                         {modelsMessage}
                                                     </span>

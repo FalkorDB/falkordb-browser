@@ -10,7 +10,7 @@ import { Monaco } from "@monaco-editor/react";
 import { SetStateAction, Dispatch, useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from "react";
 import * as monaco from "monaco-editor";
 import { History, Info, Maximize2, Minimize2, MoreHorizontal, Play, Sparkles, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import useIsMobile from "@/lib/useIsMobile";
@@ -22,11 +22,12 @@ import { createFalkorCypherEngine, attachGrammarLinting, registerGrammarCodeActi
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { isAiFixSupported } from "@/lib/aiFix";
+import { isGraphUnconfirmed } from "@/lib/graphTabs";
 import { isQueryOptimization, removeLegacyOptimizeConsent } from "@/lib/aiOptimize";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
-import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, GraphTabsContext, DiagnosticsContext, AiFixContext, type ChatModelSource, type LocalLlmProvider } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, GraphContext, GraphTabsContext, DiagnosticsContext, AiFixContext, type ChatModelSource, type LocalLlmProvider } from "./provider";
 import useQueryPreflight from "./useQueryPreflight";
 import { Graph } from "../api/graph/model";
 import ToastButton from "./ToastButton";
@@ -196,7 +197,17 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
-    const { activeTabId } = useContext(GraphTabsContext);
+    const { activeTabId, tabsReady, graphNamesReady } = useContext(GraphTabsContext);
+    const { graphNames, graphNamesUnknown } = useContext(GraphContext);
+    // The procedure lookup goes through GRAPH.QUERY on writable connections,
+    // which would re-create a dropped graph — same hold as the page's polls.
+    const graphUnconfirmed = isGraphUnconfirmed(graph.Id, graphNames, graphNamesUnknown, graphNamesReady);
+    useEffect(() => {
+        if (!tabsReady) {
+            setMaximize(false);
+            setActionsOpen(false);
+        }
+    }, [tabsReady, setMaximize]);
     const { diagnostics, setDiagnostics } = useContext(DiagnosticsContext);
     const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
     const checkPreflight = useQueryPreflight();
@@ -209,7 +220,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const [pendingOptimization, setPendingOptimization] = useState<PendingOptimizationRequest | null>(null);
     const [optimizationGuidance, setOptimizationGuidance] = useState("");
     const [optimizationResult, setOptimizationResult] = useState<AiOptimizeResultState>({ status: "idle" });
-    const optimizationContext = JSON.stringify([activeTabId, graphName, activeConnectionId]);
+    // Losing readiness also invalidates a pending or shown optimization: its Apply would edit a locked editor.
+    const optimizationContext = JSON.stringify([activeTabId, graphName, activeConnectionId, tabsReady]);
     const optimizationOwnerRef = useRef<object>({});
     const optimizationAbortRef = useRef<AbortController | null>(null);
     useLayoutEffect(() => {
@@ -568,7 +580,28 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         cachedSuggestionsRef.current = [];
         setProceduresVersion(v => v + 1);
 
+        // Built-in procedures for CALL autocomplete when the server's list is unavailable.
+        const applyFallbackProcedures = () => {
+            procedureSuggestionsRef.current = FALLBACK_PROCEDURE_NAMES.map(info => ({
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                insertText: `${info}(\${0})`,
+                label: `${info}()`,
+                kind: monaco.languages.CompletionItemKind.Function,
+                range: new monaco.Range(1, 1, 1, 1),
+                detail: '(function)',
+            }));
+            cachedSuggestionsRef.current = [];
+            if (monacoRef.current) updateTokenizer(monacoRef.current);
+            setProceduresVersion(v => v + 1);
+        };
+
         if (!requestGraphId) return () => { cancelled = true; };
+        // Querying a graph the list has not confirmed could re-create it, so
+        // offer the built-ins without a request until it is confirmed.
+        if (graphUnconfirmed) {
+            applyFallbackProcedures();
+            return () => { cancelled = true; };
+        }
 
         // Use the live `isReadOnly` value (not the ref) so this effect re-runs
         // whenever read-only mode toggles on the same graph.
@@ -609,22 +642,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             // On error, fall back to the well-known FalkorDB built-in procedures
             // so users retain CALL autocomplete even when the server is temporarily
             // unreachable or returns an unexpected response.
-            procedureSuggestionsRef.current = FALLBACK_PROCEDURE_NAMES.map(info => ({
-                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                insertText: `${info}(\${0})`,
-                label: `${info}()`,
-                kind: monaco.languages.CompletionItemKind.Function,
-                range: new monaco.Range(1, 1, 1, 1),
-                detail: '(function)',
-            }));
-            cachedSuggestionsRef.current = [];
-            if (monacoRef.current) updateTokenizer(monacoRef.current);
-            setProceduresVersion(v => v + 1);
+            applyFallbackProcedures();
         });
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [graph.Id, isReadOnly]);
+    }, [graph.Id, graphUnconfirmed, isReadOnly]);
 
     useEffect(() => {
         isReadOnlyRef.current = isReadOnly;
@@ -1277,6 +1300,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     }, [cypherLanguageConfig, onLanguageConfig]);
 
     const handleSubmit = async () => {
+        if (!tabsReady) return;
         // Real-time grammar validation gates execution: invalid syntax never runs
         // (the backend therefore only ever sees runtime issues, not syntax errors).
         if (!isQueryValid) {
@@ -1477,6 +1501,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     };
 
     const getLabel = () => {
+        if (!tabsReady) return "Restoring graph tabs";
         if (!graphName) return "Select a graph first";
         if (!historyQuery.query) return "You need to type a query first";
         if (!isQueryValid) return "Fix the highlighted syntax errors to run";
@@ -1496,10 +1521,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         languageConfig={cypherLanguageConfig}
                         options={{
                             lineNumbers: lineNumber > 1 ? "on" : "off",
+                            readOnly: !tabsReady,
                         }}
                         value={blur ? historyQuery.query.replace(/\n/g, ' ') : historyQuery.query}
                         onChange={(val) => {
-                            if (blur) return;
+                            if (blur || !tabsReady) return;
                             const newVal = val || "";
                             // Compared with the latest state, not this render's props: two quick
                             // edits can arrive before a re-render, and the second must not be lost.
@@ -1578,7 +1604,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                 data-testid="editorRun"
                                 ref={submitQuery}
                                 indicator={indicator}
-                                disabled={!historyQuery.query || !graphName}
+                                disabled={!tabsReady || !historyQuery.query || !graphName}
                                 variant="Primary"
                                 title={getLabel()}
                                 onClick={handleSubmit}
@@ -1651,7 +1677,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                 data-testid="editorRun"
                                 ref={submitQuery}
                                 indicator={indicator}
-                                disabled={!historyQuery.query || !graphName}
+                                disabled={!tabsReady || !historyQuery.query || !graphName}
                                 variant="Primary"
                                 label="RUN"
                                 title={getLabel()}
@@ -1662,7 +1688,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     )}
                 </div>
             </div>
-            <Dialog open={maximize} onOpenChange={setMaximize}>
+            <Dialog open={tabsReady && maximize} onOpenChange={setMaximize}>
                 <DialogContent hideClose className="w-full h-full mobile:w-screen mobile:max-w-none mobile:h-[100dvh] mobile:max-h-[100dvh] mobile:rounded-none mobile:p-2" onEscapeKeyDown={(e) => {
                     // When Monaco has focus, let it handle Escape (closes suggestions or blurs).
                     // Only allow the Dialog to handle Escape if Monaco is not focused.
@@ -1713,7 +1739,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                     data-testid="editorRun"
                                     className="pointer-events-auto py-2 px-8"
                                     indicator={indicator}
-                                    disabled={!historyQuery.query || !graphName}
+                                    disabled={!tabsReady || !historyQuery.query || !graphName}
                                     variant="Primary"
                                     label="RUN"
                                     title={getLabel()}
@@ -1729,6 +1755,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             language={LANGUAGE_NAME}
                             languageConfig={cypherLanguageConfig}
                             options={{
+                                readOnly: !tabsReady,
                                 lineNumbersMinChars: 3,
                                 fontSize: isMobile ? 16 : 25,
                                 // A phone has no room to scroll sideways for the rest
@@ -1741,6 +1768,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             }}
                             value={historyQuery.query}
                             onChange={(val) => {
+                                if (!tabsReady) return;
                                 setHistoryQuery(prev => ({ ...withQuery(prev, val || ""), fromEditor: true }));
                             }}
                             onMount={(e) => {
