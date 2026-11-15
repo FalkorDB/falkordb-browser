@@ -57,9 +57,17 @@ export default function AiFixDialogs() {
 
             {/* ── Background loading indicator (non-blocking) ────────────── */}
             {result.status === "loading" && (
-                <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 shadow-lg text-sm text-muted-foreground pointer-events-none select-none">
+                <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 shadow-lg text-sm text-muted-foreground select-none" role="status">
                     <Sparkles size={14} className="animate-pulse text-primary shrink-0" />
                     <span>Asking the AI…</span>
+                    <button
+                        type="button"
+                        onClick={dismissResult}
+                        className="rounded px-2 py-1 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        data-testid="aiFixCancel"
+                    >
+                        Cancel
+                    </button>
                 </div>
             )}
 
