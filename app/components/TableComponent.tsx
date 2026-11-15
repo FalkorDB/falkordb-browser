@@ -281,12 +281,12 @@ export default function TableComponent({
         }
 
         const timeout = setTimeout(() => {
-            setFilteredRows(prev => [...rows].filter((row) => {
+            setFilteredRows([...rows].filter((row) => {
                 const is = row.cells.some(cell => handleSearchFilter(cell));
 
                 // If using row selection, uncheck rows that no longer match the search
                 if (!is) {
-                    row.checked = prev.every(r => r.checked);
+                    row.checked = false;
                 }
 
                 return is;

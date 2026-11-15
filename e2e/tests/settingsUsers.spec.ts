@@ -179,6 +179,25 @@ test.describe('@Config Settings users tests', () => {
         await apiCall.deleteUsers({ users: [{ username }] });
     });
 
+    test("@admin Searching before the user list loads selects only the clicked user", async () => {
+        const username = getRandomString('user');
+        await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        let releaseUserList!: () => void;
+        const userListHeld = new Promise<void>((resolve) => { releaseUserList = resolve; });
+        await page.route("**/api/user", async (route) => {
+            if (route.request().method() === "GET") await userListHeld;
+            await route.fallback();
+        });
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.searchForElement(username);
+        releaseUserList();
+        await settingsUsersPage.clickUserCheckboxBtn(username);
+        expect(await settingsUsersPage.isEditUserButtonDisabled()).toBe(false);
+        await apiCall.deleteUsers({ users: [{ username }] });
+    });
+
     test("@admin Edit button disabled when default user is selected", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
