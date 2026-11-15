@@ -90,6 +90,7 @@ export default function Page() {
         handleSetGraphName,
         setGraphInfo,
         graphNames,
+        graphNamesUnknown,
         setGraphNames,
         labels,
         setLabels,
@@ -334,6 +335,10 @@ export default function Page() {
             prevGraphNameRef.current = graphName;
             return undefined;
         }
+        // A restored tab keeps its graph while the list is unknown, but these
+        // polls run GRAPH.QUERY on writable connections — querying a graph that
+        // was dropped would re-create it. Wait until a list confirms it.
+        if (graphNamesUnknown) return undefined;
 
         const graphNameJustChanged = prevGraphNameRef.current !== graphName;
         prevGraphNameRef.current = graphName;
@@ -403,7 +408,7 @@ export default function Page() {
             clearInterval(interval);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, graphInfoReload, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
+    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, graphInfoReload, graphNamesUnknown, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
         if (graphName) return;

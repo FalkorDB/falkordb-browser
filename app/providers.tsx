@@ -1438,6 +1438,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     handleSetGraphName,
     setGraphInfo,
     graphNames,
+    graphNamesUnknown: graphNames === UNKNOWN_GRAPH_NAMES,
     setGraphNames,
     labels,
     setLabels,
@@ -1678,9 +1679,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // A share link hands over someone else's query, and an unknown list cannot
     // vouch for the graph: show the query, but leave running it to the user. The
-    // graph page still fetches the graph's info and counts; the default-query
-    // auto-load must not fire, or it would run a query after all and replace the
-    // tab's text in the editor.
+    // graph page holds its info and count polls until a list confirms the graph
+    // (`graphNamesUnknown`); the default-query auto-load must not fire, or it
+    // would run a query after all and replace the tab's text in the editor.
     if (holdQuery) {
       pendingAutoLoadRef.current = null;
       return;

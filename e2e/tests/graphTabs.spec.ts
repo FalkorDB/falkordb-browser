@@ -109,9 +109,12 @@ test.describe("@admin Graph tabs", () => {
         await graph.waitForPageIdle();
         await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).toBeTruthy();
         await expect.poll(() => new URL(page.url()).searchParams.get("tab"), { timeout: 15000 }).not.toBe("initial");
+        // Page load can request the list more than once; fail every request
+        // until the assertions below, or a later success confirms the graph.
+        let failLists = true;
         let failedLists = 0;
         await page.route("**/api/graph", async route => {
-            if (failedLists > 0) {
+            if (!failLists) {
                 await route.continue();
                 return;
             }
@@ -124,23 +127,32 @@ test.describe("@admin Graph tabs", () => {
                 && url.searchParams.get("query")?.startsWith("MATCH (n) RETURN n") === true;
         };
         const restoredQueries: string[] = [];
+        // Info and count polls run GRAPH.QUERY on a writable connection, which
+        // would re-create the graph if it had been dropped.
+        const graphPolls: string[] = [];
         page.on("request", request => {
             if (isRestoredQuery(request.url())) restoredQueries.push(request.url());
+            const { pathname } = new URL(request.url());
+            if (pathname === `/api/graph/${graphOne}` || pathname.startsWith(`/api/graph/${graphOne}/`)) graphPolls.push(request.url());
         });
 
         await page.reload({ waitUntil: "domcontentloaded" });
-        await expect.poll(() => failedLists, { timeout: 15000 }).toBe(1);
+        await expect.poll(() => failedLists, { timeout: 15000 }).toBeGreaterThan(0);
         await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
         await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
         await expect(graph.stripTab(graphOne)).toBeVisible();
         await expect(graph.editorContainer).toHaveAttribute("data-value", "MATCH (n) RETURN n");
         await graph.waitForPageIdle();
         expect(restoredQueries).toHaveLength(0);
+        expect(graphPolls).toHaveLength(0);
 
+        failLists = false;
         await page.getByTestId("selectGraph").click();
         await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(graph.stripTab(graphOne)).toBeVisible();
+        // The confirmed list releases the polls, but the held query stays held.
+        await expect.poll(() => graphPolls.length, { timeout: 15000 }).toBeGreaterThan(0);
         expect(restoredQueries).toHaveLength(0);
 
         const restoredQuery = page.waitForRequest(request => isRestoredQuery(request.url()));

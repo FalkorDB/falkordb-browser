@@ -204,6 +204,9 @@ is a sentinel empty list: it settles readiness so the page unlocks, but `graphNa
 until a list is actually received. While it is false, restoring a tab keeps its graph name and query
 without running the query, and the "stored tab names a dropped graph" check does not clear the
 selection, so a later successful refresh validates the saved graph instead of discarding it.
+`GraphContext.graphNamesUnknown` (the list is the sentinel) also holds the graph page's info,
+memory and count polls: on a writable connection they run `GRAPH.QUERY`, which would re-create a
+dropped graph, so they start only once a list confirms it.
 Expose `handleFetchOptions` on `GraphContext` (move its declaration above the context memo). A
 separate effect, ordered after the reset effect and keyed on `activeConnectionId`, `status` and
 `handleFetchOptions`, calls `handleFetchOptions({ clear: !graphNamesLoadedRef.current })`, so an

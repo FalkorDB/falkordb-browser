@@ -163,6 +163,8 @@ type GraphContextType = {
   handleSetGraphName: (name: string) => void;
   setGraphInfo: (gi: GraphInfo) => void;
   graphNames: string[] | undefined;
+  // The last graph-list request failed, so no graph's existence is confirmed.
+  graphNamesUnknown: boolean;
   setGraphNames: Dispatch<SetStateAction<string[] | undefined>>;
   labels: Label[];
   setLabels: Dispatch<SetStateAction<Label[]>>;
@@ -527,6 +529,7 @@ export const GraphContext = createContext<GraphContextType>({
   handleSetGraphName: () => { },
   setGraphInfo: () => { },
   graphNames: undefined,
+  graphNamesUnknown: false,
   setGraphNames: () => { },
   labels: [],
   setLabels: () => { },
