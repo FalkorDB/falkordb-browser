@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { JSONTree } from "react-json-tree";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Cell, cn, getTheme, Row } from "@/lib/utils";
+import { cellMatchesSearch } from "@/lib/tableSearch";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle, ChevronDown, ChevronsDown, ChevronsUp, Loader2, Pencil, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -255,24 +256,7 @@ export default function TableComponent({
         }
     }, [inputRef, editable]);
 
-    const handleSearchFilter = useCallback((cell: Cell): boolean => {
-        if (!cell.value) return false;
-
-        const searchLower = search.toLowerCase();
-
-        if (cell.type === "object") {
-            return Object.values(cell.value).some(value => {
-                if (typeof value === "object") {
-                    return Object.values(value).some(val =>
-                        val?.toString().toLowerCase().includes(searchLower)
-                    );
-                }
-                return value?.toString().toLowerCase().includes(searchLower);
-            });
-        }
-
-        return cell.value.toString().toLowerCase().includes(searchLower);
-    }, [search]);
+    const handleSearchFilter = useCallback((cell: Cell): boolean => cellMatchesSearch(cell, search.toLowerCase()), [search]);
 
     useEffect(() => {
         if (!search) {
@@ -454,6 +438,7 @@ export default function TableComponent({
                         if (e.key === "Escape") {
                             e.preventDefault();
                             setSearch("");
+                            if (onSearchChange) onSearchChange("");
                         }
 
                         if (e.key !== "Enter") return;
