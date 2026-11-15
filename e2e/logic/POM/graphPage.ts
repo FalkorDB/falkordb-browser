@@ -87,7 +87,7 @@ export default class GraphPage extends BasePage {
   }
 
   public get uploadFileInput(): Locator {
-    return this.page.locator('input[type="file"]');
+    return this.uploadDialog.locator('input[type="file"]');
   }
 
   public get loadCsvTabTrigger(): Locator {
