@@ -286,6 +286,11 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Personal access tokens
+
+Custom expiration dates use the selected local calendar day, ending at
+23:59:59.999 in the browser's timezone, including daylight-saving transitions.
+
 ### Restoring graph tabs
 
 Graph editing waits for saved tabs and the query timeout to initialize for the

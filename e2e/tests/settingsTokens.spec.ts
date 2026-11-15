@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import urls from "../config/urls.json";
 import userConfig from "../config/user.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
@@ -17,6 +17,127 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
 
   test.afterEach(async () => {
     await browser.closeBrowser();
+  });
+
+  test("@admin Custom token expiration rejects missing and past dates before sending a request", async () => {
+    const settingsTokensPage = await browser.createNewPage(SettingsTokensPage);
+    const page = await browser.getPage();
+    let mutations = 0;
+    await page.route("**/api/auth/tokens", async route => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ json: { tokens: [], role: "Admin" } });
+      } else {
+        mutations += 1;
+        await route.fulfill({ status: 400, json: { message: "Unexpected mutation" } });
+      }
+    });
+    await browser.navigateTo(urls.settingsUrl);
+    await settingsTokensPage.navigateToTokensTab();
+    await settingsTokensPage.clickGenerateTokenButton();
+    await settingsTokensPage.fillTokenNameInput("mock-custom-expiration");
+    await settingsTokensPage.clickExpirationSelect();
+    await settingsTokensPage.clickExpirationOption("Custom");
+    await settingsTokensPage.clickGenerateTokenConfirmButton();
+    await expect(settingsTokensPage.missingDateError).toBeVisible();
+    await expect(settingsTokensPage.generateTokenConfirmButton).toBeEnabled();
+    await settingsTokensPage.customDateInput.fill("2000-01-01");
+    await settingsTokensPage.clickGenerateTokenConfirmButton();
+    await expect(settingsTokensPage.pastDateError).toBeVisible();
+    await expect(settingsTokensPage.customDateInput).toHaveValue("2000-01-01");
+    await expect(settingsTokensPage.tokenNameInput).toHaveValue("mock-custom-expiration");
+    await expect(settingsTokensPage.generateTokenConfirmButton).toBeEnabled();
+    expect(mutations).toBe(0);
+  });
+
+  test.describe("Custom expiration in a western timezone", () => {
+    test.use({ timezoneId: "America/Los_Angeles", locale: "en-US" });
+    [
+      { date: "2030-01-14", expiresAt: "2030-01-15T07:59:59.999Z", label: "Jan 14, 2030" },
+      { date: "2030-03-10", expiresAt: "2030-03-11T06:59:59.999Z", label: "Mar 10, 2030" },
+    ].forEach(({ date, expiresAt, label }) => {
+      test(`@admin Failed token generation preserves custom expiration and can be retried (${date})`,async () => {
+        const settingsTokensPage=await browser.createNewPage(SettingsTokensPage);
+        const page=await browser.getPage();
+        const name="mock-generate-retry";
+        const now = Date.parse("2030-01-01T12:00:00Z");
+        const submissions: { name: string; expiresAt: string; ttlSeconds: number }[]=[];
+        const requestTimes: number[]=[];
+        const methods: string[]=[];
+        await page.route("**/api/auth/tokens",async route => {
+          if(route.request().method()==="GET") {
+            await route.fulfill({ json: { tokens: [],role: "Admin" } });
+          } else {
+            methods.push(route.request().method());
+            requestTimes.push(await page.evaluate(() => Date.now()));
+            submissions.push(route.request().postDataJSON() as typeof submissions[number]);
+            await route.fulfill(submissions.length===1
+              ? { status: 400,json: { message: "Token generation rejected" } }
+              :{ json: { token: "mock-token-not-a-real-credential" } });
+          }
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsTokensPage.navigateToTokensTab();
+        await page.clock.setFixedTime(now);
+        await settingsTokensPage.clickGenerateTokenButton();
+        await settingsTokensPage.fillTokenNameInput(name);
+        await settingsTokensPage.clickExpirationSelect();
+        await settingsTokensPage.clickExpirationOption("Custom");
+        await settingsTokensPage.customDateInput.fill(date);
+        await settingsTokensPage.clickGenerateTokenConfirmButton();
+        await expect(settingsTokensPage.requestErrorToast).toBeVisible();
+        await expect(settingsTokensPage.tokenNameInput).toHaveValue(name);
+        await expect(settingsTokensPage.customDateInput).toHaveValue(date);
+        await expect(settingsTokensPage.generateTokenConfirmButton).toBeEnabled();
+        await settingsTokensPage.clickGenerateTokenConfirmButton();
+        await expect(settingsTokensPage.generatedTokenInput).toHaveValue("mock-token-not-a-real-credential");
+        await expect(settingsTokensPage.expirationLabel(label)).toBeVisible();
+        expect(submissions).toHaveLength(2);
+        expect(methods).toEqual(["POST","POST"]);
+        for(const [index,submission] of submissions.entries()) {
+          expect(submission).toMatchObject({ name,expiresAt });
+          expect(submission.ttlSeconds).toBeGreaterThan(0);
+          expect(submission.ttlSeconds).toBeLessThanOrEqual(31622400);
+          const expectedTtl=Math.floor((Date.parse(expiresAt)-requestTimes[index])/1000);
+          expect(Math.abs(submission.ttlSeconds-expectedTtl)).toBeLessThanOrEqual(5);
+        }
+      });
+    });
+  });
+
+  test("@admin Failed token revocation retains the row and confirmation for retry", async () => {
+    const settingsTokensPage = await browser.createNewPage(SettingsTokensPage);
+    const page = await browser.getPage();
+    const name = "mock-revoke-retry";
+    let attempts = 0;
+    const methods: string[] = [];
+    await page.route("**/api/auth/tokens", route => route.fulfill({
+      json: { role: "Admin", tokens: [{
+        token_id: "mock-token-id", name, username: "mock-user", role: "Read-Only",
+        created_at: "2026-01-01T00:00:00Z", last_used: null, expires_at: null,
+      }] },
+    }));
+    await page.route("**/api/auth/tokens/mock-token-id", async route => {
+      methods.push(route.request().method());
+      attempts += 1;
+      await route.fulfill(attempts === 1
+        ? { status: 403, json: { message: "Token revocation denied" } }
+        : { json: {} });
+    });
+    await browser.navigateTo(urls.settingsUrl);
+    await settingsTokensPage.navigateToTokensTab();
+    await settingsTokensPage.clickRevokeButtonByName(name);
+    await settingsTokensPage.clickRevokeConfirmButton();
+    await expect(settingsTokensPage.requestErrorToast).toBeVisible();
+    // The modal hides the underlying table from the accessibility tree.
+    await expect(settingsTokensPage.rowBehindDialog(name)).toBeVisible();
+    await expect(settingsTokensPage.revokeDialog).toBeVisible();
+    await expect(settingsTokensPage.revokeConfirmButton).toBeEnabled();
+    await settingsTokensPage.clickRevokeConfirmButton();
+    await expect(settingsTokensPage.revokeDialog).toHaveCount(0);
+    await expect(settingsTokensPage.getRowByText(name)).toHaveCount(0);
+    await expect(settingsTokensPage.emptyTokenList).toBeVisible();
+    expect(attempts).toBe(2);
+    expect(methods).toEqual(["DELETE", "DELETE"]);
   });
 
   test.describe("Token Generation - Admin User", () => {
