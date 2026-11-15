@@ -24,11 +24,14 @@ test.describe('Canvas Tests', () => {
     test.afterEach(async () => {
         // Close first: a live graph page polls graph info, and that poll
         // re-creates a graph deleted out from under it.
-        await browser.closeBrowser();
-        if (cleanupGraphName) {
-            const { message } = await apicalls.removeGraph(cleanupGraphName, "admin");
-            if (!message.includes("deleted")) {
-                throw new Error(`Failed to remove ${cleanupGraphName}: ${message}`);
+        try {
+            await browser.closeBrowser();
+        } finally {
+            if (cleanupGraphName) {
+                const { message } = await apicalls.removeGraph(cleanupGraphName, "admin");
+                if (!message.includes("deleted")) {
+                    throw new Error(`Failed to remove ${cleanupGraphName}: ${message}`);
+                }
             }
         }
     });

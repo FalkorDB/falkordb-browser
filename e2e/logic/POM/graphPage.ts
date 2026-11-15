@@ -1161,19 +1161,26 @@ export default class GraphPage extends BasePage {
    * screen position. Returns the node's id.
    */
   async clickNodeIn3D(index = 0): Promise<number> {
-    const target = await this.page.evaluate((i) => {
-      const canvas = document.querySelector("falkordb-canvas")!;
-      const node = canvas.getGraphData().nodes[i] as ReturnType<typeof canvas.getGraphData>["nodes"][number] & { z: number };
-      // The 3D renderer is internal to the canvas; only its screen projection is needed here.
-      const { graph3d } = canvas as unknown as {
-        graph3d: { graph: { graph2ScreenCoords(x: number, y: number, z: number): { x: number; y: number } } };
-      };
-      const screen = graph3d.graph.graph2ScreenCoords(node.x!, node.y!, node.z);
-      const rect = canvas.getBoundingClientRect();
-      return { id: node.id, x: rect.left + screen.x, y: rect.top + screen.y };
-    }, index);
-    // Hover first: the library resolves what is under the pointer on move.
-    await this.page.mouse.move(target.x, target.y);
+    let target = { id: -1, x: 0, y: 0 };
+    // The library resolves what is under the pointer on a throttled frame, and a
+    // click lands on whatever that last resolved, so the click waits for the
+    // hover tooltip. Until the 3D layout has landed, the camera may still move
+    // to fit it, so the node's position is read again until the hover holds.
+    await expect(async () => {
+      target = await this.page.evaluate((i) => {
+        const canvas = document.querySelector("falkordb-canvas")!;
+        const node = canvas.getGraphData().nodes[i] as ReturnType<typeof canvas.getGraphData>["nodes"][number] & { z: number };
+        // The 3D renderer is internal to the canvas; only its screen projection is needed here.
+        const { graph3d } = canvas as unknown as {
+          graph3d: { graph: { graph2ScreenCoords(x: number, y: number, z: number): { x: number; y: number } } };
+        };
+        const screen = graph3d.graph.graph2ScreenCoords(node.x!, node.y!, node.z);
+        const rect = canvas.getBoundingClientRect();
+        return { id: node.id, x: rect.left + screen.x, y: rect.top + screen.y };
+      }, index);
+      await this.page.mouse.move(target.x, target.y);
+      await expect(this.nodeCanvasToolTip).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 15000 });
     await this.page.mouse.click(target.x, target.y);
     return target.id;
   }
@@ -1932,20 +1939,47 @@ export default class GraphPage extends BasePage {
     await this.page.mouse.up();
   }
 
-  async clickAtCanvasCenter(): Promise<void> {
+  /**
+   * Resolves once the canvas box has held still for `frames` animation frames.
+   * A selection opens the data panel beside the canvas, which shrinks it over a
+   * few frames (expand, then a resize on the next frame, then the canvas's own
+   * ResizeObserver); the graph keeps its centre, so a centre read before that
+   * ends points beside the node.
+   */
+  private async waitForCanvasSizeToSettle(frames = 10): Promise<void> {
+    await this.canvasElement.evaluate((canvas, stableFrames) => new Promise<void>((resolve) => {
+      let last = "";
+      let stable = 0;
+      const check = () => {
+        const { left, top, width, height } = canvas.getBoundingClientRect();
+        const box = `${left},${top},${width},${height}`;
+        stable = box === last ? stable + 1 : 0;
+        last = box;
+        if (stable >= stableFrames) resolve();
+        else requestAnimationFrame(check);
+      };
+      requestAnimationFrame(check);
+    }), frames);
+  }
+
+  private async getCanvasCenter(): Promise<{ x: number; y: number }> {
+    await this.waitForCanvasSizeToSettle();
     const boundingBox = await this.getBoundingBoxCanvasElement();
     if (!boundingBox) throw new Error("Canvas bounding box not found");
-    const centerX = boundingBox.x + boundingBox.width / 2;
-    const centerY = boundingBox.y + boundingBox.height / 2;
-    await this.page.mouse.click(centerX, centerY);
+    return {
+      x: boundingBox.x + boundingBox.width / 2,
+      y: boundingBox.y + boundingBox.height / 2,
+    };
+  }
+
+  async clickAtCanvasCenter(): Promise<void> {
+    const { x, y } = await this.getCanvasCenter();
+    await this.page.mouse.click(x, y);
   }
 
   async hoverAtCanvasCenter(): Promise<void> {
-    const boundingBox = await this.getBoundingBoxCanvasElement();
-    if (!boundingBox) throw new Error("Canvas bounding box not found");
-    const centerX = boundingBox.x + boundingBox.width / 2;
-    const centerY = boundingBox.y + boundingBox.height / 2;
-    await this.page.mouse.move(centerX, centerY);
+    const { x, y } = await this.getCanvasCenter();
+    await this.page.mouse.move(x, y);
   }
 
   async getQuerySearchListText(): Promise<string[]> {
