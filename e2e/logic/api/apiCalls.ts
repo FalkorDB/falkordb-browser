@@ -541,6 +541,73 @@ export default class ApiCalls {
     }
   }
 
+  // Raw token API calls: expose the HTTP status and body so tests can assert error paths.
+  // Authenticates with the admin session cookie unless a bearer token is given.
+  private async tokenRequestHeaders(
+    bearerToken?: string
+  ): Promise<Record<string, string> | undefined> {
+    return bearerToken
+      ? { Authorization: `Bearer ${bearerToken}` }
+      : getAdminToken();
+  }
+
+  // A string body is sent verbatim, so a test can post malformed JSON.
+  async generateTokenRaw(
+    body: unknown
+  ): Promise<{ status: number; body: any }> {
+    const headers = {
+      ...(await this.tokenRequestHeaders()),
+      "Content-Type": "application/json",
+    };
+    const result = await postRequest(`${urls.api.tokenUrl}tokens`, body, undefined, headers);
+    return { status: result.status(), body: await result.json() };
+  }
+
+  async listTokensRaw(
+    bearerToken?: string
+  ): Promise<{ status: number; body: any }> {
+    const result = await getRequest(
+      `${urls.api.tokenUrl}tokens`,
+      await this.tokenRequestHeaders(bearerToken)
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
+  async getTokenDetailsRaw(
+    tokenId: string,
+    bearerToken?: string
+  ): Promise<{ status: number; body: any }> {
+    const result = await getRequest(
+      `${urls.api.tokenUrl}tokens/${tokenId}`,
+      await this.tokenRequestHeaders(bearerToken)
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
+  async revokeTokenRaw(
+    tokenId: string,
+    bearerToken?: string
+  ): Promise<{ status: number; body: any }> {
+    const result = await deleteRequest(
+      `${urls.api.tokenUrl}tokens/${tokenId}`,
+      await this.tokenRequestHeaders(bearerToken)
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
+  // A string body is sent verbatim, so a test can post malformed JSON.
+  async generateTokenWithCredentialsRaw(
+    body: unknown
+  ): Promise<{ status: number; body: any }> {
+    const result = await postRequest(
+      `${urls.api.tokenUrl}tokens/credentials`,
+      body,
+      undefined,
+      { "Content-Type": "application/json" }
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
   async revokeAllUserTokens(tokens: string[]): Promise<void> {
     try {
       const results = await Promise.allSettled(
