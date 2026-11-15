@@ -1710,8 +1710,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   markTabRanRef.current = graphTabs.markRan;
 
+  // Also forget the failure so a retained toast can't start a fix for the old query, whose
+  // Insert would then overwrite the edited query or another tab's draft.
   useLayoutEffect(() => {
     dismissAiFix();
+    setLastFailure(null);
     return dismissAiFix;
   }, [graphTabs.activeTabId, historyQuery.query, dismissAiFix]);
 

@@ -90,9 +90,11 @@ describe("isAiFixSupported", () => {
     assert.equal(isAiFixSupported({ source: "api-key", key: "k", model: "xai::grok-2" }), true);
     assert.equal(isAiFixSupported({ source: "api-key", key: "k", model: "anthropic::claude-3" }), false);
   });
-  it("recognizes a legacy unprefixed Codex model saved in settings", () => {
-    assert.equal(detectProviderFromModel("codex-mini-latest"), "openai");
-    assert.equal(isAiFixSupported({ source: "api-key", key: "sk-x", model: "codex-mini-latest" }), true);
+  it("recognizes legacy unprefixed OpenAI models saved in settings", () => {
+    for (const legacy of ["codex-mini-latest", "chatgpt-4o-latest", "o5-mini"]) {
+      assert.equal(detectProviderFromModel(legacy), "openai");
+      assert.equal(isAiFixSupported({ source: "api-key", key: "sk-x", model: legacy }), true);
+    }
     const resolved = resolveFixTarget({
       modelSource: "api-key",
       model: "codex-mini-latest",

@@ -1,0 +1,20 @@
+
+> falkordb-browser@2.7.3 start
+> next start
+
+▲ Next.js 16.4.3
+- Local:         http://localhost:3000
+- Network:       http://10.100.102.3:3000
+✓ Ready in 121ms
+✓ Running next.config.js took 8ms
+⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+Using FalkorDB storage for API tokens
+Error: NOPERM User readonlyuser has no permissions to run the 'graph.UDF' command
+    at ignore-listed frames
+Error: NOPERM User readonlyuser has no permissions to run the 'graph.UDF' command
+    at ignore-listed frames
+Error: NOPERM User signoutreadonlyuser has no permissions to run the 'graph.UDF' command
+    at ignore-listed frames
+Error: NOPERM User signoutreadonlyuser has no permissions to run the 'graph.UDF' command
+    at ignore-listed frames
+[memory] memoryUsage failed for graph="chatDraftRace_9bc3bbca-eec9-4421-a1eb-2c1d7e9dac4d-1794742243837": ERR Invalid graph operation on empty key

@@ -181,6 +181,28 @@ describe("shared AI completion transport", () => {
     assert.equal(cancelled, true);
   });
 
+  for (const [status, expectedStatus, error] of [[401, 401, /API key/], [429, 422, /rate limit/]] as const) {
+    it(`preserves the provider's HTTP ${status} when its failure body cannot be read`, async (t) => {
+      t.mock.method(console, "warn", () => {});
+      t.mock.method(globalThis, "fetch", async () => new Response(new ReadableStream({
+        start(controller) { controller.error(new TypeError("terminated")); },
+      }), { status }));
+      const result = await requestAiCompletion(input);
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(result.status, expectedStatus);
+        assert.match(result.error, error);
+      }
+    });
+  }
+
+  it("still rejects when a successful provider body cannot be read", async (t) => {
+    t.mock.method(globalThis, "fetch", async () => new Response(new ReadableStream({
+      start(controller) { controller.error(new TypeError("terminated")); },
+    })));
+    await assert.rejects(requestAiCompletion(input), { message: "terminated" });
+  });
+
   it("rejects malformed success bodies and handles non-JSON provider failures", async (t) => {
     t.mock.method(console, "warn", () => {});
     const mock = t.mock.method(globalThis, "fetch", async () => new Response("not JSON"));

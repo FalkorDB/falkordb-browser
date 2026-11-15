@@ -48,7 +48,12 @@ export async function requestAiCompletion(input: {
       : { model, messages: input.messages, temperature: 0 }),
     signal: AbortSignal.any([input.signal, AbortSignal.timeout(responses ? 240_000 : 30_000)]),
   });
-  const raw = await readChatBodyWithLimit(response, 256 * 1024);
+  // A failure body that can't be read still carries the provider's status, so report that
+  // instead of letting the read error mask it.
+  const raw = await readChatBodyWithLimit(response, 256 * 1024).catch((error: unknown) => {
+    if (response.ok) throw error;
+    return "";
+  });
   if (raw === OVER_LIMIT) {
     if (!response.ok) {
       console.warn("AI completion provider rejected request:", response.status);
