@@ -1233,6 +1233,14 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("graphTabAdd");
   }
 
+  public get firstTabSelect(): Locator {
+    return this.page.locator('[data-testid^="graphTabSelect-"]').first();
+  }
+
+  public tabSelect(testId: string): Locator {
+    return this.page.getByTestId(testId);
+  }
+
   public stripTab(label: string): Locator {
     // Labels are user-supplied: quote them so a `"` or `\` cannot break out of
     // the attribute selector.

@@ -51,6 +51,10 @@ export const COVERAGE_WORKFLOWS = {
       'Run stateless tests': { upload: 'e2e-stateless', steps: ['Run stateless tests', ...E2E_STEPS] },
       'Run TLS tests': { upload: 'e2e-tls', steps: ['Run TLS tests', ...E2E_STEPS] },
       'Run cluster tests': { upload: 'e2e-cluster', steps: ['Run cluster tests', ...E2E_STEPS] },
+      'Run smoke tests against local docker build': {
+        upload: 'e2e-docker',
+        steps: ['Record existing docker smoke tests', 'Collect docker coverage and exact build artifacts'],
+      },
     },
   },
   'Desktop app': {
@@ -222,13 +226,13 @@ export function notStarted(expected, runs) {
  * (each job's latest attempt). A failure anywhere else in a workflow (an
  * installer, an APK, a security scan) leaves its coverage complete.
  */
-export function unsuccessful(expected, runs, jobs) {
+export function unsuccessful(expected, runs, jobs, workflows = COVERAGE_WORKFLOWS) {
   const latest = latestRuns(runs);
   const failed = [];
   for (const name of expected) {
     const run = latest.get(name);
     const ran = (run && jobs.get(run.id)) ?? [];
-    for (const [jobName, { steps }] of Object.entries(COVERAGE_WORKFLOWS[name].jobs)) {
+    for (const [jobName, { steps }] of Object.entries(workflows[name].jobs)) {
       const job = ran.find((j) => j.name === jobName);
       const produced = job && steps.every((step) => job.steps?.some((s) => s.name === step && s.conclusion === 'success'));
       if (!produced) failed.push(`${name}: ${jobName}`);
@@ -284,12 +288,12 @@ export function missingFlags(expected, uploads) {
  * job, so one shard's lost upload, its flag still uploaded by the others,
  * shows only here.
  */
-export function missingUploads(expected, uploads) {
+export function missingUploads(expected, uploads, workflows = COVERAGE_WORKFLOWS) {
   const uploaded = new Set(currentUploads(uploads)
     .filter((u) => u.upload_type !== 'carriedforward' && u.state !== 'error')
     .map(uploadName));
   return expected
-    .flatMap((name) => Object.values(COVERAGE_WORKFLOWS[name].jobs).map((job) => job.upload))
+    .flatMap((name) => Object.values(workflows[name].jobs).map((job) => job.upload))
     .filter((name) => !uploaded.has(name));
 }
 
@@ -558,6 +562,7 @@ export async function gate({
   // files above leave out, still has a run of each workflow it triggered;
   // and a workflow its files call for is waited for even before it shows.
   const expected = [...new Set(runs.map((run) => run.name))];
+  const workflows = { ...COVERAGE_WORKFLOWS };
   for (const [name, { file }] of Object.entries(COVERAGE_WORKFLOWS)) {
     let content;
     try {
@@ -569,6 +574,18 @@ export async function gate({
       throw error;
     }
     const workflow = Buffer.from(content.content, 'base64').toString('utf8');
+    // Only the newly introduced Docker job is conditional. Older commits
+    // keep every existing safeguard without running code from their workflow.
+    if (name === 'Playwright Tests') {
+      const declared = workflow.split(/^      - /m).some((step) =>
+        /^name: (?:Record existing docker smoke tests|Collect docker coverage and exact build artifacts)\s*$/m.test(step)
+        || (step.includes('codecov/codecov-action') && /^ {10}name:\s*['"]?e2e-docker['"]?\s*(?:#.*)?$/m.test(step)));
+      if (!declared) {
+        const jobs = { ...COVERAGE_WORKFLOWS[name].jobs };
+        delete jobs['Run smoke tests against local docker build'];
+        workflows[name] = { ...COVERAGE_WORKFLOWS[name], jobs };
+      }
+    }
     if (!expected.includes(name) && filtersApply(files) && runsFor(pathFilters(workflow, trigger), files)) expected.push(name);
   }
   // A pull request's workflows test it merged into its base: a run made
@@ -611,7 +628,7 @@ export async function gate({
     const { id } = latest.get(name);
     jobs.set(id, await allPages((page) => gh(`actions/runs/${id}/jobs?per_page=100&page=${page}`), (page) => page.jobs));
   }
-  const failed = unsuccessful(expected, runs, jobs);
+  const failed = unsuccessful(expected, runs, jobs, workflows);
   if (failed.length) {
     console.log(`Did not produce their coverage: ${failed.join(', ')}`);
     const description = `${failed.join(', ')} did not succeed: the coverage is incomplete`.slice(0, 140);
@@ -619,19 +636,23 @@ export async function gate({
     return false;
   }
 
-  // Every upload is in once its workflow finished; wait for Codecov to
-  // process them (up to 15 minutes), riding out its passing errors.
+  // Uploads can appear after their workflow finishes. Wait for every required
+  // name and for processing (up to 15 minutes), riding out passing API errors.
   const base = `${CODECOV}/${repo.split('/')[0]}/repos/${repo.split('/')[1]}`;
   let uploads;
   for (let attempt = 0; ; attempt += 1) {
     try {
       uploads = await followPages(`${base}/commits/${sha}/uploads/?page_size=100`, codecov);
-      if (uploads.length && codecovSettled(uploads)) break;
+      if (uploads.length && codecovSettled(uploads)
+        && (!missingUploads(expected, uploads, workflows).length || failedUploads(uploads).length)) break;
     } catch (error) {
       if (!transient(error)) throw error;
       console.log(`Codecov: ${error.message}`);
     }
-    if (attempt >= 45 || timeLeft() < 20_000) throw new Error('Codecov did not process every upload in time');
+    if (attempt >= 45 || timeLeft() < 20_000) {
+      if (uploads?.length && codecovSettled(uploads)) break;
+      throw new Error('Codecov did not process every upload in time');
+    }
     await sleep(20_000);
   }
 
@@ -660,7 +681,7 @@ export async function gate({
     return false;
   }
 
-  const lost = missingUploads(expected, uploads);
+  const lost = missingUploads(expected, uploads, workflows);
   if (lost.length) {
     console.log(`No upload named ${lost.join(', ')}`);
     for (const context of contexts) await post(context, { state: 'failure', description: `No ${lost.join(', ')} upload for this commit: the coverage is incomplete`.slice(0, 140) });

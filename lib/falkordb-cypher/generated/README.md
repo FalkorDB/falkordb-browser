@@ -26,7 +26,7 @@ community) — the same reference grammar that defines the whole Cypher language
 The Apache-2.0 attribution header is preserved in `.grammar-src/Cypher.g4` and
 must stay. It is **extended with FalkorDB-specific clauses**:
 
-- `CYPHER name=value …` parameter headers before a query
+- optional, repeatable, case-insensitive `CYPHER name=value …` parameter headers before a query
 - `FOREACH (x IN list | …)` — list-driven updates
 - `CALL { … }` — inline subqueries
 - `shortestPath(…)` / `allShortestPaths(…)` — shortest-path pattern functions
@@ -59,6 +59,8 @@ npm run generate:grammar
 which (from within `.grammar-src/`, so the combined-grammar token file resolves)
 runs `antlr4ng -Dlanguage=TypeScript` on `Cypher.g4` and copies the emitted
 `CypherLexer.ts`, `CypherParser.ts`, `CypherListener.ts` up into `generated/`.
+The command also rewrites local generated imports to `.ts`, which lets Node's
+test runner load the generated parser directly.
 
 Then commit the regenerated `.ts` files. Day-to-day schema changes (labels,
 procedures, `algo.*`, `$params`) do **not** require regeneration — they are

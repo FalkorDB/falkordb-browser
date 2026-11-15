@@ -1,5 +1,6 @@
-import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, prepareArg, securedFetch, Query } from "@/lib/utils";
+import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, securedFetch, Query } from "@/lib/utils";
 import { getStatsLines } from "@/lib/queryStats";
+import { getProfileUrl } from "@/lib/graphUrls";
 import { JSONTree } from "react-json-tree";
 import { useContext, useMemo, useState } from "react";
 import { Info } from "lucide-react";
@@ -40,8 +41,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
         const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
         try {
-            const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
-            const result = await securedFetch(`/api/graph/${query.graphName}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
+            const result = await securedFetch(getProfileUrl(query.graphName, query.text, isReadOnly), {
                 method: "GET",
             }, toast, setIndicator, cid);
 
@@ -77,14 +77,15 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
                 />
                 <Button
                     className="cursor-default"
-                    title="be aware that running the profile command will change your data"
+                    title="Profile executes read-only queries to measure their performance. Update clauses and CALL procedures are not supported."
                 >
                     <Info size={25} />
                 </Button>
             </div>
+            <p className="text-xs">Only read-only Cypher is profiled. CALL procedures, including read-only procedures, are not supported.</p>
             {
                 profile.length > 0 &&
-                <div className="h-1 grow w-full overflow-auto">
+                <div className="h-1 grow w-full overflow-auto" data-testid="profileTree">
                     <JSONTree
                         data={createNestedObject(profile)}
                         shouldExpandNodeInitially={() => true}

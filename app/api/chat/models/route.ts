@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
-import { detectProviderFromApiKey, getProviderDisplayName, type AIProvider } from "@/lib/ai-provider-utils";
+import { detectProviderFromApiKey, getProviderDisplayName, prefixProviderModels, type AIProvider } from "@/lib/ai-provider-utils";
 import { normalizeLocalEndpoint, normalizeLocalProvider, type LocalProvider } from "@/lib/local-llm-utils";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { buildFalkorDBConnection, getCorsHeaders, corsPreflight } from "../../utils";
@@ -92,8 +92,8 @@ export async function GET(request: NextRequest) {
     }
 }
 
-const withProviderPrefix = (provider: AIProvider, models: string[]) =>
-    provider === "openai" ? models : models.map(model => `${provider}::${model}`);
+const withProviderPrefix = (provider: Exclude<AIProvider, "unknown">, models: string[]) =>
+    prefixProviderModels(provider, models);
 
 const withLocalProviderPrefix = (provider: LocalProvider, models: string[]) =>
     models.map(model => provider === "ollama" ? `ollama::${model}` : `openai::${model}`);
