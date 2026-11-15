@@ -12,13 +12,20 @@ export default class MetadataView extends GraphPage {
         return this.page.getByRole('button', { name: 'Profile', exact: true });
     }
 
-    public get metadataViewTabPanel(): Locator {
+    private get metadataViewTabPanel(): Locator {
         return this.page.getByRole('tabpanel', { name: 'Metadata', exact: true });
     }
 
     public get metadataLines(): Locator {
-        return this.metadataViewTabPanel.getByRole('heading', { name: 'Metadata', exact: true })
-            .locator('..').getByRole('listitem');
+        return this.metadataViewTabPanel.getByTestId("metadataLines").getByRole('listitem');
+    }
+
+    public get profileTree(): Locator {
+        return this.metadataViewTabPanel.getByTestId("profileTree");
+    }
+
+    public get profileReadOnlyNotice(): Locator {
+        return this.metadataViewTabPanel.getByText('Only read-only Cypher is profiled.');
     }
 
     public async clickProfileButton(): Promise<void> {

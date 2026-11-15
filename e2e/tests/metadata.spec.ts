@@ -1,4 +1,4 @@
-import { test, expect } from "../infra/coverage";
+import test, { expect } from "playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import MetadataView from "../logic/POM/metadataView";
 import urls from "../config/urls.json";
@@ -9,20 +9,26 @@ test.describe('Metadata Tests', () => {
     let browser: BrowserWrapper;
     let apiCalls : APICalls;
     let GRAPH_NAME: string;
+    let graphsToRemove: string[];
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apiCalls = new APICalls();
         GRAPH_NAME = getRandomString('metadata');
+        graphsToRemove = [GRAPH_NAME];
         await apiCalls.addGraph(GRAPH_NAME);
     });
     
     test.afterEach(async () => {
-        try {
-            await browser.closeBrowser();
-        } finally {
-            expect((await apiCalls.removeGraph(GRAPH_NAME, "admin")).message).toMatch(/deleted|empty key/i);
-        }
+        // Close first: a live graph page polls graph info, and that poll
+        // re-creates a graph deleted out from under it.
+        await browser.closeBrowser();
+        await Promise.all(graphsToRemove.map(async (name) => {
+            const { message } = await apiCalls.removeGraph(name, "admin");
+            if (!message.includes("deleted") && !message.includes("empty key")) {
+                throw new Error(`Failed to remove ${name}: ${message}`);
+            }
+        }));
     });
 
     test('@admin check metadata view tab is disabled when there is no metadata', async () => {
@@ -41,8 +47,8 @@ test.describe('Metadata Tests', () => {
         const profileResponse = page.waitForResponse((response) => response.url().includes('/profile?'));
         await metadataView.clickProfileButton();
         expect((await profileResponse).status()).toBe(400);
-        await expect(page.getByText("Profile only supports valid read-only Cypher queries; update clauses and CALL procedures are not profiled.", { exact: true })).toBeVisible();
-        await expect(page.getByText("Only read-only Cypher is profiled. CALL procedures, including read-only procedures, are not supported.", { exact: true })).toBeVisible();
+        await expect(metadataView.errorToast).toContainText("Profile only supports valid read-only Cypher queries; update clauses and CALL procedures are not profiled.");
+        await expect(metadataView.profileReadOnlyNotice).toHaveText("Only read-only Cypher is profiled. CALL procedures, including read-only procedures, are not supported.");
         const result = await apiCalls.runQuery(GRAPH_NAME, "MATCH (n:ProfileDup) RETURN count(n) AS c");
         expect(Number(result.data[0].c)).toBe(1);
     });
@@ -58,28 +64,17 @@ test.describe('Metadata Tests', () => {
 
     test('@admin metadata replaces mutation statistics after a read query', async () => {
         const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
-        const page = await browser.getPage();
+        const { metadataLines } = metadataView;
+        const queryRunLines = [/^Cached execution: [01]$/, /^Query internal execution time: [\d.]+ milliseconds$/];
         await metadataView.selectGraphByName(GRAPH_NAME);
         await metadataView.insertQuery("CREATE (:MetadataCoverage {name: 'created'})");
         await metadataView.clickRunQuery(false);
         await metadataView.clickMetadataViewTab();
-        const panel = metadataView.metadataViewTabPanel;
-        await expect(panel).toContainText('Nodes created: 1');
-        await expect(panel).toContainText('Properties set: 1');
-        const readQuery = "MATCH (n:MetadataCoverage) RETURN n LIMIT 10";
-        await metadataView.insertQuery(readQuery);
-        const readResponse = page.waitForResponse(response => {
-            const url = new URL(response.url());
-            return url.pathname === `/api/graph/${GRAPH_NAME}`
-                && url.searchParams.get("query") === readQuery;
-        });
+        await expect(metadataLines).toHaveText(["Labels added: 1", "Nodes created: 1", "Properties set: 1", ...queryRunLines]);
+        await metadataView.insertQuery("MATCH (n:MetadataCoverage) RETURN n");
         await metadataView.clickRunQuery(false);
-        expect((await readResponse).ok()).toBe(true);
         await metadataView.clickMetadataViewTab();
-        await expect(panel).toContainText('Query internal execution time:');
-        await expect(panel).not.toContainText(
-            /(?:Labels (?:added|removed)|Nodes (?:created|deleted)|Properties (?:set|removed)|(?:Relationships|Indices|Constraints) (?:created|deleted)):/,
-        );
+        await expect(metadataLines).toHaveText(queryRunLines);
     });
 
     test('@admin failed profiling can be retried without losing metadata', async () => {
@@ -90,13 +85,14 @@ test.describe('Metadata Tests', () => {
         await metadataView.clickRunQuery(false);
         await metadataView.clickMetadataViewTab();
         let attempts = 0;
+        // A 4xx keeps the connection indicator online (a 5xx would disable Profile), and the
+        // "Invalid input:" prefix makes the toast show the raw message.
         await page.route(`**/api/graph/${GRAPH_NAME}/profile?*`, async (route) => {
             attempts += 1;
             await route.fulfill(attempts === 1
                 ? { status: 400, json: { message: 'Invalid input: profile temporarily unavailable' } }
                 : { json: { result: ['Results | Records produced: 0', '    All Node Scan | Records produced: 0'] } });
         });
-        const panel = metadataView.metadataViewTabPanel;
         const { metadataLines } = metadataView;
         await expect(metadataLines).toContainText([/Query internal execution time:/]);
         const metadataBeforeProfiling = await metadataLines.allTextContents();
@@ -104,37 +100,32 @@ test.describe('Metadata Tests', () => {
         await expect(metadataView.errorToast).toContainText('Invalid input: profile temporarily unavailable');
         await expect(metadataView.profileButton).toBeEnabled();
         await expect(metadataLines).toHaveText(metadataBeforeProfiling);
+        await expect(metadataView.profileTree).toHaveCount(0);
         await metadataView.clickProfileButton();
-        await expect(panel).toContainText('Records produced: 0');
+        await expect(metadataView.profileTree).toBeVisible();
+        await expect(metadataView.profileTree).toContainText('Records produced: 0');
         expect(attempts).toBe(2);
     });
 
     test('@admin profile works for a graph name with reserved URL characters', async () => {
         const graphName = `${getRandomString('metadata')}#a/b%c`;
         const encodedName = encodeURIComponent(graphName);
+        graphsToRemove.push(encodedName);
         await apiCalls.addGraph(encodedName);
-        try {
-            const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
-            await metadataView.selectGraphByName(graphName);
-            await metadataView.insertQuery("MATCH (n) RETURN n");
-            await metadataView.clickRunQuery();
-            await metadataView.clickMetadataViewTab();
-            const page = await browser.getPage();
-            const profileResponse = page.waitForResponse((response) => response.url().includes('/profile?'));
-            await metadataView.clickProfileButton();
-            const response = await profileResponse;
-            expect(response.status()).toBe(200);
-            const segments = new URL(response.url()).pathname.split('/');
-            expect(segments).toHaveLength(5);
-            expect(decodeURIComponent(segments[3])).toBe(graphName);
-            await expect(page.getByTestId("profileTree")).toBeVisible();
-            await expect(page.getByTestId("profileTree")).not.toBeEmpty();
-        } finally {
-            try {
-                await browser.closeBrowser();
-            } finally {
-                expect((await apiCalls.removeGraph(encodedName, "admin")).message).toMatch(/deleted|empty key/i);
-            }
-        }
+        const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
+        await metadataView.selectGraphByName(graphName);
+        await metadataView.insertQuery("MATCH (n) RETURN n");
+        await metadataView.clickRunQuery();
+        await metadataView.clickMetadataViewTab();
+        const page = await browser.getPage();
+        const profileResponse = page.waitForResponse((response) => response.url().includes('/profile?'));
+        await metadataView.clickProfileButton();
+        const response = await profileResponse;
+        expect(response.status()).toBe(200);
+        const segments = new URL(response.url()).pathname.split('/');
+        expect(segments).toHaveLength(5);
+        expect(decodeURIComponent(segments[3])).toBe(graphName);
+        await expect(metadataView.profileTree).toBeVisible();
+        await expect(metadataView.profileTree).not.toBeEmpty();
     });
 });
