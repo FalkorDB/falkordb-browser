@@ -374,15 +374,8 @@ export default class GraphPage extends BasePage {
 
     await this.canvasElement.waitFor({ state: "attached", timeout: 10000 });
 
-    const startTime = Date.now();
-    while (Date.now() - startTime < timeout) {
-      const status = await this.canvasElement.getAttribute("data-engine-status");
-      if (status === "stopped") {
-        return;
-      }
-      await this.page.waitForTimeout(500);
-    }
-    throw new Error(`Canvas animation did not stop within ${timeout}ms`);
+    await expect(this.canvasElement, `Canvas animation did not stop within ${timeout}ms`)
+      .toHaveAttribute("data-engine-status", "stopped", { timeout });
   }
 
   async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
@@ -1531,10 +1524,6 @@ export default class GraphPage extends BasePage {
     return waitForElementToBeVisible(this.toast);
   }
 
-  async isVisibleNodeCanvasToolTip(): Promise<boolean> {
-    return waitForElementToBeVisible(this.nodeCanvasToolTip);
-  }
-
   async getNodeCanvasToolTipContent(): Promise<string | null> {
     const content = await interactWhenVisible(
       this.nodeCanvasToolTip,
@@ -1624,31 +1613,8 @@ export default class GraphPage extends BasePage {
 
     try {
       await this.clickSelect();
-      await this.page.waitForTimeout(1000);
-
       await this.fillSearch(graphName);
-
-      let attempts = 0;
-      const maxAttempts = 5;
-      let isVisible = false;
-
-      while (attempts < maxAttempts) {
-        await this.page.waitForTimeout(1000); // wait for the search results to be populated
-        isVisible = await this.isVisibleSelectItem(graphName);
-
-        if (!isVisible) {
-          break;
-        }
-
-        attempts += 1;
-        if (attempts < maxAttempts) {
-          await this.fillSearch("");
-          await this.page.waitForTimeout(500);
-          await this.fillSearch(graphName);
-        }
-      }
-
-      return isVisible;
+      return await this.isVisibleSelectItem(graphName);
     } catch (error) {
       console.log("Graph selector interaction failed:", error);
       return false;
@@ -1658,7 +1624,7 @@ export default class GraphPage extends BasePage {
   async addGraph(graphName: string, waitForVisibility = true): Promise<void> {
     await this.clickCreateGraph();
     await this.fillCreateGraphInput(graphName);
-    await this.page.waitForTimeout(1000); // wait for the input to be filled
+    await expect(this.insertInput).toHaveValue(graphName);
     await this.clickConfirmCreateGraph();
     if (waitForVisibility) {
       await waitForElementToNotBeVisible(this.createConfirm);
@@ -1919,7 +1885,6 @@ export default class GraphPage extends BasePage {
   }
 
   async getNotificationToast(): Promise<boolean> {
-    await this.page.waitForTimeout(1000);
     const isVisible = await this.isVisibleToast();
     return isVisible;
   }
@@ -1929,16 +1894,8 @@ export default class GraphPage extends BasePage {
     return status === "running";
   }
 
-  async isNodeCanvasToolTipVisible(): Promise<boolean> {
-    await this.page.waitForTimeout(500);
-    const isVisible = await this.isVisibleNodeCanvasToolTip();
-    return isVisible;
-  }
-
   async getNodeCanvasToolTip(): Promise<string | null> {
-      await this.page.waitForTimeout(1000);
-      const toolTipText = await this.getNodeCanvasToolTipContent();
-      return toolTipText;
+    return this.getNodeCanvasToolTipContent();
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -2013,11 +1970,6 @@ export default class GraphPage extends BasePage {
     }
 
     return texts;
-  }
-
-  async clickElementAt(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y);
-    await this.page.waitForTimeout(500);
   }
 
   /**
