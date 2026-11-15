@@ -330,6 +330,27 @@ test.describe("Error Toast Messages", () => {
     await expect(hintLink).toHaveAttribute("target", "_blank");
   });
 
+  test(`@admin Query timeout hint link opens the timeout settings`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    // FalkorDB's timeout cannot be forced deterministically, so the query's SSE stream replies with it.
+    const page = await browser.getPage();
+    await page.route(url => url.pathname === `/api/graph/${graphName}` && (url.searchParams.get("query") ?? "").includes("timeout-hint"), route => route.fulfill({
+      contentType: "text/event-stream",
+      body: `event: error\ndata: ${JSON.stringify({ message: "Query timed out", status: 400 })}\n\n`,
+    }));
+    await graph.insertQuery("RETURN 'timeout-hint'");
+    await graph.clickRunQuery(false);
+
+    await graph.errorToast.getByTestId("toast-hint-link").click();
+    await page.waitForURL(url => url.pathname === "/settings" && url.searchParams.get("focus") === "timeout");
+  });
+
   test(`@admin Unaliased WITH projection shows the specific message and a hint`, async () => {
     graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
