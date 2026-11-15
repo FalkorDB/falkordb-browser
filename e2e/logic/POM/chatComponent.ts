@@ -27,12 +27,16 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatMessagesList");
   }
 
-  public get chatUserMessages(): Locator {
+  private get chatUserMessages(): Locator {
     return this.page.getByTestId("chatUserMessage");
   }
 
-  public chatAssistantMessage(type: string): Locator {
+  private chatAssistantMessage(type: string): Locator {
     return this.page.getByTestId(`chatAssistantMessage-${type}`);
+  }
+
+  private get chatErrorSettingsLink(): Locator {
+    return this.chatAssistantMessage("Error").getByRole("link", { name: "Go to Settings", exact: true });
   }
 
   private get chatConfidenceBadge(): Locator {
@@ -44,24 +48,12 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatForm");
   }
 
-  public get chatInput(): Locator {
+  private get chatInput(): Locator {
     return this.page.getByTestId("chatInput");
   }
 
-  public get chatSendButton(): Locator {
+  private get chatSendButton(): Locator {
     return this.page.getByTestId("chatSendButton");
-  }
-
-  public get errorSettingsLink(): Locator {
-    return this.chatAssistantMessage("Error").getByRole("link", { name: /settings/i });
-  }
-
-  async goToSettingsFromValidation(): Promise<void> {
-    await this.page.getByRole("button", { name: "Go to Settings" }).click();
-  }
-
-  async pressChatEnter(): Promise<void> {
-    await this.chatInput.press("Enter");
   }
 
   // Query Actions
@@ -217,6 +209,14 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
+  async pressEnterInChatInput(): Promise<void> {
+    await interactWhenVisible(
+      this.chatInput,
+      (el) => el.press("Enter"),
+      "Chat Input Enter"
+    );
+  }
+
   // Get Content Methods
   async getChatInputValue(): Promise<string> {
     return interactWhenVisible(
@@ -247,6 +247,14 @@ export default class ChatComponent extends GraphPage {
       this.chatUserMessages.first(),
       (el) => el.textContent(),
       "First User Message"
+    );
+  }
+
+  async getChatErrorSettingsLinkHref(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatErrorSettingsLink,
+      (el) => el.getAttribute("href"),
+      "Chat Error Settings Link"
     );
   }
 
@@ -374,7 +382,7 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatFooterLastTokens");
   }
 
-  public get chatFooterTotalTokens(): Locator {
+  private get chatFooterTotalTokens(): Locator {
     return this.page.getByTestId("chatFooterTotalTokens");
   }
 
@@ -421,6 +429,10 @@ export default class ChatComponent extends GraphPage {
       (el) => el.textContent(),
       "Chat Footer Model"
     );
+  }
+
+  async waitForChatFooterModel(model: string): Promise<void> {
+    await expect(this.chatFooterModel).toHaveText(model);
   }
 
   async waitForChatConfidenceBadge(): Promise<boolean> {

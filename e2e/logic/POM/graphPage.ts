@@ -7,8 +7,10 @@ import {
   waitForElementToNotBeVisible,
   interactWhenVisible,
   waitForElementToBeEnabled,
+  waitForURL,
 } from "@/e2e/infra/utils";
 import BasePage from "@/e2e/infra/ui/basePage";
+import urls from "../../config/urls.json";
 
 export type Element = "Node" | "Relation";
 
@@ -332,6 +334,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("toast-destructive");
   }
 
+  private get errorToastGoToSettingsButton(): Locator {
+    return this.errorToast.getByRole("button", { name: "Go to Settings", exact: true });
+  }
+
   public get toastUnDoButton(): Locator {
     return this.page.getByTestId("toast").getByRole("button", { name: "Undo" });
   }
@@ -569,6 +575,15 @@ export default class GraphPage extends BasePage {
       (el) => el.click(),
       "Error toast See more"
     );
+  }
+
+  async clickErrorToastGoToSettings(): Promise<void> {
+    await interactWhenVisible(
+      this.errorToastGoToSettingsButton,
+      (el) => el.click(),
+      "Error toast Go to Settings"
+    );
+    await waitForURL(this.page, urls.settingsUrl);
   }
 
   /** Rendered height of the toast against the viewport, and whether its body overflows. */
@@ -1832,6 +1847,20 @@ export default class GraphPage extends BasePage {
     await this.fillSearch(graphName);
     await waitForElementToBeVisible(this.selectItem("Graph", graphName), 500, 20);
     await this.clickSelectItem(graphName); // selecting the first item in list after search
+  }
+
+  /** The graph page writes the selection, view and layout to the URL once the selection settles. */
+  async waitForSelectedGraphInUrl(graphName: string): Promise<void> {
+    await this.page.waitForURL((url) =>
+      url.searchParams.get("graph") === graphName && url.searchParams.has("view") && url.searchParams.has("layout"));
+  }
+
+  /** The connection ID browser requests must carry in `X-Connection-Id`. */
+  async getActiveConnectionId(): Promise<string | undefined> {
+    const response = await this.page.request.get(new URL("/api/auth/session", urls.localHost).href);
+    if (!response.ok()) throw new Error(`Session request failed with status ${response.status()}`);
+    const { activeConnectionId } = await response.json();
+    return activeConnectionId;
   }
 
   async deleteElementsByPosition(
