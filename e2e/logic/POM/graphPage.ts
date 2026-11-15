@@ -1515,6 +1515,19 @@ export default class GraphPage extends BasePage {
     await expect(this.page.getByText("Graph name cannot be empty", { exact: true })).toBeVisible();
   }
 
+  async dismissErrorToast(): Promise<void> {
+    await this.errorToast.locator("[toast-close]").click();
+    await expect(this.errorToast).toHaveCount(0);
+  }
+
+  async expectNoGraphCreatedToast(): Promise<void> {
+    await expect(this.page.getByText("Graph created successfully", { exact: true })).toHaveCount(0);
+  }
+
+  async expectGraphNameExistsError(): Promise<void> {
+    await expect(this.page.getByText("Graph name already exists", { exact: true })).toBeVisible();
+  }
+
   async clickSaveButton(): Promise<void> {
     await interactWhenVisible(
       this.saveButton,
