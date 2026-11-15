@@ -129,7 +129,8 @@ export default class BrowserWrapper {
                 this.context = null;
             }
             if (this.browser) {
-                await this.browser.close();
+                // Guarded like the context, so a closePage() failure is the one that surfaces.
+                await this.browser.close().catch(() => {});
             }
         }
     }

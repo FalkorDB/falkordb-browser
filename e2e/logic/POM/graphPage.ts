@@ -1201,25 +1201,33 @@ export default class GraphPage extends BasePage {
    * screen position. Returns the node's id.
    */
   async clickNodeIn3D(index = 0): Promise<number> {
-    let target = { id: -1, x: 0, y: 0 };
+    let target = { id: -1, x: 0, y: 0, label: "" };
     // The library resolves what is under the pointer on a throttled frame, and a
     // click lands on whatever that last resolved, so the click waits for the
-    // hover tooltip. Until the 3D layout has landed, the camera may still move
-    // to fit it, so the node's position is read again until the hover holds.
+    // hover tooltip to name the target node; any other node's tooltip, current
+    // or stale, means the click would land elsewhere. Until the 3D layout has
+    // landed, the camera may still move to fit it, so the node's position is
+    // read again until the hover holds.
     await expect(async () => {
       target = await this.page.evaluate((i) => {
         const canvas = document.querySelector("falkordb-canvas")!;
         const node = canvas.getGraphData().nodes[i] as ReturnType<typeof canvas.getGraphData>["nodes"][number] & { z: number };
-        // The 3D renderer is internal to the canvas; only its screen projection is needed here.
+        // The 3D renderer is internal to the canvas; only its screen projection
+        // and the tooltip label it gives this node are needed here.
         const { graph3d } = canvas as unknown as {
-          graph3d: { graph: { graph2ScreenCoords(x: number, y: number, z: number): { x: number; y: number } } };
+          graph3d: {
+            graph: {
+              graph2ScreenCoords(x: number, y: number, z: number): { x: number; y: number };
+              nodeLabel(): (n: typeof node) => string;
+            };
+          };
         };
         const screen = graph3d.graph.graph2ScreenCoords(node.x!, node.y!, node.z);
         const rect = canvas.getBoundingClientRect();
-        return { id: node.id, x: rect.left + screen.x, y: rect.top + screen.y };
+        return { id: node.id, x: rect.left + screen.x, y: rect.top + screen.y, label: graph3d.graph.nodeLabel()(node) };
       }, index);
       await this.page.mouse.move(target.x, target.y);
-      await expect(this.nodeCanvasToolTip).toBeVisible({ timeout: 1000 });
+      await expect(this.nodeCanvasToolTip).toHaveText(target.label, { timeout: 1000 });
     }).toPass({ timeout: 15000 });
     await this.page.mouse.click(target.x, target.y);
     return target.id;
