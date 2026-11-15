@@ -58,6 +58,9 @@ It allows a developer to interact with graphs loaded to FaklorDB, explore how sp
 - **Delete graphs** (supports deleting multiple selected graphs).
 - **Duplicate graphs**
   - Create a copy of an existing graph (including data).
+- **Graph names with spaces**
+  - Names typed when creating, duplicating or renaming a graph are trimmed, and whitespace-only names are rejected.
+  - Existing graphs whose names start or end with spaces are opened, queried and kept under their exact name.
 - **Export graphs**
   - Download a `.dump` file via the Browser (`/api/graph/:graph/export`).
 - **Upload data**

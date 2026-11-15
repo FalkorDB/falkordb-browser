@@ -804,6 +804,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("duplicateGraphInput");
   }
 
+  private get searchInputGraphs(): Locator {
+    return this.page.getByTestId("searchInputGraphs");
+  }
+
   private get duplicateGraphConfirm(): Locator {
     return this.page.getByTestId("duplicateGraphConfirm");
   }
@@ -1414,7 +1418,7 @@ export default class GraphPage extends BasePage {
   }
 
   async searchManagedGraphs(name: string): Promise<void> {
-    await this.page.getByTestId("searchInputGraphs").fill(name);
+    await this.searchInputGraphs.fill(name);
   }
 
   private managedGraphRow(name: string): Locator {
@@ -2038,7 +2042,7 @@ export default class GraphPage extends BasePage {
       panel: await GraphPage.boxOf(this.manageContent, "Manage Graphs panel"),
       actions,
       search: await GraphPage.boxOf(
-        this.page.getByTestId("searchInputGraphs"),
+        this.searchInputGraphs,
         "Graphs search box",
       ),
     };

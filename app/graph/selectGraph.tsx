@@ -259,7 +259,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         if (input === optionName) return true;
         const option = input.trim();
         if (!option) {
-            toast({ title: "Error", description: "Graph name cannot be empty" });
+            toast({ title: "Error", description: "Graph name cannot be empty", variant: "destructive" });
             return false;
         }
         if (option === optionName) return true;

@@ -1776,12 +1776,12 @@ test.describe("Tutorial", () => {
         await tutorial.addStripTab();
         const userTabs = await tutorial.getStripTabCount();
         expect(userTabs).toBe(2);
-        // The address bar follows the new blank tab after a short debounce.
-        // Reloading earlier would reload the first tab's share link, and a
-        // share link holds the tutorial back.
+        // The address bar follows the new blank tab after a short debounce, so the
+        // blank tab is the persisted active one; opening the page while a share
+        // link is still active would hold the tutorial back.
         await expect(await browser.getPage()).toHaveURL(url => !url.searchParams.has("graph"));
 
-        // 2. Start the tutorial by setting localStorage and refreshing
+        // 2. Start the tutorial by setting localStorage and reopening the graph page
         await tutorial.changeLocalStorage("true");
         await browser.navigateTo(urls.graphUrl);
         await tutorial.waitForTimeout(2000);

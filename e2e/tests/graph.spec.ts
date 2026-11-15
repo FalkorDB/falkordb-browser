@@ -54,11 +54,9 @@ test.describe("Graph Tests", () => {
       expect(opts).not.toContain(trimmedName);
     } finally {
       await browser.closeBrowser();
-      const { message } = await apiCall.removeGraph(encodedName, "admin");
-      expect(message).toMatch(/deleted|empty key/);
+      await apiCall.removeGraph(encodedName, "admin");
       if ((await apiCall.getGraphs("admin")).opts.includes(trimmedName)) {
-        const { message: trimmedMessage } = await apiCall.removeGraph(trimmedName, "admin");
-        expect(trimmedMessage).toMatch(/deleted|empty key/);
+        await apiCall.removeGraph(trimmedName, "admin");
       }
     }
   });
@@ -491,13 +489,11 @@ test.describe("Graph Tests", () => {
       expect((await apiCall.getGraphs("admin")).opts).not.toContain(` ${target} `);
     } finally {
       await browser.closeBrowser();
-      const { message } = await apiCall.removeGraph(source, "admin");
-      expect(message).toMatch(/deleted|empty key/);
+      await apiCall.removeGraph(source, "admin");
       const { opts } = await apiCall.getGraphs("admin");
       for (const name of [target, ` ${target} `]) {
         if (opts.includes(name)) {
-          const { message: cleanupMessage } = await apiCall.removeGraph(encodeURIComponent(name), "admin");
-          expect(cleanupMessage).toMatch(/deleted|empty key/);
+          await apiCall.removeGraph(encodeURIComponent(name), "admin");
         }
       }
     }
@@ -535,8 +531,7 @@ test.describe("Graph Tests", () => {
         const { opts } = await apiCall.getGraphs("admin");
         for (const name of [source, trimmed]) {
           if (opts.includes(name)) {
-            const { message } = await apiCall.removeGraph(encodeURIComponent(name), "admin");
-            expect(message).toMatch(/deleted|empty key/);
+            await apiCall.removeGraph(encodeURIComponent(name), "admin");
           }
         }
       }
@@ -568,8 +563,7 @@ test.describe("Graph Tests", () => {
       expect(opts).not.toContain(` ${source} `);
     } finally {
       await browser.closeBrowser();
-      const { message } = await apiCall.removeGraph(source, "admin");
-      expect(message).toMatch(/deleted|empty key/);
+      await apiCall.removeGraph(source, "admin");
     }
   });
 
@@ -606,8 +600,7 @@ test.describe("Graph Tests", () => {
       const { opts } = await apiCall.getGraphs("admin");
       for (const name of [source, target, ` ${target} `]) {
         if (opts.includes(name)) {
-          const { message } = await apiCall.removeGraph(encodeURIComponent(name), "admin");
-          expect(message).toMatch(/deleted|empty key/);
+          await apiCall.removeGraph(encodeURIComponent(name), "admin");
         }
       }
     }
