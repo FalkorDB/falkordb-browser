@@ -1103,7 +1103,7 @@ export default function BrowserSettings() {
                                                     <label className="text-sm font-medium">
                                                         {isLoadingModels ? "Live models" : "Model"}
                                                     </label>
-                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <span data-testid="modelsStatusMessage" className="flex items-center gap-1 text-xs text-muted-foreground">
                                                         {isLoadingModels && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                                         {modelsMessage}
                                                     </span>
