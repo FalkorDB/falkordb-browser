@@ -30,6 +30,9 @@ The search bar now indexes schema, nodes, and metadata. Results are ranked more 
 #### Expanded Settings & User Controls  
 New options let you fine-tune database behavior, toggle visual preferences, and manage users without falling back to CLI tools.
 
+Successful database configuration edits offer **Undo**, which restores the immediately
+preceding value, including zero. Load-time configuration values remain read-only.
+
 #### Node Style Customization  
 Customize the visual appearance of nodes per label. Select custom colors from a palette, adjust node sizes, and choose which property to display as the node caption. All customizations are saved per graph and persist across sessions.
 

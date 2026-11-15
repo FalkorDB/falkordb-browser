@@ -108,6 +108,35 @@ test.describe('@config Settings config tests', () => {
         expect(requests).toEqual(Array(2).fill({ method: "POST", path: "/api/graph/config/MAX_QUEUED_QUERIES" }));
     });
 
+    test("@admin Undo restores zero and the immediately preceding configuration value", async () => {
+        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage);
+        const page = await browser.getPage();
+        const submissions: { value: string }[] = [];
+        await page.route(/\/api\/graph\/config(?:\/.*)?$/, async route => {
+            if (route.request().method() === "GET") {
+                await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 0]] } });
+            } else {
+                submissions.push(route.request().postDataJSON() as { value: string });
+                await route.fulfill({ json: {} });
+            }
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsConfigPage.navigateToDBConfigurationTab();
+        await settingsConfigPage.modifyRoleValue("TIMEOUT_MAX", "1");
+        await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("1");
+        await settingsConfigPage.clickOnUndoBtnInToastMsg();
+        await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("0");
+        await settingsConfigPage.modifyRoleValue("TIMEOUT_MAX", "2");
+        await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("2");
+        await settingsConfigPage.modifyRoleValue("TIMEOUT_MAX", "3");
+        await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("3");
+        await settingsConfigPage.clickOnUndoBtnInToastMsg();
+        await expect(settingsConfigPage.roleContentValue("TIMEOUT_MAX")).toHaveText("2");
+        expect(submissions).toEqual([
+            { value: "1" }, { value: "0" }, { value: "2" }, { value: "3" }, { value: "2" }
+        ]);
+    });
+
     test.describe.serial("Database configuration mutations", () => {
         Data.inputDataRejectsZero.forEach(({ input, description, expected }, index) => {
             test(`@admin Modify ${roles.maxQueuedQueries} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
