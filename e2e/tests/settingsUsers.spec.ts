@@ -90,6 +90,24 @@ test.describe('@Config Settings users tests', () => {
         expect(mock.requests).toEqual([{ method: "PATCH", body }, { method: "PATCH", body }]);
     });
 
+    test("@admin Search before the users load -> select the match -> Validate only that user is selected", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const username = getRandomString('user');
+        const users = [{ username, role: user.ReadWrite, keys: ["*"] }, { username: getRandomString('other'), role: user.ReadOnly, keys: ["*"] }];
+        let releaseUsers!: () => void;
+        const usersReleased = new Promise<void>(resolve => { releaseUsers = resolve; });
+        await (await browser.getPage()).route(/\/api\/user$/, async route => {
+            await usersReleased;
+            await route.fulfill({ json: { result: users } });
+        });
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.searchForElement(username);
+        releaseUsers();
+        await settingsUsersPage.clickUserCheckboxBtn(username);
+        await expect.poll(() => settingsUsersPage.isEditUserButtonEnabled()).toBe(true);
+    });
+
     test("@admin Add one new user -> validating user exists in the users list", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();

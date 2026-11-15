@@ -314,6 +314,10 @@ export default class SettingsUsersPage extends BasePage {
     );
   }
 
+  async isEditUserButtonEnabled(): Promise<boolean> {
+    return interactWhenVisible(this.editUserButton, (el) => el.isEnabled(), "edit user button");
+  }
+
   async clickOnSubmitEditUser(): Promise<void> {
     await interactWhenVisible(
       this.submitEditUser,
