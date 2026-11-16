@@ -184,6 +184,8 @@ test.describe("Tutorial", () => {
         const page = await browser.getPage();
         await browser.setPageToFullScreen();
         await page.addInitScript(() => {
+            // Keep the refreshInterval polls off the accelerated 60s heartbeat cadence (see the Web Locks test below).
+            localStorage.setItem("refreshInterval", "30");
             const nativeInterval = window.setInterval.bind(window);
             Object.defineProperty(window, "setInterval", {
                 value: (handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
@@ -443,6 +445,9 @@ test.describe("Tutorial", () => {
         await apiCall.runQuery(failedName, "CREATE (:Mine)");
         await page.addInitScript(() => {
             localStorage.setItem("tutorial", "false");
+            // Only the 60s ownership heartbeat may be accelerated: the e2e-seeded 60s refreshInterval would put the
+            // header memory poll on that cadence too, and its rate-limited (429) toast would replace the cleanup toast.
+            localStorage.setItem("refreshInterval", "30");
             Object.defineProperty(navigator, "locks", { value: undefined, configurable: true });
             const nativeInterval = window.setInterval.bind(window);
             window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>

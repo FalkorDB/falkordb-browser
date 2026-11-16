@@ -488,6 +488,57 @@ export default class ApiCalls {
     }
   }
 
+  async loadUdf(name: string, code: string): Promise<void> {
+    try {
+      const headers = await getAdminToken();
+      const result = await postRequest(
+        `${urls.api.udfUrl}/${encodeURIComponent(name)}`,
+        { code, replace: false },
+        undefined,
+        headers
+      );
+      if (!result.ok()) {
+        throw new Error(`${result.status()} ${await result.text()}`);
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to load UDF library. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  // Resolves to false instead of throwing when the library is gone, so it can run as cleanup.
+  async deleteUdf(name: string): Promise<boolean> {
+    try {
+      const headers = await getAdminToken();
+      const result = await deleteRequest(
+        `${urls.api.udfUrl}/${encodeURIComponent(name)}`,
+        headers
+      );
+      return result.ok();
+    } catch (error) {
+      throw new Error(
+        `Failed to delete UDF library. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async listUdfs(): Promise<string[]> {
+    try {
+      const headers = await getAdminToken();
+      const result = await getRequest(urls.api.udfUrl, headers);
+      if (!result.ok()) {
+        throw new Error(`${result.status()} ${await result.text()}`);
+      }
+      const { result: libraries } = await result.json();
+      return libraries.map((library: string[]) => library[1]);
+    } catch (error) {
+      throw new Error(
+        `Failed to list UDF libraries. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
   // Token API methods
   async generateToken(data?: {
     name?: string;
@@ -539,6 +590,77 @@ export default class ApiCalls {
         `Failed to get token details. \n Error: ${(error as Error).message}`
       );
     }
+  }
+
+  // Raw token API calls: expose the HTTP status and body so tests can assert error paths.
+  // Authenticates with the admin session cookie unless a bearer token is given.
+  private async tokenRequestHeaders(
+    bearerToken?: string
+  ): Promise<Record<string, string> | undefined> {
+    return bearerToken
+      ? { Authorization: `Bearer ${bearerToken}` }
+      : getAdminToken();
+  }
+
+  // Playwright re-encodes a string payload that is not valid JSON when the content type is
+  // JSON, so a string is sent as a Buffer to reach the server byte for byte (malformed JSON).
+  private rawJsonBody(body: unknown) {
+    return typeof body === "string" ? Buffer.from(body, "utf8") : body;
+  }
+
+  async generateTokenRaw(
+    body: unknown
+  ): Promise<{ status: number; body: any }> {
+    const headers = {
+      ...(await this.tokenRequestHeaders()),
+      "Content-Type": "application/json",
+    };
+    const result = await postRequest(`${urls.api.tokenUrl}tokens`, this.rawJsonBody(body), undefined, headers);
+    return { status: result.status(), body: await result.json() };
+  }
+
+  async listTokensRaw(
+    bearerToken?: string
+  ): Promise<{ status: number; body: any }> {
+    const result = await getRequest(
+      `${urls.api.tokenUrl}tokens`,
+      await this.tokenRequestHeaders(bearerToken)
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
+  async getTokenDetailsRaw(
+    tokenId: string,
+    bearerToken?: string
+  ): Promise<{ status: number; body: any }> {
+    const result = await getRequest(
+      `${urls.api.tokenUrl}tokens/${tokenId}`,
+      await this.tokenRequestHeaders(bearerToken)
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
+  async revokeTokenRaw(
+    tokenId: string,
+    bearerToken?: string
+  ): Promise<{ status: number; body: any }> {
+    const result = await deleteRequest(
+      `${urls.api.tokenUrl}tokens/${tokenId}`,
+      await this.tokenRequestHeaders(bearerToken)
+    );
+    return { status: result.status(), body: await result.json() };
+  }
+
+  async generateTokenWithCredentialsRaw(
+    body: unknown
+  ): Promise<{ status: number; body: any }> {
+    const result = await postRequest(
+      `${urls.api.tokenUrl}tokens/credentials`,
+      this.rawJsonBody(body),
+      undefined,
+      { "Content-Type": "application/json" }
+    );
+    return { status: result.status(), body: await result.json() };
   }
 
   async revokeAllUserTokens(tokens: string[]): Promise<void> {
