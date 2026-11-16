@@ -1,6 +1,6 @@
 import { Locator, Page } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForURL } from "@/e2e/infra/utils";
+import { interactWhenVisible, waitForElementToNotBeVisible, waitForURL } from "@/e2e/infra/utils";
 import urls from '../../config/urls.json'
 
 export default class HeaderComponent extends BasePage {
@@ -184,8 +184,11 @@ export default class HeaderComponent extends BasePage {
     }
 
     async closePopUp(): Promise<void> {
+        // Outside clicks are ignored while the Help menu closes or the drawer slides in.
+        await waitForElementToNotBeVisible(this.page.getByRole("menu"));
+        await this.aboutPopUp.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
         await this.page.mouse.click(10, 10);
-        await this.page.waitForTimeout(1000);
+        await waitForElementToNotBeVisible(this.aboutPopUp);
     }
 
     async clickOnAbout(): Promise<void> {
