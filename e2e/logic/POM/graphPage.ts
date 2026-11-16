@@ -148,6 +148,11 @@ export default class GraphPage extends BasePage {
     return (type: Type = "Graph") => this.page.getByTestId(`${type}Search`);
   }
 
+  /** Shown while opening the graph list refreshes it. */
+  public get graphListLoading(): Locator {
+    return this.page.getByTestId("GraphSearchLoading");
+  }
+
   // MANAGE
   public get manage(): Locator {
     return this.page.getByTestId("manageGraphs");
@@ -1950,24 +1955,14 @@ export default class GraphPage extends BasePage {
     }
     if (!isEnabled) throw new Error("Graph selector is not enabled after reloading the graph list");
 
-    const graphListResponse = this.page.waitForResponse(
-      (response) => {
-        const { pathname } = new URL(response.url());
-        // Match only the graph-list endpoint, not nested requests such as
-        // /api/graph/<name>?query=... or /api/graph/<name>/memory.
-        return /^\/api\/graph\/?$/.test(pathname) && response.request().method() === "GET";
-      }
-    );
-
-    const wasSelected = await this.getSelectedGraphName() === graphName;
+    // Raw text: graph names may carry significant whitespace.
+    const selectedBefore = await this.select("Graph").textContent();
     await this.clickSelect();
-    const response = await graphListResponse;
-    const { opts } = response.ok() ? await response.json() as { opts: string[] } : { opts: [] };
-    // Opening the list refreshes it, and a list holding exactly one graph is
-    // auto-selected. Parallel tests drop their graphs, so ours can become the
-    // only one right then: the selection change closes the list under us.
-    if (!wasSelected && opts.length === 1 && opts[0] === graphName) {
-      await expect(this.select("Graph")).toHaveText(graphName);
+    // Opening the list refreshes it behind a loader. A refresh that finds only
+    // our graph (parallel tests drop theirs) auto-selects it, and that selection
+    // change closes the list, so decide on what the refresh applied.
+    await expect(this.graphListLoading).toBeHidden();
+    if (selectedBefore !== graphName && await this.select("Graph").textContent() === graphName) {
       await expect(this.search()).toBeHidden();
       return;
     }
