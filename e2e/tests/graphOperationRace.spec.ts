@@ -1,11 +1,27 @@
-import { expect, test, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Route } from "@playwright/test";
 import type { FalkorDBCanvas, ForceGraphConfig } from "@falkordb/canvas";
 import type { SessionConnection } from "@/app/components/provider";
 import { getRandomString } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
+import HeaderComponent from "../logic/POM/headerComponent";
+import SchemaView from "../logic/POM/schemaView";
 import urls from "../config/urls.json";
+
+// Await the real async React handler, not just delivery of its network response.
+const doubleClickNode = (canvas: Locator, name: string) => canvas.evaluate(async (element, target) => {
+  const c = element as FalkorDBCanvas;
+  const config: ForceGraphConfig = Reflect.get(c, "config");
+  const click = config.eventHandlers?.onNodeClick;
+  if (!click) throw new Error("Missing node click handler");
+  const node = c.getGraphData().nodes.find(n => n.data.name === target);
+  if (!node) throw new Error(`Missing node ${target}`);
+  await click(node, new MouseEvent("click"));
+  await click(node, new MouseEvent("click"));
+}, name);
+
+const nodeCount = (canvas: Locator) => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length);
 
 // Regression coverage for the connection/graph ownership guards (idea-6): a
 // query captured for one graph must NOT apply its (stale) result after the user
@@ -162,6 +178,135 @@ test.describe("Graph operation race conditions", () => {
   });
   }
 
+  test("@admin a held create cannot overwrite another graph after the page remounts", async () => {
+    test.setTimeout(90000);
+    const graphName = getRandomString("create-remount");
+    const otherGraph = getRandomString("create-remount-other");
+    const reached = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    try {
+      await apiCall.runQuery(otherGraph, "CREATE (:RemountOther {name:'x'}), (:RemountOther {name:'y'})");
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      const header = new HeaderComponent(page);
+      await browser.setPageToFullScreen();
+      await page.getByTestId("graphInfoToggle").waitFor();
+      await graph.addGraph(graphName);
+      await graph.insertQuery("CREATE (a:RemountOwner {name:'a'}) RETURN a");
+      await graph.clickRunQuery();
+      const canvas = page.locator("falkordb-canvas");
+      await expect.poll(() => nodeCount(canvas)).toBe(1);
+      await page.route(`**/api/graph/${graphName}/*`, async route => {
+        if (route.request().method() === "POST") {
+          reached.resolve();
+          await release.promise;
+        }
+        await route.continue();
+      });
+      await graph.clickElementCanvasAddNode();
+      await page.getByRole("button", { name: "Add a new node to the graph", exact: true }).click();
+      await reached.promise;
+      // Client-side navigation unmounts the page while the providers keep its graph and tab.
+      await header.clickOnSettingsBtn();
+      await header.clickOnGraphsButton();
+      await graph.selectGraphByName(otherGraph);
+      await graph.insertQuery("MATCH (n:RemountOther) RETURN n");
+      await graph.clickRunQuery();
+      await expect.poll(() => nodeCount(canvas)).toBe(2);
+      const before = await canvas.evaluate(element => (element as FalkorDBCanvas).getData());
+      release.resolve();
+      await expect(page.getByTestId("toast").filter({ hasText: "Node created" })).toBeVisible();
+      expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getData())).toEqual(before);
+      // The server still created the node in the graph the unmounted page owned.
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery("MATCH (n:RemountOwner) RETURN n");
+      await graph.clickRunQuery();
+      await expect.poll(() => nodeCount(canvas)).toBe(2);
+    } finally {
+      release.resolve();
+      await apiCall.removeGraph(graphName);
+      await apiCall.removeGraph(otherGraph);
+    }
+  });
+
+  test("@admin node clicks wait until a delayed tab restore owns the canvas", async () => {
+    test.setTimeout(90000);
+    const graphName = getRandomString("click-owner");
+    const tabName = getRandomString("click-target");
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await page.getByTestId("graphInfoToggle").waitFor();
+      await graph.addGraph(graphName);
+      await graph.insertQuery("CREATE (a:ClickOwner {name:'a'})-[:REL]->(b:ClickOwner {name:'b'}), (c:ClickOwner {name:'c'}) RETURN a");
+      await graph.clickRunQuery();
+      const canvas = page.locator("falkordb-canvas");
+      await expect.poll(() => nodeCount(canvas)).toBe(1);
+      await doubleClickNode(canvas, "a");
+      await expect.poll(() => nodeCount(canvas)).toBe(2);
+      await graph.addStripTab();
+      await graph.renameStripTab("New tab", tabName);
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery("MATCH (n:ClickOwner) RETURN n");
+      await graph.clickRunQuery();
+      await expect.poll(() => nodeCount(canvas)).toBe(3);
+      await graph.clickDimensionControl("3d");
+      await expect.poll(() => graph.getCanvasDimension(), { timeout: 30000 }).toBe("3d");
+      await canvas.evaluate(element => {
+        const c = element as FalkorDBCanvas;
+        const setDimension = c.setDimension.bind(c);
+        let hold = true;
+        element.addEventListener("release-restore", () => { hold = false; });
+        c.setDimension = async dimension => {
+          if (dimension === "2d" && hold) {
+            element.setAttribute("data-restore-waiting", "true");
+            await new Promise<void>(resolve => element.addEventListener("release-restore", () => resolve(), { once: true }));
+          }
+          await setDimension(dimension);
+        };
+      });
+      await graph.selectStripTab(graphName);
+      await expect(canvas).toHaveAttribute("data-restore-waiting", "true");
+      // The canvas still shows the outgoing tab's "a"; it must not collapse the incoming, expanded "a".
+      await doubleClickNode(canvas, "a");
+      await canvas.dispatchEvent("release-restore");
+      await expect.poll(() => graph.getCanvasDimension()).toBe("2d");
+      await expect.poll(() => nodeCount(canvas)).toBe(2);
+      await doubleClickNode(canvas, "a");
+      await expect.poll(() => nodeCount(canvas)).toBe(1);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
+  });
+
+  test("@admin a failed expansion fetch lets the next double-click retry", async () => {
+    test.setTimeout(90000);
+    const graphName = getRandomString("expand-retry");
+    const nodeFetch = `**/api/graph/${graphName}/*`;
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await page.getByTestId("graphInfoToggle").waitFor();
+      await graph.addGraph(graphName);
+      await graph.insertQuery("CREATE (a:ExpandRetry {name:'a'})-[:REL]->(b:ExpandRetry {name:'b'}) RETURN a");
+      await graph.clickRunQuery();
+      const canvas = page.locator("falkordb-canvas");
+      await expect.poll(() => nodeCount(canvas)).toBe(1);
+      await page.route(nodeFetch, async route => {
+        if (route.request().method() === "GET" && /\/\d+$/.test(new URL(route.request().url()).pathname)) await route.abort();
+        else await route.continue();
+      });
+      await expect(doubleClickNode(canvas, "a")).rejects.toThrow();
+      await page.unroute(nodeFetch);
+      await doubleClickNode(canvas, "a");
+      await expect.poll(() => nodeCount(canvas)).toBe(2);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
+  });
+
   test("@admin a successful create is still reported when its canvas repaint is refused", async () => {
     test.setTimeout(90000);
     const graphName = getRandomString("create-refused-paint");
@@ -240,11 +385,12 @@ test.describe("Graph operation race conditions", () => {
     }
   });
 
-  for (const pendingWrite of [true, false]) {
-  test(`@admin connection rollback ${pendingWrite ? "discards a pending write" : "renews the preserved canvas"}`, async () => {
+  for (const preserved of ["pending write", "graph canvas", "schema canvas"] as const) {
+  const pendingWrite = preserved === "pending write";
+  test(`@admin connection rollback ${pendingWrite ? "discards a pending write" : `renews the preserved ${preserved}`}`, async () => {
     test.setTimeout(90000);
     const graphName = getRandomString("canvas-connection-owner");
-    const graph = await browser.createNewPage(GraphPage);
+    const graph = await browser.createNewPage(SchemaView);
     const page = await browser.getPage();
     const switching = Promise.withResolvers<Route>();
     let pendingSwitch: Route | undefined;
@@ -282,6 +428,11 @@ test.describe("Graph operation race conditions", () => {
       await graph.clickRunQuery();
       await expect(canvas).toHaveAttribute("data-restore-waiting", "true");
       }
+      if (preserved === "schema canvas") {
+        await graph.clickSchemaTab();
+        await expect.poll(() => graph.getSchemaLabels()).toEqual(["PendingConnection"]);
+        await graph.waitForSchemaToSettle();
+      }
       await page.route("**/api/auth/session", async route => {
         if (route.request().method() === "POST") switching.resolve(route);
         else await route.continue();
@@ -296,8 +447,21 @@ test.describe("Graph operation race conditions", () => {
       await pendingSwitch.fulfill({ status: 500, json: { message: "Intentional test rollback" } });
       pendingSwitch = undefined;
       await expect(page.getByTestId("toast-destructive").filter({ hasText: "Failed to switch connection" })).toBeVisible();
-      expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(2);
-      if (!pendingWrite) {
+      if (preserved === "schema canvas") {
+        // Leaving the view snapshots its camera only if the rollback renewed the schema canvas too.
+        await graph.setSchemaViewport({ zoom: 1.75, centerX: 123, centerY: -87 });
+        await graph.clickGraphTab();
+        await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(2);
+        await graph.clickSchemaTab();
+        await expect.poll(async () => {
+          const viewport = await graph.getSchemaViewport();
+          return !!viewport && Math.abs(viewport.zoom - 1.75) < 0.05
+            && Math.abs(viewport.centerX - 123) < 1 && Math.abs(viewport.centerY + 87) < 1;
+        }).toBe(true);
+      } else {
+        expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(2);
+      }
+      if (preserved === "graph canvas") {
         await canvas.evaluate(async element => {
           const c = element as FalkorDBCanvas;
           const config: ForceGraphConfig = Reflect.get(c, "config");

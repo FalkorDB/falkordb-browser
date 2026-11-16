@@ -24,7 +24,7 @@ import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { QueryStatistics } from "falkordb";
-import { ownsCanvasSession, renewCanvasSession } from "@/lib/canvasSession";
+import { ownsCanvasSession, renewMountedCanvasSessions } from "@/lib/canvasSession";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
@@ -2009,14 +2009,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (switchOriginRef.current === undefined) return;
     const rolledBack = switchOriginRef.current === activeConnectionId;
     switchOriginRef.current = undefined;
-    const canvas = canvasRef.current;
-    if (rolledBack && activeConnectionId && canvas) {
-      const state = sessionStateRef.current;
-      renewCanvasSession(canvas, {
-        graph: state.graph, data: state.data, tabId: activeCanvasTabRef.current,
-        epoch: getConnectionEpoch(), restore: state.graphData,
-      });
-    }
+    if (rolledBack && activeConnectionId) renewMountedCanvasSessions(getConnectionEpoch());
   });
 
   // Keep "Did you mean…?" function suggestions aware of the loaded UDFs.

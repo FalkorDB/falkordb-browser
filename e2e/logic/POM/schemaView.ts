@@ -276,6 +276,18 @@ export default class SchemaView extends GraphPage {
     });
   }
 
+  /** Moves the schema camera the way a pan and zoom would. */
+  public async setSchemaViewport(viewport: SchemaViewport): Promise<void> {
+    await this.page.evaluate((target) => {
+      const canvas = document.querySelector(
+        '[data-testid="schemaView"] falkordb-canvas'
+      ) as { setViewport?: (viewport: SchemaViewport) => void } | null;
+
+      if (!canvas?.setViewport) throw new Error("Schema canvas is not mounted");
+      canvas.setViewport(target);
+    }, viewport);
+  }
+
   /** Every relationship placement in the schema, sorted and de-duplicated. */
   public async getSchemaTriples(): Promise<SchemaTriple[]> {
     return this.readSchemaTriples();

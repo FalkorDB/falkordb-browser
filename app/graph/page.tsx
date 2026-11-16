@@ -110,9 +110,12 @@ export default function Page() {
         chatOpen,
         setChatOpen,
     } = useContext(GraphContext);
-    const graphOwnerRef = useRef({ graph, data, graphName, activeTabId, restore: graphData });
+    const graphOwnerRef = useRef({ graph, data, graphName, activeTabId, restore: graphData, mounted: false });
     useLayoutEffect(() => {
-        graphOwnerRef.current = { graph, data, graphName, activeTabId, restore: graphData };
+        graphOwnerRef.current = { graph, data, graphName, activeTabId, restore: graphData, mounted: true };
+        // The providers outlive this page: a mutation it started must not write
+        // into them once it unmounts, even if the user comes back to the same graph.
+        return () => { graphOwnerRef.current = { ...graphOwnerRef.current, mounted: false }; };
     }, [graph, data, graphName, activeTabId, graphData]);
     const {
         settings: {
@@ -606,6 +609,7 @@ export default function Page() {
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const isCurrentOwner = () => getConnectionEpoch() === startEpoch
+            && graphOwnerRef.current.mounted
             && graphOwnerRef.current.graph === graph
             && graphOwnerRef.current.graphName === graphName
             && graphOwnerRef.current.activeTabId === activeTabId;
@@ -672,6 +676,7 @@ export default function Page() {
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const isCurrentOwner = () => getConnectionEpoch() === startEpoch
+            && graphOwnerRef.current.mounted
             && graphOwnerRef.current.graph === graph
             && graphOwnerRef.current.graphName === graphName
             && graphOwnerRef.current.activeTabId === activeTabId;

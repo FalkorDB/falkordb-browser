@@ -48,3 +48,20 @@ export function renewCanvasSession(canvas: object, session: CanvasSession): bool
     commitCanvasSession(canvas, session);
     return true;
 }
+
+const mountedCanvases = new Map<object, () => Omit<CanvasSession, "epoch">>();
+
+/** Tracks a mounted canvas and its live session so a rollback can renew it; returns the untrack function. */
+export function trackMountedCanvas(canvas: object, liveSession: () => Omit<CanvasSession, "epoch">): () => void {
+    mountedCanvases.set(canvas, liveSession);
+    return () => {
+        if (mountedCanvases.get(canvas) === liveSession) mountedCanvases.delete(canvas);
+    };
+}
+
+/** Renews every mounted canvas (Graph and Schema each have their own) after a confirmed rollback. */
+export function renewMountedCanvasSessions(epoch: number): void {
+    mountedCanvases.forEach((liveSession, canvas) => {
+        renewCanvasSession(canvas, { ...liveSession(), epoch });
+    });
+}

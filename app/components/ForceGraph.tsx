@@ -12,7 +12,7 @@ import useLongPress from "@/lib/useLongPress";
 import { getNodeUrl } from "@/lib/graphUrls";
 import { setCanvasGraphData, writeCanvasData } from "@/lib/graph3DResources";
 import { createGraphAppearanceLookup } from "@/lib/graphAppearance";
-import { commitCanvasSession, ownsCanvasOperation, ownsCanvasSession } from "@/lib/canvasSession";
+import { commitCanvasSession, ownsCanvasOperation, ownsCanvasSession, trackMountedCanvas } from "@/lib/canvasSession";
 import use3DWarning from "./use3DWarning";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext, GraphTabsContext } from "./provider";
@@ -172,6 +172,15 @@ export default function ForceGraph({
             if (globals[testHookName] === hook) delete globals[testHookName];
         };
     }, [canvasRef, canvasLoaded, testHookName]);
+
+    // Lets a confirmed connection-switch rollback renew this canvas, whichever view owns it.
+    useEffect(() => {
+        const canvas = canvasRef.current;
+
+        if (!canvas || !canvasLoaded) return undefined;
+
+        return trackMountedCanvas(canvas, () => sessionRef.current);
+    }, [canvasRef, canvasLoaded]);
 
     // Load saved viewport on mount
     useEffect(() => {
@@ -387,8 +396,16 @@ export default function ForceGraph({
         commitSelection(fullElement, additive);
     }, [graph, commitSelection]);
 
+    // While a delayed restore is pending the canvas still shows the outgoing
+    // view but already runs these handlers, so a click there would select or
+    // toggle the incoming view's element that happens to share its id.
+    const ownsCanvas = useCallback(() => {
+        const canvas = canvasRef.current;
+        return !!canvas && ownsCanvasSession(canvas, { ...sessionRef.current, epoch: getConnectionEpoch() });
+    }, [canvasRef]);
+
     const handleNodeClick = useCallback(async (node: GraphNode, event: MouseEvent) => {
-        if (consumeClick()) return;
+        if (consumeClick() || !ownsCanvas()) return;
 
         const fullNode = graph.NodesMap.get(node.id);
         if (!fullNode) return;
@@ -426,7 +443,14 @@ export default function ForceGraph({
 
         fullNode.expand = !fullNode.expand;
         if (fullNode.expand) {
-            const merged = await onFetchNode(fullNode, () => expandTokens.current.get(node.id) === token);
+            let merged: boolean;
+            try {
+                merged = await onFetchNode(fullNode, () => expandTokens.current.get(node.id) === token);
+            } catch (error) {
+                // A failed fetch merged nothing either, so the retry must fetch again.
+                if (expandTokens.current.get(node.id) === token) fullNode.expand = false;
+                throw error;
+            }
 
             if (expandTokens.current.get(node.id) !== token) {
                 // A newer toggle superseded this one while the fetch was in
@@ -452,14 +476,14 @@ export default function ForceGraph({
         } else {
             await deleteNeighbors([fullNode]);
         }
-    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand, handleSelect, clearPendingClick, flushPendingClick, multiSelect, consumeClick]);
+    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand, handleSelect, clearPendingClick, flushPendingClick, multiSelect, consumeClick, ownsCanvas]);
 
     // Links have nothing to expand, so their click selects straight away.
     const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
-        if (consumeClick()) return;
+        if (consumeClick() || !ownsCanvas()) return;
         flushPendingClick();
         handleSelect(link, event.shiftKey || event.ctrlKey || multiSelect);
-    }, [handleSelect, flushPendingClick, multiSelect, consumeClick]);
+    }, [handleSelect, flushPendingClick, multiSelect, consumeClick, ownsCanvas]);
 
     const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
         if (element === null) {

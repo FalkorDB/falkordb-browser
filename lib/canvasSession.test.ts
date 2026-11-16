@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { commitCanvasSession, ownsCanvasOperation, ownsCanvasSession, renewCanvasSession } from "./canvasSession.ts";
+import { commitCanvasSession, ownsCanvasOperation, ownsCanvasSession, renewCanvasSession, renewMountedCanvasSessions, trackMountedCanvas } from "./canvasSession.ts";
 import { register3DCheck, writeCanvasData } from "./graph3DResources.ts";
 import { getConnectionEpoch, setActiveConnectionIdGlobal } from "./active-connection.ts";
 
@@ -123,4 +123,33 @@ test("an operation owns the canvas only while its live view, epoch and committed
     ]) {
         assert.equal(ownsCanvasOperation(canvas, session, stale), false);
     }
+});
+
+test("rollback renews every mounted canvas from its live session until it unmounts", () => {
+    const graphCanvas = {};
+    const schemaCanvas = {};
+    const graphView = { graph: {}, data: {}, tabId: "a" };
+    const schemaView = { graph: {}, data: {}, tabId: "a" };
+    commitCanvasSession(graphCanvas, { ...graphView, epoch: 1 });
+    commitCanvasSession(schemaCanvas, { ...schemaView, epoch: 1 });
+    const untrackGraph = trackMountedCanvas(graphCanvas, () => graphView);
+    const untrackSchema = trackMountedCanvas(schemaCanvas, () => schemaView);
+    renewMountedCanvasSessions(3);
+    assert.equal(ownsCanvasSession(graphCanvas, { ...graphView, epoch: 3 }), true);
+    assert.equal(ownsCanvasSession(schemaCanvas, { ...schemaView, epoch: 3 }), true);
+
+    untrackGraph();
+    renewMountedCanvasSessions(5);
+    assert.equal(ownsCanvasSession(graphCanvas, { ...graphView, epoch: 3 }), true);
+    assert.equal(ownsCanvasSession(schemaCanvas, { ...schemaView, epoch: 5 }), true);
+
+    // A remount re-tracks the canvas before the previous effect's cleanup runs.
+    const remountedView = { ...schemaView };
+    const untrackRemounted = trackMountedCanvas(schemaCanvas, () => remountedView);
+    untrackSchema();
+    renewMountedCanvasSessions(7);
+    assert.equal(ownsCanvasSession(schemaCanvas, { ...remountedView, epoch: 7 }), true);
+    untrackRemounted();
+    renewMountedCanvasSessions(9);
+    assert.equal(ownsCanvasSession(schemaCanvas, { ...remountedView, epoch: 7 }), true);
 });
