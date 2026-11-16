@@ -39,30 +39,32 @@ export async function isPreconfiguredSignIn(request: Request): Promise<boolean> 
     const reader = request.clone().body?.getReader();
     if (!reader) return false;
     try {
-        const chunks: Uint8Array[] = [];
-        let size = 0;
-        for (;;) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            size += value.byteLength;
-            if (size > SIGN_IN_BODY_CAP) {
-                void reader.cancel().catch(error => console.warn("Failed to cancel sign-in inspection:", error));
-                return true;
-            }
-            chunks.push(value);
-        }
-        const body = new TextDecoder().decode(Buffer.concat(chunks));
-        if (request.headers.get("content-type")?.includes("application/json")) {
-            return (JSON.parse(body) as { preconfigured?: unknown } | null)?.preconfigured === "true";
-        }
-        return new URLSearchParams(body).getAll("preconfigured").includes("true");
+        return await readPreconfiguredFlag(request, reader).finally(() => reader.releaseLock());
     } catch {
         // A body this cannot read is one Auth.js cannot read either, so it is not a preconfigured sign-in.
         console.warn("Could not inspect sign-in request");
         return false;
-    } finally {
-        reader.releaseLock();
     }
+}
+
+async function readPreconfiguredFlag(request: Request, reader: ReadableStreamDefaultReader<Uint8Array>): Promise<boolean> {
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > SIGN_IN_BODY_CAP) {
+            void reader.cancel().catch(error => console.warn("Failed to cancel sign-in inspection:", error));
+            return true;
+        }
+        chunks.push(value);
+    }
+    const body = new TextDecoder().decode(Buffer.concat(chunks));
+    if (request.headers.get("content-type")?.includes("application/json")) {
+        return (JSON.parse(body) as { preconfigured?: unknown } | null)?.preconfigured === "true";
+    }
+    return new URLSearchParams(body).getAll("preconfigured").includes("true");
 }
 
 /**
