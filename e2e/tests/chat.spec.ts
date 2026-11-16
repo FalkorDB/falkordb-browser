@@ -57,9 +57,14 @@ test.describe("Chat Feature Tests", () => {
     // parallel tests on the shared FalkorDB often create exactly one. Two of our
     // own keep the count above one so nothing gets auto-selected.
     const graphNames = [getRandomString("chat"), getRandomString("chat")];
-    await Promise.all(graphNames.map((name) => apiCall.addGraph(name)));
 
     try {
+      // Let both creations settle before failing, so `finally` also removes a
+      // graph whose sibling failed instead of leaking it into the shared DB.
+      const created = await Promise.allSettled(graphNames.map((name) => apiCall.addGraph(name)));
+      const failure = created.find((result): result is PromiseRejectedResult => result.status === "rejected");
+      if (failure) throw failure.reason;
+
       await browser.createNewPage(ChatComponent);
       const page = await browser.getPage();
       await page.addInitScript(() => {
@@ -73,7 +78,8 @@ test.describe("Chat Feature Tests", () => {
       await expect(page.getByTestId("chatToggleButton")).toBeVisible();
       await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
     } finally {
-      await Promise.all(graphNames.map((name) => apiCall.removeGraph(name)));
+      // allSettled: removing a graph that was never created must not mask the real error.
+      await Promise.allSettled(graphNames.map((name) => apiCall.removeGraph(name)));
     }
   });
 
