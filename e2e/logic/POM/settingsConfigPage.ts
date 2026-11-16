@@ -65,7 +65,7 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     valueTooltip(value: string): Locator {
-        return this.page.getByRole("tooltip").filter({ hasText: new RegExp(`^${value}$`) });
+        return this.page.getByRole("tooltip").filter({ hasText: new RegExp(`^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) });
     }
 
     public get errorToast(): Locator {
