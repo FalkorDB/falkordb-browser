@@ -284,9 +284,12 @@ test.describe('Query history Tests', () => {
     test(`@admin search and graph filter narrow the list; select-all affects visible rows only`, async () => {
         const firstGraph = getRandomString('queryhistory');
         const secondGraph = getRandomString('queryhistory');
-        await apicalls.addGraph(firstGraph);
-        await apicalls.addGraph(secondGraph);
+        const created: string[] = [];
         try {
+            await apicalls.addGraph(firstGraph);
+            created.push(firstGraph);
+            await apicalls.addGraph(secondGraph);
+            created.push(secondGraph);
             const tag = getRandomString('filter');
             const [alpha, beta, gamma] = [`RETURN '${tag}-alpha'`, `RETURN '${tag}-beta'`, `RETURN '${tag}-gamma'`];
             const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
@@ -326,10 +329,11 @@ test.describe('Query history Tests', () => {
             await expect(graph.historySelectedCount).toHaveText("1");
             await expect(graph.historySelectAllButton).toHaveAttribute("aria-label", "Select all queries");
         } finally {
-            await Promise.allSettled([
-                apicalls.removeGraph(firstGraph, "admin"),
-                apicalls.removeGraph(secondGraph, "admin"),
-            ]);
+            // Logged, not thrown: a failed cleanup must not replace the test's own error
+            const results = await Promise.allSettled(created.map((name) => apicalls.removeGraph(name, "admin")));
+            results.forEach((result, index) => {
+                if (result.status === "rejected") console.error(`Failed to remove graph ${created[index]}:`, result.reason);
+            });
         }
     });
 
