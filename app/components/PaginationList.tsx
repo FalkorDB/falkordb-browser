@@ -292,7 +292,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                     onFocus={() => setHoverIndex(0)}
                     onBlur={() => setHoverIndex(-1)}
                 />
-                {isLoading && <Loader2 className="w-4 h-4 animate-spin duration-[infinite]" />}
+                {isLoading && <Loader2 data-testid={`${label}SearchLoading`} className="w-4 h-4 animate-spin duration-[infinite]" />}
             </div>
             <ul
                 ref={containerRef}

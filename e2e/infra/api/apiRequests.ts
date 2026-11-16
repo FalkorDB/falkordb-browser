@@ -25,6 +25,11 @@ const postRequest = async (url: string, body?: any, availableRequest?: APIReques
   return response;
 };
 
+const postMultipartRequest = async (url: string, multipart: Record<string, { name: string; mimeType: string; buffer: Buffer }>) => {
+  const requestContext = await request.newContext();
+  return requestContext.post(url, { multipart });
+};
+
 const deleteRequest = async (url: string, headers?: Record<string, string>, body?: any) => {
   const requestOptions = {
     data: body,
@@ -47,4 +52,4 @@ const patchRequest = async (url: string, body?: any, availableRequest?: APIReque
   return response;
 };
 
-export { getRequest, deleteRequest, postRequest, patchRequest }
+export { getRequest, deleteRequest, postRequest, patchRequest, postMultipartRequest }

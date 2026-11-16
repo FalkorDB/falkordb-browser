@@ -2630,6 +2630,22 @@ const swaggerSpec = {
           "400": {
             description: "Bad request - missing parameters"
           },
+          "403": {
+            description: "Forbidden - only Admin users can manage users, or users are managed by LDAP on this connection",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: only Admin users can manage users"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "409": {
             description: "User already exists"
           },
@@ -2693,6 +2709,22 @@ const swaggerSpec = {
           "400": {
             description: "Bad request"
           },
+          "403": {
+            description: "Forbidden - only Admin users can manage users, or users are managed by LDAP on this connection",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: only Admin users can manage users"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "500": {
             description: "Internal server error"
           }
@@ -2724,6 +2756,22 @@ const swaggerSpec = {
           },
           "400": {
             description: "Bad request"
+          },
+          "403": {
+            description: "Forbidden - only Admin users can manage users, or users are managed by LDAP on this connection",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: only Admin users can manage users"
+                    }
+                  }
+                }
+              }
+            }
           },
           "500": {
             description: "Internal server error"
@@ -2794,6 +2842,22 @@ const swaggerSpec = {
           },
           "400": {
             description: "Bad request - validation error or invalid role"
+          },
+          "403": {
+            description: "Forbidden - only Admin users can manage users, or users are managed by LDAP on this connection",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: only Admin users can manage users"
+                    }
+                  }
+                }
+              }
+            }
           },
           "500": {
             description: "Internal server error"

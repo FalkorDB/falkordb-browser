@@ -148,6 +148,11 @@ export default class GraphPage extends BasePage {
     return (type: Type = "Graph") => this.page.getByTestId(`${type}Search`);
   }
 
+  /** Shown while opening the graph list refreshes it. */
+  public get graphListLoading(): Locator {
+    return this.page.getByTestId("GraphSearchLoading");
+  }
+
   // MANAGE
   public get manage(): Locator {
     return this.page.getByTestId("manageGraphs");
@@ -1641,6 +1646,12 @@ export default class GraphPage extends BasePage {
     await this.refreshPage();
   }
 
+  private get listedGraphNames(): Locator {
+    return this.page.locator(
+      '//ul[@data-testid="queryList"]//p[contains(@data-testid, "selectGraph")]'
+    );
+  }
+
   /**
    * The graph names as the select list renders them, in display order, narrowed
    * to the graphs matching `searchTerm` so a shared server doesn't affect it.
@@ -1651,13 +1662,28 @@ export default class GraphPage extends BasePage {
   ): Promise<string[]> {
     await this.clickSelect();
     await this.fillSearch(searchTerm);
-    const names = this.page.locator(
-      '//ul[@data-testid="queryList"]//p[contains(@data-testid, "selectGraph")]'
-    );
+    const names = this.listedGraphNames;
     // The search is debounced, so the unfiltered list is still on screen for a
     // moment; wait for it to settle on the matches before reading the order.
     await expect(names).toHaveCount(expectedCount);
     return (await names.allInnerTexts()).map((name) => name.trim());
+  }
+
+  /**
+   * One read of the graph names the select list shows for `searchTerm`, opening
+   * the list when it is closed. It does not wait for the list to settle, so poll
+   * it; close the list with `closeGraphList` before leaving the page's graph view.
+   */
+  async readGraphNamesInList(searchTerm: string): Promise<string[]> {
+    if (!(await this.search().isVisible())) await this.clickSelect();
+    await this.fillSearch(searchTerm);
+    const names = this.listedGraphNames;
+    return (await names.allInnerTexts()).map((name) => name.trim());
+  }
+
+  async closeGraphList(): Promise<void> {
+    await this.page.keyboard.press("Escape");
+    await expect(this.search()).toBeHidden();
   }
 
   async verifyGraphExists(graphName: string, apiCall?: any): Promise<boolean> {
@@ -1848,13 +1874,7 @@ export default class GraphPage extends BasePage {
     body: string,
     withHeaders = true
   ): Promise<void> {
-    await this.openUploadDialog(graphName);
-    await interactWhenVisible(this.loadCsvTabTrigger, (el) => el.click(), "Load CSV Tab");
-    await this.setUploadFile(absoluteFilePath);
-    await interactWhenVisible(this.csvUploadTempConfirm, (el) => el.click(), "Upload CSV Button");
-
-    // Step 2 (query editor + Run) appears once the CSV is stored.
-    await waitForElementToBeVisible(this.loadCsvRunConfirm);
+    await this.uploadCsvToTemp(graphName, absoluteFilePath);
 
     if (!withHeaders) {
       await this.loadCsvWithHeadersCheckbox.uncheck();
@@ -1865,8 +1885,23 @@ export default class GraphPage extends BasePage {
     // binds Enter to submit. `window.monaco` is exposed by EditorComponent.
     await this.setLoadCsvBody(body);
 
-    await interactWhenVisible(this.loadCsvRunConfirm, (el) => el.click(), "Run LOAD CSV");
+    await this.clickLoadCsvRun();
     await waitForElementToBeVisible(this.toast);
+  }
+
+  /** Open the dialog on the Load CSV tab and upload the file to temp storage (step 1), landing on the query step. */
+  async uploadCsvToTemp(graphName: string, absoluteFilePath: string): Promise<void> {
+    await this.openUploadDialog(graphName);
+    await this.selectUploadTab("csv");
+    await this.setUploadFile(absoluteFilePath);
+    await interactWhenVisible(this.csvUploadTempConfirm, (el) => el.click(), "Upload CSV Button");
+
+    // Step 2 (query editor + Run) appears once the CSV is stored.
+    await waitForElementToBeVisible(this.loadCsvRunConfirm);
+  }
+
+  async clickLoadCsvRun(): Promise<void> {
+    await interactWhenVisible(this.loadCsvRunConfirm, (el) => el.click(), "Run LOAD CSV");
   }
 
   /**
@@ -1932,20 +1967,27 @@ export default class GraphPage extends BasePage {
     }
     if (!isEnabled) throw new Error("Graph selector is not enabled after reloading the graph list");
 
-    const graphListResponse = this.page.waitForResponse(
-      (response) => {
-        const { pathname } = new URL(response.url());
-        // Match only the graph-list endpoint, not nested requests such as
-        // /api/graph/<name>?query=... or /api/graph/<name>/memory.
-        return /^\/api\/graph\/?$/.test(pathname) && response.request().method() === "GET";
+    // Any list refresh (on opening, or the periodic one) that finds only our graph
+    // (parallel tests drop theirs) auto-selects it and closes the list, at any
+    // point of this flow. So retry on the actual state instead of ordering steps.
+    // The trigger shows "Select Graph" when nothing is selected, so that label
+    // never proves a graph of the same name is selected.
+    const isSelected = async () => graphName !== "Select Graph"
+      // Raw text: graph names may carry significant whitespace.
+      && await this.select("Graph").textContent() === graphName;
+    await expect(async () => {
+      if (await isSelected()) {
+        if (await this.search().isVisible()) await this.page.keyboard.press("Escape");
+        await expect(this.search()).toBeHidden({ timeout: 2000 });
+        return;
       }
-    );
-
-    await this.clickSelect();
-    await graphListResponse;
-    await this.fillSearch(graphName);
-    await waitForElementToBeVisible(this.selectItem("Graph", graphName), 500, 20);
-    await this.clickSelectItem(graphName); // selecting the first item in list after search
+      if (!(await this.search().isVisible())) await this.select("Graph").click({ timeout: 2000 });
+      await expect(this.graphListLoading).toBeHidden({ timeout: 10000 });
+      await this.search().fill(graphName, { timeout: 2000 });
+      await this.selectItem("Graph", graphName).click({ timeout: 5000 });
+      await expect(this.search()).toBeHidden({ timeout: 2000 });
+      if (graphName !== "Select Graph") await expect.poll(() => this.select("Graph").textContent(), { timeout: 2000 }).toBe(graphName);
+    }).toPass({ timeout: 45000 });
   }
 
   /** The graph page writes the selection, view and layout to the URL once the selection settles. */
