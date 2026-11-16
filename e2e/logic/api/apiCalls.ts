@@ -129,6 +129,23 @@ export default class ApiCalls {
     }
   }
 
+  async migrateSession(
+    requestContext: APIRequestContext
+  ): Promise<{ status: number; body: { message?: string } }> {
+    try {
+      const result = await postRequest(
+        urls.api.migrateSessionUrl,
+        undefined,
+        requestContext
+      );
+      return { status: result.status(), body: await result.json() };
+    } catch (error) {
+      throw new Error(
+        `Failed to call migrate-session. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
   async addGraph(graphName: string): Promise<AddGraphResponse> {
     try {
       const requestUrl = `${urls.api.graphUrl + graphName}?query=RETURN%201`;
