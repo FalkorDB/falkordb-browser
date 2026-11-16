@@ -705,13 +705,9 @@ test.describe("Chat Feature Tests", () => {
     
     for (let i = 0; i < messages.length; i += 1) {
       const message = messages[i];
-      // eslint-disable-next-line no-await-in-loop
       await chat.fillChatInput(message);
-      // eslint-disable-next-line no-await-in-loop
       await chat.waitForChatSendButtonEnabled();
-      // eslint-disable-next-line no-await-in-loop
       await chat.clickChatSendButton();
-      // eslint-disable-next-line no-await-in-loop
       await chat.waitForUserMessageCount(i + 1);
     }
 
