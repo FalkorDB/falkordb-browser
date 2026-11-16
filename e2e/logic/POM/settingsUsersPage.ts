@@ -1,6 +1,8 @@
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from "../../infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible, waitForElementToNotBeVisible, waitForTimeOut } from "../../infra/utils";
+
+type EditUserOptions = { role?: string, keys?: string, password?: string, confirmPassword?: string };
 
 export default class SettingsUsersPage extends BasePage {
   private get usersTabBtn(): Locator {
@@ -67,6 +69,10 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.locator("//input[@id='Key / Graph Permissions']");
   }
 
+  private get editKeysContainer(): Locator {
+    return this.editKeysField.locator("..");
+  }
+
   private get confirmUserDeleteMsg(): Locator {
     return this.page.getByRole("button", { name: "Continue" });
   }
@@ -109,6 +115,19 @@ export default class SettingsUsersPage extends BasePage {
 
   private get fakeRow(): Locator {
     return this.page.locator("//table//tbody//tr[@class='fakeRow']");
+  }
+
+  private get userForm(): Locator {
+    return this.page.getByRole("dialog");
+  }
+
+  private get errorToast(): Locator {
+    return this.page.getByTestId("toast-destructive");
+  }
+
+  private get editKeyTagRemoveBtn(): (key: string) => Locator {
+    return (key: string) =>
+      this.editKeysContainer.getByRole("button", { name: `Remove ${key}`, exact: true });
   }
 
   async navigateToUserTab(): Promise<void> {
@@ -219,8 +238,7 @@ export default class SettingsUsersPage extends BasePage {
     );
   }
 
-  async addUser(userDetails: { [key: string]: string }): Promise<void> {
-    await this.waitForPageIdle();
+  async fillAddUserForm(userDetails: { [key: string]: string }): Promise<void> {
     await this.clickOnAddUserBtn();
     await this.fillUserNameField(userDetails.userName);
     await this.fillPasswordField(userDetails.password);
@@ -229,8 +247,22 @@ export default class SettingsUsersPage extends BasePage {
       await this.clickOnSelectRoleBtnInAddUser();
       await this.clickOnSelectUserRole(userDetails.role);
     }
+  }
+
+  async addUser(userDetails: { [key: string]: string }): Promise<void> {
+    await this.waitForPageIdle();
+    await this.fillAddUserForm(userDetails);
     await this.clickOnSubmitUserAddition();
-    await waitForTimeOut(this.page, 1500);
+    await this.waitForUserFormToSettle();
+  }
+
+  // A submitted form closes once the request succeeds; an invalid one stays open showing field errors.
+  private async waitForUserFormToSettle(): Promise<void> {
+    await Promise.race([
+      this.userForm.waitFor({ state: "hidden" }),
+      this.errorToast.waitFor({ state: "visible" }),
+      this.userForm.getByRole("alert").first().waitFor({ state: "visible" }),
+    ]);
   }
 
   async getUserRole(selectedUser: string): Promise<string | null> {
@@ -250,11 +282,7 @@ export default class SettingsUsersPage extends BasePage {
     await waitForTimeOut(this.page, 1500);
   }
 
-  async editUser(selectedUser: string, options: { role?: string, keys?: string, password?: string, confirmPassword?: string }): Promise<void> {
-    await this.waitForPageIdle();
-    await this.searchForElement(selectedUser);
-    await this.clickUserCheckboxBtn(selectedUser);
-    await this.clickOnEditUserBtn();
+  async fillEditUserForm(options: EditUserOptions): Promise<void> {
     if (options.password) {
       await this.fillEditNewPasswordField(options.password);
       await this.fillEditConfirmPasswordField(options.confirmPassword || options.password);
@@ -266,8 +294,16 @@ export default class SettingsUsersPage extends BasePage {
     if (options.keys !== undefined) {
       await this.fillEditKeysField(options.keys);
     }
+  }
+
+  async editUser(selectedUser: string, options: EditUserOptions): Promise<void> {
+    await this.waitForPageIdle();
+    await this.searchForElement(selectedUser);
+    await this.clickUserCheckboxBtn(selectedUser);
+    await this.clickOnEditUserBtn();
+    await this.fillEditUserForm(options);
     await this.clickOnSubmitEditUser();
-    await waitForTimeOut(this.page, 1500);
+    await this.waitForUserFormToSettle();
   }
 
   async clickOnEditUserBtn(): Promise<void> {
@@ -276,6 +312,10 @@ export default class SettingsUsersPage extends BasePage {
       (el) => el.click(),
       "edit user button"
     );
+  }
+
+  async isEditUserButtonEnabled(): Promise<boolean> {
+    return interactWhenVisible(this.editUserButton, (el) => el.isEnabled(), "edit user button");
   }
 
   async clickOnSubmitEditUser(): Promise<void> {
@@ -312,8 +352,7 @@ export default class SettingsUsersPage extends BasePage {
 
   async fillEditKeysField(keys: string): Promise<void> {
     // Remove all existing tags by clicking their remove buttons (scoped to tag input container)
-    const keysContainer = this.editKeysField.locator('..');
-    const removeButtons = keysContainer.locator("button[aria-label^='Remove ']");
+    const removeButtons = this.editKeysContainer.locator("button[aria-label^='Remove ']");
     while (await removeButtons.count() > 0) {
       await removeButtons.first().click();
     }
@@ -343,8 +382,55 @@ export default class SettingsUsersPage extends BasePage {
   async getUserKeys(selectedUser: string): Promise<string | null> {
     await this.waitForPageIdle();
     await this.searchForElement(selectedUser);
-    const keys = await this.userKeysContent(selectedUser).textContent();
-    return keys;
+    return this.getUserKeysInRow(selectedUser);
+  }
+
+  async getUserKeysInRow(selectedUser: string): Promise<string | null> {
+    return this.userKeysContent(selectedUser).textContent();
+  }
+
+  async getUserRowCount(selectedUser: string): Promise<number> {
+    return this.findUserNameInTable(selectedUser).count();
+  }
+
+  async getUserNameFieldValue(): Promise<string> {
+    return interactWhenVisible(this.userNameField, (el) => el.inputValue(), "user name input");
+  }
+
+  async isUserNameFieldDisabled(): Promise<boolean> {
+    return interactWhenVisible(this.userNameField, (el) => el.isDisabled(), "user name input");
+  }
+
+  async getPasswordFieldValue(): Promise<string> {
+    return interactWhenVisible(this.passwordField, (el) => el.inputValue(), "password input");
+  }
+
+  async getEditSelectedRole(): Promise<string | null> {
+    return interactWhenVisible(this.editSelectRoleBtn, (el) => el.textContent(), "edit select role button");
+  }
+
+  async isEditKeyTagVisible(key: string): Promise<boolean> {
+    return waitForElementToBeVisible(this.editKeyTagRemoveBtn(key));
+  }
+
+  async isEditKeyTagNotVisible(key: string): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.editKeyTagRemoveBtn(key));
+  }
+
+  async isUserFormVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.userForm);
+  }
+
+  async isUserFormNotVisible(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.userForm);
+  }
+
+  async getErrorToastText(): Promise<string> {
+    return (await interactWhenVisible(
+      this.errorToast.getByTestId("toast-description"),
+      (el) => el.textContent(),
+      "error toast description"
+    )) || "";
   }
 
   async deleteTwoUsers(

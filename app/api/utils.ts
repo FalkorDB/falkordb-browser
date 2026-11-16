@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server.js";
+import { isTutorialDemoGraphName } from "../../lib/tutorialDemoGraphs.ts";
 export { runQuery } from "./run-query.ts";
 
 const AUTO_NEXTAUTH_URL = "auto";
@@ -14,6 +15,11 @@ const TRUST_PROXY_HEADERS = "true";
 export function resolveReadOnly(request: NextRequest, userRole?: string): boolean {
     return request.nextUrl.searchParams.get("readOnly") === "true"
         || userRole === "Read-Only";
+}
+
+// Background reads must not recreate a removed sample; explicit mutations use resolveReadOnly.
+export function resolveGraphReadOnly(request: NextRequest, userRole: string | undefined, graphId: string): boolean {
+    return isTutorialDemoGraphName(graphId) || resolveReadOnly(request, userRole);
 }
 
 /**

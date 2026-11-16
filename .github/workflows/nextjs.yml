@@ -1,24 +1,19 @@
 name: Build
 
+# No path filters: `build`, `codecov/project` and `codecov/patch` are required
+# checks, and a skipped run would leave them pending forever. Codecov reports
+# only for a commit that uploaded coverage, which this workflow always does.
 on:
   push:
     branches: ["main", "staging"]
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE.txt'
-      - '.github/dependabot.yml'
 
   pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE.txt'
-      - '.github/dependabot.yml'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -54,11 +49,45 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --progress=false
 
+      # Also records raw V8 coverage, turned into a report over every source
+      # file (see .github/scripts/coverage-report.mjs).
       - name: Run unit tests with coverage
         run: npm run test:coverage
+        env:
+          NODE_V8_COVERAGE: coverage/raw/unit
 
+      # The build script, as the Docker image and the e2e tests build it (webpack).
       - name: Build with Next.js
-        run: npx next build
+        run: npm run build
+
+      # Last, so a Codecov problem never skips the build.
+      - name: Build the unit coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs unit coverage/raw/unit
+
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/unit/codecov.json
+          disable_search: true
+          flags: unit
+          name: unit
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-unit
+          path: coverage/unit/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
 
   smoke-tests:
     runs-on: ubuntu-latest
@@ -94,6 +123,33 @@ jobs:
         env:
           FALKORDB_SMOKE: "1"
           FALKORDB_URL: redis://localhost:6379
+          NODE_V8_COVERAGE: coverage/raw/smoke
+      - name: Build the smoke coverage report
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/coverage-report.mjs smoke coverage/raw/smoke
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/smoke/codecov.json
+          disable_search: true
+          flags: smoke
+          name: smoke
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-smoke
+          path: coverage/smoke/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
 
   security-scan:
     runs-on: ubuntu-latest
@@ -152,7 +208,7 @@ jobs:
           fi
 
       - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
         if: always() && steps.check-sarif.outputs.sarif_exists == 'true'
         with:
           sarif_file: 'trivy-results.sarif'

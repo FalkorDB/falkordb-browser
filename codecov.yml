@@ -1,0 +1,43 @@
+# Coverage is measured over every source file (.github/scripts/coverage-report.mjs
+# decides which), by every kind of test, each uploaded under its own flag:
+#   unit     node --test unit tests              (Build workflow)
+#   smoke    node --test smoke tests vs FalkorDB (Build workflow)
+#   e2e      Playwright, browser and server side (Playwright Tests workflow)
+#   desktop  Electron shell tests                (Desktop app workflow)
+#   mobile   Capacitor shell tests               (Mobile app workflow)
+# Codecov merges them per commit: a line any test runs is covered.
+#
+# The gate is not Codecov's: the Coverage status workflow posts
+# coverage/project and coverage/patch (95%, required by branch protection) once
+# every coverage workflow of the commit has finished and Codecov has processed
+# its uploads (.github/scripts/coverage-gate.mjs). Codecov posts its statuses
+# whenever a pull request changes, before the tests are done, so they are off.
+
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    # Comment once the Coverage status workflow says the coverage is complete.
+    manual_trigger: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "95...100"
+
+  status:
+    project: off
+    patch: off
+
+flag_management:
+  default_rules:
+    # A workflow a commit does not trigger (Desktop and Mobile run only for
+    # their own paths) keeps its flag's last coverage. That is safe because
+    # each flag reports only the code its workflow tests (desktop: desktop/,
+    # mobile: mobile/, the others: the web app), and the workflow runs
+    # whenever that code changes.
+    carryforward: true
+
+comment:
+  layout: "header, diff, flags, files"
+  behavior: default
+  require_changes: false

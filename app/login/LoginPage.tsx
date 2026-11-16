@@ -2,7 +2,8 @@
 
 import { SignInResponse, signIn, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import Image from "next/image";
 import Link from "next/link";
 import { FileText } from "lucide-react";
@@ -240,6 +241,7 @@ export default function LoginPage() {
           <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             <Link
               href="/docs"
+              onNavigate={event => { event.preventDefault(); router.push("/docs"); }}
               className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
             >
               <FileText className="w-4 h-4" />

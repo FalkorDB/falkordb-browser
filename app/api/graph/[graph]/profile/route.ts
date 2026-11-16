@@ -1,6 +1,7 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders, resolveReadOnly, corsPreflight } from "../../../utils";
+import { isReadOnlyQuery } from "@/lib/falkordb-cypher/readOnly";
 
 export const OPTIONS = corsPreflight;
 
@@ -48,6 +49,13 @@ export async function POST(
     const { graph: graphId } = await params;
 
     try {
+      if (!isReadOnlyQuery(body.query)) {
+        return NextResponse.json(
+          { message: "Profile only supports valid read-only Cypher queries; update clauses and CALL procedures are not profiled." },
+          { status: 400, headers: getCorsHeaders(request) }
+        );
+      }
+
       const graph = client.selectGraph(graphId);
       // The plan's lines, which the UI renders, as before falkordb 7
       const result = (await graph.profile(body.query)).steps;

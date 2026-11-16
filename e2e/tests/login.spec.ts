@@ -79,6 +79,12 @@ test.describe(`Login tests`, () => {
         await expect.poll(() => urlPath(login.getCurrentURL()), { timeout: 10000 }).toBe(urlPath(urls.graphUrl));
     });
 
+    test(`@admin API Documentation link opens the API docs`, async () => {
+        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
+        await login.disconnectConnection();
+        expect(await login.openApiDocumentation()).toBe("/docs");
+    });
+
     test(`@admin validate user login with credentials`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
         await login.disconnectConnection();

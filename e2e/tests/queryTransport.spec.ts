@@ -46,6 +46,16 @@ test("@admin Query transports enforce read-only profiling and preserve SSE error
       data: { query: "CREATE (:Forbidden)", timeout: 1 },
     });
     expect(profile.status()).toBe(403);
+    const writeProfile = await request.post(`/api/graph/${graph}/profile`, {
+      data: { query: "CREATE (:Forbidden)" },
+    });
+    expect(writeProfile.status()).toBe(400);
+    expect((await writeProfile.json()).message).toContain("Profile only supports valid read-only Cypher queries");
+    const readProfile = await request.post(`/api/graph/${graph}/profile`, {
+      data: { query: "RETURN 1" },
+    });
+    expect(readProfile.status()).toBe(200);
+    expect((await readProfile.json()).result.length).toBeGreaterThan(0);
     const readOnly = await request.get(`/api/graph/${graph}`, {
       params: { query: "CREATE (:Forbidden)", timeout: 1 },
     });

@@ -30,6 +30,10 @@ const swaggerSpec = {
       name: "Graph",
       description: "Graph management and query endpoints",
     },
+    {
+      name: "AI Assistance",
+      description: "AI-assisted Cypher query analysis and repair",
+    },
     // {
     //   name: "Schema",
     //   description: "Schema management endpoints",
@@ -784,6 +788,112 @@ const swaggerSpec = {
         }
       }
     },
+    "/api/chat/fix": {
+      post: {
+        tags: ["AI Assistance"],
+        summary: "Suggest a fix for a Cypher query",
+        description: "Analyze a failed Cypher query and return an explanation and optional corrected query. The query is not executed.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query", "errorMessage", "model"],
+                properties: {
+                  query: { type: "string", minLength: 1, maxLength: 8192 },
+                  errorMessage: { type: "string", minLength: 1, maxLength: 4096 },
+                  graphName: { type: "string", maxLength: 255 },
+                  hint: { type: "string", maxLength: 1024 },
+                  key: { type: "string", maxLength: 1024, writeOnly: true, default: "" },
+                  model: { type: "string", minLength: 1, maxLength: 256 },
+                  modelSource: { type: "string", enum: ["api-key", "local"], default: "api-key" },
+                  localProvider: { type: "string", enum: ["ollama", "lmstudio"], default: "ollama" },
+                  localEndpoint: { type: "string", maxLength: 2048, default: "" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Explanation and optional corrected query",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["explanation"],
+                  properties: {
+                    explanation: { type: "string" },
+                    correctedQuery: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Invalid request or unsupported provider" },
+          "401": { description: "Authentication failed or the provider rejected its API key" },
+          "413": { description: "Request body is too large" },
+          "422": { description: "The provider could not complete the request" },
+          "500": { description: "Internal server error" },
+        },
+      },
+    },
+    "/api/chat/optimize": {
+      post: {
+        tags: ["AI Assistance"],
+        summary: "Analyze a Cypher query for optimization opportunities",
+        description: "Analyze the query, its EXPLAIN plan, and available indexes without executing the query.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query", "graphName", "model"],
+                properties: {
+                  query: { type: "string", minLength: 1, maxLength: 8192 },
+                  guidance: { type: "string", maxLength: 2000 },
+                  graphName: { type: "string", minLength: 1, maxLength: 255 },
+                  key: { type: "string", maxLength: 1024, writeOnly: true, default: "" },
+                  model: { type: "string", minLength: 1, maxLength: 256 },
+                  modelSource: { type: "string", enum: ["api-key", "local"], default: "api-key" },
+                  localProvider: { type: "string", enum: ["ollama", "lmstudio"], default: "ollama" },
+                  localEndpoint: { type: "string", maxLength: 2048 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Query analysis and original execution plan",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["explanation", "suggestions", "executionPlan"],
+                  properties: {
+                    explanation: { type: "string" },
+                    suggestions: { type: "array", items: { type: "string" } },
+                    optimizedQuery: { type: "string" },
+                    executionPlan: { type: "array", items: { type: "string" } },
+                    indexWarning: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Invalid request or unable to read the query plan" },
+          "401": { description: "Authentication failed or the provider rejected its API key" },
+          "413": { description: "Request body is too large" },
+          "422": { description: "The provider could not complete the request" },
+          "500": { description: "Internal server error" },
+        },
+      },
+    },
     "/api/graph/{graph}/explain": {
       get: {
         tags: ["Graph"],
@@ -821,7 +931,7 @@ const swaggerSpec = {
       post: {
         tags: ["Graph"],
         summary: "Profile query execution",
-        description: "Execute a Cypher query and return profiling information. Requires a writable user and connection; read-only mode returns 403.",
+        description: "Get detailed profiling information for a valid read-only Cypher query. Update clauses and CALL procedures, including read-only procedures, are not supported. Requires a writable user and connection; read-only mode returns 403.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -852,7 +962,7 @@ const swaggerSpec = {
           "200": {
             description: "Query profiling information returned successfully"
           },
-          "400": { description: "Invalid JSON, missing query, or query profiling failed" },
+          "400": { description: "Invalid JSON, missing, invalid or unsupported query, or query profiling failed. Profiling accepts only read-only Cypher without CALL procedures." },
           "401": { description: "Authentication or an active connection is required" },
           "403": { description: "Profiling is unavailable in read-only mode" },
           "415": { description: "Content-Type must be application/json" },
@@ -1232,7 +1342,7 @@ const swaggerSpec = {
       post: {
         tags: ["Graph"],
         summary: "Set node/relationship property",
-        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships.",
+        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use property as the key path segment and supply the name in the propertyKey query parameter.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1260,7 +1370,14 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name"
+            description: "Property key name, or property when propertyKey is supplied"
+          },
+          {
+            in: "query",
+            name: "propertyKey",
+            required: false,
+            schema: { type: "string", minLength: 1 },
+            description: "Exact property name to set; overrides the key in the path. An empty value is rejected with 400"
           }
         ],
         requestBody: {
@@ -1294,7 +1411,7 @@ const swaggerSpec = {
       delete: {
         tags: ["Graph"],
         summary: "Remove node/relationship property",
-        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships.",
+        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use property as the key path segment and supply the name in the propertyKey query parameter.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1322,7 +1439,14 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name"
+            description: "Property key name, or property when propertyKey is supplied"
+          },
+          {
+            in: "query",
+            name: "propertyKey",
+            required: false,
+            schema: { type: "string", minLength: 1 },
+            description: "Exact property name to remove; overrides the key in the path. An empty value is rejected with 400"
           }
         ],
         requestBody: {

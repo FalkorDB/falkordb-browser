@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { SYNTAX_ERROR_HINT } from "../cypherErrors.ts";
 import { grammarErrorsToDiagnostics, prettifyGrammarMessage } from "./grammarDiagnostics.ts";
+import { lint } from "./linter.ts";
 
 describe("prettifyGrammarMessage", () => {
   it("normalizes mismatched/extraneous input into Unexpected", () => {
@@ -51,4 +52,44 @@ describe("grammarErrorsToDiagnostics", () => {
 
     assert.deepEqual([diagnostics[0].startColumn, diagnostics[0].endColumn], [11, 14]);
   });
+});
+
+describe("Cypher grammar compatibility (#2208)", () => {
+  it("still reports syntax errors for invalid queries", () => {
+    assert.notDeepEqual(lint("MATCH (n RETURN n"), []);
+  });
+
+  for (const query of ["MATCH (n) RETURN n {.name .age}", "MATCH (n) RETURN n {.name,}"]) {
+    it(`rejects malformed map projection: ${query}`, () => {
+      assert.notDeepEqual(lint(query), []);
+    });
+  }
+
+  const validQueries = [
+    "MATCH (n) WHERE exists(n.name) RETURN n",
+    "CALL { MATCH (m) RETURN m } RETURN m",
+    "MATCH (n) WHERE EXISTS { MATCH (n)-->(m) } RETURN n",
+    "/* **/ RETURN 1",
+    "MATCH (n) RETURN n {.name}",
+    "MATCH (n) RETURN n {.*}",
+    "MATCH (n) RETURN n {.name} AS person",
+    "MATCH (n) RETURN collect(n {.name})",
+    "MATCH (n) RETURN collect(n {.name}) AS people",
+    "MATCH (n) RETURN n {name: n.name, answer: 42}",
+    "MATCH (n) WITH n, 42 AS answer RETURN n {.name, answer}",
+    "MATCH (n) RETURN n {nested: n {.name}}",
+    "CALL db.labels() YIELD label AS name WHERE name = 'Person' RETURN name",
+    "MATCH (n) CALL db.labels() YIELD label AS name WHERE name = 'Person' RETURN n, name",
+    "MATCH (n:Call) RETURN n",
+    "MATCH (n) RETURN n.call",
+    "MATCH (n:Yield) RETURN n.yield",
+    "MATCH ()-[r:YIELD]->() RETURN r",
+    "CREATE VECTOR INDEX FOR ()-[e:Call]->() ON (e.embedding) OPTIONS {dimension:3, similarityFunction:'euclidean'}",
+  ];
+
+  for (const query of validQueries) {
+    it(`accepts ${query}`, () => {
+      assert.deepEqual(lint(query), []);
+    });
+  }
 });

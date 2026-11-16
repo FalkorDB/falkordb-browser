@@ -1,5 +1,6 @@
 import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, securedFetch, Query } from "@/lib/utils";
 import { getStatsLines } from "@/lib/queryStats";
+import { getProfileUrl } from "@/lib/graphUrls";
 import { JSONTree } from "react-json-tree";
 import { useContext, useMemo, useState } from "react";
 import { Info } from "lucide-react";
@@ -41,7 +42,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
         const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
         try {
-            const result = await securedFetch(`/api/graph/${query.graphName}/profile`, {
+            const result = await securedFetch(getProfileUrl(query.graphName), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query: query.text }),
@@ -80,14 +81,15 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
                 />
                 <Button
                     className="cursor-default"
-                    title="be aware that running the profile command will change your data"
+                    title="Profile executes read-only queries to measure their performance. Update clauses and CALL procedures are not supported."
                 >
                     <Info size={25} />
                 </Button>
             </div>
+            <p className="text-xs">Only read-only Cypher is profiled. CALL procedures, including read-only procedures, are not supported.</p>
             {
                 profile.length > 0 &&
-                <div className="h-1 grow w-full overflow-auto">
+                <div className="h-1 grow w-full overflow-auto" data-testid="profileTree">
                     <JSONTree
                         data={createNestedObject(profile)}
                         shouldExpandNodeInitially={() => true}
@@ -126,7 +128,7 @@ export function Metadata({ query, hideTitle }: {
     return (
         <>
             {!hideTitle && <h1 className="text-2xl font-bold">Metadata</h1>}
-            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs">
+            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs" data-testid="metadataLines">
                 {getStatsLines(query).map((m, i) => (
                     <li key={i}>{m}</li>
                 ))}
