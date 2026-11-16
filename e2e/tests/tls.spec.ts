@@ -385,29 +385,39 @@ test.describe(`@tls TLS Login tests`, () => {
                     requestAnimationFrame(() => { document.documentElement.dataset.firstReadLoaded = "true"; });
                 });
                 readAsDataURL.call(reads[0].reader, reads[0].file);
-            });
-            window.addEventListener("complete-second-read", () => readAsDataURL.call(reads[1].reader, reads[1].file));
+            }, { once: true });
+            window.addEventListener("complete-second-read", () => {
+                if (reads[1]) readAsDataURL.call(reads[1].reader, reads[1].file);
+            }, { once: true });
         });
         await browser.navigateTo(urls.loginUrl);
         await login.clickEnableTLS();
         const firstUpload = login.uploadCertificate(certificatePath);
-        await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
-        await expect(login.logInButton).toBeDisabled();
-        await login.clickUrlMode();
-        await login.fillFalkorDBUrl("falkor://localhost:6379");
-        await expect(login.logInButton).toBeEnabled();
-        await page.evaluate(() => window.dispatchEvent(new Event("complete-first-read")));
-        await page.waitForFunction(() => document.documentElement.dataset.firstReadLoaded === "true");
-        await expect(login.logInButton).toBeEnabled();
-        await login.clickManualMode();
-        expect(await login.isTLSEnabled()).toBe(false);
-        await login.clickEnableTLS();
-        expect(await login.isTLSEnabled()).toBe(true);
-        expect(await login.isCertificateRemoved()).toBe(true);
-        const secondUpload = login.uploadCertificate(certificatePath);
-        await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
-        await page.evaluate(() => window.dispatchEvent(new Event("complete-second-read")));
-        await Promise.all([firstUpload, secondUpload]);
+        let secondUpload: Promise<void> | undefined;
+        try {
+            await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
+            await expect(login.logInButton).toBeDisabled();
+            await login.clickUrlMode();
+            await login.fillFalkorDBUrl("falkor://localhost:6379");
+            await expect(login.logInButton).toBeEnabled();
+            await page.evaluate(() => window.dispatchEvent(new Event("complete-first-read")));
+            await page.waitForFunction(() => document.documentElement.dataset.firstReadLoaded === "true");
+            await expect(login.logInButton).toBeEnabled();
+            await login.clickManualMode();
+            expect(await login.isTLSEnabled()).toBe(false);
+            await login.clickEnableTLS();
+            expect(await login.isTLSEnabled()).toBe(true);
+            expect(await login.isCertificateRemoved()).toBe(true);
+            secondUpload = login.uploadCertificate(certificatePath);
+            await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
+        } finally {
+            // Settle both reads even if an assertion failed; the once-listeners make repeats no-ops.
+            await page.evaluate(() => {
+                window.dispatchEvent(new Event("complete-first-read"));
+                window.dispatchEvent(new Event("complete-second-read"));
+            });
+            await Promise.all([firstUpload, secondUpload]);
+        }
         expect(await login.isCertificateUploaded()).toBe(true);
         await expect(login.logInButton).toBeEnabled();
     });
