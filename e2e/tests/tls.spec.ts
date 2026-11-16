@@ -368,6 +368,50 @@ test.describe(`@tls TLS Login tests`, () => {
         await expect(login.logInButton).toBeEnabled();
     });
 
+    test(`ignores a pending certificate read after a URL edit disables TLS`, async ({}, testInfo) => {
+        const login = await browser.createNewPage(LoginPage);
+        const page = await browser.getPage();
+        const certificatePath = testInfo.outputPath('url-disabled-tls.crt');
+        await writeFile(certificatePath, 'certificate');
+        await page.addInitScript(() => {
+            const readAsDataURL = FileReader.prototype.readAsDataURL;
+            const reads: { reader: FileReader; file: Blob }[] = [];
+            FileReader.prototype.readAsDataURL = function(file: Blob) {
+                reads.push({ reader: this, file });
+                document.documentElement.dataset.readCount = String(reads.length);
+            };
+            window.addEventListener("complete-first-read", () => {
+                reads[0].reader.addEventListener("load", () => {
+                    requestAnimationFrame(() => { document.documentElement.dataset.firstReadLoaded = "true"; });
+                });
+                readAsDataURL.call(reads[0].reader, reads[0].file);
+            });
+            window.addEventListener("complete-second-read", () => readAsDataURL.call(reads[1].reader, reads[1].file));
+        });
+        await browser.navigateTo(urls.loginUrl);
+        await login.clickEnableTLS();
+        const firstUpload = login.uploadCertificate(certificatePath);
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
+        await expect(login.logInButton).toBeDisabled();
+        await login.clickUrlMode();
+        await login.fillFalkorDBUrl("falkor://localhost:6379");
+        await expect(login.logInButton).toBeEnabled();
+        await page.evaluate(() => window.dispatchEvent(new Event("complete-first-read")));
+        await page.waitForFunction(() => document.documentElement.dataset.firstReadLoaded === "true");
+        await expect(login.logInButton).toBeEnabled();
+        await login.clickManualMode();
+        expect(await login.isTLSEnabled()).toBe(false);
+        await login.clickEnableTLS();
+        expect(await login.isTLSEnabled()).toBe(true);
+        expect(await login.isCertificateRemoved()).toBe(true);
+        const secondUpload = login.uploadCertificate(certificatePath);
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
+        await page.evaluate(() => window.dispatchEvent(new Event("complete-second-read")));
+        await Promise.all([firstUpload, secondUpload]);
+        expect(await login.isCertificateUploaded()).toBe(true);
+        await expect(login.logInButton).toBeEnabled();
+    });
+
     // A FalkorDB with tls-auth-clients on is unreachable without these two
     // uploads, which is the whole reason the client certificate fields exist.
     test(`validate successful login with a client certificate and key`, async () => {

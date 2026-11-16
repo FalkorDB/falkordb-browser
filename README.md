@@ -94,7 +94,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 For TLS connections, upload a CA certificate and, if required, a client certificate
 and key on the login form. Opening any file chooser clears the previous error, and
 selecting a new file replaces an earlier unfinished upload for that input. Log in
-stays disabled while files are being read; turning TLS off discards uploads.
+stays disabled while files are being read; turning TLS off (the checkbox or a `falkor://` URL) discards uploads.
 
 > Note: to run the application with a different URL, set the NEXTAUTH_URL environment variable.
 

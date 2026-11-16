@@ -135,6 +135,21 @@ export default function LoginForm({
     setUsername(initialUsername);
     setTLS(initialTLS);
   }, [initialHost, initialPort, initialUsername, initialTLS]);
+
+  // TLS turns off from the checkbox, a `falkor://` URL edit or `initialTLS`;
+  // each must drop pending reads and attachments so hidden uploads cannot
+  // block or later alter the non-TLS login.
+  useEffect(() => {
+    if (TLS) return;
+    readTracker.invalidateAll();
+    setIsReading(false);
+    setCA(undefined);
+    setUploadedFileName("");
+    setClientCert(undefined);
+    setClientCertFileName("");
+    setClientKey(undefined);
+    setClientKeyFileName("");
+  }, [TLS, readTracker]);
   const [error, setError] = useState<{
     message: React.ReactNode
     show: boolean
@@ -445,16 +460,6 @@ export default function LoginForm({
                   setTLS(checked as boolean);
                   setRawUrl(buildUrl({ host, port, username, password, TLS: checked as boolean }));
                   clearError();
-                  if (!checked) {
-                    readTracker.invalidateAll();
-                    setIsReading(false);
-                    setCA(undefined);
-                    setUploadedFileName("");
-                    setClientCert(undefined);
-                    setClientCertFileName("");
-                    setClientKey(undefined);
-                    setClientKeyFileName("");
-                  }
                 }}
                 data-testid="tls-checkbox"
               />
