@@ -10,6 +10,7 @@ import { IndicatorContext } from "../components/provider";
 import { useToast } from "@/components/ui/use-toast";
 import { securedFetch } from "@/lib/utils";
 import { matchUrl, parseUrlString, validateUrl } from "./urlUtils";
+import { type CertificateSlot, createCertificateReadTracker } from "./certificateReadTracker";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
@@ -119,6 +120,14 @@ export default function LoginForm({
   const [clientCertFileName, setClientCertFileName] = useState<string>("");
   const [clientKey, setClientKey] = useState<string>();
   const [clientKeyFileName, setClientKeyFileName] = useState<string>("");
+  const [readTracker] = useState(createCertificateReadTracker);
+  const [isReading, setIsReading] = useState(false);
+
+  const finishRead = (slot: CertificateSlot, version: number) => {
+    if (!readTracker.finish(slot, version)) return false;
+    setIsReading(readTracker.hasPending());
+    return true;
+  };
 
   useEffect(() => {
     setHost(initialHost);
@@ -126,6 +135,21 @@ export default function LoginForm({
     setUsername(initialUsername);
     setTLS(initialTLS);
   }, [initialHost, initialPort, initialUsername, initialTLS]);
+
+  // TLS turns off from the checkbox, a `falkor://` URL edit or `initialTLS`;
+  // each must drop pending reads and attachments so hidden uploads cannot
+  // block or later alter the non-TLS login.
+  useEffect(() => {
+    if (TLS) return;
+    readTracker.invalidateAll();
+    setIsReading(false);
+    setCA(undefined);
+    setUploadedFileName("");
+    setClientCert(undefined);
+    setClientCertFileName("");
+    setClientKey(undefined);
+    setClientKeyFileName("");
+  }, [TLS, readTracker]);
   const [error, setError] = useState<{
     message: React.ReactNode
     show: boolean
@@ -235,6 +259,7 @@ export default function LoginForm({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (readTracker.hasPending()) return;
 
     // Pre-submit validation for URL mode
     if (loginMode === "url") {
@@ -342,15 +367,20 @@ export default function LoginForm({
 
   // A file the browser cannot read (an unreadable private key, say) never fires
   // `load`, so the failure has to be reported from `onerror`.
-  const readPemAsBase64 = (file: File, onRead: (base64: string, name: string) => void) => {
+  const readPemAsBase64 = (slot: CertificateSlot, file: File, onRead: (base64: string, name: string) => void) => {
+    clearError();
+    const version = readTracker.start(slot);
+    setIsReading(true);
     const reader = new FileReader();
 
     reader.onload = () => {
+      if (!finishRead(slot, version)) return;
       clearError();
       onRead((reader.result as string).split(',').pop() ?? "", file.name);
     };
 
     reader.onerror = () => {
+      if (!finishRead(slot, version)) return;
       setError({
         message: <p className="text-xs text-destructive">{`Could not read ${file.name}`}</p>,
         show: true,
@@ -363,7 +393,7 @@ export default function LoginForm({
   const onFileDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
-    readPemAsBase64(acceptedFiles[0], (base64, name) => {
+    readPemAsBase64("ca", acceptedFiles[0], (base64, name) => {
       setCA(base64);
       setUploadedFileName(name);
     });
@@ -372,7 +402,7 @@ export default function LoginForm({
   const onCertDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
-    readPemAsBase64(acceptedFiles[0], (base64, name) => {
+    readPemAsBase64("cert", acceptedFiles[0], (base64, name) => {
       setClientCert(base64);
       setClientCertFileName(name);
     });
@@ -381,7 +411,7 @@ export default function LoginForm({
   const onKeyDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
-    readPemAsBase64(acceptedFiles[0], (base64, name) => {
+    readPemAsBase64("key", acceptedFiles[0], (base64, name) => {
       setClientKey(base64);
       setClientKeyFileName(name);
     });
@@ -417,6 +447,7 @@ export default function LoginForm({
         handleSubmit={handleSubmit}
         error={error}
         submitButtonLabel={submitButtonLabel}
+        submitDisabled={isReading}
       >
         {
           loginMode !== "url" &&
@@ -429,14 +460,6 @@ export default function LoginForm({
                   setTLS(checked as boolean);
                   setRawUrl(buildUrl({ host, port, username, password, TLS: checked as boolean }));
                   clearError();
-                  if (!checked) {
-                    setCA(undefined);
-                    setUploadedFileName("");
-                    setClientCert(undefined);
-                    setClientCertFileName("");
-                    setClientKey(undefined);
-                    setClientKeyFileName("");
-                  }
                 }}
                 data-testid="tls-checkbox"
               />
@@ -454,7 +477,7 @@ export default function LoginForm({
                 <div className="flex flex-col gap-2">
                   {!uploadedFileName ? (
                     <div className="relative">
-                      <Dropzone title="Upload Certificate" onFileDrop={onFileDrop} disabled={!TLS} />
+                      <Dropzone title="Upload Certificate" onFileDrop={onFileDrop} onFileDialogOpen={clearError} disabled={!TLS} />
                       <div className="mt-2 text-xs text-muted/70 flex items-center gap-1">
                         <Info className="w-5 h-5" aria-label="Information icon" />
                         Upload your CA certificate file
@@ -496,7 +519,7 @@ export default function LoginForm({
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-muted">Client certificate (mTLS)</span>
                   {!clientCertFileName ? (
-                    <Dropzone title="Upload Client Certificate" onFileDrop={onCertDrop} disabled={!TLS} />
+                    <Dropzone title="Upload Client Certificate" onFileDrop={onCertDrop} onFileDialogOpen={clearError} disabled={!TLS} />
                   ) : (
                     <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md" data-testid="client-cert-uploaded-status">
                       <span className="text-sm font-medium text-foreground truncate max-w-48">{clientCertFileName}</span>
@@ -519,7 +542,7 @@ export default function LoginForm({
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-muted">Client private key (mTLS)</span>
                   {!clientKeyFileName ? (
-                    <Dropzone title="Upload Client Key" onFileDrop={onKeyDrop} disabled={!TLS} />
+                    <Dropzone title="Upload Client Key" onFileDrop={onKeyDrop} onFileDialogOpen={clearError} disabled={!TLS} />
                   ) : (
                     <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md" data-testid="client-key-uploaded-status">
                       <span className="text-sm font-medium text-foreground truncate max-w-48">{clientKeyFileName}</span>
