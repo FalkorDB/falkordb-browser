@@ -61,9 +61,11 @@ Rules for every change:
 2. **Put logic where it is testable.** Extract decisions out of `.tsx` components and
    `providers.tsx` into framework-free modules in `lib/` (or `app/**/<name>.ts`) and unit-test
    them with `node:test` + `node:assert/strict`. Components themselves are covered by Playwright.
-3. **New pure module → add it to the 100% gate**: append a
-   `--test-coverage-include="<path>"` to `test:coverage` in `package.json` (as the existing
-   modules do) once it reaches 100% lines/branches/functions.
+3. **New pure module → add it to the 100% gate**: add a
+   `--test-coverage-include="<path>"` to `test:coverage` in `package.json` next to the existing
+   ones, **before the test globs** (Node stops reading options at the first glob, so a trailing
+   one is silently treated as a test pattern), once it reaches 100% lines/branches/functions.
+   Check that the file shows up in the coverage table.
 4. **Unit tests** live next to the source as `<name>.test.ts`; relative imports of TS files
    include the `.ts` extension (`import { x } from "./graphTabs.ts"`) because `node --test`
    runs the TS directly. Use `describe/it` or `test`, `mock` from `node:test`; no extra test
