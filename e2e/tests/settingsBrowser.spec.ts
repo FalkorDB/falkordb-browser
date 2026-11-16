@@ -1065,7 +1065,9 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
         expect(await settings.isModelVisible("phi3")).toBe(false);
 
         await settings.searchModels("no-such-model");
-        expect(await settings.getNoModelsFoundText()).toBe("No models found");
+        const noModelsText = await settings.getNoModelsFoundText();
+        expect(noModelsText).toContain("No models found");
+        expect(noModelsText).toContain("Try a different search term");
 
         await settings.clearModelSearch();
         await expect.poll(() => settings.isModelVisible("llama3.2")).toBe(true);
@@ -1159,6 +1161,7 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
         expect(await settings.getChatApiKeyCount()).toBe(1);
         expect(await settings.getChatApiKeyValue()).toBe("");
         expect(getEncryptRequests()).toBe(1);
+        await expect(settings.modelsStatusMessage).toHaveText("1 live models loaded for OpenAI.");
 
         await settings.showChatApiKey(apiKey);
         await settings.beginEditChatApiKey(apiKey);
@@ -1179,6 +1182,7 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
         const apiKey = `sk-e2e-${getRandomString("key")}`;
         const discardedApiKey = `sk-e2e-discarded-${getRandomString("key")}`;
         await settings.addChatApiKey(apiKey);
+        await expect(settings.modelsStatusMessage).toHaveText("1 live models loaded for OpenAI.");
         await settings.showChatApiKey(apiKey);
 
         await settings.beginEditChatApiKey(apiKey);

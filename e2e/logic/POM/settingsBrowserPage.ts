@@ -403,28 +403,9 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<void> {
-    const card = this.getChatApiKeyCard(currentApiKey);
-    await interactWhenVisible(
-      card.getByTestId("editChatApiKeyButton"),
-      (el) => el.click(),
-      "Edit Chat API Key Button"
-    );
-
-    const editInput = this.page.getByTestId("chatApiKeyEditInput");
-    await interactWhenVisible(
-      editInput,
-      async (el) => {
-        await el.clear();
-        await el.fill(nextApiKey);
-      },
-      "Chat API Key Edit Input"
-    );
-
-    await interactWhenVisible(
-      this.page.getByTestId("saveEditedChatApiKeyButton"),
-      (el) => el.click(),
-      "Save Edited Chat API Key Button"
-    );
+    await this.beginEditChatApiKey(currentApiKey);
+    await this.fillChatApiKeyEdit(nextApiKey);
+    await this.clickSaveEditedChatApiKey();
     await this.getChatApiKeyCard(nextApiKey).waitFor({ state: "visible", timeout: 5000 });
   }
 
