@@ -104,7 +104,9 @@ export default function UdfPanel() {
 
     /** Resolves to false when the library did not become the selection: failed, or superseded by a newer pick. */
     const handleSelectLib = async (libraryName: string): Promise<boolean> => {
-        if (selectedLib === libraryName) return true;
+        // Only once it is loaded: while its request is in flight the editor still shows
+        // another library, and a function picked now would be revealed in that one.
+        if (selectedLib === libraryName && committedLibRef.current === libraryName) return true;
 
         libRequestIdRef.current += 1;
         const requestId = libRequestIdRef.current;
