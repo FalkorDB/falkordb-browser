@@ -246,7 +246,7 @@ test.describe("Upload Graph – Load CSV", () => {
     expect(cleanup.status()).toBe(204);
 
     // The temp CSV is really gone: LOAD CSV with its key no longer finds it.
-    const reload = await apiCall.loadCsv(page.request, graphName, key, "RETURN 1");
+    const reload = await apiCall.loadCsvWithRequest(page.request, graphName, key, "RETURN 1");
     expect(reload.status).toBe(404);
     expect(reload.body.message).toBe("Uploaded CSV not found. Please re-upload and try again.");
     await expect(graph.loadCsvRunConfirm).toBeHidden();
