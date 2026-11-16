@@ -154,7 +154,7 @@ type BrowserSettingsContextType = {
   resetSettings: () => void;
   replayTutorial: () => void;
   tutorialOpen: boolean;
-  /** False until the saved settings are read; edits made before then are overwritten. */
+  /** False until the saved browser settings are read (chat API keys load separately); edits made before then are overwritten. */
   settingsLoaded: boolean;
 };
 
