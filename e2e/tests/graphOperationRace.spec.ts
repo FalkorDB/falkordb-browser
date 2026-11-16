@@ -55,7 +55,7 @@ test.describe("Graph operation race conditions", () => {
         await route.continue();
       });
       // Await the real async React handler, not just delivery of its network response.
-      const expanded = canvas.evaluate(async element => {
+      const doubleClickFirstNode = () => canvas.evaluate(async element => {
         const c = element as FalkorDBCanvas;
         const config: ForceGraphConfig = Reflect.get(c, "config");
         const click = config.eventHandlers?.onNodeClick;
@@ -64,6 +64,7 @@ test.describe("Graph operation race conditions", () => {
         await click(node, new MouseEvent("click"));
         await click(node, new MouseEvent("click"));
       });
+      const expanded = doubleClickFirstNode();
       await reached.promise;
       await graph.selectStripTab(tabName);
       await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(3);
@@ -73,6 +74,10 @@ test.describe("Graph operation race conditions", () => {
       expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getData())).toEqual(before);
       await graph.selectStripTab(graphName);
       await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(1);
+      // The discarded expansion must not leave the node marked expanded: retrying fetches its neighbour.
+      await page.unroute(`**/api/graph/${graphName}/*`);
+      await doubleClickFirstNode();
+      await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(2);
       await graph.selectStripTab(tabName);
       await expect.poll(() => canvas.evaluate(element => (element as FalkorDBCanvas).getGraphData().nodes.length)).toBe(3);
     } finally {

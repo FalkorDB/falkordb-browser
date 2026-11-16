@@ -110,10 +110,10 @@ export default function Page() {
         chatOpen,
         setChatOpen,
     } = useContext(GraphContext);
-    const graphOwnerRef = useRef({ graph, data, graphName, activeTabId });
+    const graphOwnerRef = useRef({ graph, data, graphName, activeTabId, restore: graphData });
     useLayoutEffect(() => {
-        graphOwnerRef.current = { graph, data, graphName, activeTabId };
-    }, [graph, data, graphName, activeTabId]);
+        graphOwnerRef.current = { graph, data, graphName, activeTabId, restore: graphData };
+    }, [graph, data, graphName, activeTabId, graphData]);
     const {
         settings: {
             querySettings: { runDefaultQuery, defaultQuery },

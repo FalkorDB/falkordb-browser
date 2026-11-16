@@ -218,16 +218,17 @@ export default function ForceGraph({
     // `isCurrent` reports whether the toggle that started this fetch is still the
     // one that owns the node's neighbours. It is checked before every commit, not
     // just on the way out: a superseded expansion that merged its result would
-    // paint neighbours back onto a node the user has since collapsed.
-    const onFetchNode = useCallback(async (node: Node, isCurrent: () => boolean) => {
+    // paint neighbours back onto a node the user has since collapsed. Resolves
+    // whether the neighbours were merged into the graph model.
+    const onFetchNode = useCallback(async (node: Node, isCurrent: () => boolean): Promise<boolean> => {
         const canvas = canvasRef.current;
-        if (!canvas || !canvasLoaded) return;
+        if (!canvas || !canvasLoaded) return false;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const session = { graph, data, tabId: activeTabId, epoch: startEpoch };
         const isCurrentOwner = () => isCurrent()
             && ownsCanvasOperation(canvas, session, { canvas: canvasRef.current, session: sessionRef.current, epoch: getConnectionEpoch() });
-        if (!isCurrentOwner()) return;
+        if (!isCurrentOwner()) return false;
 
         const result = await securedFetch(getNodeUrl(graph.Id, node.id, isReadOnly), {
             method: 'GET',
@@ -236,13 +237,13 @@ export default function ForceGraph({
             }
         }, toast, setIndicator, cid);
 
-        if (!isCurrentOwner()) return;
+        if (!isCurrentOwner()) return false;
         if (result.ok) {
             const json = await result.json();
-            if (!isCurrentOwner()) return;
+            if (!isCurrentOwner()) return false;
 
             const elements = await graph.extend(json.result, true, true);
-            if (!isCurrentOwner()) return;
+            if (!isCurrentOwner()) return true;
 
             if (elements.length === 0) {
                 toast({
@@ -262,7 +263,9 @@ export default function ForceGraph({
 
                 await setCanvasGraphData(canvas, newData, isCurrentOwner);
             }
+            return true;
         }
+        return false;
     }, [canvasRef, canvasLoaded, graph, data, activeTabId, isReadOnly, toast, setIndicator]);
 
     const deleteNeighbors = useCallback(async (nodes: Node[]) => {
@@ -423,7 +426,7 @@ export default function ForceGraph({
 
         fullNode.expand = !fullNode.expand;
         if (fullNode.expand) {
-            await onFetchNode(fullNode, () => expandTokens.current.get(node.id) === token);
+            const merged = await onFetchNode(fullNode, () => expandTokens.current.get(node.id) === token);
 
             if (expandTokens.current.get(node.id) !== token) {
                 // A newer toggle superseded this one while the fetch was in
@@ -432,6 +435,13 @@ export default function ForceGraph({
                 // that landed mid-merge may have swept before the neighbours
                 // arrived — sweep again for it.
                 if (!fullNode.expand) await deleteNeighbors([fullNode]);
+                return;
+            }
+
+            // Nothing was merged (the fetch failed or lost the canvas), so a
+            // later double-click must fetch the neighbours instead of collapsing.
+            if (!merged) {
+                fullNode.expand = false;
                 return;
             }
 

@@ -111,6 +111,8 @@ test("an operation owns the canvas only while its live view, epoch and committed
     assert.equal(ownsCanvasOperation(canvas, session, live), false);
     commitCanvasSession(canvas, { ...session, restore });
     assert.equal(ownsCanvasOperation(canvas, session, live), true);
+    // A consumed restore clears the live one without committing a new session.
+    assert.equal(ownsCanvasOperation(canvas, session, { ...live, session: { ...live.session, restore: undefined } }), true);
     for (const stale of [
         { ...live, canvas: null },
         { ...live, epoch: 4 },
