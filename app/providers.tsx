@@ -863,6 +863,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // --- "Fix with AI" (Idea #3) -----------------------------------------------
   const [lastFailure, setLastFailure] = useState<{ query: string; errorMessage: string } | null>(null);
+  // The editor text as of the last commit (runQuery sets it at once), so a run
+  // that fails after an edit can tell its query is no longer the one shown.
+  const editorQueryRef = useRef("");
   const [aiFixResult, setAiFixResult] = useState<AiFixResult>({ status: "idle" });
   const [pendingConsent, setPendingConsent] = useState<{ query: string; errorMessage: string; provider: ReturnType<typeof detectProviderFromModel> } | null>(null);
   const aiFixAbortRef = useRef<AbortController | null>(null);
@@ -1475,6 +1478,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     dismissAiFix();
     setLastFailure(null);
 
+    editorQueryRef.current = q;
     setHistoryQuery(prev => ({
       ...prev,
       query: q,
@@ -1590,8 +1594,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       } else {
         // Errors from getSSEGraphResult are already surfaced via toast
         const errorMessage = (err as Error).message || "";
-        setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
-        setLastFailure({ query: newQuery.text, errorMessage });
+        // Edited while it ran: its markers and fix would land on the new text.
+        if (editorQueryRef.current === q) {
+          setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
+          setLastFailure({ query: newQuery.text, errorMessage });
+        }
 
         // Save failed query to history with the error message
         newQuery = { ...newQuery, errorMessage };
@@ -1960,6 +1967,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Also forget the failure so a retained toast can't start a fix for the old query, whose
   // Insert would then overwrite the edited query or another tab's draft.
   useLayoutEffect(() => {
+    editorQueryRef.current = historyQuery.query;
     dismissAiFix();
     setLastFailure(null);
     return dismissAiFix;

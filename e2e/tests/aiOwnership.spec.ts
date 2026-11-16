@@ -81,6 +81,37 @@ for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
   });
 }
 
+test("@admin an edit made while the failing query runs gets no Fix with AI", async ({ page }) => {
+  const graphName = getRandomString("fixInFlight");
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  createdGraphs.push(graphName);
+  let held!: (route: Route) => void;
+  const failingRun = new Promise<Route>(resolve => { held = resolve; });
+  await page.route(
+    url => url.pathname === `/api/graph/${graphName}` && url.searchParams.get("query")?.startsWith("RETURN missing") === true,
+    route => held(route),
+  );
+  await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
+  const ai = new AiAssistComponent(page);
+  await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+  // Valid syntax, so the request goes out; the server rejects the unbound variable.
+  await ai.insertQuery("RETURN missing");
+  await ai.clickEditorRun();
+  const route = await failingRun;
+
+  // insertQuery's default focus presses Escape, which would dismiss the toast under test.
+  await ai.editorContainer.click();
+  await ai.insertQuery("RETURN 99", { focus: false });
+  await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 99");
+  await route.continue();
+
+  // The failure still reports, but its fix would overwrite the edit, so it is not offered.
+  await expect(ai.errorToast).toBeVisible();
+  await expect(ai.fixWithAiButton).toHaveCount(0);
+  await expect(ai.errorToast).toBeVisible();
+  await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 99");
+});
+
 for (const invalidation of ["edit", "tab-switch"] as const) {
   test(`@admin stale Fix with AI action clears on ${invalidation}`, async ({ page }) => {
     const graphName = getRandomString("fixFailureOwner");
