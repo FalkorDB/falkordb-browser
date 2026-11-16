@@ -218,10 +218,10 @@ test.describe("Graph operation race conditions", () => {
       await expect(page.getByTestId("toast").filter({ hasText: "Node created" })).toBeVisible();
       expect(await canvas.evaluate(element => (element as FalkorDBCanvas).getData())).toEqual(before);
       // The server still created the node in the graph the unmounted page owned.
-      await graph.selectGraphByName(graphName);
-      await graph.insertQuery("MATCH (n:RemountOwner) RETURN n");
-      await graph.clickRunQuery();
-      await expect.poll(() => nodeCount(canvas)).toBe(2);
+      await expect.poll(async () => {
+        const result = await apiCall.runQuery(graphName, "MATCH (n) RETURN count(n) AS c");
+        return Number(result.data[0].c);
+      }).toBe(2);
     } finally {
       release.resolve();
       await apiCall.removeGraph(graphName);
