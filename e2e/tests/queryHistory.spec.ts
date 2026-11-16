@@ -285,6 +285,7 @@ test.describe('Query history Tests', () => {
         const firstGraph = getRandomString('queryhistory');
         const secondGraph = getRandomString('queryhistory');
         const created: string[] = [];
+        let bodyFailed = true;
         try {
             await apicalls.addGraph(firstGraph);
             created.push(firstGraph);
@@ -328,12 +329,12 @@ test.describe('Query history Tests', () => {
             await expect(graph.selectQueryHistory(beta)).toBeVisible();
             await expect(graph.historySelectedCount).toHaveText("1");
             await expect(graph.historySelectAllButton).toHaveAttribute("aria-label", "Select all queries");
+            bodyFailed = false;
         } finally {
-            // Logged, not thrown: a failed cleanup must not replace the test's own error
             const results = await Promise.allSettled(created.map((name) => apicalls.removeGraph(name, "admin")));
-            results.forEach((result, index) => {
-                if (result.status === "rejected") console.error(`Failed to remove graph ${created[index]}:`, result.reason);
-            });
+            const failures = results.flatMap((result, index) => result.status === "rejected" ? [`${created[index]}: ${String(result.reason)}`] : []);
+            // Only fail on a leak when the body passed, so cleanup never replaces the test's own error
+            if (failures.length > 0 && !bodyFailed) throw new Error(`Failed to remove graph(s): ${failures.join("; ")}`);
         }
     });
 
