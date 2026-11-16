@@ -318,7 +318,7 @@ test.describe("Graph Tests", () => {
       await browser.setPageToFullScreen();
       const writes: string[] = [];
       page.on("request", request => {
-        if (request.method() === "POST" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
+        if (request.method() === "POST" && /^\/api\/graph(?:\/[^/]*)?$/.test(new URL(request.url()).pathname)) writes.push(request.url());
       });
       await graph.clickCreateGraph();
       await graph.clickConfirmCreateGraph();
