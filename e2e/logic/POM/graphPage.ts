@@ -1935,7 +1935,7 @@ export default class GraphPage extends BasePage {
       await this.search().fill(graphName, { timeout: 2000 });
       await this.selectItem("Graph", graphName).click({ timeout: 5000 });
       await expect(this.search()).toBeHidden({ timeout: 2000 });
-      if (graphName !== "Select Graph") await expect(this.select("Graph")).toHaveText(graphName, { timeout: 2000 });
+      if (graphName !== "Select Graph") await expect.poll(() => this.select("Graph").textContent(), { timeout: 2000 }).toBe(graphName);
     }).toPass({ timeout: 45000 });
   }
 
