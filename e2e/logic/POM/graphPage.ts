@@ -1916,20 +1916,27 @@ export default class GraphPage extends BasePage {
     }
     if (!isEnabled) throw new Error("Graph selector is not enabled after reloading the graph list");
 
-    // Raw text: graph names may carry significant whitespace.
-    const selectedBefore = await this.select("Graph").textContent();
-    await this.clickSelect();
-    // Opening the list refreshes it behind a loader. A refresh that finds only
-    // our graph (parallel tests drop theirs) auto-selects it, and that selection
-    // change closes the list, so decide on what the refresh applied.
-    await expect(this.graphListLoading).toBeHidden();
-    if (selectedBefore !== graphName && await this.select("Graph").textContent() === graphName) {
-      await expect(this.search()).toBeHidden();
-      return;
-    }
-    await this.fillSearch(graphName);
-    await waitForElementToBeVisible(this.selectItem("Graph", graphName), 500, 20);
-    await this.clickSelectItem(graphName); // selecting the first item in list after search
+    // Any list refresh (on opening, or the periodic one) that finds only our graph
+    // (parallel tests drop theirs) auto-selects it and closes the list, at any
+    // point of this flow. So retry on the actual state instead of ordering steps.
+    // The trigger shows "Select Graph" when nothing is selected, so that label
+    // never proves a graph of the same name is selected.
+    const isSelected = async () => graphName !== "Select Graph"
+      // Raw text: graph names may carry significant whitespace.
+      && await this.select("Graph").textContent() === graphName;
+    await expect(async () => {
+      if (await isSelected()) {
+        if (await this.search().isVisible()) await this.page.keyboard.press("Escape");
+        await expect(this.search()).toBeHidden({ timeout: 2000 });
+        return;
+      }
+      if (!(await this.search().isVisible())) await this.select("Graph").click({ timeout: 2000 });
+      await expect(this.graphListLoading).toBeHidden({ timeout: 10000 });
+      await this.search().fill(graphName, { timeout: 2000 });
+      await this.selectItem("Graph", graphName).click({ timeout: 5000 });
+      await expect(this.search()).toBeHidden({ timeout: 2000 });
+      if (graphName !== "Select Graph") await expect(this.select("Graph")).toHaveText(graphName, { timeout: 2000 });
+    }).toPass({ timeout: 45000 });
   }
 
   /** The graph page writes the selection, view and layout to the URL once the selection settles. */

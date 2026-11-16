@@ -123,9 +123,9 @@ test.describe("Graph Tests", () => {
   test(`@admin selectGraphByName copes with the opening refresh auto-selecting the only graph`, async () => {
     const graphName = getRandomString("autoSelect");
     const otherName = getRandomString("autoSelect");
-    await apiCall.addGraph(graphName);
-    await apiCall.addGraph(otherName);
     try {
+      await apiCall.addGraph(graphName);
+      await apiCall.addGraph(otherName);
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
       const page = await browser.getPage();
       // Two graphs are listed at load, so nothing is auto-selected yet.
@@ -134,6 +134,12 @@ test.describe("Graph Tests", () => {
       await page.route("**/api/graph", (route) => (route.request().method() === "GET"
         ? route.fulfill({ json: { opts: [graphName] } })
         : route.continue()));
+      await graph.selectGraphByName(graphName);
+      await expect(graph.select("Graph")).toHaveText(graphName);
+      await expect(graph.search()).toBeHidden();
+      // A refresh that selected the target while the list stays open: the helper closes it.
+      await graph.clickSelect();
+      await expect(graph.search()).toBeVisible();
       await graph.selectGraphByName(graphName);
       await expect(graph.select("Graph")).toHaveText(graphName);
       await expect(graph.search()).toBeHidden();
