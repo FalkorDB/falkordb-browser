@@ -292,9 +292,11 @@ test.describe('@browser Browser Settings tests', () => {
 
     test('@readwrite Chat API key visibility does not reveal other keys when editing', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
-        const firstApiKey = `sk-e2e-${getRandomString("first-key")}`;
-        const secondApiKey = `sk-e2e-${getRandomString("second-key")}`;
+        const firstApiKey = `sk-e2e-${getRandomString("first-key")}-A001`;
+        const secondApiKey = `sk-e2e-${getRandomString("second-key")}-B002`;
         const maskedFirstApiKeyText = `${firstApiKey.slice(0, 6)}••••••••${firstApiKey.slice(-4)}`;
+        const maskedSecondApiKeyText = `${secondApiKey.slice(0, 6)}••••••••${secondApiKey.slice(-4)}`;
+        expect(maskedFirstApiKeyText).not.toBe(maskedSecondApiKeyText);
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.selectApiKeyModelSource();
@@ -302,11 +304,10 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.addChatApiKey(firstApiKey);
         await settingsBrowserPage.addChatApiKey(secondApiKey);
         expect(await settingsBrowserPage.getMaskedChatApiKeyText(firstApiKey)).toBe(maskedFirstApiKeyText);
-        expect(await settingsBrowserPage.getMaskedChatApiKeyText(secondApiKey)).toBe(
-            `${secondApiKey.slice(0, 6)}••••••••${secondApiKey.slice(-4)}`
-        );
+        expect(await settingsBrowserPage.getMaskedChatApiKeyText(secondApiKey)).toBe(maskedSecondApiKeyText);
 
         await settingsBrowserPage.beginEditChatApiKey(secondApiKey);
+        expect(await settingsBrowserPage.getChatApiKeyEditValue()).toBe(secondApiKey);
         expect(await settingsBrowserPage.getMaskedChatApiKeyText(firstApiKey)).toBe(maskedFirstApiKeyText);
         await settingsBrowserPage.cancelChatApiKeyEdit();
         expect(await settingsBrowserPage.getMaskedChatApiKeyText(firstApiKey)).toBe(maskedFirstApiKeyText);
