@@ -47,6 +47,11 @@ test("@admin Query transports enforce read-only profiling and preserve SSE error
     });
     expect(emptyBody.status()).toBe(200);
     expect(await emptyBody.json()).toEqual({ message: "Graph created successfully" });
+    const whitespaceBody = await request.post(`/api/graph/${graph}`, {
+      headers: { "Content-Type": "application/json" },
+      data: Buffer.from(" \n"),
+    });
+    expect(whitespaceBody.status()).toBe(200);
     const malformedBody = await request.post(`/api/graph/${graph}`, {
       headers: { "Content-Type": "application/json" },
       data: Buffer.from("{"),

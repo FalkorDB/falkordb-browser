@@ -193,9 +193,10 @@ class FileTokenStorage implements ITokenStorage {
    * Read all tokens from file.
    * Retries up to 3 times on JSON parse failure to handle the brief window
    * where a concurrent atomic write (rename) is in progress.
+   * Callers inside `withLock` pass `lockHeld` so a missing file never queues a nested lock.
    */
-  private async readTokens(): Promise<TokenData[]> {
-    await this.ensureFileExists();
+  private async readTokens(lockHeld = false): Promise<TokenData[]> {
+    await this.ensureFileExists(lockHeld);
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
@@ -244,7 +245,7 @@ class FileTokenStorage implements ITokenStorage {
 
   async createToken(tokenData: TokenData): Promise<void> {
     return this.withLock(async () => {
-      const tokens = await this.readTokens();
+      const tokens = await this.readTokens(true);
       tokens.push(tokenData);
       await this.writeTokens(tokens);
     });
@@ -286,7 +287,7 @@ class FileTokenStorage implements ITokenStorage {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async revokeToken(tokenId: string, revokerUsername: string): Promise<boolean> {
     return this.withLock(async () => {
-      const tokens = await this.readTokens();
+      const tokens = await this.readTokens(true);
       const token = tokens.find(t => t.token_id === tokenId);
 
       if (!token) {
@@ -301,7 +302,7 @@ class FileTokenStorage implements ITokenStorage {
 
   async deleteToken(tokenId: string): Promise<boolean> {
     return this.withLock(async () => {
-      const tokens = await this.readTokens();
+      const tokens = await this.readTokens(true);
       const next = tokens.filter(t => t.token_id !== tokenId);
       if (next.length === tokens.length) {
         return false;
@@ -313,7 +314,7 @@ class FileTokenStorage implements ITokenStorage {
 
   async updateLastUsed(tokenId: string): Promise<void> {
     return this.withLock(async () => {
-      const tokens = await this.readTokens();
+      const tokens = await this.readTokens(true);
       const token = tokens.find(t => t.token_id === tokenId);
 
       if (token) {
@@ -359,7 +360,7 @@ class FileTokenStorage implements ITokenStorage {
 
   async cleanupExpiredTokens(): Promise<number> {
     return this.withLock(async () => {
-      const tokens = await this.readTokens();
+      const tokens = await this.readTokens(true);
       const now = Math.floor(Date.now() / 1000);
 
       const validTokens = tokens.filter(

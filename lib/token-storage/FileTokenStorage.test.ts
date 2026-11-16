@@ -532,6 +532,27 @@ test("initial publication failure releases the lock and allows a later initializ
     assert.ok(await storage.fetchTokenById("second"));
 });
 
+test("a token file removed while the lock is held is recreated without queueing a nested lock", async (t) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-removed-test-"));
+    const file = path.join(dir, "tokens.json");
+    t.after(async () => { await fs.rm(dir, { recursive: true, force: true }); });
+    const storage = new FileTokenStorage(file);
+    await storage.createToken(token("lost"));
+    const chmod = fs.chmod;
+    let fileChecks = 0;
+    t.mock.method(fs, "chmod", async (name: Parameters<typeof fs.chmod>[0], mode: Parameters<typeof fs.chmod>[1]) => {
+        if (name === file) {
+            fileChecks += 1;
+            // Check 1 runs when the lock is taken; check 2 is the locked read inside createToken.
+            if (fileChecks === 2) await fs.unlink(file);
+        }
+        return chmod(name, mode);
+    });
+    await storage.createToken(token("after"));
+    const { tokens } = JSON.parse(await fs.readFile(file, "utf8")) as { tokens: TokenData[] };
+    assert.deepEqual(tokens.map(row => row.token_id), ["after"]);
+});
+
 for (const target of ["directory", "file"] as const) {
     test(`storage ${target} permission failures are explicit and preserve records`, async (t) => {
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-permission-test-"));

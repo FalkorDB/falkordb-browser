@@ -10,7 +10,12 @@ export function getQueryRequestParam(request: Request, name: "query" | "timeout"
   if (request.method() !== "POST" || !request.postData()) {
     return new URL(request.url()).searchParams.get(name);
   }
-  const body: unknown = request.postDataJSON();
+  let body: unknown;
+  try {
+    body = request.postDataJSON();
+  } catch {
+    return null;
+  }
   if (!body || typeof body !== "object" || !(name in body)) return null;
   const value = body[name as keyof typeof body];
   if (typeof value !== "string" && typeof value !== "number") {

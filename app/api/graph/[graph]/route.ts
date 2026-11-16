@@ -89,7 +89,7 @@ export async function POST(
 
     try {
       if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() === "application/json") {
-        const content = await request.text();
+        const content = (await request.text()).trim();
         const body = (content ? JSON.parse(content) : null) as { query?: unknown; timeout?: unknown } | null;
         if (body && typeof body === "object" && body.query !== undefined) {
           if (typeof body.query !== "string") {

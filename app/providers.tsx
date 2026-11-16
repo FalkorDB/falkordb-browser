@@ -2177,6 +2177,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const pinAndSync = async (id: string) => {
       const sameConnection = getActiveConnectionIdGlobal() === null
         && sessionConnectionIdRef.current === id;
+      // null → B bumps no epoch, so a tab query restored under the session's
+      // connection could otherwise commit into B's storage once the prefix moves.
+      if (!sameConnection) bumpContextGen();
       setActiveConnectionId(id);
       setActiveConnectionIdGlobal(id);
       const pinnedEpoch = getConnectionEpoch();
@@ -2244,7 +2247,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     })();
 
     return () => { cancelled = true; };
-  }, [status, toast]);
+  }, [status, toast, bumpContextGen]);
 
   useEffect(() => {
     if (timeoutInitKey === null) {

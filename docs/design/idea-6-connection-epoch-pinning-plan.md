@@ -237,7 +237,9 @@ restored tabs and the editor wait on it.
 
 The reset effect skips the **same‑connection bootstrap** (`null → A` where discovery confirmed the
 session's existing connection, recorded in `sameConnectionBootstrapRef` with the epoch): the loaded list
-and restored tabs are kept, and a later epoch bump invalidates the record. Restored tabs additionally
+and restored tabs are kept, and a later epoch bump invalidates the record. When discovery instead adopts a
+different connection, `pinAndSync` bumps `contextGen` first: `null → B` bumps no epoch, so a tab query
+restored under the session's connection would otherwise commit into B's storage. Restored tabs additionally
 wait for the saved query timeout (`lib/timeoutInitialization.ts`), keyed on the session's user and
 connection details plus the storage prefix's connection, so a reload never re‑runs them with
 `timeout=0`.

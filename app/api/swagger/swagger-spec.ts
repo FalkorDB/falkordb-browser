@@ -18,7 +18,13 @@ const swaggerSpec = {
         type: "apiKey",
         in: "cookie",
         name: "authjs.session-token",
-        description: "Browser session cookie; named __Secure-authjs.session-token on HTTPS deployments",
+        description: "Browser session cookie on HTTP deployments",
+      },
+      sessionCookieSecure: {
+        type: "apiKey",
+        in: "cookie",
+        name: "__Secure-authjs.session-token",
+        description: "Browser session cookie on HTTPS deployments",
       },
     },
     schemas: {
@@ -97,7 +103,7 @@ const swaggerSpec = {
         tags: ["Authentication"],
         summary: "Validate the session's stored active connection",
         description: "Compatibility endpoint: returns an existing usable connection owned by this session. Never recreates a missing or revoked connection and never connects to the user's database. Cookie requests require a trusted Origin or same-origin Fetch Metadata.",
-        security: [{ sessionCookie: [] }],
+        security: [{ sessionCookie: [] }, { sessionCookieSecure: [] }],
         responses: {
           "200": {
             description: "The stored connection remains usable",
@@ -138,7 +144,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "List the current session's connections",
-        security: [{ sessionCookie: [] }],
+        security: [{ sessionCookie: [] }, { sessionCookieSecure: [] }],
         responses: {
           "200": {
             description: "Stored connections",
@@ -163,7 +169,7 @@ const swaggerSpec = {
         tags: ["Authentication"],
         summary: "Add a connection to the current session",
         description: "Connect with another ACL user. Cookie requests require a trusted Origin or same-origin Fetch Metadata. Classified failures return safe messages, not raw database errors.",
-        security: [{ sessionCookie: [] }],
+        security: [{ sessionCookie: [] }, { sessionCookieSecure: [] }],
         requestBody: {
           required: true,
           content: {
@@ -814,7 +820,7 @@ const swaggerSpec = {
       post: {
         tags: ["Graph"],
         summary: "Execute a query or verify a graph",
-        description: "Execute a Cypher query using a JSON body, or verify graph access when no query body is supplied. An empty body is accepted even with Content-Type: application/json; malformed nonempty JSON returns 400.",
+        description: "Execute a Cypher query using a JSON body, or verify graph access when no query body is supplied. An empty or whitespace-only body is accepted even with Content-Type: application/json; malformed nonempty JSON returns 400.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
