@@ -233,6 +233,8 @@ test.describe("Tutorial", () => {
 
         try {
             await tutorial.changeLocalStorage("true");
+            // Sole-graph auto-selection adds share parameters. A refresh there
+            // deliberately defers the tutorial, so start from a regular visit.
             await browser.navigateTo(urls.graphUrl);
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
