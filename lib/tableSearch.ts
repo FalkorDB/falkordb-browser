@@ -3,6 +3,12 @@ const includesTerm = (value: unknown, lowerTerm: string): boolean =>
 
 const isObject = (value: unknown): value is object => typeof value === "object" && value !== null;
 
+// Objects have no useful string form ("[object Object]"), so only primitives, and primitives inside arrays, are searched.
+const nestedMatches = (value: unknown, lowerTerm: string): boolean =>
+  Array.isArray(value)
+    ? value.some(element => !isObject(element) && includesTerm(element, lowerTerm))
+    : !isObject(value) && includesTerm(value, lowerTerm);
+
 /**
  * Whether a table cell matches a search term (already lower-cased).
  * Object cells match on their values, looking one level into nested ones;
@@ -15,7 +21,7 @@ export function cellMatchesSearch(cell: { type: string; value?: unknown }, lower
 
   return Object.values(value).some(inner =>
     isObject(inner)
-      ? Object.values(inner).some(nested => includesTerm(nested, lowerTerm))
+      ? Object.values(inner).some(nested => nestedMatches(nested, lowerTerm))
       : includesTerm(inner, lowerTerm)
   );
 }

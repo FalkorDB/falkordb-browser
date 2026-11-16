@@ -34,6 +34,14 @@ describe("cellMatchesSearch", () => {
     assert.equal(cellMatchesSearch(objectCell({ properties: { city: "paris" } }), "rome"), false);
   });
 
+  it("searches primitives inside nested arrays but never the text of nested objects", () => {
+    assert.equal(cellMatchesSearch(objectCell({ properties: { tags: ["red", "blue"] } }), "blu"), true);
+    assert.equal(cellMatchesSearch(objectCell({ properties: { tags: [{ a: 1 }, null, "red"] } }), "red"), true);
+    assert.equal(cellMatchesSearch(objectCell({ properties: { tags: [{ a: 1 }] } }), "object"), false);
+    assert.equal(cellMatchesSearch(objectCell({ properties: { deep: { a: "x" } } }), "object"), false);
+    assert.equal(cellMatchesSearch(objectCell({ properties: { deep: { a: "x" } } }), "x"), false);
+  });
+
   it("skips null values at either level instead of throwing", () => {
     assert.equal(cellMatchesSearch(objectCell({ a: null, b: "x" }), "x"), true);
     assert.equal(cellMatchesSearch(objectCell({ a: null }), "a"), false);
