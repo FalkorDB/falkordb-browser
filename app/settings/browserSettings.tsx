@@ -613,7 +613,6 @@ export default function BrowserSettings() {
         if (!keyToEdit) return;
         setEditingKeyId(id);
         setEditingKeyValue(keyToEdit.key);
-        setVisibleKeyIds(prev => new Set(prev).add(id));
     };
 
     const handleSaveEditedKey = async (id: string) => {
@@ -1007,7 +1006,7 @@ export default function BrowserSettings() {
                                                                                         <Input
                                                                                             data-testid="chatApiKeyEditInput"
                                                                                             className="flex-1 font-mono text-xs"
-                                                                                            type={isVisible ? "text" : "password"}
+                                                                                            type="text"
                                                                                             value={editingKeyValue}
                                                                                             onChange={(e) => setEditingKeyValue(e.target.value)}
                                                                                         />

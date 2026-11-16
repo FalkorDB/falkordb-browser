@@ -351,6 +351,47 @@ export default class SettingsBrowserPage extends BasePage {
     return (await keyText.textContent()) ?? "";
   }
 
+  private get editingChatApiKeyCard(): Locator {
+    return this.chatApiKeyCards.filter({ has: this.page.getByTestId("chatApiKeyEditInput") });
+  }
+
+  async beginEditChatApiKey(apiKey: string): Promise<void> {
+    const maskedCard = this.getMaskedChatApiKeyCard(apiKey);
+    const card = await maskedCard.isVisible() ? maskedCard : this.getChatApiKeyCard(apiKey);
+    await interactWhenVisible(
+      card.getByTestId("editChatApiKeyButton"),
+      (el) => el.click(),
+      "Edit Chat API Key Button"
+    );
+    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async getChatApiKeyEditInputType(): Promise<string | null> {
+    return this.page.getByTestId("chatApiKeyEditInput").getAttribute("type");
+  }
+
+  async getChatApiKeyEditValue(): Promise<string> {
+    return this.page.getByTestId("chatApiKeyEditInput").inputValue();
+  }
+
+  async saveChatApiKeyEdit(): Promise<void> {
+    await interactWhenVisible(
+      this.page.getByTestId("saveEditedChatApiKeyButton"),
+      (el) => el.click(),
+      "Save Edited Chat API Key Button"
+    );
+    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "detached", timeout: 5000 });
+  }
+
+  async cancelChatApiKeyEdit(): Promise<void> {
+    await interactWhenVisible(
+      this.editingChatApiKeyCard.getByTestId("editChatApiKeyButton"),
+      (el) => el.click(),
+      "Cancel Edit Chat API Key Button"
+    );
+    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "detached", timeout: 5000 });
+  }
+
   async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<void> {
     const card = this.getChatApiKeyCard(currentApiKey);
     await interactWhenVisible(
