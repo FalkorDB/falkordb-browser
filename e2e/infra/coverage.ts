@@ -12,7 +12,7 @@
 
 import { test as base, type BrowserContext, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'crypto';
-import { linkSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, linkSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import path from 'path';
 
 const dir = process.env.E2E_COVERAGE_DIR;
@@ -50,6 +50,11 @@ async function save(page: Page) {
     if (!started || page.isClosed()) return;
     recording.delete(page);
     await started;
+    // A popup can close while its recording is still starting: nothing to stop or save.
+    if (page.isClosed()) {
+        sources.delete(page);
+        return;
+    }
     const entries = (await page.coverage.stopJSCoverage())
         .filter(({ url }) => url.includes('/_next/static/'));
     const capturedSources = sources.get(page);
@@ -62,17 +67,22 @@ async function save(page: Page) {
     for (const entry of entries) {
         const { url } = entry;
         if (savedSources.has(url)) continue;
+        const file = path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
         let source = entry.source;
         if (source === undefined) {
             const captured = await capturedSources?.get(url);
             if (!captured || 'error' in captured) {
+                // savedSources is per worker: another worker may already have saved this chunk.
+                if (existsSync(file)) {
+                    savedSources.add(url);
+                    continue;
+                }
                 throw new Error(`No source available for browser chunk ${url}`, {
                     cause: captured && 'error' in captured ? captured.error : undefined,
                 });
             }
             source = captured.source;
         }
-        const file = path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
         const tmp = `${file}.${randomUUID()}.tmp`;
         writeFileSync(tmp, source);
         try {

@@ -1,8 +1,8 @@
 import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateBrowserCoverage } from './coverage-report.mjs';
@@ -19,15 +19,19 @@ beforeEach(() => {
   for (const name of readdirSync(dir)) unlinkSync(path.join(dir, name));
 });
 
-function context({ browser = 'chromium', startError, stopError, missingSource = false } = {}) {
+function context({ browser = 'chromium', startError, stopError, missingSource = false, start } = {}) {
   const pages = [];
   const url = `http://localhost:3000/_next/static/chunks/${randomUUID()}.js`;
   let closed = false;
   const page = Object.assign(new EventEmitter(), {
     coverage: {
-      async startJSCoverage() { if (startError) throw startError; },
+      async startJSCoverage() {
+        if (startError) throw startError;
+        await start;
+      },
       async stopJSCoverage() {
         if (stopError) throw stopError;
+        if (closed) throw new Error('Target page, context or browser has been closed');
         return [{
           url,
           scriptId: '1',
@@ -55,7 +59,7 @@ function context({ browser = 'chromium', startError, stopError, missingSource = 
     request: () => ({ resourceType: () => 'script' }),
     text,
   });
-  return { context: result, page, respond };
+  return { context: result, page, pages, url, respond };
 }
 
 test('records once when a context is tracked twice and closes its page', async () => {
@@ -102,6 +106,32 @@ test('missing source without a captured response fails explicitly and still clos
   await page.close();
   assert.ok(page.isClosed());
   assert.throws(() => validateBrowserCoverage([dir]), /Browser coverage collection failed.*source/);
+});
+
+test('missing source another worker already saved is not a failure', async () => {
+  const fixture = context({ missingSource: true });
+  trackContext(fixture.context);
+  const page = await fixture.context.newPage();
+  const sourceFile = path.join(dir, `browser-source-${createHash('sha1').update(fixture.url).digest('hex')}.js`);
+  writeFileSync(sourceFile, 'window.otherWorker = true;');
+  await page.close();
+  validateBrowserCoverage([dir]);
+  assert.equal(readFileSync(sourceFile, 'utf8'), 'window.otherWorker = true;');
+});
+
+test('a popup that closes while its recording starts is skipped, not a failure', async () => {
+  let failStart;
+  const fixture = context({ start: new Promise((_, reject) => { failStart = reject; }) });
+  trackContext(fixture.context);
+  // The app opens it: recording starts in the background, unlike newPage().
+  fixture.pages.push(fixture.page);
+  fixture.context.emit('page', fixture.page);
+  const closing = fixture.context.close();
+  await fixture.page.close();
+  failStart(new Error('Target page, context or browser has been closed'));
+  await closing;
+  assert.deepEqual(readdirSync(dir).filter((name) => name.startsWith('browser-error-')), []);
+  validateBrowserCoverage([dir], false);
 });
 
 for (const firstFails of [false, true]) {
