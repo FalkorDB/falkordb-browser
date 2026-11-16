@@ -54,7 +54,7 @@ export default class UdfPage extends HeaderComponent {
   }
 
   private libraryByName(name: string): Locator {
-    return this.libraryNames.filter({ hasText: name });
+    return this.libraryNames.filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) });
   }
 
   /** Reaches /udf through the navbar, so the Functions entry itself is exercised. */

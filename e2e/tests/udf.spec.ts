@@ -41,12 +41,10 @@ test.describe("UDF page", () => {
 
   test.afterEach(async () => {
     try {
-      const results = await Promise.allSettled(libraries.map((name) => apiCall.deleteUdf(name)));
-      results.forEach((result, i) => {
-        if (result.status !== "fulfilled" || !result.value) {
-          console.warn(`UDF library ${libraries[i]} was not deleted during cleanup`);
-        }
-      });
+      await Promise.allSettled(libraries.map((name) => apiCall.deleteUdf(name)));
+      // A deletion that did not take effect would leak into the shared server, so fail the teardown.
+      const leaked = (await apiCall.listUdfs()).filter((name) => libraries.includes(name));
+      expect(leaked, "UDF libraries left behind by the test").toEqual([]);
     } finally {
       await browser.closeBrowser();
     }
