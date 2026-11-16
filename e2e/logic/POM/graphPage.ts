@@ -1937,6 +1937,7 @@ export default class GraphPage extends BasePage {
   }
 
   async selectGraphByName(graphName: string): Promise<void> {
+    await expect(this.page.getByTestId("graphPage")).toHaveAttribute("aria-busy", "false", { timeout: 15000 });
     await this.ensureGraphInfoPanelOpen();
     // Wait for graph selector to be enabled (graphs loaded from API)
     let isEnabled = await waitForElementToBeEnabled(this.select("Graph"), 1000, 15);

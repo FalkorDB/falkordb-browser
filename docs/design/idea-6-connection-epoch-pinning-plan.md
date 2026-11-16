@@ -210,7 +210,9 @@ restoring a tab keeps its graph name and query without running the query, and th
 a dropped graph" check does not clear the selection, so a later successful refresh validates the
 saved graph instead of discarding it. It also holds the graph page's info, memory and count polls
 for a graph not in the list: on a writable connection they run `GRAPH.QUERY`, which would re-create
-a dropped graph, so they start only once a list confirms it.
+a dropped graph, so they start only once a list confirms it. The same guard applies
+to the editor's procedure discovery. A settled list that excludes the selected graph
+keeps these requests blocked while the provider clears the selection.
 Expose `handleFetchOptions` on `GraphContext` (move its declaration above the context memo). A
 separate effect, ordered after the reset effect and keyed on `activeConnectionId`, `status` and
 `handleFetchOptions`, calls `handleFetchOptions({ clear: !graphNamesLoadedRef.current })`, so an
@@ -224,6 +226,12 @@ and restored tabs are kept, and a later epoch bump invalidates the record. Resto
 wait for the saved query timeout (`lib/timeoutInitialization.ts`), keyed on the session's user and
 connection details plus the storage prefix's connection, so a reload never re‑runs them with
 `timeout=0`.
+The tutorial recovery key uses the effective connection (`activeConnectionId ??
+prefixConnectionId`), so discovering the existing connection does not restart
+completed recovery. Interaction readiness includes recovery readiness, matching
+the tab hook's restoration/persistence gate. Tutorial decisions and refresh settings
+are initialized before the timeout-config await, allowing graph discovery and
+non-editing panels to settle while the timeout is still loading.
 
 ### 3i. `selectGraph.tsx` dropdown refresh (`:75‑77`, `:196‑203`) — the 2nd `fetchOptions` caller
 Replace the direct `fetchOptions` call with the provider's guarded `handleFetchOptions` (now on

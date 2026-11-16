@@ -2287,6 +2287,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       && !isReadOnlyRef.current
     );
     setTutorialDecided(true);
+    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
     (async () => {
       try {
         const raw: Query[] = JSON.parse(getConnectionItem("query history") || "[]");
@@ -2364,7 +2365,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLastLimit(l);
       setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined));
       setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false");
-      setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
       setMaxTabs(loadedMaxTabs);
       // Seed the settings-form value too, otherwise the form keeps showing the

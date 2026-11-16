@@ -659,35 +659,27 @@ test.describe("Tutorial", () => {
             // Verification lists hang until the sweep gives up; the graph list the
             // page loads afterwards is answered so the tab strip can unlock.
             let requests = 0;
-            let released = false;
-            let release!: () => void;
-            const gate = new Promise<void>(resolve => { release = resolve; });
+            let releaseLists!: () => void;
+            const listGate = new Promise<void>(resolve => { releaseLists = resolve; });
             await page.route(url => url.pathname === "/api/graph", async route => {
-                if (released) {
-                    await route.continue();
-                    return;
-                }
                 requests += 1;
                 if (failPublication && requests === 1) {
                     await route.fulfill({ json: { opts: [] } });
                     return;
                 }
-                await gate;
-                // The page has usually abandoned a held verification by now.
-                await route.continue().catch(() => {});
+                await listGate;
+                await route.fulfill({ json: { opts: [] } });
             });
             try {
                 await page.goto(urls.graphUrl);
                 await expect(page.getByTestId("toast-title").filter({ hasText: "Tutorial cleanup failed" })).toBeVisible({ timeout: 25000 });
-                const sweepRequests = requests;
-                released = true;
-                release();
-                expect(sweepRequests).toBeLessThan(5);
-                await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
+                expect(requests).toBeLessThan(5);
                 expect(await page.evaluate(({ scope, owners }) => owners.every(owner =>
                     localStorage.getItem(`${scope}tutorialDemoGraphOwnership:${owner}`) !== null), { scope, owners })).toBe(true);
+                releaseLists();
+                await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
             } finally {
-                release();
+                releaseLists();
                 await browser.closeBrowser();
             }
     });
@@ -1968,6 +1960,39 @@ test.describe("Tutorial", () => {
         await tutorial.waitForStep("Open Layout Dropdown");
         await tutorial.clickTutorialTarget('[data-testid="layoutControl"]');
 
+        // Menu closure must not cancel a selection waiting for rendering.
+        const pageUnderClock = await browser.getPage();
+        await pageUnderClock.clock.install();
+        const frames = await pageUnderClock.evaluateHandle(() => {
+            const browserWindow: Window = window;
+            const requestFrame = browserWindow.requestAnimationFrame.bind(browserWindow);
+            const cancelFrame = browserWindow.cancelAnimationFrame.bind(browserWindow);
+            const pending = new Map<number, [FrameRequestCallback, number]>();
+            let holding = false;
+            browserWindow.requestAnimationFrame = callback => {
+                let id = 0;
+                id = requestFrame(time => {
+                    if (holding) pending.set(id, [callback, time]);
+                    else callback(time);
+                });
+                return id;
+            };
+            browserWindow.cancelAnimationFrame = id => {
+                pending.delete(id);
+                cancelFrame(id);
+            };
+            return {
+                hold: () => { holding = true; },
+                resume: () => {
+                    holding = false;
+                    browserWindow.requestAnimationFrame = requestFrame;
+                    browserWindow.cancelAnimationFrame = cancelFrame;
+                    for (const [callback] of pending.values()) requestFrame(callback);
+                    pending.clear();
+                },
+            };
+        });
+
         // Step 39: "Hover Tree" — advanceOn: "pointermove" on layoutTreeSub, advanceCondition checks sub-content
         await tutorial.waitForStep("Hover Tree");
         await tutorial.hoverTutorialTarget(
@@ -1978,7 +2003,18 @@ test.describe("Tutorial", () => {
 
         // Step 40: "Select Tree Direction" — advanceOn: "click" on layoutTreeDirection-td, passthrough
         await tutorial.waitForStep("Select Tree Direction");
-        await tutorial.clickTutorialTarget('[data-testid="layoutTreeDirection-td"]');
+        try {
+            await pageUnderClock.clock.pauseAt(new Date(await pageUnderClock.evaluate(() => Date.now() + 250)));
+            await frames.evaluate(control => control.hold());
+            await tutorial.clickTutorialTarget('[data-testid="layoutTreeDirection-td"]');
+            await expect(tutorial.layoutControl).toContainText("Tree");
+            await expect(tutorial.treeDirection).toHaveCount(0);
+            await pageUnderClock.clock.runFor(200);
+        } finally {
+            await frames.evaluate(control => control.resume());
+            await frames.dispose();
+            await pageUnderClock.clock.resume();
+        }
 
         // Step 41: "Tree Layout Active" — no advanceOn, has Next button
         await tutorial.waitForStep("Tree Layout Active");

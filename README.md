@@ -78,6 +78,8 @@ Access the Browser: (https://browser.falkordb.com)
   old connection's samples recorded for its own cleanup. Background sample
   reads cannot recreate deleted graphs; explicit editor writes retain their
   normal permissions. Closing restores only user graphs verified to still exist.
+- Selecting a layout direction advances the tutorial even when rendering is
+  delayed; closing the layout menu does not restart an accepted selection.
 
 ### Quick start
 
@@ -297,7 +299,12 @@ Custom expiration dates use the selected local calendar day, ending at
 ### Restoring graph tabs
 
 Graph editing waits for saved tabs and the query timeout to initialize for the
-current connection, while information panels and Chat remain accessible.
+current connection and for tutorial recovery to finish, while information panels
+and Chat remain accessible. Tutorial initialization and graph discovery do not
+wait for timeout configuration. A failed graph list preserves saved selections
+without querying unconfirmed graphs; a later empty list clears those selections
+without recreating dropped graphs.
+An auto-selected graph waits for saved settings before running its default query.
 If timeout configuration does not respond within five seconds, restoration uses
 the 60-second fallback.
 

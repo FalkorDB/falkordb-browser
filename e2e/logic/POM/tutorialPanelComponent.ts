@@ -170,6 +170,10 @@ export default class TutorialPanel extends GraphPage {
     return this.page.getByTestId("layoutControl");
   }
 
+  public get treeDirection(): Locator {
+    return this.page.getByTestId("layoutTreeDirection-td");
+  }
+
   /**
    * The rename box of the tab the tutorial points at — always the active one,
    * so a stale input on another tab can never be picked up.
