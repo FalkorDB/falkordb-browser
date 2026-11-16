@@ -52,10 +52,6 @@ export interface SchemaViewport {
 }
 
 export default class SchemaView extends GraphPage {
-  private get schemaTab(): Locator {
-    return this.page.getByTestId("schemaTab");
-  }
-
   private get schemaTabPanel(): Locator {
     return this.page.getByRole("tabpanel", { name: "Schema" });
   }
@@ -110,14 +106,6 @@ export default class SchemaView extends GraphPage {
   /** The query run time, which only the graph reports. */
   public async isRunTimeVisible(): Promise<boolean> {
     return this.page.getByText(/^RT:/).isVisible();
-  }
-
-  public async clickSchemaTab(): Promise<void> {
-    await interactWhenVisible(
-      this.schemaTab,
-      (el) => el.click(),
-      "schema tab"
-    );
   }
 
   public async clickSchemaZoomIn(): Promise<void> {

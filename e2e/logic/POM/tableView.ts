@@ -5,7 +5,7 @@ import GraphPage from "./graphPage";
 
 export default class TableView extends GraphPage {
 
-    private get tableViewTab(): Locator {
+    public get tableViewTab(): Locator {
         return this.page.getByTestId("tableTab");
     }
 
@@ -19,6 +19,42 @@ export default class TableView extends GraphPage {
 
     public get lastColumnCells(): Locator {
         return this.tableViewTableRows.locator('td:last-child');
+    }
+
+    /** Rendered data rows only: the virtualised table's spacer rows have no test id. */
+    public get dataRows(): Locator {
+        return this.tableViewTabPanel.locator('[data-testid^="tableRowTableView"]');
+    }
+
+    public dataRow(index: number): Locator {
+        return this.tableViewTabPanel.getByTestId(`tableRowTableViewrow-${index}`);
+    }
+
+    /** The row-number cell ("1.", "2.", ...) of a rendered row. */
+    public rowNumber(row: Locator): Locator {
+        return row.locator('td').first();
+    }
+
+    public get searchInput(): Locator {
+        return this.page.getByTestId('searchInputTableView');
+    }
+
+    public async searchTable(text: string): Promise<void> {
+        await this.searchInput.fill(text);
+    }
+
+    public async clearSearchWithEscape(): Promise<void> {
+        await this.searchInput.press('Escape');
+    }
+
+    private get scrollContainer(): Locator {
+        return this.tableViewTabPanel.locator('#tableContent');
+    }
+
+    public async scrollTableTo(position: 'top' | 'bottom'): Promise<void> {
+        await this.scrollContainer.evaluate((el, target) => {
+            el.scrollTo(0, target === 'top' ? 0 : el.scrollHeight);
+        }, position);
     }
 
     columnHeader(name: RegExp): Locator {
