@@ -223,7 +223,7 @@ test.describe("Connection Manager Tests: own session", () => {
       await expect(manager.logoutDialog).toBeHidden();
       await expect(manager.connectionItems).toHaveCount(1);
       await expect(manager.activeMarkerForUser(ADMIN_USERNAME)).toHaveCount(1);
-      await manager.closeDropdown();
+      // The reload below closes the menu; after the removal dialog, Escape leaves it open.
       const restoredSession = manager.waitForSessionUpdate();
       await manager.refreshPage();
       const restored = await restoredSession;
