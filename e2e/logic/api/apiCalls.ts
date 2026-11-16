@@ -48,7 +48,11 @@ async function postForStatus(
     ...(authenticated ? await getAdminToken() : {}),
     "Content-Type": "application/json",
   };
-  const ctx = await playwrightRequest.newContext();
+  // Playwright Test seeds new request contexts with the project's storageState, so start empty:
+  // authenticated calls pass their cookies explicitly and unauthenticated ones must carry none.
+  const ctx = await playwrightRequest.newContext({
+    storageState: { cookies: [], origins: [] },
+  });
   try {
     const response = await postRequest(url, body, ctx, headers);
     const isJson = response.headers()["content-type"]?.includes("application/json");

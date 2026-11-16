@@ -1292,9 +1292,17 @@ test.describe("Chat API validation", () => {
   const messages = [{ role: "user", content: "How many nodes are there?" }];
 
   let apiCall: ApiCalls;
+  let graphToRemove: string | undefined;
 
   test.beforeEach(() => {
     apiCall = new ApiCalls();
+    graphToRemove = undefined;
+  });
+
+  test.afterEach(async () => {
+    if (!graphToRemove) return;
+    const response = await apiCall.removeGraph(graphToRemove, "admin");
+    expect(response.status, "Chat test graph deletion should succeed").toBe(200);
   });
 
   test("@admin POST /api/chat rejects a malformed JSON body", async () => {
@@ -1365,20 +1373,17 @@ test.describe("Chat API validation", () => {
   test("@admin POST /api/chat answers an empty graph with a friendly 400", async () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
+    graphToRemove = graphName;
 
-    try {
-      const response = await apiCall.postChat({
-        messages,
-        graphName,
-        model: DEFAULT_CHAT_MODEL,
-        key: apiKey,
-      });
+    const response = await apiCall.postChat({
+      messages,
+      graphName,
+      model: DEFAULT_CHAT_MODEL,
+      key: apiKey,
+    });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe("Your graph is empty. Add some data to your graph before using the chat.");
-    } finally {
-      await apiCall.removeGraph(graphName, "admin");
-    }
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Your graph is empty. Add some data to your graph before using the chat.");
   });
 
   test("@admin POST /api/chat rejects an unauthenticated request", async () => {
