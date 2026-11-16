@@ -463,3 +463,5 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   The Firefox settings project depends on the Chromium settings project because both
   mutate server-wide configuration. Selecting Firefox also runs Chromium first; do not
   bypass this dependency when both projects share a server.
+  The connection manager's server-switching test also needs a second FalkorDB on port 6380
+  (CI runs one as the `falkordb-pat` service): `docker run -d -p 6380:6379 falkordb/falkordb`.
