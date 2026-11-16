@@ -1302,7 +1302,10 @@ test.describe("Chat API validation", () => {
   test.afterEach(async () => {
     if (!graphToRemove) return;
     const response = await apiCall.removeGraph(graphToRemove, "admin");
-    expect(response.status, "Chat test graph deletion should succeed").toBe(200);
+    if (response.status === 200) return;
+    // Registered before addGraph, so the graph may never have been created
+    const graphs = await apiCall.getGraphs("admin");
+    expect(graphs.opts, "Chat test graph deletion should succeed").not.toContain(graphToRemove);
   });
 
   test("@admin POST /api/chat rejects a malformed JSON body", async () => {
@@ -1372,8 +1375,8 @@ test.describe("Chat API validation", () => {
 
   test("@admin POST /api/chat answers an empty graph with a friendly 400", async () => {
     const graphName = getRandomString("chat");
-    await apiCall.addGraph(graphName);
     graphToRemove = graphName;
+    await apiCall.addGraph(graphName);
 
     const response = await apiCall.postChat({
       messages,
