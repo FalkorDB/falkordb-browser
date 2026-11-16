@@ -1,6 +1,3 @@
-/* eslint-disable no-restricted-syntax */
-/* eslint-disable no-plusplus */
-/* eslint-disable no-await-in-loop */
 import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
@@ -13,18 +10,42 @@ import {
   getRandomString,
 } from "../infra/utils";
 import { FETCH_FIRST_TEN_NODES } from "../config/constants";
+import { getPropertyUrl } from "../../lib/graphUrls";
+
+// Matches the editor's property writes, which carry the key as a query value
+// (see getPropertyUrl): /api/graph/<graph>/<id>/property?propertyKey=<key>.
+const isPropertyWrite = (graphName: string, key: string) => (url: URL) => {
+  const prefix = `/api/graph/${encodeURIComponent(graphName)}/`;
+  return url.pathname.startsWith(prefix)
+    && /^[^/]+\/property$/.test(url.pathname.slice(prefix.length))
+    && url.searchParams.get("propertyKey") === key;
+};
 
 test.describe("Data panel Tests", () => {
   let browser: BrowserWrapper;
   let apicalls: ApiCalls;
 
+  // Set by tests that rely on afterEach to drop their graph strictly; the
+  // older tests in this file still remove theirs inline.
+  let graphToRemove: string | undefined;
+
   test.beforeEach(async () => {
     browser = new BrowserWrapper();
     apicalls = new ApiCalls();
+    graphToRemove = undefined;
   });
 
   test.afterEach(async () => {
+    // Close first: a live graph page polls graph info, and that poll
+    // re-creates a graph deleted out from under it.
     await browser.closeBrowser();
+
+    if (graphToRemove) {
+      const { message } = await apicalls.removeGraph(graphToRemove, "admin");
+      if (!message.includes("deleted")) {
+        throw new Error(`Failed to remove ${graphToRemove}: ${message}`);
+      }
+    }
   });
 
   test(`@readwrite Validate modifying node attributes header via UI and validate via API`, async () => {
@@ -210,6 +231,134 @@ test.describe("Data panel Tests", () => {
     await apicalls.removeGraph(graphName);
   });
 
+  test("@admin property mutations preserve legacy URLs, read-only protection and reject empty keys", async ({ request }) => {
+    const graphName = getRandomString("propertyApi");
+    const protectedKeys = ["_NEXTSEP_name/part", "a?b"];
+    const initial = { [protectedKeys[0]]: 2, [protectedKeys[1]]: 3 };
+    await apicalls.addGraph(graphName);
+    try {
+      const result = await apicalls.runQuery(graphName, `CREATE (n {legacy: 1, \`${protectedKeys[0]}\`: 2, \`${protectedKeys[1]}\`: 3}) RETURN ID(n) AS id`);
+      const id = Number(result.data[0].id);
+      const legacyUrl = `${urls.api.graphUrl}${encodeURIComponent(graphName)}/${id}/legacy`;
+      const readProperties = async () => (await apicalls.runQuery(graphName, "MATCH (n) RETURN n")).data[0].n.properties;
+      const updated = await request.post(legacyUrl, { data: { type: true, value: 7, valueType: "integer" } });
+      expect(updated.ok(), await updated.text()).toBe(true);
+      expect(await readProperties()).toEqual({ legacy: 7, ...initial });
+      const removed = await request.delete(legacyUrl, { data: { type: true } });
+      expect(removed.ok(), await removed.text()).toBe(true);
+      expect(await readProperties()).toEqual(initial);
+      // A "?" in the key used to cut off the readOnly flag before keys were encoded (#2205).
+      for (const key of protectedKeys) {
+        const protectedUrl = new URL(getPropertyUrl(graphName, id, key, true), urls.localHost).toString();
+        const blockedUpdate = await request.post(protectedUrl, { data: { type: true, value: 9, valueType: "integer" } });
+        const blockedDelete = await request.delete(protectedUrl, { data: { type: true } });
+        expect(blockedUpdate.status()).toBe(403);
+        expect(blockedDelete.status()).toBe(403);
+      }
+      const emptyKeyUrl = new URL(getPropertyUrl(graphName, id, ""), urls.localHost).toString();
+      const emptyUpdate = await request.post(emptyKeyUrl, { data: { type: true, value: 9, valueType: "integer" } });
+      const emptyDelete = await request.delete(emptyKeyUrl, { data: { type: true } });
+      expect(emptyUpdate.status()).toBe(400);
+      expect(await emptyUpdate.json()).toEqual({ message: "Property key must not be empty" });
+      expect(emptyDelete.status()).toBe(400);
+      expect(await readProperties()).toEqual(initial);
+    } finally {
+      await apicalls.removeGraph(graphName);
+    }
+  });
+
+  for (const [key, isNode] of [["a?b", false], ["_NEXTSEP_name/part", false], ["_NEXTSEP_name/part", true]] as const) {
+    test(`@admin editing and deleting ${isNode ? "node" : "relationship"} property "${key}" targets the exact key`, async () => {
+      // Two UI mutations, each followed by a poll of up to 10s, can exceed the 40s project timeout.
+      test.setTimeout(60_000);
+      const graphName = getRandomString(isNode ? "nodeProperty" : "relationshipProperty");
+      await apicalls.addGraph(graphName);
+      try {
+        const properties = `{\`${key}\`: 1, a: 2, \`name/part\`: 3}`;
+        await apicalls.runQuery(graphName, isNode
+          ? `CREATE (n:Person ${properties}) SET n.name = 'Alice'`
+          : `CREATE (:Person {name: 'Alice'})-[:KNOWS ${properties}]->(:Person {name: 'Bob'})`);
+        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(isNode ? "MATCH (n) RETURN n" : "MATCH (a)-[r:KNOWS]->(b) RETURN a, r, b");
+        await graph.clickRunQuery();
+        await graph.waitForCanvasAnimationToEnd();
+        if (isNode) {
+          await graph.searchElementInCanvas("Alice");
+        } else {
+          await graph.clickCenterControl();
+          await graph.waitForScaleToStabilize();
+          const links = await graph.getLinksScreenPositions();
+          expect(links).toHaveLength(1);
+          await graph.clickCanvasElement(links[0].midX, links[0].midY);
+        }
+        const readProperties = async () => {
+          const response = await apicalls.runQuery(graphName, isNode ? "MATCH (n) RETURN n AS element" : "MATCH ()-[r:KNOWS]->() RETURN r AS element");
+          return response.data[0].element.properties;
+        };
+        const neighbours = { a: 2, "name/part": 3, ...(isNode ? { name: "Alice" } : {}) };
+        await graph.setAttribute(key, "70", "integer");
+        await expect.poll(readProperties, { timeout: 10000 }).toEqual({ [key]: 70, ...neighbours });
+        await graph.removeAttribute(key);
+        await expect.poll(readProperties, { timeout: 10000 }).toEqual(neighbours);
+      } finally {
+        await browser.closeBrowser();
+        await apicalls.removeGraph(graphName);
+      }
+    });
+  }
+
+  for (const key of ["a?b", "c#d", "e/f", "g%h"]) {
+    const readNodeProperties = async (graphName: string) => (await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES)).data[0].n.properties;
+
+    test(`@readwrite Validate modifying attribute with reserved URL character key "${key}" updates that key only`, async () => {
+      const graphName = getRandomString("datapanel");
+      await apicalls.addGraph(graphName);
+      try {
+        await apicalls.runQuery(
+          graphName,
+          `CREATE (:Person {name: "Alice", \`${key}\`: 1, a: 2, c: 3, e: 4, g: 5})`
+        );
+        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+        await graph.clickRunQuery();
+        await graph.searchElementInCanvas("Alice");
+        await graph.setAttribute(key, "70", "integer");
+        // The UI save is async, so poll until it lands before checking the other keys.
+        await expect.poll(() => readNodeProperties(graphName), { timeout: 10000 })
+          .toEqual({ name: "Alice", [key]: 70, a: 2, c: 3, e: 4, g: 5 });
+      } finally {
+        await apicalls.removeGraph(graphName);
+      }
+    });
+
+    test(`@readwrite Validate removing attribute with reserved URL character key "${key}" removes that key only`, async () => {
+      const graphName = getRandomString("datapanel");
+      await apicalls.addGraph(graphName);
+      try {
+        await apicalls.runQuery(
+          graphName,
+          `CREATE (:Person {name: "Alice", \`${key}\`: 1, a: 2, c: 3, e: 4, g: 5})`
+        );
+        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+        await graph.clickRunQuery();
+        await graph.searchElementInCanvas("Alice");
+        await graph.removeAttribute(key);
+        // The UI save is async, so poll until it lands before checking the other keys.
+        await expect.poll(() => readNodeProperties(graphName), { timeout: 10000 })
+          .toEqual({ name: "Alice", a: 2, c: 3, e: 4, g: 5 });
+      } finally {
+        await apicalls.removeGraph(graphName);
+      }
+    });
+  }
+
   test(`@readwrite Validate modify attribute for node via API and validation via UI`, async () => {
     const graphName = getRandomString("datapanel");
     await apicalls.addGraph(graphName);
@@ -229,6 +378,75 @@ test.describe("Data panel Tests", () => {
     await graph.searchElementInCanvas("Alice");
     expect(await graph.getAttributeValueByName("35")).toContain("35");
     await apicalls.removeGraph(graphName);
+  });
+
+  test("@readwrite cancelling a property edit leaves the displayed and stored value unchanged", async () => {
+    const graphName = getRandomString("propertyCancel");
+    await apicalls.addGraph(graphName);
+    graphToRemove = graphName;
+    await apicalls.runQuery(graphName, "CREATE (:Person {name: 'edit-target', age: 30})");
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+    await graph.searchElementInCanvas("edit-target");
+    let writes = 0;
+    await page.route(isPropertyWrite(graphName, "age"), async (route) => {
+      writes += 1;
+      await route.continue();
+    });
+    await graph.hoverDataPanelAttribute("age");
+    await graph.clickDataPanelSetAttribute();
+    await graph.fillDataPanelSetAttributeValue("99");
+    await graph.clickDataPanelSetAttributeCancel();
+    expect(await graph.isNotEditingAttribute()).toBe(true);
+    expect(await graph.getAttributeValueByName("30")).toBe("30");
+    expect(await graph.isAttributeValueByNameVisible("99")).toBe(false);
+    const result = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
+    expect(Number(result.data[0].age)).toBe(30);
+    expect(writes).toBe(0);
+  });
+
+  test("@readwrite rejected property edits preserve the old value and support retry", async () => {
+    const graphName = getRandomString("propertyRetry");
+    await apicalls.addGraph(graphName);
+    graphToRemove = graphName;
+    await apicalls.runQuery(graphName, "CREATE (:Person {name: 'retry-target', age: 30})");
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+    await graph.searchElementInCanvas("retry-target");
+    let attempts = 0;
+    await page.route(isPropertyWrite(graphName, "age"), async (route) => {
+      attempts += 1;
+      if (attempts === 1) {
+        await route.fulfill({ status: 400, json: { message: "Invalid value: age update rejected" } });
+      } else {
+        await route.continue();
+      }
+    });
+    await graph.hoverDataPanelAttribute("age");
+    await graph.clickDataPanelSetAttribute();
+    await graph.fillDataPanelSetAttributeValue("31");
+    await graph.clickDataPanelSetAttributeConfirm();
+    expect(await graph.getErrorToastText()).toContain("Invalid value: age update rejected");
+    expect(await graph.isEditingAttribute()).toBe(true);
+    expect(await graph.getDataPanelSetAttributeValue()).toBe("31");
+    // The mock keeps the write from the backend, so what can regress is the
+    // panel adopting the rejected value; its value cell is keyed by the value.
+    expect(await graph.isAttributeValueByNameVisible("30")).toBe(true);
+    expect(await graph.isAttributeValueByNameVisible("31")).toBe(false);
+    await graph.clickDataPanelSetAttributeConfirm();
+    expect(await graph.isNotEditingAttribute()).toBe(true);
+    expect(await graph.getAttributeValueByName("31")).toBe("31");
+    const saved = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n.age AS age");
+    expect(Number(saved.data[0].age)).toBe(31);
+    expect(attempts).toBe(2);
   });
 
   test(`@readwrite Validate delete node via ui and validation via API`, async () => {

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { Page, expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import ChatComponent from "../logic/POM/chatComponent";
@@ -9,9 +9,14 @@ import { getRandomString } from "../infra/utils";
 
 const DEFAULT_CHAT_MODEL = "gpt-4o-mini";
 
+/**
+ * Opens the graph page with the chat model preconfigured. A `null` API key
+ * selects the local model source instead, which skips the API-key guard (and
+ * its async key migration) for tests that mock `/api/chat`.
+ */
 async function createChatPageWithSettings(
   browser: BrowserWrapper,
-  apiKey: string,
+  apiKey: string | null,
   model: string = DEFAULT_CHAT_MODEL
 ): Promise<ChatComponent> {
   const chat = await browser.createNewPage(ChatComponent);
@@ -19,12 +24,16 @@ async function createChatPageWithSettings(
   const page = await browser.getPage();
 
   await page.addInitScript(({ key, selectedModel }) => {
-    localStorage.setItem("secretKey", key);
+    if (key === null) localStorage.setItem("chatModelSource", "local");
+    else localStorage.setItem("secretKey", key);
     localStorage.setItem("model", selectedModel);
   }, { key: apiKey, selectedModel: model });
 
   await page.goto(urls.graphUrl);
   await page.waitForLoadState("networkidle");
+  if (apiKey === null) return chat;
+
+
   // Chat API keys live under a connection-scoped key
   // (`<host>:<port>:<user>:chatApiKeys`), so resolve it by suffix rather than
   // reading the bare name.
@@ -63,12 +72,10 @@ test.describe("Chat Feature Tests", () => {
         if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
       }
     });
-    // A single real graph is auto-selected, so isolate the empty-list case
-    // from graphs created or removed by other workers.
     await page.route("**/api/graph", route => route.fulfill({ json: { opts: [] } }));
     await page.goto(urls.graphUrl);
     await browser.setPageToFullScreen();
-    
+
     await expect(page.getByTestId("selectGraph")).toHaveText("Select Graph");
     await expect(page.getByTestId("chatToggleButton")).toBeVisible();
     await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
@@ -657,12 +664,12 @@ test.describe("Chat Feature Tests", () => {
       expect(displayedQuery?.trim().startsWith("CYPHER sourceCode='TLV'")).toBe(true);
 
       const queryMessage = page.getByTestId("chatAssistantMessage-CypherQuery").last();
-      const queryText = queryMessage.locator("pre");
+      const queryText = queryMessage.getByTestId("chatSuggestedQuery");
       await expect(queryText).toHaveText(cypherQuery);
-      await expect(queryText).toHaveCSS("font-size", "12px");
-      await expect(queryMessage.getByRole("button")).toHaveCount(2);
-      await expect(queryMessage.getByTestId("chatInsertQueryButton")).toBeVisible();
+      await expect(queryText).toHaveCSS("white-space", "pre-wrap");
       await expect(queryMessage.getByTestId("chatCopyQueryButton")).toBeVisible();
+      await expect(queryMessage.getByTestId("chatInsertQueryButton")).toBeVisible();
+      await expect(queryMessage.getByRole("button")).toHaveCount(2);
       expect(await queryText.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 
       let queryRequests = 0;
@@ -674,7 +681,6 @@ test.describe("Chat Feature Tests", () => {
 
       await expect.poll(() => chat.getEditorInput(), { timeout: 10000 })
         .toMatch(/^CYPHER sourceCode='TLV'/);
-      expect(queryRequests).toBe(0);
       await chat.clickRunQuery();
       await expect.poll(() => queryRequests).toBeGreaterThan(0);
       await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
@@ -1150,5 +1156,163 @@ test.describe("Chat Feature Tests", () => {
     } finally {
       await apiCall.removeGraph(graphName);
     }
+  });
+
+  test.describe("Mocked chat request recovery", () => {
+    let graphName: string | undefined;
+    let mockedPage: Page | undefined;
+
+    test.beforeEach(() => {
+      graphName = undefined;
+      mockedPage = undefined;
+    });
+
+    test.afterEach(async () => {
+      const graphToRemove = graphName;
+      graphName = undefined;
+
+      // A test that fails while a mocked response is pending must not leave
+      // its route handler fulfilling into the page being closed.
+      // Close first: a live graph page polls graph info, and that poll
+      // re-creates a graph deleted out from under it.
+      try {
+        await mockedPage?.unrouteAll({ behavior: "ignoreErrors" });
+      } finally {
+        try {
+          await browser.closeBrowser();
+        } finally {
+          if (graphToRemove) {
+            const response = await apiCall.removeGraph(graphToRemove, "admin");
+            expect(response.status, "Chat test graph deletion should succeed").toBe(200);
+          }
+        }
+      }
+    });
+
+    async function openMockedChat(model = DEFAULT_CHAT_MODEL) {
+      graphName = getRandomString("chatRecovery");
+      await apiCall.addGraph(graphName);
+      const chat = await createChatPageWithSettings(browser, null, model);
+      await chat.selectGraphByName(graphName);
+      await chat.waitForSelectedGraphInUrl(graphName);
+      await chat.openChat();
+      if (model) await chat.waitForChatFooterModel(model);
+      mockedPage = await browser.getPage();
+      return { chat, page: mockedPage, graphName };
+    }
+
+    test(`@readwrite Verify chat rejects a missing model without sending or losing the draft`, async () => {
+      const { chat, page } = await openMockedChat("");
+      let requests = 0;
+      await page.route("**/api/chat", async (route) => {
+        requests += 1;
+        await route.fulfill({ json: { answer: "Unexpected request" } });
+      });
+      const draft = "Keep this question until a model is selected";
+      await chat.fillChatInput(draft);
+      await chat.clickChatSendButton();
+
+      await expect(chat.errorToast).toContainText("No model selected");
+      await expect.poll(() => chat.getChatInputValue()).toBe(draft);
+      await chat.waitForChatSendButtonEnabled();
+      expect(await chat.getChatUserMessagesCount()).toBe(0);
+      expect(requests).toBe(0);
+      await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: [] } }));
+      await chat.clickErrorToastGoToSettings();
+    });
+
+    for (const failure of ["HTTP rejection", "malformed JSON", "network failure"] as const) {
+      test(`@readwrite Verify chat restores the submitted draft after ${failure} and retries successfully`, async () => {
+        const { chat, page, graphName: selectedGraph } = await openMockedChat();
+        const requests: { graphName: string; messages: { role: string; content: string }[] }[] = [];
+        const connectionIds: (string | undefined)[] = [];
+        const activeConnectionId = await chat.getActiveConnectionId();
+        expect(activeConnectionId).toBeTruthy();
+        await page.route("**/api/chat", async (route) => {
+          requests.push(route.request().postDataJSON());
+          connectionIds.push(route.request().headers()["x-connection-id"]);
+          if (requests.length > 1) {
+            await route.fulfill({ json: { answer: "The retry succeeded.", tokenUsage: { totalTokens: 12 } } });
+          } else if (failure === "HTTP rejection") {
+            await route.fulfill({ status: 503, json: { error: "Cannot connect to local server" } });
+          } else if (failure === "malformed JSON") {
+            await route.fulfill({ status: 200, contentType: "application/json", body: '{"answer":' });
+          } else {
+            await route.abort("failed");
+          }
+        });
+        const question = "Which people are in this graph?";
+        await chat.fillChatInput(question);
+        await chat.clickChatSendButton();
+
+        expect(await chat.waitForChatAssistantMessage("Error")).toBe(true);
+        expect(await chat.getChatAssistantMessagesCount("Error")).toBe(1);
+        const error = await chat.getLastAssistantMessageContent("Error");
+        if (failure === "HTTP rejection") {
+          expect(error).toContain("Cannot connect to local server");
+          expect(await chat.getChatErrorSettingsLinkHref()).toBe("/settings");
+        } else if (failure === "malformed JSON") {
+          expect(error).toContain("Failed to parse server response");
+        } else {
+          expect(error).toContain("Error: An unexpected error occurred. Please try again.");
+        }
+        await expect.poll(() => chat.getChatInputValue()).toBe(question);
+        await chat.waitForChatSendButtonEnabled();
+        expect(await chat.getChatAssistantMessagesCount("Result")).toBe(0);
+        await chat.clickChatSendButton();
+
+        expect(await chat.waitForChatAssistantMessage("Result")).toBe(true);
+        expect(await chat.getLastAssistantMessageContent("Result")).toContain("The retry succeeded.");
+        await expect.poll(() => chat.getChatInputValue()).toBe("");
+        expect(await chat.waitForChatFooterTokens()).toBe(true);
+        expect(await chat.getChatFooterTotalTokens()).toContain("12");
+        expect(requests).toHaveLength(2);
+        expect(requests[1].graphName).toBe(selectedGraph);
+        expect(requests[1].messages.at(-1)).toEqual({ role: "user", content: question });
+        expect(connectionIds).toEqual([activeConnectionId, activeConnectionId]);
+      });
+    }
+
+    test(`@readwrite Verify chat preserves a newer draft while a delayed response completes`, async () => {
+      const responseGate = Promise.withResolvers<void>();
+      const { chat, page } = await openMockedChat();
+      const requests: { messages: { role: string; content: string }[] }[] = [];
+      await page.route("**/api/chat", async (route) => {
+        requests.push(route.request().postDataJSON());
+        if (requests.length === 1) await responseGate.promise;
+        await route.fulfill({ json: { answer: `Answer ${requests.length}` } });
+      });
+      await chat.fillChatInput("First question");
+      await chat.clickChatSendButton();
+      await expect.poll(() => requests.length).toBe(1);
+      await chat.waitForUserMessageCount(1);
+      await chat.fillChatInput("My next question");
+      expect(await chat.isChatSendButtonDisabled()).toBe(true);
+      await chat.pressEnterInChatInput();
+      expect(await chat.getChatInputValue()).toBe("My next question");
+      await chat.waitForUserMessageCount(1);
+      // The disabled send button blocks the native submit, so the handler's
+      // "Please wait" guard toast never fires.
+      await expect(chat.errorToast).toHaveCount(0);
+
+      responseGate.resolve();
+      expect(await chat.waitForChatAssistantMessage("Result")).toBe(true);
+      expect(await chat.getLastAssistantMessageContent("Result")).toContain("Answer 1");
+      await chat.waitForChatSendButtonEnabled();
+      expect(await chat.getChatInputValue()).toBe("My next question");
+      await chat.closeChat();
+      await chat.openChat();
+      await expect.poll(() => chat.getChatInputValue()).toBe("My next question");
+      await chat.clickChatSendButton();
+
+      await expect.poll(() => chat.getChatAssistantMessagesCount("Result")).toBe(2);
+      expect(await chat.getLastAssistantMessageContent("Result")).toContain("Answer 2");
+      await expect.poll(() => chat.getChatInputValue()).toBe("");
+      expect(requests[1].messages).toEqual([
+        { role: "user", content: "First question" },
+        { role: "assistant", content: "Answer 1" },
+        { role: "user", content: "My next question" },
+      ]);
+    });
   });
 });

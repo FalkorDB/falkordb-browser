@@ -3,7 +3,9 @@ import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import {
   interactWhenVisible,
+  waitForElementToBeEnabled,
   waitForElementToBeVisible,
+  waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
 
 export default class SettingsBrowserPage extends BasePage {
@@ -87,6 +89,16 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.getByTestId("noModelsFoundMessage");
   }
 
+  // Public so specs can wait on the text with web-first assertions (as graphPage.toast does).
+  public get modelsStatusMessage(): Locator {
+    return this.page.getByTestId("modelsStatusMessage");
+  }
+
+  // Toast
+  public get errorToastDescription(): Locator {
+    return this.page.getByTestId("toast-destructive").getByTestId("toast-description");
+  }
+
   // Wait for Interactive Methods
   async waitForChatSection(): Promise<boolean> {
     return waitForElementToBeVisible(this.chatSectionHeader);
@@ -106,6 +118,22 @@ export default class SettingsBrowserPage extends BasePage {
       this.chatSectionHeader,
       (el) => el.click(),
       "Chat Section Header"
+    );
+  }
+
+  async clickAddChatApiKeyButton(): Promise<void> {
+    await interactWhenVisible(
+      this.addChatApiKeyButton,
+      (el) => el.click(),
+      "Add Chat API Key Button"
+    );
+  }
+
+  async clickLocalLlmLoadButton(): Promise<void> {
+    await interactWhenVisible(
+      this.localLlmLoadButton,
+      (el) => el.click(),
+      "Local LLM Load Button"
     );
   }
 
@@ -200,6 +228,23 @@ export default class SettingsBrowserPage extends BasePage {
     await this.page.evaluate(() => localStorage.removeItem("chatModelSource"));
   }
 
+  /** Seed a stored model for `source` before the next navigation, as a returning user would have it. */
+  async seedStoredModel(source: string, model: string): Promise<void> {
+    await this.page.addInitScript(({ source: s, model: m }) => {
+      localStorage.setItem("chatModelSource", s);
+      localStorage.setItem("model", m);
+      localStorage.setItem("perSourceModels", JSON.stringify({ [s]: m }));
+    }, { source, model });
+  }
+
+  async getStoredPerSourceModel(source: string): Promise<string | undefined> {
+    return this.page.evaluate((s) => JSON.parse(localStorage.getItem("perSourceModels") ?? "{}")[s], source);
+  }
+
+  async getSavedModelFromLocalStorage(): Promise<string | null> {
+    return this.page.evaluate(() => localStorage.getItem("model"));
+  }
+
   /**
    * Wait until the async saveEncryptedSetting call has written the
    * chatModelSource key back into localStorage.
@@ -233,12 +278,10 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async fillLocalLlmEndpoint(endpoint: string): Promise<void> {
+    // fill() replaces the value in one step, so the app never sees a transient empty endpoint.
     await interactWhenVisible(
       this.localLlmEndpointInput,
-      async (el) => {
-        await el.clear();
-        await el.fill(endpoint);
-      },
+      (el) => el.fill(endpoint),
       "Local LLM Endpoint Input"
     );
   }
@@ -312,11 +355,7 @@ export default class SettingsBrowserPage extends BasePage {
 
   async addChatApiKey(apiKey: string): Promise<void> {
     await this.fillChatApiKey(apiKey);
-    await interactWhenVisible(
-      this.addChatApiKeyButton,
-      (el) => el.click(),
-      "Add Chat API Key Button"
-    );
+    await this.clickAddChatApiKeyButton();
     await this.getMaskedChatApiKeyCard(apiKey).waitFor({ state: "visible", timeout: 5000 });
   }
 
@@ -398,6 +437,10 @@ export default class SettingsBrowserPage extends BasePage {
     return this.getChatApiKeyCard(apiKey).isVisible();
   }
 
+  async getChatApiKeyCount(): Promise<number> {
+    return this.chatApiKeyCards.count();
+  }
+
   async fillMaxSavedMessages(value: number): Promise<void> {
     await interactWhenVisible(
       this.maxSaveMessagesInput,
@@ -436,6 +479,10 @@ export default class SettingsBrowserPage extends BasePage {
 
   async isChatApiKeyInputEnabled(): Promise<boolean> {
     return this.chatApiKeyInput.isEnabled();
+  }
+
+  async isAddChatApiKeyButtonEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.addChatApiKeyButton);
   }
 
   async waitForChatApiKeyInputEnabled(): Promise<void> {
@@ -669,6 +716,14 @@ export default class SettingsBrowserPage extends BasePage {
     } catch {
       return false;
     }
+  }
+
+  async isNoModelsFoundMessageNotVisible(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.noModelsFoundMessage);
+  }
+
+  async isModelSearchEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.modelSearchInput);
   }
 
   async getNoModelsFoundText(): Promise<string> {

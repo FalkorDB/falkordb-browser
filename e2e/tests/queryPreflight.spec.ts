@@ -54,6 +54,41 @@ test.describe("Query pre-flight and FalkorDB grammar extensions", () => {
 
     const validQueries: { issue: string; label: string; query: string }[] = [
         {
+            issue: "#2198",
+            label: "the documented CYPHER parameter header",
+            query: "CYPHER minAge=30 MATCH (p:Person) WHERE p.age > $minAge RETURN count(p)",
+        },
+        {
+            issue: "#2198",
+            label: "multiple parameter values including strings, lists, and maps",
+            query: "CYPHER source='TLV' ids=[1,2] options={active: true} RETURN $source, $ids, $options",
+        },
+        {
+            issue: "#2198",
+            label: "a CYPHER prefix with no parameters",
+            query: "CYPHER MATCH (n) RETURN n",
+        },
+        {
+            issue: "#2198",
+            label: "repeated CYPHER prefixes",
+            query: "CYPHER a=1 CYPHER b=2 RETURN $a, $b",
+        },
+        {
+            issue: "#2198",
+            label: "a lowercase CYPHER prefix",
+            query: "cypher a=1 RETURN $a",
+        },
+        {
+            issue: "#2198",
+            label: "a parameter value adjacent to the query",
+            query: "CYPHER a='x'RETURN $a",
+        },
+        {
+            issue: "#2198",
+            label: "CYPHER as a variable name",
+            query: "MATCH (cypher) RETURN cypher",
+        },
+        {
             issue: "#2056",
             label: "LOAD CSV with a file:// source",
             query: "LOAD CSV FROM 'file://fuzz.csv' AS row RETURN row",

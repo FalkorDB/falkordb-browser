@@ -81,6 +81,7 @@ test("rollback renews only the preserved canvas and never revives an old write",
     const canvas = { setGraphData() {} };
     const session = { graph: {}, data: {}, tabId: "a", epoch: getConnectionEpoch() };
     commitCanvasSession(canvas, session);
+    assert.equal(renewCanvasSession(canvas, session), false);
     const ready = Promise.withResolvers<boolean>();
     register3DCheck(canvas, () => ready.promise);
     const pending = writeCanvasData(canvas, { nodes: [], links: [] }, () => assert.fail("old write revived"),
@@ -88,6 +89,7 @@ test("rollback renews only the preserved canvas and never revives an old write",
     setActiveConnectionIdGlobal("rollback-b");
     setActiveConnectionIdGlobal("rollback-a");
     const renewed = { ...session, epoch: getConnectionEpoch() };
+    assert.equal(renewCanvasSession(canvas, session), false);
     for (const replacement of [
         { ...renewed, graph: {} }, { ...renewed, data: {} },
         { ...renewed, tabId: "b" }, { ...renewed, restore: {} },

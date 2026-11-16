@@ -12,14 +12,121 @@ import urls from "../config/urls.json";
 test.describe("Customize Style Tests", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
+  let relationshipGraph: string | undefined;
 
   test.beforeEach(async () => {
     browser = new BrowserWrapper();
     apiCall = new ApiCalls();
+    relationshipGraph = undefined;
   });
 
   test.afterEach(async () => {
-    await browser.closeBrowser();
+    const graphToRemove = relationshipGraph;
+    relationshipGraph = undefined;
+    try {
+      // Close first: a live graph page polls graph info, and that poll
+      // re-creates a graph deleted out from under it.
+      await browser.closeBrowser();
+    } finally {
+      if (graphToRemove) await apiCall.removeGraph(graphToRemove, "admin");
+    }
+  });
+
+  test(`@readwrite Validate relationship style saves color and all scaled dimensions without changing node styles`, async () => {
+    relationshipGraph = getRandomString("relationshipStyle");
+    await apiCall.addGraph(relationshipGraph);
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(relationshipGraph);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery();
+    await graph.openGraphInfoButton();
+
+    await graph.clickCustomizeStyleButton("person1");
+    const nodeColor = await graph.getColorByIndex(4);
+    await graph.selectColorByIndex(4);
+    await graph.selectSizeByIndex(2);
+    await graph.clickSaveStyleButton();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    // Size option 2 is 0.75x the canvas default node size of 9.
+    const nodeStyle = { color: nodeColor, size: 6.75 };
+    expect(await graph.getLabelStyleFromLocalStorage("person1")).toEqual(nodeStyle);
+    const nodesBefore = await graph.readNodeStyles();
+    expect(nodesBefore).toHaveLength(2);
+
+    await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+    const color = await graph.getColorByIndex(2);
+    await graph.selectColorByIndex(2);
+    await graph.selectSizeByIndex(5);
+    await graph.clickSaveStyleButton();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    // Size option 5 is 1.5x the canvas defaults: width 1, font size 6, arrow size 8.
+    const saved = { color, width: 1.5, fontSize: 9, arrowSize: 12 };
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+    expect(await graph.getLabelStyleFromLocalStorage("person1")).toEqual(nodeStyle);
+    expect(await graph.readNodeStyles()).toEqual(nodesBefore);
+
+    await graph.refreshPage();
+    await graph.selectGraphByName(relationshipGraph);
+    await graph.insertQuery("MATCH (n)-[e]->(m) RETURN n,e,m");
+    await graph.clickRunQuery();
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+    await graph.openGraphInfoButton();
+    await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+    expect(await graph.isColorSectionVisible()).toBe(true);
+    expect(await graph.getSelectedColorButtonIndex()).toBe(2);
+    expect(await graph.getSelectedSizeButtonIndex()).toBe(5);
+  });
+
+  test(`@readwrite Validate cancelling relationship style restores both controls and does not persist previews`, async () => {
+    relationshipGraph = getRandomString("relationshipCancel");
+    await apiCall.addGraph(relationshipGraph);
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(relationshipGraph);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery();
+    await graph.openGraphInfoButton();
+
+    // Save a known style first, so the checks below compare against it rather than an absent key.
+    await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+    const savedColor = await graph.getColorByIndex(3);
+    await graph.selectColorByIndex(3);
+    await graph.selectSizeByIndex(1);
+    await graph.clickSaveStyleButton();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    // Size option 1 is 0.5x the canvas defaults: width 1, font size 6, arrow size 8.
+    const saved = { color: savedColor, width: 0.5, fontSize: 3, arrowSize: 4 };
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+
+    await graph.clickCustomizeRelationshipStyleButton("KNOWS");
+    expect(await graph.isColorSectionVisible()).toBe(true);
+    expect(await graph.getSelectedColorButtonIndex()).toBe(3);
+    expect(await graph.getSelectedSizeButtonIndex()).toBe(1);
+    const previewColor = await graph.getColorByIndex(0);
+    await graph.selectColorByIndex(0);
+    await graph.selectSizeByIndex(5);
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS"))
+      .toEqual([{ color: previewColor, width: 1.5, fontSize: 9, arrowSize: 12 }]);
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
+
+    await graph.clickCancelStyleButton();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    expect(await graph.getSelectedColorButtonIndex()).toBe(3);
+    expect(await graph.getSelectedSizeButtonIndex()).toBe(1);
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
+    expect(await graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+
+    await graph.closePanel();
+    expect(await graph.isSaveButtonNotVisible()).toBe(true);
+    await graph.refreshPage();
+    await graph.selectGraphByName(relationshipGraph);
+    await graph.insertQuery("MATCH (n)-[e]->(m) RETURN n,e,m");
+    await graph.clickRunQuery();
+    await expect.poll(() => graph.readRelationshipStyles("KNOWS")).toEqual([saved]);
+    expect(await graph.getRelationshipStyleFromLocalStorage("KNOWS")).toEqual(saved);
   });
 
   test(`@readwrite Validate customize style button is visible for each label`, async () => {

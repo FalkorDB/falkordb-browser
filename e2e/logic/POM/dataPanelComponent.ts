@@ -207,6 +207,14 @@ export default class DataPanel extends GraphPage {
     );
   }
 
+  async getDataPanelSetAttributeValue(): Promise<string> {
+    return interactWhenVisible(
+      this.dataPanelSetAttributeValue,
+      (el) => el.inputValue(),
+      "Data Panel Set Attribute Value"
+    );
+  }
+
   async clickDataPanelClose(): Promise<void> {
     await interactWhenVisible(
       this.dataPanelClose,
@@ -351,6 +359,10 @@ export default class DataPanel extends GraphPage {
     return waitForElementToBeVisible(this.dataPanelSetAttributeConfirm);
   }
 
+  async isNotEditingAttribute(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.dataPanelSetAttributeConfirm);
+  }
+
   async clickDataPanelDeleteAttribute(): Promise<void> {
     await interactWhenVisible(
       this.dataPanelDeleteAttribute,
@@ -379,7 +391,7 @@ export default class DataPanel extends GraphPage {
     return interactWhenVisible(
       this.attributeValue(attribute),
       (el) => el.textContent(),
-      "Data Panel Delete Attribute Cancel"
+      `Data Panel Attribute Value ${attribute}`
     );
   }
 

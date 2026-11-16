@@ -8,6 +8,7 @@ import {
   getChatCompletionsUrl,
   resolveFixTarget,
 } from "./aiFix.ts";
+import { detectProviderFromModel, prefixProviderModels } from "./ai-provider-utils.ts";
 
 describe("buildFixMessages", () => {
   it("builds system + user messages with the query and error", () => {
@@ -88,6 +89,29 @@ describe("isAiFixSupported", () => {
     assert.equal(isAiFixSupported({ source: "api-key", key: "k", model: "groq::llama-3.1-8b" }), true);
     assert.equal(isAiFixSupported({ source: "api-key", key: "k", model: "xai::grok-2" }), true);
     assert.equal(isAiFixSupported({ source: "api-key", key: "k", model: "anthropic::claude-3" }), false);
+  });
+  it("recognizes legacy unprefixed OpenAI models saved in settings", () => {
+    for (const legacy of ["codex-mini-latest", "chatgpt-4o-latest", "o5-mini"]) {
+      assert.equal(detectProviderFromModel(legacy), "openai");
+      assert.equal(isAiFixSupported({ source: "api-key", key: "sk-x", model: legacy }), true);
+    }
+    const resolved = resolveFixTarget({
+      modelSource: "api-key",
+      model: "codex-mini-latest",
+      key: "sk-x",
+      localProvider: "ollama",
+    });
+    assert.ok(resolved.ok);
+    if (resolved.ok) assert.deepEqual(resolved.target, { source: "api-key", provider: "openai" });
+  });
+  it("keeps the OpenAI provider from discovered model IDs through Fix with AI guards", async () => {
+    const [model] = prefixProviderModels("openai", ["codex-mini-latest"]);
+    assert.equal(model, "openai::codex-mini-latest");
+    assert.equal(getProviderModelName(model), "codex-mini-latest");
+    assert.equal(isAiFixSupported({ source: "api-key", key: "sk-x", model }), true);
+    const resolved = resolveFixTarget({ modelSource: "api-key", model, key: "sk-x", localProvider: "ollama" });
+    assert.ok(resolved.ok);
+    if (resolved.ok) assert.deepEqual(resolved.target, { source: "api-key", provider: "openai" });
   });
 });
 

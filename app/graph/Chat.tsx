@@ -5,11 +5,11 @@ import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { ChevronDown, ChevronRight, Share2, Loader2, Search, X, Sparkles, Copy, FileCode2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Share2, Loader2, Search, X, Sparkles } from "lucide-react";
 import { Chat as ChatPanel, ChatAvatar, ChatFooter, ChatHeader, ChatInput, ChatInputField, ChatMessage, ChatMessages, ChatSendButton, ChatTitle } from "@falkordb/ui";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import Link from "next/link";
 import Button from "../components/ui/Button";
 import { GraphContext, GraphTabsContext, HistoryQueryContext, IndicatorContext, BrowserSettingsContext, ConnectionContext, UDFContext } from "../components/provider";
@@ -22,7 +22,7 @@ import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConfidenceStyle, normalizeConfidence } from "./confidence";
 import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
 import { stripCypherFenceTag } from "./cypherDisplay";
-import { copyText } from "@/lib/clipboard";
+import SuggestedQuery from "../components/SuggestedQuery";
 import { chatDraftKey, isUnchangedChatDraft, isChatConfigurationError } from "./chatDraft";
 
 const mdInstance = new MarkdownIt({
@@ -78,7 +78,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graphName } = useContext(GraphContext);
     const { setHistoryQuery } = useContext(HistoryQueryContext);
-    const { activeTabId } = useContext(GraphTabsContext);
+    const { activeTabId, tabsReady } = useContext(GraphTabsContext);
     const { activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
     const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
@@ -109,6 +109,12 @@ export default function Chat({ onClose }: Props) {
     const draftScope = `${getConnectionPrefix()}${draftKey}`;
     const loadedDraftScopeRef = useRef<string | null>(null);
     const draftRevisionsRef = useRef(new Map<string, number>());
+    const draftOwnerRef = useRef<object | null>(null);
+
+    useLayoutEffect(() => {
+        draftOwnerRef.current = {};
+        return () => { draftOwnerRef.current = null; };
+    }, []);
 
     useLayoutEffect(() => {
         if (!getConnectionPrefix() || activeConnectionId !== prefixConnectionId) {
@@ -203,9 +209,11 @@ export default function Chat({ onClose }: Props) {
         // and only this conversation's loading state may be settled by it.
         const submittedKey = historyKey;
         const submittedScope = draftScope;
+        const submittedOwner = draftOwnerRef.current;
         const submittedDraft = { text: newMessage, revision: draftRevisionsRef.current.get(submittedScope) ?? 0 };
-        const isStale = () => historyKeyRef.current !== submittedKey || loadedDraftScopeRef.current !== submittedScope;
-        const draftUnchanged = () => isUnchangedChatDraft(submittedDraft, localStorage.getItem(submittedScope), draftRevisionsRef.current.get(submittedScope) ?? 0);
+        const ownsDraft = () => submittedOwner !== null && draftOwnerRef.current === submittedOwner;
+        const isStale = () => !ownsDraft() || historyKeyRef.current !== submittedKey || loadedDraftScopeRef.current !== submittedScope;
+        const draftUnchanged = () => ownsDraft() && isUnchangedChatDraft(submittedDraft, localStorage.getItem(submittedScope), draftRevisionsRef.current.get(submittedScope) ?? 0);
         const showRequestError = (content: string) => {
             if (isStale()) return;
             if (draftUnchanged()) setNewMessage(submittedDraft.text);
@@ -410,42 +418,13 @@ export default function Chat({ onClose }: Props) {
                 );
             case "CypherQuery":
                 return (
-                    <div className="flex min-w-0 flex-col gap-1">
-                        <pre data-testid="chatSuggestedQuery" role="group" tabIndex={0} aria-label="Suggested query" className="max-h-48 min-w-0 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
-                            {message.content}
-                        </pre>
-                        <div className="flex items-center gap-1">
-                            <Button
-                                data-testid="chatInsertQueryButton"
-                                title="Insert into editor"
-                                className="p-1"
-                                onClick={() => setHistoryQuery(prev => withQuery(prev, message.content))}
-                            >
-                                <FileCode2 size={16} />
-                            </Button>
-                            <Button
-                                data-testid="chatCopyQueryButton"
-                                title="Copy Query"
-                                className="p-1"
-                                onClick={async () => {
-                                    if (!await copyText(navigator.clipboard?.writeText?.bind(navigator.clipboard), message.content)) {
-                                        toast({
-                                            title: "Couldn't copy query",
-                                            description: "Clipboard access is unavailable. Select and copy the query manually.",
-                                            variant: "destructive",
-                                        });
-                                        return;
-                                    }
-                                    toast({
-                                        title: "Copied to clipboard",
-                                        description: "The query has been copied to your clipboard",
-                                    });
-                                }}
-                            >
-                                <Copy size={16} />
-                            </Button>
-                        </div>
-                    </div>
+                    <SuggestedQuery
+                        query={message.content}
+                        onInsert={query => setHistoryQuery(prev => withQuery(prev, query))}
+                        insertDisabled={!tabsReady}
+                        collapsible
+                        testIds={{ query: "chatSuggestedQuery", copy: "chatCopyQueryButton", insert: "chatInsertQueryButton" }}
+                    />
                 );
             // case "CypherResult":
             //     return (
@@ -459,7 +438,7 @@ export default function Chat({ onClose }: Props) {
                     <div className="flex flex-col gap-1">
                         <MarkdownMessage content={message.content} />
                         {message.type === "Error" && isChatConfigurationError(message.content) && (
-                            <Link href="/settings" className="text-sm underline">
+                            <Link href="/settings" onNavigate={event => { event.preventDefault(); route.push("/settings"); }} className="text-sm underline">
                                 Go to Settings
                             </Link>
                         )}

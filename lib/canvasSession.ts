@@ -26,7 +26,9 @@ export function ownsCanvasSession(canvas: object, session: CanvasSession): boole
 /** Renew only the preserved view after a confirmed connection-switch rollback. */
 export function renewCanvasSession(canvas: object, session: CanvasSession): boolean {
     const committed = committedSessions.get(canvas);
-    if (!committed || !ownsCanvasSession(canvas, { ...session, epoch: committed.epoch })) return false;
+    if (!committed
+        || session.epoch <= committed.epoch
+        || !ownsCanvasSession(canvas, { ...session, epoch: committed.epoch })) return false;
     commitCanvasSession(canvas, session);
     return true;
 }

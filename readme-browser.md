@@ -58,6 +58,9 @@ It allows a developer to interact with graphs loaded to FaklorDB, explore how sp
 - **Delete graphs** (supports deleting multiple selected graphs).
 - **Duplicate graphs**
   - Create a copy of an existing graph (including data).
+- **Graph names with spaces**
+  - Names typed when creating, duplicating or renaming a graph are trimmed, and whitespace-only names are rejected.
+  - Existing graphs whose names start or end with spaces are opened, queried and kept under their exact name.
 - **Export graphs**
   - Download a `.dump` file via the Browser (`/api/graph/:graph/export`).
 - **Upload data**
@@ -118,6 +121,12 @@ If enabled, the Browser includes a **Chat panel** that streams responses from a 
 - The UI sends messages to `/api/chat` and processes server-sent events.
 - Chat configuration lives in Settings (model + secret key).
 - The chat backend URL is controlled by `CHAT_URL`.
+
+### Optional AI query assistance (Fix with AI, Optimize)
+With an OpenAI, Groq, xAI, Ollama or LM Studio model configured in Settings:
+- **Fix with AI** (error toast or editor quick fix) explains a failed query and suggests a corrected one. It can be cancelled while loading; stale replies never replace a newer result.
+- **Optimize** analyzes the query with its `GRAPH.EXPLAIN` plan and the graph's indexes, without running it. An optional per-request goal (for example "reduce scans") steers the advice and is never saved.
+- Suggested queries are only copied or inserted into the editor; they never run automatically.
 
 ## Common workflows
 ### 1) Run a query and visualize results

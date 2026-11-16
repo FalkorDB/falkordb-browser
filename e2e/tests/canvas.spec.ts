@@ -6,6 +6,7 @@ import type { FalkorDBCanvas } from "@falkordb/canvas";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
+import DataPanel from "../logic/POM/dataPanelComponent";
 import urls from '../config/urls.json';
 import { BATCH_CREATE_PERSONS, CREATE_TEN_CONNECTED_NODES } from "../config/constants";
 import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomString, simulateCanvasFingerprintNoise } from "../infra/utils";
@@ -13,14 +14,27 @@ import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomStrin
 test.describe('Canvas Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
+    let cleanupGraphName: string | undefined;
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
+        cleanupGraphName = undefined;
     });
 
     test.afterEach(async () => {
-        await browser.closeBrowser();
+        // Close first: a live graph page polls graph info, and that poll
+        // re-creates a graph deleted out from under it.
+        try {
+            await browser.closeBrowser();
+        } finally {
+            if (cleanupGraphName) {
+                const { message } = await apicalls.removeGraph(cleanupGraphName, "admin");
+                if (!message.includes("deleted")) {
+                    throw new Error(`Failed to remove ${cleanupGraphName}: ${message}`);
+                }
+            }
+        }
     });
 
     test("@admin Warn before rendering a large graph in 3D and honor fallback or approval", async () => {
@@ -379,6 +393,61 @@ test.describe('Canvas Tests', () => {
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
         await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate canvas search keyboard navigation wraps and selects the highlighted node`, async () => {
+        cleanupGraphName = getRandomString("canvasKeyboard");
+        await apicalls.addGraph(cleanupGraphName);
+        await apicalls.runQuery(cleanupGraphName, "CREATE (:Keyboard {name: 'keyboard-alpha'}), (:Keyboard {name: 'keyboard-beta'})");
+        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(cleanupGraphName);
+        await graph.insertQuery("MATCH (n) RETURN n ORDER BY n.name");
+        await graph.clickRunQuery();
+        await graph.fillElementCanvasSearch("keyboard-");
+        await expect(graph.elementCanvasSuggestions).toHaveCount(2);
+        await expect(graph.elementCanvasSelectedSuggestion).toContainText("keyboard-alpha");
+        await graph.pressElementCanvasSearchKey("ArrowUp");
+        await expect(graph.elementCanvasSelectedSuggestion).toContainText("keyboard-beta");
+        await graph.pressElementCanvasSearchKey("Enter");
+        expect(await graph.getAttributeValueByName("keyboard-beta")).toContain("keyboard-beta");
+        await expect(graph.elementCanvasSearch).toHaveValue("");
+        await expect(graph.elementCanvasSuggestionList).toBeHidden();
+        await graph.fillElementCanvasSearch("keyboard-");
+        await expect(graph.elementCanvasSuggestions).toHaveCount(2);
+        await graph.pressElementCanvasSearchKey("ArrowDown");
+        await expect(graph.elementCanvasSelectedSuggestion).toContainText("keyboard-beta");
+        await graph.pressElementCanvasSearchKey("ArrowDown");
+        await expect(graph.elementCanvasSelectedSuggestion).toContainText("keyboard-alpha");
+        await graph.pressElementCanvasSearchKey("Enter");
+        expect(await graph.getAttributeValueByName("keyboard-alpha")).toContain("keyboard-alpha");
+    });
+
+    test(`@admin Validate unmatched canvas search selects nothing and Escape clears the query`, async () => {
+        cleanupGraphName = getRandomString("canvasNoMatch");
+        await apicalls.addGraph(cleanupGraphName);
+        await apicalls.runQuery(cleanupGraphName, "CREATE (:Search {name: 'existing-search-node'})");
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(cleanupGraphName);
+        await graph.insertQuery("MATCH (n) RETURN n");
+        await graph.clickRunQuery();
+        await graph.fillElementCanvasSearch("existing-search-node");
+        await expect(graph.elementCanvasSuggestions).toHaveCount(1);
+        await graph.pressElementCanvasSearchKey("Escape");
+        await expect(graph.elementCanvasSearch).toHaveValue("");
+        await expect(graph.elementCanvasSuggestionList).toBeHidden();
+        await graph.fillElementCanvasSearch("existing-search-node");
+        await expect(graph.elementCanvasSuggestions).toHaveCount(1);
+        await graph.fillElementCanvasSearch("no-such-canvas-value");
+        await expect(graph.elementCanvasSuggestionList).toBeHidden();
+        await graph.pressElementCanvasSearchKey("Enter");
+        await expect(graph.elementCanvasSearch).toHaveValue("no-such-canvas-value");
+        expect(await graph.getSelectionCount()).toBe(0);
+        await graph.pressElementCanvasSearchKey("Escape");
+        await expect(graph.elementCanvasSearch).toHaveValue("");
+        await graph.fillElementCanvasSearch("existing-search-node");
+        await expect(graph.elementCanvasSuggestions).toHaveCount(1);
     });
 
     test(`@admin Deleting a node and ensuring its removed from the canvas`, async () => {

@@ -38,9 +38,15 @@ const linkedCanvasRoot = (() => {
   }
 })()
 
+// COVERAGE=1 builds for the e2e coverage run: unminified, with source maps for
+// the client and the server, so V8 coverage maps back to the original sources.
+// Never set it for a build that is shipped: the client maps are public.
+const coverage = process.env.COVERAGE === '1'
+
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+  productionBrowserSourceMaps: coverage,
   allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
   output: 'standalone',
   reactStrictMode: true,
@@ -100,7 +106,12 @@ const nextConfig = {
   },
   // Webpack config for production builds (next build --webpack)
   // SVG handling + local @falkordb/canvas alias
-  webpack(config) {
+  webpack(config, { dev }) {
+    if (coverage && !dev) {
+      config.devtool = 'source-map'
+      config.optimization.minimize = false
+    }
+
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>
       rule.test?.test?.('.svg'),
