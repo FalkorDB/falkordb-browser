@@ -1008,14 +1008,17 @@ test.describe("@admin Graph tabs", () => {
             await configGate;
             await route.continue();
         });
-        const defaultRun = page.waitForRequest(request => {
-            const url = new URL(request.url());
-            return url.pathname === `/api/graph/${graphOne}` && url.searchParams.get("query") === defaultQuery;
-        }, { timeout: 15000 });
         try {
             await page.goto(urls.graphUrl);
             await expect.poll(() => configRequested, { timeout: 15000 }).toBe(true);
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true", { timeout: 15000 });
+            // Created here, not before goto, so an earlier failure leaves no
+            // unawaited wait to reject later. The default query cannot run
+            // before the config (and with it the timeout) is released.
+            const defaultRun = page.waitForRequest(request => {
+                const url = new URL(request.url());
+                return url.pathname === `/api/graph/${graphOne}` && url.searchParams.get("query") === defaultQuery;
+            }, { timeout: 15000 });
             releaseConfig();
             await defaultRun;
         } finally {
