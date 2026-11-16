@@ -477,6 +477,17 @@ test.describe('@Config Settings users tests', () => {
         }
     });
 
+    test(`@admin API Test: POST /api/user/save as an admin passes the admin guard and reaches ACL SAVE`, async () => {
+        const response = await apiCall.saveUsersWithStatus("admin");
+        // Without an aclfile (as in CI) Redis rejects ACL SAVE itself, so either outcome proves the guard let it through.
+        if (response.status === 200) {
+            expect(response.body.message).toBe("ACL saved to disk");
+        } else {
+            expect(response.status).toBe(400);
+            expect(response.body.message).toMatch(/not configured to use an ACL file/);
+        }
+    });
+
     // Every request below is made as the project's own (non-admin) user; the admin calls only seed and verify.
     const nonAdminRoles = [
         { tag: "@readonly", label: "read-only" },
