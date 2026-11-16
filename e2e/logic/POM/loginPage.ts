@@ -360,7 +360,7 @@ export default class LoginPage extends HeaderComponent {
     if (credentials.host) params.set("host", credentials.host);
     if (credentials.port) params.set("port", credentials.port);
     if (credentials.username) params.set("username", credentials.username);
-    if (credentials.tls) params.set("tls", "true");
+    if (credentials.tls !== undefined) params.set("tls", String(credentials.tls));
 
     const loginUrlWithParams = `${urls.loginUrl}?${params.toString()}`;
     await this.page.goto(loginUrlWithParams);
@@ -369,7 +369,8 @@ export default class LoginPage extends HeaderComponent {
     if (credentials.password) {
       await this.fillPassword(credentials.password);
     }
-    await this.clickConnect();
+    // Wait for the redirect: connecting only works if the URL prefilled the form.
+    await this.clickOnConnect();
   }
 
   async uploadCertificate(file: CertificateFile): Promise<void> {
