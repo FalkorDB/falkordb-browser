@@ -1,6 +1,6 @@
-import { Locator } from "@playwright/test";
+import { expect, Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForElementToBeVisible, waitForElementToNotBeVisible, waitForTimeOut } from "../../infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible, waitForElementToNotBeVisible } from "../../infra/utils";
 
 type EditUserOptions = { role?: string, keys?: string, password?: string, confirmPassword?: string };
 
@@ -279,7 +279,7 @@ export default class SettingsUsersPage extends BasePage {
     await this.clickEditSelectRoleBtn();
     await this.clickOnSelectUserRole(role);
     await this.clickOnSubmitEditUser();
-    await waitForTimeOut(this.page, 1500);
+    await this.waitForUserFormToSettle();
   }
 
   async fillEditUserForm(options: EditUserOptions): Promise<void> {
@@ -442,7 +442,8 @@ export default class SettingsUsersPage extends BasePage {
     await this.clickUserCheckboxBtn(selectedUser2);
     await this.clickDeleteUsersBtn();
     await this.clickConfirmUserDeleteMsg();
-    await waitForTimeOut(this.page, 1500);
+    await expect(this.userRow(selectedUser1)).toBeHidden();
+    await expect(this.userRow(selectedUser2)).toBeHidden();
   }
 
   async removeUser(selectedUser: string): Promise<void> {
@@ -460,7 +461,6 @@ export default class SettingsUsersPage extends BasePage {
   }
 
   async getTableRolesCount(): Promise<number> {
-    await this.page.waitForTimeout(1000);
     const count = await this.tableRoles
       .filter({ hasNot: this.fakeRow })
       .count();
