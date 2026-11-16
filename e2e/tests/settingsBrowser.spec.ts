@@ -85,9 +85,6 @@ test.describe('@browser Browser Settings tests', () => {
         // Save settings
         await settingsBrowserPage.clickSaveSettingsButton();
 
-        // Wait for save to complete
-        await settingsBrowserPage.waitForTimeout(1000);
-
         // Verify the selected model is highlighted
         const isModelSelected = await settingsBrowserPage.isModelSelected(openaiModel);
         expect(isModelSelected).toBe(true);
@@ -115,7 +112,6 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.selectModel(openaiModel);
         await settingsBrowserPage.fillChatApiKey(testApiKey);
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(1000);
 
         // Reload the page
         await settingsBrowserPage.reloadPage();
@@ -147,15 +143,10 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Search for "gpt" - should only show OpenAI models
         await settingsBrowserPage.searchModels("gpt");
-        await settingsBrowserPage.waitForTimeout(300); // Wait for debounce
 
-        // Verify GPT models are visible
-        const isGptModelVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-        expect(isGptModelVisible).toBe(true);
-
-        // Verify non-GPT models are not visible
-        const isClaudeVisible = await settingsBrowserPage.isModelVisible(anthropicModel);
-        expect(isClaudeVisible).toBe(false);
+        // Poll: the search filter is debounced and auto-expands matching categories
+        await expect.poll(() => settingsBrowserPage.isModelShown(openaiModel)).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelShown(anthropicModel)).toBe(false);
     });
 
     test('@readwrite Verify search shows only matching category', async () => {
@@ -172,15 +163,10 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Search for "claude" - should only show Anthropic category
         await settingsBrowserPage.searchModels("claude");
-        await settingsBrowserPage.waitForTimeout(300);
 
-        // Verify Anthropic models are visible
-        const isClaudeVisible = await settingsBrowserPage.isModelVisible(anthropicModel);
-        expect(isClaudeVisible).toBe(true);
-
-        // Verify other provider models are not visible
-        const isGptVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-        expect(isGptVisible).toBe(false);
+        // Poll: the search filter is debounced and auto-expands matching categories
+        await expect.poll(() => settingsBrowserPage.isModelShown(anthropicModel)).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelShown(openaiModel)).toBe(false);
     });
 
     test('@readwrite Verify empty search state displays correctly', async () => {
@@ -204,7 +190,6 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Search for non-existent model
         await settingsBrowserPage.searchModels("nonexistentmodel123");
-        await settingsBrowserPage.waitForTimeout(300);
 
         // Verify "No models found" message is displayed
         const noModelsText = await settingsBrowserPage.getNoModelsFoundText();
@@ -346,19 +331,15 @@ test.describe('@browser Browser Settings tests', () => {
         // Search for specific model
         await settingsBrowserPage.searchModels("gpt");
 
-        // Verify filtered state - Anthropic model should not be visible
-        let isClaudeVisible = await settingsBrowserPage.isModelVisible(anthropicModel);
-        expect(isClaudeVisible).toBe(false);
+        // Verify filtered state (debounced) - Anthropic model should not be visible
+        await expect.poll(() => settingsBrowserPage.isModelShown(anthropicModel)).toBe(false);
 
         // Clear search
         await settingsBrowserPage.clearModelSearch();
-        await settingsBrowserPage.waitForTimeout(300);
 
         // Verify all models are visible again
-        isClaudeVisible = await settingsBrowserPage.isModelVisible(anthropicModel);
-        const isGptVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-        expect(isClaudeVisible).toBe(true);
-        expect(isGptVisible).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelVisible(anthropicModel)).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelVisible(openaiModel)).toBe(true);
     });
 
     test('@readwrite Verify different models from different categories can be selected', async () => {
@@ -380,9 +361,7 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Select Anthropic model
         await settingsBrowserPage.selectModel(anthropicModel);
-        await settingsBrowserPage.waitForTimeout(500); // Wait for selection to register
-        isSelected = await settingsBrowserPage.isModelSelected(anthropicModel);
-        expect(isSelected).toBe(true);
+        await expect.poll(() => settingsBrowserPage.isModelSelected(anthropicModel)).toBe(true);
 
         // Verify previous selection is no longer selected
         const isPreviousSelected = await settingsBrowserPage.isModelSelected(openaiModel);
@@ -418,7 +397,6 @@ test.describe('@browser Browser Settings tests', () => {
 
             // Save the settings
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(1000);
 
             // Navigate to graph page using header component
             const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
@@ -482,7 +460,6 @@ test.describe('@browser Browser Settings tests', () => {
 
             // Save the settings
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(1000);
 
             // Navigate to graph page using header component
             const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
@@ -524,10 +501,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.fillMaxSavedMessages(7);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandChatSection();
             await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
@@ -550,10 +525,8 @@ test.describe('@browser Browser Settings tests', () => {
 
         await settingsBrowserPage.fillMaxSavedMessages(3);
         await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
-        await settingsBrowserPage.waitForTimeout(1000);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
@@ -571,10 +544,8 @@ test.describe('@browser Browser Settings tests', () => {
 
         await settingsBrowserPage.fillMaxSavedMessages(15);
         await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
-        await settingsBrowserPage.waitForTimeout(1000);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
@@ -591,10 +562,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setMaxTabsSlider(4);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandUserExperienceSection();
 
             const value = await settingsBrowserPage.getMaxTabsValue();
@@ -622,10 +591,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setGraphsSortOrder('a-z');
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
 
             expect(await settingsBrowserPage.getGraphsSortOrder()).toBe('Name (A-Z)');
         } finally {
@@ -646,10 +613,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setRefreshIntervalSlider(30);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandGraphInfoSection();
 
             const value = await settingsBrowserPage.getRefreshIntervalValue();
@@ -670,10 +635,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setMaxItemsForSearchSlider(25);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandGraphInfoSection();
 
             const value = await settingsBrowserPage.getMaxItemsForSearchValue();
@@ -696,10 +659,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setColumnWidthSlider(50);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandUserExperienceSection();
 
             const value = await settingsBrowserPage.getColumnWidthValue();
@@ -720,10 +681,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setRowHeightSlider(60);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandUserExperienceSection();
 
             const value = await settingsBrowserPage.getRowHeightValue();
@@ -744,10 +703,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.setRowHeightExpandMultipleSlider(4);
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandUserExperienceSection();
 
         const value = await settingsBrowserPage.getRowHeightExpandMultipleValue();
@@ -769,10 +726,8 @@ test.describe('@browser Browser Settings tests', () => {
         const captionKey = `testkey_${Date.now()}`;
         await settingsBrowserPage.addCaptionKey(captionKey);
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandUserExperienceSection();
 
         const keys = await settingsBrowserPage.getCaptionKeys();
@@ -791,19 +746,15 @@ test.describe('@browser Browser Settings tests', () => {
         const captionKey = `removekey_${Date.now()}`;
         await settingsBrowserPage.addCaptionKey(captionKey);
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandUserExperienceSection();
 
         // Remove the key
         await settingsBrowserPage.removeCaptionKey(captionKey);
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
 
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandUserExperienceSection();
 
         const keys = await settingsBrowserPage.getCaptionKeys();
@@ -820,10 +771,8 @@ test.describe('@browser Browser Settings tests', () => {
         try {
             await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
             await settingsBrowserPage.clickSaveSettingsButton();
-            await settingsBrowserPage.waitForTimeout(500);
 
             await settingsBrowserPage.reloadPage();
-            await settingsBrowserPage.waitForTimeout(1000);
             await settingsBrowserPage.expandUserExperienceSection();
 
             const newState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
@@ -919,16 +868,21 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
         await browser.closeBrowser();
     });
 
-    async function openLocalSettings(settings: SettingsBrowserPage, initialModel = "") {
+    async function openLocalSettings(
+        settings: SettingsBrowserPage,
+        initialModel = "",
+        perSourceModels?: Record<string, string>
+    ) {
         const page = await browser.getPage();
-        await page.addInitScript(({ model, endpoint }) => {
+        await page.addInitScript(({ model, endpoint, perSource }) => {
             localStorage.setItem("chatModelSource", "local");
             localStorage.setItem("localLlmProvider", "ollama");
             localStorage.setItem("localLlmEndpoint", endpoint);
             if (model) localStorage.setItem("model", model);
             else localStorage.removeItem("model");
-            localStorage.removeItem("perSourceModels");
-        }, { model: initialModel, endpoint: LOCAL_LLM_ENDPOINT });
+            if (perSource) localStorage.setItem("perSourceModels", JSON.stringify(perSource));
+            else localStorage.removeItem("perSourceModels");
+        }, { model: initialModel, endpoint: LOCAL_LLM_ENDPOINT, perSource: perSourceModels });
         await browser.navigateTo(urls.settingsUrl);
         await settings.expandChatSection();
     }
@@ -1002,10 +956,125 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
         await expect.poll(() => settings.getSavedModelFromLocalStorage()).toBe("qwen2.5");
     });
 
-    test('@readwrite Verify an API key is retained after an encryption failure and can be retried', async () => {
+    test('@readwrite Verify Ollama models load and the first one is selected', async () => {
         const settings = await browser.createNewPage(SettingsBrowserPage);
         const page = await browser.getPage();
-        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const requests: Record<string, string>[] = [];
+        await page.route("**/api/chat/models", async (route) => {
+            requests.push(route.request().postDataJSON());
+            await route.fulfill({ json: { models: ["llama3.2", "qwen2.5"] } });
+        });
+        await openLocalSettings(settings);
+
+        await expect(settings.modelsStatusMessage).toHaveText("2 local Ollama models loaded.");
+        expect(await settings.isModelVisible("llama3.2")).toBe(true);
+        expect(await settings.isModelVisible("qwen2.5")).toBe(true);
+        expect(await settings.isModelSelected("llama3.2")).toBe(true);
+        expect(await settings.isModelSelected("qwen2.5")).toBe(false);
+        expect(requests.at(-1)).toEqual({ source: "local", localProvider: "ollama", endpoint: LOCAL_LLM_ENDPOINT });
+        await expect.poll(() => settings.getSavedModelFromLocalStorage()).toBe("llama3.2");
+    });
+
+    test('@readwrite Verify LM Studio loads its models from its default endpoint', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        const requests: Record<string, string>[] = [];
+        await page.route("**/api/chat/models", async (route) => {
+            const request = route.request().postDataJSON();
+            requests.push(request);
+            await route.fulfill({
+                json: { models: request.localProvider === "lmstudio" ? ["qwen2.5", "phi3"] : ["llama3.2"] },
+            });
+        });
+        await openLocalSettings(settings);
+        await expect(settings.modelsStatusMessage).toHaveText(LOCAL_MODELS_LOADED);
+
+        await settings.selectLmStudioProvider();
+
+        await expect(settings.modelsStatusMessage).toHaveText("2 local LM Studio models loaded.");
+        expect(await settings.isLmStudioProviderSelected()).toBe(true);
+        expect(await settings.getLocalLlmEndpointValue()).toBe("http://localhost:1234/v1");
+        expect(requests.at(-1)).toEqual({ source: "local", localProvider: "lmstudio", endpoint: "http://localhost:1234/v1" });
+        expect(await settings.isModelVisible("qwen2.5")).toBe(true);
+        expect(await settings.isModelVisible("llama3.2")).toBe(false);
+    });
+
+    test('@readwrite Verify local model search filters case-insensitively and clears', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models", (route) => route.fulfill({
+            json: { models: ["llama3.2", "qwen2.5", "phi3"] },
+        }));
+        await openLocalSettings(settings);
+        await expect(settings.modelsStatusMessage).toHaveText("3 local Ollama models loaded.");
+
+        await settings.searchModels("QWEN");
+        await expect.poll(() => settings.isModelShown("llama3.2")).toBe(false);
+        expect(await settings.isModelVisible("qwen2.5")).toBe(true);
+        expect(await settings.isModelVisible("phi3")).toBe(false);
+
+        await settings.searchModels("no-such-model");
+        const noModelsText = await settings.getNoModelsFoundText();
+        expect(noModelsText).toContain("No models found");
+        expect(noModelsText).toContain("Try a different search term");
+
+        await settings.clearModelSearch();
+        await expect.poll(() => settings.isModelShown("llama3.2")).toBe(true);
+        expect(await settings.isModelVisible("qwen2.5")).toBe(true);
+        expect(await settings.isModelVisible("phi3")).toBe(true);
+        expect(await settings.isModelSelected("llama3.2")).toBe(true);
+    });
+
+    test('@readwrite Verify a stored model the server no longer offers falls back to the first local model', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models", (route) => route.fulfill({
+            json: { models: ["llama3.2", "qwen2.5"] },
+        }));
+        await openLocalSettings(settings, "ghost-model", { ollama: "ghost-model" });
+        await expect(settings.modelsStatusMessage).toHaveText("2 local Ollama models loaded.");
+
+        expect(await settings.isModelSelected("llama3.2")).toBe(true);
+        await expect.poll(() => settings.getSavedModelFromLocalStorage()).toBe("llama3.2");
+        await expect.poll(() => settings.getStoredPerSourceModel("ollama")).toBe("llama3.2");
+    });
+
+    test('@readwrite Verify key-like stored model values are dropped instead of being persisted again', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models", (route) => route.fulfill({
+            json: { models: ["llama3.2", "qwen2.5"] },
+        }));
+        await openLocalSettings(settings, "sk-not-a-model", { ollama: "sk-not-a-model", lmstudio: "sk-other-secret" });
+        await expect(settings.modelsStatusMessage).toHaveText("2 local Ollama models loaded.");
+
+        await expect.poll(() => settings.getStoredPerSourceModel("ollama")).toBe("llama3.2");
+        expect(await settings.getStoredPerSourceModel("lmstudio")).toBeUndefined();
+        expect(await settings.getSavedModelFromLocalStorage()).toBe("llama3.2");
+    });
+
+    test('@readwrite Verify Cancel Changes discards unsaved local LLM provider and endpoint edits', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: ["llama3.2"] } }));
+        await openLocalSettings(settings);
+        await expect(settings.modelsStatusMessage).toHaveText(LOCAL_MODELS_LOADED);
+        await settings.waitForSaveSettingsButtonHidden();
+
+        await settings.selectLmStudioProvider();
+        await settings.fillLocalLlmEndpoint("http://localhost:9999/v1");
+        expect(await settings.waitForSaveSettingsButton()).toBe(true);
+        await settings.clickCancelSettingsButton();
+
+        await settings.waitForSaveSettingsButtonHidden();
+        expect(await settings.isOllamaProviderSelected()).toBe(true);
+        expect(await settings.getLocalLlmEndpointValue()).toBe(LOCAL_LLM_ENDPOINT);
+        await expect(settings.modelsStatusMessage).toHaveText(LOCAL_MODELS_LOADED);
+        expect(await settings.getStoredLocalLlmEndpoint()).toBe(LOCAL_LLM_ENDPOINT);
+    });
+
+    async function openApiKeySettings(settings: SettingsBrowserPage) {
+        const page = await browser.getPage();
         await page.addInitScript((storageKeys) => {
             localStorage.setItem("chatModelSource", "api-key");
             localStorage.removeItem("secretKey");
@@ -1015,7 +1084,77 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
                 }
             }
         }, [CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY]);
+        let encryptRequests = 0;
+        await page.route("**/api/encrypt", async (route) => {
+            if (route.request().postDataJSON().action === "encrypt") encryptRequests += 1;
+            await route.fallback();
+        });
+        await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: ["gpt-4o-mini"] } }));
+        await browser.navigateTo(urls.settingsUrl);
+        await settings.expandChatSection();
+        return { getEncryptRequests: () => encryptRequests };
+    }
+
+    test('@readwrite Verify empty API keys are not added or saved while editing', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const { getEncryptRequests } = await openApiKeySettings(settings);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const editedApiKey = `sk-e2e-edited-${getRandomString("key")}`;
+
+        await settings.fillChatApiKey("   ");
+        await settings.clickAddChatApiKeyButton();
+        await settings.fillChatApiKey(`  ${apiKey}  `);
+        await settings.clickAddChatApiKeyButton();
+
+        expect(await settings.getMaskedChatApiKeyText(apiKey)).toBe(`${apiKey.slice(0, 6)}••••••••${apiKey.slice(-4)}`);
+        expect(await settings.getChatApiKeyCount()).toBe(1);
+        expect(await settings.getChatApiKeyValue()).toBe("");
+        expect(getEncryptRequests()).toBe(1);
+        await expect(settings.modelsStatusMessage).toHaveText("1 live models loaded for OpenAI.");
+
+        await settings.showChatApiKey(apiKey);
+        await settings.beginEditChatApiKey(apiKey);
+        await settings.fillChatApiKeyEdit("   ");
+        await settings.clickSaveEditedChatApiKey();
+
+        await settings.fillChatApiKeyEdit(editedApiKey);
+        await settings.clickSaveEditedChatApiKey();
+
+        expect(await settings.getVisibleChatApiKeyText(editedApiKey)).toBe(editedApiKey);
+        expect(await settings.getChatApiKeyCount()).toBe(1);
+        expect(getEncryptRequests()).toBe(2);
+    });
+
+    test('@readwrite Verify cancelling an API key edit keeps the saved key', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const { getEncryptRequests } = await openApiKeySettings(settings);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const discardedApiKey = `sk-e2e-discarded-${getRandomString("key")}`;
+        await settings.addChatApiKey(apiKey);
+        await expect(settings.modelsStatusMessage).toHaveText("1 live models loaded for OpenAI.");
+        await settings.showChatApiKey(apiKey);
+
+        await settings.beginEditChatApiKey(apiKey);
+        await settings.fillChatApiKeyEdit(discardedApiKey);
+        await settings.cancelEditChatApiKey();
+
+        expect(await settings.getVisibleChatApiKeyText(apiKey)).toBe(apiKey);
+        expect(await settings.isChatApiKeyPresent(discardedApiKey)).toBe(false);
+        expect(await settings.getChatApiKeyCount()).toBe(1);
+
+        await settings.beginEditChatApiKey(apiKey);
+        expect(await settings.getChatApiKeyEditValue()).toBe(apiKey);
+        await settings.cancelEditChatApiKey();
+        expect(getEncryptRequests()).toBe(1);
+    });
+
+    test('@readwrite Verify an API key is retained after an encryption failure and can be retried', async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        await openApiKeySettings(settings);
+        const page = await browser.getPage();
         let encryptAttempts = 0;
+        // Registered after the helper's counting route, so it runs first and falls back to it.
         await page.route("**/api/encrypt", async (route) => {
             if (route.request().postDataJSON().action !== "encrypt") {
                 await route.fallback();
@@ -1028,9 +1167,6 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
                 await route.fallback();
             }
         });
-        await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: ["gpt-4o-mini"] } }));
-        await browser.navigateTo(urls.settingsUrl);
-        await settings.expandChatSection();
         await settings.fillChatApiKey(apiKey);
         await settings.clickAddChatApiKeyButton();
 

@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorage';
+import type { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorage.ts';
 
 /**
  * File-based token storage implementation

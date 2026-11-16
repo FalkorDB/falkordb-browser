@@ -362,16 +362,6 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
-  async isNodeVisibleInCanvas(nodeName: string): Promise<boolean> {
-    // Wait for canvas to render
-    await this.waitForTimeout(1000);
-    
-    // Check if node with the given name exists in the canvas
-    // Try to find tooltip or node element containing the name
-    const nodeElement = this.page.locator(`[data-tooltip*="${nodeName}"], text="${nodeName}"`).first();
-    const visible = await nodeElement.isVisible().catch(() => false);
-    return visible;
-  }
 
   // Footer Locators
   private get chatFooter(): Locator {

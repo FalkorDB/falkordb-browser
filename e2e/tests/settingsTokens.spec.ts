@@ -226,8 +226,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       );
       await settingsTokensPage.navigateToTokensTab();
 
-      // Wait for the token to appear in the table (this ensures data has loaded)
-      await settingsTokensPage.waitFor(1500);
       expect(await settingsTokensPage.verifyTokenExists(tokenName)).toBe(true);
       
       // Admin should see Username and Role columns
@@ -262,8 +260,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       await settingsTokensPage.fillTokenName("");
       
       // Generate token confirm button should be disabled without name
-      await settingsTokensPage.waitFor(300);
-      expect(await settingsTokensPage.isGenerateTokenConfirmButtonDisabled()).toBe(true);
+      await expect.poll(() => settingsTokensPage.isGenerateTokenConfirmButtonDisabled()).toBe(true);
     });
 
     test("@readonly Copy token to clipboard", async () => {
@@ -353,9 +350,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       );
       await settingsTokensPage.navigateToTokensTab();
 
-      // Wait for tokens to load in the UI
-      await settingsTokensPage.waitFor(1500);
-
       // Verify token appears in UI
       expect(await settingsTokensPage.verifyTokenExists(tokenName)).toBe(true);
 
@@ -363,9 +357,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokensBefore = await settingsTokensPage.getTokenCount();
 
       await settingsTokensPage.revokeToken(tokenName);
-      
-      // Wait for token to be removed from list
-      await settingsTokensPage.waitFor(1000);
 
       // Verify token count decreased
       const tokensAfter = await settingsTokensPage.getTokenCount();
@@ -384,12 +375,12 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       );
   
       await settingsTokensPage.navigateToTokensTab();
+      expect(await settingsTokensPage.verifyTokenExists(tokenName2)).toBe(true);
       const tokensBefore = await settingsTokensPage.getTokenCount();
       await settingsTokensPage.revokeToken(tokenName1);
       await settingsTokensPage.revokeToken(tokenName2);
-      const tokensAfter = await settingsTokensPage.getTokenCount();
-      
-      expect(tokensAfter).toBe(tokensBefore - 2);
+      // The table re-renders after each revoke; poll until it settles.
+      await expect.poll(() => settingsTokensPage.getTokenCount()).toBe(tokensBefore - 2);
     });
   });
 
@@ -813,9 +804,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokensBefore = await settingsTokensPage.getTokenCount();
 
       await settingsTokensPage.revokeToken(tokenName);
-      
-      // Wait for token to be removed from list
-      await settingsTokensPage.waitFor(1000);
 
       // Verify token count decreased
       const tokensAfter = await settingsTokensPage.getTokenCount();
@@ -846,9 +834,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokensBefore = await settingsTokensPage.getTokenCount();
 
       await settingsTokensPage.revokeToken(tokenName);
-      
-      // Wait for token to be removed from list
-      await settingsTokensPage.waitFor(1000);
 
       // Verify token count decreased
       const tokensAfter = await settingsTokensPage.getTokenCount();
@@ -879,6 +864,238 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       await apiCall.revokeToken((hostile as { token_id: string }).token_id);
       const sentinel = response.tokens.find((t: { name: string }) => t.name === sentinelName);
       await apiCall.revokeToken((sentinel as { token_id: string }).token_id);
+    });
+  });
+});
+
+test.describe("@Tokens Token API Tests", () => {
+  type TokenRow = {
+    token_id: string;
+    name: string;
+    username: string;
+    created_at: string;
+    expires_at: string | null;
+    is_active?: boolean;
+  };
+
+  const readwriteUser = userConfig.userRoles.find((u) => u.role === "readwrite")!;
+  const pastExpiry = "2000-01-01T00:00:00.000Z";
+  let apiCall: ApiCalls;
+
+  test.beforeEach(async () => {
+    apiCall = new ApiCalls();
+  });
+
+  const findToken = async (name: string) => {
+    const { tokens } = await apiCall.listTokens();
+    return (tokens as TokenRow[]).find((t) => t.name === name);
+  };
+
+  // Revoked after every test so a failing body leaves nothing active; a failed
+  // revoke is reported next to (not instead of) the test's own failure.
+  const trackedNames: string[] = [];
+  test.afterEach(async () => {
+    const names = trackedNames.splice(0);
+    const { tokens } = await apiCall.listTokens();
+    await Promise.all(
+      (tokens as TokenRow[])
+        .filter((t) => names.includes(t.name))
+        .map(async (t) => {
+          const revoked = await apiCall.revokeTokenRaw(t.token_id);
+          expect(revoked.status, `revoke ${t.name}`).toBe(200);
+        })
+    );
+  });
+
+  test.describe("Create token validation", () => {
+    [
+      { label: "malformed JSON", sendsName: false, build: () => "{not valid json", message: "Invalid JSON in request body" },
+      { label: "empty name", sendsName: false, build: () => ({ name: "" }), message: "Token name cannot be empty" },
+      { label: "non-numeric ttlSeconds", sendsName: true, build: (name: string) => ({ name, ttlSeconds: "60" }), message: "Invalid TTL value" },
+      { label: "ttlSeconds below 1", sendsName: true, build: (name: string) => ({ name, ttlSeconds: 0 }), message: "TTL must be at least 1 second" },
+      { label: "ttlSeconds above one year", sendsName: true, build: (name: string) => ({ name, ttlSeconds: 31622401 }), message: "TTL cannot exceed 1 year" },
+      { label: "past expiresAt", sendsName: true, build: (name: string) => ({ name, expiresAt: pastExpiry }), message: "Expiration date must be in the future" },
+    ].forEach(({ label, sendsName, build, message }) => {
+      test(`@admin Create token rejects ${label} with 400`, async () => {
+        const name = getRandomString("invalid-token");
+        trackedNames.push(name);
+        const response = await apiCall.generateTokenRaw(build(name));
+        expect(response.status).toBe(400);
+        expect(response.body.message).toContain(message);
+        expect(response.body.token).toBeUndefined();
+        if (sendsName) expect(await findToken(name)).toBeUndefined();
+      });
+    });
+  });
+
+  test.describe("Token lifecycle", () => {
+    const futureExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    [
+      { label: "a TTL", payload: { ttlSeconds: 3600 }, expectExpiry: (row: TokenRow) => {
+        const lifetime = (Date.parse(row.expires_at!) - Date.parse(row.created_at)) / 1000;
+        expect(lifetime).toBeGreaterThanOrEqual(3590);
+        expect(lifetime).toBeLessThanOrEqual(3610);
+      } },
+      { label: "an absolute expiresAt", payload: { expiresAt: futureExpiry.toISOString() }, expectExpiry: (row: TokenRow) => {
+        expect(row.expires_at).toBe(new Date(Math.floor(futureExpiry.getTime() / 1000) * 1000).toISOString());
+      } },
+      { label: "no expiry", payload: {}, expectExpiry: (row: TokenRow) => {
+        expect(row.expires_at).toBeNull();
+      } },
+    ].forEach(({ label, payload, expectExpiry }) => {
+      test(`@admin Token created with ${label} can be listed, viewed and revoked once`, async () => {
+        const name = getRandomString("lifecycle-token");
+        trackedNames.push(name);
+        const created = await apiCall.generateTokenRaw({ name, ...payload });
+        expect(created.status).toBe(200);
+        expect(created.body.message).toBe("Token created successfully");
+        expect(typeof created.body.token).toBe("string");
+
+        const listed = await apiCall.listTokensRaw();
+        expect(listed.status).toBe(200);
+        const row = (listed.body.tokens as TokenRow[]).find((t) => t.name === name)!;
+        expect(row).toBeDefined();
+        expectExpiry(row);
+
+        const detail = await apiCall.getTokenDetailsRaw(row.token_id);
+        expect(detail.status).toBe(200);
+        expect(detail.body.token).toMatchObject({
+          token_id: row.token_id,
+          name,
+          expires_at: row.expires_at,
+          is_active: true,
+        });
+
+        const revoked = await apiCall.revokeTokenRaw(row.token_id);
+        expect(revoked.status).toBe(200);
+        expect(revoked.body).toMatchObject({ message: "Token revoked successfully", tokenId: row.token_id });
+        expect(await findToken(name)).toBeUndefined();
+        const revokedDetail = await apiCall.getTokenDetailsRaw(row.token_id);
+        expect(revokedDetail.status).toBe(200);
+        expect(revokedDetail.body.token.is_active).toBe(false);
+
+        const secondRevoke = await apiCall.revokeTokenRaw(row.token_id);
+        expect(secondRevoke.status).toBe(400);
+        expect(secondRevoke.body.message).toBe("Token is already revoked");
+      });
+    });
+
+    test("@admin Viewing or revoking an unknown token id returns 404", async () => {
+      const unknownId = getRandomString("missing-token");
+      const detail = await apiCall.getTokenDetailsRaw(unknownId);
+      expect(detail.status).toBe(404);
+      expect(detail.body.message).toBe("Token not found");
+      const revoke = await apiCall.revokeTokenRaw(unknownId);
+      expect(revoke.status).toBe(404);
+      expect(revoke.body.message).toBe("Token not found");
+    });
+  });
+
+  test.describe("Token ownership", () => {
+    test("@admin Read-write user cannot view or revoke an admin token, admin can manage the user's token", async () => {
+      const adminTokenName = getRandomString("admin-owned-token");
+      const userTokenName = getRandomString("rw-owned-token");
+      trackedNames.push(adminTokenName, userTokenName);
+      expect((await apiCall.generateTokenRaw({ name: adminTokenName })).status).toBe(200);
+      const adminRow = (await findToken(adminTokenName))!;
+      expect(adminRow).toBeDefined();
+
+      const userLogin = await apiCall.generateTokenWithCredentialsRaw({
+        username: readwriteUser.name,
+        password: userConfig.user.password,
+        name: userTokenName,
+      });
+      expect(userLogin.status).toBe(200);
+      const userBearer = userLogin.body.token as string;
+
+      const userList = await apiCall.listTokensRaw(userBearer);
+      expect(userList.status).toBe(200);
+      const userNames = (userList.body.tokens as TokenRow[]).map((t) => t.name);
+      expect(userNames).toContain(userTokenName);
+      expect(userNames).not.toContain(adminTokenName);
+
+      const view = await apiCall.getTokenDetailsRaw(adminRow.token_id, userBearer);
+      expect(view.status).toBe(403);
+      expect(view.body.message).toBe("Forbidden: You can only view your own tokens");
+      const revoke = await apiCall.revokeTokenRaw(adminRow.token_id, userBearer);
+      expect(revoke.status).toBe(403);
+      expect(revoke.body.message).toBe("Forbidden: You can only revoke your own tokens");
+      expect((await apiCall.getTokenDetailsRaw(adminRow.token_id)).body.token.is_active).toBe(true);
+
+      const userRow = (await findToken(userTokenName))!;
+      expect(userRow).toBeDefined();
+      expect(userRow.username).toBe(readwriteUser.name);
+      const adminView = await apiCall.getTokenDetailsRaw(userRow.token_id);
+      expect(adminView.status).toBe(200);
+      expect(adminView.body.token.name).toBe(userTokenName);
+      const adminRevoke = await apiCall.revokeTokenRaw(userRow.token_id);
+      expect(adminRevoke.status).toBe(200);
+      expect((await apiCall.getTokenDetailsRaw(userRow.token_id)).body.token.is_active).toBe(false);
+    });
+  });
+
+  test.describe("Credentials token endpoint", () => {
+    const credentials = { username: readwriteUser.name, password: userConfig.user.password };
+
+    [
+      { label: "malformed JSON", sendsName: false, build: () => "{not valid json", message: "Invalid JSON in request body" },
+      { label: "empty username", sendsName: false, build: () => ({ username: "" }), message: "Username cannot be empty" },
+      { label: "non-numeric ttlSeconds", sendsName: true, build: (name: string) => ({ ...credentials, name, ttlSeconds: "60" }), message: "Invalid TTL value" },
+      { label: "past expiresAt", sendsName: true, build: (name: string) => ({ ...credentials, name, expiresAt: pastExpiry }), message: "Expiration date must be in the future" },
+      { label: "ttlSeconds below 1", sendsName: true, build: (name: string) => ({ ...credentials, name, ttlSeconds: 0 }), message: "Invalid TTL value (must be between 1 and 31622400 seconds)" },
+      { label: "ttlSeconds above one year", sendsName: true, build: (name: string) => ({ ...credentials, name, ttlSeconds: 31622401 }), message: "Invalid TTL value (must be between 1 and 31622400 seconds)" },
+    ].forEach(({ label, sendsName, build, message }) => {
+      test(`@admin Credentials token rejects ${label} with 400`, async () => {
+        const name = getRandomString("invalid-credentials-token");
+        trackedNames.push(name);
+        const response = await apiCall.generateTokenWithCredentialsRaw(build(name));
+        expect(response.status).toBe(400);
+        expect(response.body.message).toContain(message);
+        expect(response.body.token).toBeUndefined();
+        if (sendsName) expect(await findToken(name)).toBeUndefined();
+      });
+    });
+
+    test("@admin Credentials token with a wrong password returns 401", async () => {
+      const name = getRandomString("wrong-password-token");
+      trackedNames.push(name);
+      const response = await apiCall.generateTokenWithCredentialsRaw({
+        username: readwriteUser.name,
+        password: `${userConfig.user.password}-wrong`,
+        name,
+      });
+      expect(response.status).toBe(401);
+      expect(response.body.message).toBe("Invalid credentials or connection failed");
+      expect(response.body.token).toBeUndefined();
+      expect(await findToken(name)).toBeUndefined();
+    });
+
+    test("@admin Credentials token is usable and its owner can view and revoke it", async () => {
+      const name = getRandomString("credentials-token");
+      trackedNames.push(name);
+      const created = await apiCall.generateTokenWithCredentialsRaw({ ...credentials, name, ttlSeconds: 3600 });
+      expect(created.status).toBe(200);
+      expect(created.body.message).toBe("Token created successfully");
+      const bearer = created.body.token as string;
+
+      const listed = await apiCall.listTokensRaw(bearer);
+      expect(listed.status).toBe(200);
+      const row = (listed.body.tokens as TokenRow[]).find((t) => t.name === name)!;
+      expect(row).toBeDefined();
+      expect(row.username).toBe(readwriteUser.name);
+      expect(row.expires_at).not.toBeNull();
+
+      const ownDetail = await apiCall.getTokenDetailsRaw(row.token_id, bearer);
+      expect(ownDetail.status).toBe(200);
+      expect(ownDetail.body.token).toMatchObject({ token_id: row.token_id, name, is_active: true });
+
+      const revoked = await apiCall.revokeTokenRaw(row.token_id, bearer);
+      expect(revoked.status).toBe(200);
+      expect(revoked.body).toMatchObject({ message: "Token revoked successfully", tokenId: row.token_id });
+
+      const afterRevoke = await apiCall.listTokensRaw(bearer);
+      expect(afterRevoke.status).toBe(401);
+      expect(afterRevoke.body.message).toBe("Invalid or revoked access token");
     });
   });
 });
