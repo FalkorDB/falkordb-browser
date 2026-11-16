@@ -58,18 +58,21 @@ function checkViewPermission(
   // Normalize host (empty string defaults to localhost)
   const authenticatedHost = authenticatedUser.host || "localhost";
   const tokenHost = tokenData.host || "localhost";
+  const isSameEndpoint =
+    authenticatedHost.toLowerCase() === tokenHost.toLowerCase() &&
+    Number(authenticatedUser.port) === Number(tokenData.port);
 
   // Check ownership
   const isTokenOwner =
     authenticatedUser.username === tokenData.username &&
-    authenticatedHost === tokenHost &&
-    authenticatedUser.port === tokenData.port;
+    isSameEndpoint;
+  const canAdministerEndpoint = isAdmin && isSameEndpoint;
 
-  if (!isAdmin && !isTokenOwner) {
+  if (!canAdministerEndpoint && !isTokenOwner) {
     return {
       authorized: false,
       error: NextResponse.json(
-        { message: "Forbidden: You can only view your own tokens" },
+        { message: "Forbidden: You can only view tokens for your connection" },
         { status: 403, headers: getCorsHeaders(request) }
       ),
     };
@@ -93,18 +96,21 @@ function checkRevokePermission(
   // Normalize host
   const authenticatedHost = authenticatedUser.host || "localhost";
   const tokenHost = tokenData.host || "localhost";
+  const isSameEndpoint =
+    authenticatedHost.toLowerCase() === tokenHost.toLowerCase() &&
+    Number(authenticatedUser.port) === Number(tokenData.port);
 
   // Check ownership by username + host + port (consistent across logins)
   const isTokenOwner =
     authenticatedUser.username === tokenData.username &&
-    authenticatedHost === tokenHost &&
-    authenticatedUser.port === tokenData.port;
+    isSameEndpoint;
+  const canAdministerEndpoint = isAdmin && isSameEndpoint;
 
-  if (!isAdmin && !isTokenOwner) {
+  if (!canAdministerEndpoint && !isTokenOwner) {
     return {
       authorized: false,
       error: NextResponse.json(
-        { message: "Forbidden: You can only revoke your own tokens" },
+        { message: "Forbidden: You can only revoke tokens for your connection" },
         { status: 403, headers: getCorsHeaders(request) }
       ),
     };

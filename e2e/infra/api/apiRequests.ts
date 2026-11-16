@@ -17,7 +17,7 @@ const getRequest = async (url: string, headers?: Record<string, string>, body?: 
 const postRequest = async (url: string, body?: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
   const requestOptions = {
     data: body,
-    headers: headers || undefined,
+    headers: { ...headers, Origin: new URL(url).origin },
   };
 
   const requestContext = availableRequest || (await request.newContext());
@@ -27,13 +27,13 @@ const postRequest = async (url: string, body?: any, availableRequest?: APIReques
 
 const postMultipartRequest = async (url: string, multipart: Record<string, { name: string; mimeType: string; buffer: Buffer }>) => {
   const requestContext = await request.newContext();
-  return requestContext.post(url, { multipart });
+  return requestContext.post(url, { multipart, headers: { Origin: new URL(url).origin } });
 };
 
 const deleteRequest = async (url: string, headers?: Record<string, string>, body?: any) => {
   const requestOptions = {
     data: body,
-    headers: headers || undefined,
+    headers: { ...headers, Origin: new URL(url).origin },
   };
 
   const requestContext = await request.newContext();
@@ -44,7 +44,7 @@ const deleteRequest = async (url: string, headers?: Record<string, string>, body
 const patchRequest = async (url: string, body?: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
   const requestOptions = {
     data: body,
-    headers: headers || undefined,
+    headers: { ...headers, Origin: new URL(url).origin },
   };
 
   const requestContext = availableRequest || (await request.newContext());

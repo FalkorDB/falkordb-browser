@@ -77,6 +77,42 @@ export async function getSSEGraphResult(
     // Always get the admin token and add it to headers
     const adminHeaders = await getAdminToken();
     const mergedHeaders = { ...adminHeaders, ...headers };
+    const requestUrl = new URL(url);
+    const query = requestUrl.searchParams.get("query");
+
+    if (query !== null) {
+      const timeout = requestUrl.searchParams.get("timeout");
+      requestUrl.searchParams.delete("query");
+      requestUrl.searchParams.delete("timeout");
+      const response = await fetch(requestUrl.toString(), {
+        method: "POST",
+        headers: { ...mergedHeaders, Origin: requestUrl.origin, "Content-Type": "application/json" },
+        body: JSON.stringify({ query, timeout: timeout ?? 0 }),
+      });
+      const responseText = await response.text();
+      const event = responseText.split(/\r?\n\r?\n/).find((part) => part.startsWith("event:"));
+      if (!event) {
+        let payload: unknown;
+        try {
+          payload = JSON.parse(responseText);
+        } catch {
+          throw new Error(`Unexpected query response (${response.status})`);
+        }
+        throw new Error(payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+          ? payload.message : `Unexpected query response (${response.status})`);
+      }
+      const eventType = event.match(/^event:\s*(.+)$/m)?.[1];
+      const data = event
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).replace(/^ /, ""))
+        .join("\n");
+      if (!data) throw new Error("Query response did not contain event data");
+      const payload = JSON.parse(data);
+      if (eventType === "error") throw new Error(payload.message || "Query failed");
+      if (!response.ok) throw new Error(payload.message || `Query failed (${response.status})`);
+      return payload;
+    }
 
     return await new Promise((resolve, reject) => {
       let handled = false;
@@ -161,14 +197,14 @@ export default class ApiCalls {
 
   async migrateSession(
     requestContext: APIRequestContext
-  ): Promise<{ status: number; body: { message?: string } }> {
+  ): Promise<{ status: number; headers: Record<string, string>; body: { message?: string; code?: string } }> {
     try {
       const result = await postRequest(
         urls.api.migrateSessionUrl,
         undefined,
         requestContext
       );
-      return { status: result.status(), body: await result.json() };
+      return { status: result.status(), headers: result.headers(), body: await result.json() };
     } catch (error) {
       throw new Error(
         `Failed to call migrate-session. \n Error: ${(error as Error).message}`
@@ -213,10 +249,10 @@ export default class ApiCalls {
     graphName: string,
     connectionId: string
   ): Promise<number> {
-    const response = await request.delete(
-      urls.api.graphUrl + encodeURIComponent(graphName),
-      { headers: { "X-Connection-Id": connectionId } }
-    );
+    const url = urls.api.graphUrl + encodeURIComponent(graphName);
+    const response = await request.delete(url, {
+      headers: { "X-Connection-Id": connectionId, Origin: new URL(url).origin },
+    });
     return response.status();
   }
 
@@ -322,7 +358,10 @@ export default class ApiCalls {
     request: APIRequestContext,
     multipart: Record<string, string | { name: string; mimeType: string; buffer: Buffer }>
   ): Promise<{ status: number; body: any }> {
-    const result = await request.post(`${urls.localHost}/api/upload`, { multipart });
+    const result = await request.post(`${urls.localHost}/api/upload`, {
+      multipart,
+      headers: { Origin: new URL(urls.localHost).origin },
+    });
     return { status: result.status(), body: await result.json() };
   }
 
@@ -333,8 +372,10 @@ export default class ApiCalls {
     key: string,
     body: string
   ): Promise<{ status: number; body: any }> {
-    const result = await request.post(`${urls.api.graphUrl}${encodeURIComponent(graph)}/load-csv`, {
+    const url = `${urls.api.graphUrl}${encodeURIComponent(graph)}/load-csv`;
+    const result = await request.post(url, {
       data: { key, body },
+      headers: { Origin: new URL(url).origin },
     });
     return { status: result.status(), body: await result.json() };
   }

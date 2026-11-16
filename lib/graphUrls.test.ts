@@ -13,19 +13,17 @@ const graphSegment = (url: string) => {
 describe("graph API URLs (#2207)", () => {
   it("sends the whole graph name as one path segment for profile", () => {
     for (const name of reservedNames) {
-      const { parsed, segments, graph } = graphSegment(getProfileUrl(name, "MATCH (n) RETURN n"));
+      const { parsed, segments, graph } = graphSegment(getProfileUrl(name));
       assert.equal(graph, name);
       assert.equal(segments.length, 5);
       assert.equal(segments[4], "profile");
-      assert.equal(parsed.searchParams.get("query"), "MATCH (n) RETURN n");
+      assert.equal(parsed.search, "");
       assert.equal(parsed.hash, "");
     }
   });
 
-  it("keeps the read-only flag and query intact for profile", () => {
-    const parsed = new URL(getProfileUrl("g#1", "RETURN '&x'", true), "http://localhost/");
-    assert.equal(parsed.searchParams.get("query"), "RETURN '&x'");
-    assert.equal(parsed.searchParams.get("readOnly"), "true");
+  it("keeps profile URLs free of query text and credentials", () => {
+    assert.equal(getProfileUrl("g#1"), "/api/graph/g%231/profile");
   });
 
   it("sends the whole graph name as one path segment for node expansion", () => {

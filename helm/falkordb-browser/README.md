@@ -140,6 +140,8 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `env.nextauthSecret` | Secret for NextAuth.js. Empty generates a random one on first install and reuses it on upgrade (not under `helm template`/Argo CD — see above). Known placeholders are rejected. Mutually exclusive with `nextauth.existingSecret.name`. | `""` |
 | `env.googleAnalytics` | Google Analytics ID | `""` |
 | `env.cypher` | Enable text-to-cypher feature | `"1"` |
+| `env.allowedOrigins` | `ALLOWED_ORIGINS`: comma-separated extra browser origins (e.g. a separate frontend) allowed to call the API with the session cookie. The `env.nextauthUrl` origin (unless `auto`) is always allowed; while this is empty, the request's own origin is allowed too. Empty is not emitted. | `""` |
+| `env.trustProxyHeaders` | `TRUST_PROXY_HEADERS`: set `"true"` only when the ingress/proxy overwrites `X-Forwarded-Host` and `X-Forwarded-Proto`; used to derive the request origin when `env.nextauthUrl` is `auto`. Empty is not emitted. | `""` |
 | `persistence.enabled` | Enable persistence for API tokens | `false` |
 | `persistence.size` | Size of persistent volume | `1Gi` |
 | `persistence.accessMode` | Access mode for persistent volume | `ReadWriteOnce` |

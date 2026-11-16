@@ -47,7 +47,7 @@ test.describe('Metadata Tests', () => {
         await metadataView.clickRunQuery();
         await metadataView.clickMetadataViewTab();
         const page = await browser.getPage();
-        const profileResponse = page.waitForResponse((response) => response.url().includes('/profile?'));
+        const profileResponse = page.waitForResponse((response) => response.url().endsWith('/profile') && response.request().method() === 'POST');
         await metadataView.clickProfileButton();
         expect((await profileResponse).status()).toBe(400);
         await expect(metadataView.errorToast).toContainText("Profile only supports valid read-only Cypher queries; update clauses and CALL procedures are not profiled.");
@@ -63,6 +63,15 @@ test.describe('Metadata Tests', () => {
         await metadataView.clickRunQuery();
         const isMetadataViewTabEnabled = await metadataView.GetIsMetadataViewTabEnabled();
         expect(isMetadataViewTabEnabled).toBe(true);
+    });
+
+    test('@readonly profiling is disabled for read-only connections', async () => {
+        const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
+        await metadataView.selectGraphByName(GRAPH_NAME);
+        await metadataView.insertQuery("RETURN 1");
+        await metadataView.clickRunQuery();
+        await metadataView.clickMetadataViewTab();
+        await expect((await browser.getPage()).getByRole("button", { name: "Profile", exact: true })).toBeDisabled();
     });
 
     test('@admin metadata replaces mutation statistics after a read query', async () => {
@@ -93,7 +102,7 @@ test.describe('Metadata Tests', () => {
         let attempts = 0;
         // A 4xx keeps the connection indicator online (a 5xx would disable Profile), and the
         // "Invalid input:" prefix makes the toast show the raw message.
-        await page.route(`**/api/graph/${GRAPH_NAME}/profile?*`, async (route) => {
+        await page.route(`**/api/graph/${GRAPH_NAME}/profile`, async (route) => {
             attempts += 1;
             await route.fulfill(attempts === 1
                 ? { status: 400, json: { message: 'Invalid input: profile temporarily unavailable' } }
@@ -124,7 +133,7 @@ test.describe('Metadata Tests', () => {
         await metadataView.clickRunQuery();
         await metadataView.clickMetadataViewTab();
         const page = await browser.getPage();
-        const profileResponse = page.waitForResponse((response) => response.url().includes('/profile?'));
+        const profileResponse = page.waitForResponse((response) => response.url().endsWith('/profile') && response.request().method() === 'POST');
         await metadataView.clickProfileButton();
         const response = await profileResponse;
         expect(response.status()).toBe(200);

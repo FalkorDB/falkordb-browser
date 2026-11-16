@@ -122,9 +122,8 @@ Rules for every change:
   routes return 403 **before** running any query; some (e.g. `POST app/api/graph/[graph]/route.ts`)
   run the work through `roQuery` / `runQuery(…, isReadOnly)` instead. Do not switch one to the other.
 - Browser requests carry `X-Connection-Id` so `getClient` pins the intended connection;
-  `getClient` validates an identified connection against an active token record and fails closed. The one
-  exception is the legacy session fallback (no connection ID, Token DB lookup failed), which can still return a
-  client without such a record; do not rely on the guarantee there.
+  `getClient` validates the connection against an active token record and fails closed (401 `SESSION_INVALID`),
+  including when no connection ID is sent and the Token DB has no usable record or cannot be read.
 - **Changing an endpoint's shape updates `app/api/swagger/swagger-spec.ts`** (served at `/docs`); the **API docs** CI check enforces it (see the docs table below).
 - Keep `falkordb` (server-only, BigInt) and `@falkordb/text-to-cypher` (native binaries) in
   `serverExternalPackages` in `next.config.js`; never import them from client code.

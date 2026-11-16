@@ -5,40 +5,13 @@ import { getCsvStorageProvider } from "@/app/lib/csv-storage";
 import { hashOwner, isValidCsvKey, normalizeCsvKey } from "@/app/lib/csv-key";
 import { assertFalkorFetchableCsvUrl, CsvUrlConfigError } from "@/app/lib/csv-load-url";
 import { CSV_UPLOAD_ENABLED, containsLoadCsv } from "@/lib/graphUpload";
-import { CSV_HEAD_INSPECT_BYTES, headLooksBinary, stripLeadingBom } from "@/app/api/csv-temp/csv-head";
+import { validateCsvHeadFromUrl } from "@/app/api/csv-temp/csv-url-head";
 
 /**
  * Interval for keep-alive heartbeat bytes streamed while a (potentially long,
  * atomic) LOAD CSV runs, so idle proxies/load balancers don't drop the request.
  */
 const HEARTBEAT_INTERVAL_MS = 15_000;
-
-async function validateCsvHeadFromUrl(csvUrl: string): Promise<string | null> {
-    try {
-        const response = await fetch(csvUrl, {
-            method: "GET",
-            headers: { Range: `bytes=0-${CSV_HEAD_INSPECT_BYTES - 1}` },
-            cache: "no-store",
-        });
-
-        // Let LOAD CSV surface connectivity/auth errors with provider-specific
-        // diagnostics; this pre-check is only for content sanity validation.
-        if (!response.ok) return null;
-
-        const raw = Buffer.from(await response.arrayBuffer());
-        const head = stripLeadingBom(raw);
-
-        if (head.length === 0) {
-            return "The uploaded CSV is empty.";
-        }
-        if (headLooksBinary(head)) {
-            return "The uploaded file does not appear to be a valid CSV (contains binary data).";
-        }
-        return null;
-    } catch {
-        return null;
-    }
-}
 
 interface LoadCsvBody {
     key?: string;
@@ -157,10 +130,12 @@ export async function POST(
             throw configError;
         }
 
-        const csvHeadError = await validateCsvHeadFromUrl(csvUrl);
-        if (csvHeadError) {
+        // The URL targets FalkorDB's network, which may be unreachable from Next.js.
+        // Unavailable prechecks are logged; LOAD CSV remains authoritative.
+        const csvHead = await validateCsvHeadFromUrl(csvUrl);
+        if (csvHead.status === "invalid") {
             return NextResponse.json(
-                { message: csvHeadError },
+                { message: csvHead.message },
                 { status: 422, headers: getCorsHeaders(request) }
             );
         }

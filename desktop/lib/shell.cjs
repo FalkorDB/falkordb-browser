@@ -19,11 +19,39 @@ function readJson(file) {
 }
 
 function writeJson(file, value) {
-    fs.writeFileSync(file, JSON.stringify(value, null, 2), { mode: 0o600 });
-    // `mode` only applies when the file is created; tighten one that already existed.
-    // POSIX only: on Windows chmod just toggles read-only, and the app-data
-    // folder is private because it sits in the user's own profile.
-    fs.chmodSync(file, 0o600);
+    const temp = `${file}.${crypto.randomBytes(12).toString("hex")}.tmp`;
+    let fd;
+    try {
+        fd = fs.openSync(temp, "wx", 0o600);
+        fs.writeFileSync(fd, JSON.stringify(value, null, 2));
+        fs.fchmodSync(fd, 0o600);
+        fs.fsyncSync(fd);
+        const writtenFd = fd;
+        fd = undefined;
+        fs.closeSync(writtenFd);
+        for (let attempt = 0; ; attempt += 1) {
+            try {
+                fs.renameSync(temp, file);
+                break;
+            } catch (error) {
+                if (process.platform !== "win32" || !["EPERM", "EACCES", "EBUSY"].includes(error.code) || attempt >= 4) throw error;
+                Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+            }
+        }
+        if (process.platform !== "win32") {
+            fd = fs.openSync(path.dirname(file), "r");
+            fs.fsyncSync(fd);
+            const directoryFd = fd;
+            fd = undefined;
+            fs.closeSync(directoryFd);
+        }
+    } finally {
+        try {
+            if (fd !== undefined) fs.closeSync(fd);
+        } finally {
+            if (fs.existsSync(temp)) fs.unlinkSync(temp);
+        }
+    }
 }
 
 /**
@@ -41,6 +69,7 @@ const HEX_32_BYTES = /^[0-9a-f]{64}$/;
 // Generated once and kept: a new AUTH_SECRET would sign every user out, and a
 // new ENCRYPTION_KEY would make stored credentials unreadable.
 function loadSecrets(dir) {
+    ensurePrivateDir(dir);
     const file = path.join(dir, "secrets.json");
     const stored = readJson(file);
     if (stored && HEX_32_BYTES.test(stored.authSecret) && HEX_32_BYTES.test(stored.encryptionKey)) {
@@ -106,7 +135,8 @@ function buildServerEnv(baseEnv, { host, port, secrets, dataDir, importDir }) {
         AUTH_TRUST_HOST: "true",
         AUTH_SECRET: secrets.authSecret,
         ENCRYPTION_KEY: secrets.encryptionKey,
-        ALLOWED_ORIGINS: origin,
+        // isAppUrl also lets the window load "localhost" redirects, so accept its requests too.
+        ALLOWED_ORIGINS: `${origin},http://localhost:${port}`,
         API_TOKEN_STORAGE_PATH: path.join(dataDir, "api_tokens.json"),
         CSV_STORAGE: baseEnv.CSV_STORAGE || "local",
         CSV_LOCAL_TEMP_DIR: baseEnv.CSV_LOCAL_TEMP_DIR || importDir,

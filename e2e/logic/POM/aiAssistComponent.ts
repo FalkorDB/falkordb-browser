@@ -91,6 +91,12 @@ export default class AiAssistComponent extends GraphPage {
     await this.clickRunQuery(false);
   }
 
+  async editQueryKeepingToast(query: string): Promise<void> {
+    // The generic focus helper presses Escape, which also dismisses error toasts.
+    await this.editorContainer.click();
+    await this.insertQuery(query, { focus: false });
+  }
+
   async runInvalidQueryAndRequestFix(query: string): Promise<void> {
     await this.runInvalidQuery(query);
     await this.fixWithAiButton.click();

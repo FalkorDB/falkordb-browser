@@ -15,6 +15,19 @@ breaking.**
 
 ## 0. Background — primitives that already exist
 
+### Tab restoration during connection bootstrap
+
+`useGraphTabs` in `app/providers.tsx` uses the active connection ID as its
+connection key, falling back to the signed session's prefix connection ID only
+while initial connection discovery has not supplied an active ID. Restoration
+requires a non-null ID and a ready storage prefix. Once an active ID exists, it
+must match the prefix ID; a pending connection switch cannot restore another
+connection's tabs. Graph-list, timeout, and tutorial recovery readiness still
+control when restoration may finish.
+
+The delayed-discovery and create-dialog scenarios in `e2e/tests/graphTabs.spec.ts`
+cover this bootstrap window as well as loss of readiness during restoration.
+
 `lib/utils.ts`
 - `_activeConnectionId` — injected as `X-Connection-Id` by `securedFetch`, `uploadFileWithProgress`,
   `getSSEGraphResult`, `getMetaStats`, `getMemoryUsage`. A request **snapshots** it **synchronously
@@ -224,7 +237,10 @@ restored tabs and the editor wait on it.
 
 The reset effect skips the **same‑connection bootstrap** (`null → A` where discovery confirmed the
 session's existing connection, recorded in `sameConnectionBootstrapRef` with the epoch): the loaded list
-and restored tabs are kept, and a later epoch bump invalidates the record. Restored tabs additionally
+and restored tabs are kept, and a later epoch bump invalidates the record. When discovery instead adopts a
+different connection, `pinAndSync` bumps `contextGen` and supersedes in-flight graph lists
+(`supersedeGraphLists`) first: `null → B` bumps no epoch, so a tab query restored, or a graph list read,
+under the session's connection would otherwise commit into B's state. Restored tabs additionally
 wait for the saved query timeout (`lib/timeoutInitialization.ts`), keyed on the session's user and
 connection details plus the storage prefix's connection, so a reload never re‑runs them with
 `timeout=0`.

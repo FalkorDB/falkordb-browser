@@ -1,6 +1,6 @@
 /* eslint-disable no-await-in-loop */
 import { expect, test } from "@playwright/test";
-import { getRandomString } from "../infra/utils";
+import { getQueryRequestParam, getRandomString } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
@@ -341,10 +341,13 @@ test.describe("Error Toast Messages", () => {
 
     // FalkorDB's timeout cannot be forced deterministically, so the query's SSE stream replies with it.
     const page = await browser.getPage();
-    await page.route(url => url.pathname === `/api/graph/${graphName}` && (url.searchParams.get("query") ?? "").includes("timeout-hint"), route => route.fulfill({
-      contentType: "text/event-stream",
-      body: `event: error\ndata: ${JSON.stringify({ message: "Query timed out", status: 400 })}\n\n`,
-    }));
+    await page.route(`**/api/graph/${graphName}{,?*}`, route => {
+      if (!(getQueryRequestParam(route.request(), "query") ?? "").includes("timeout-hint")) return route.fallback();
+      return route.fulfill({
+        contentType: "text/event-stream",
+        body: `event: error\ndata: ${JSON.stringify({ message: "Query timed out", status: 400 })}\n\n`,
+      });
+    });
     await graph.insertQuery("RETURN 'timeout-hint'");
     await graph.clickRunQuery(false);
 
