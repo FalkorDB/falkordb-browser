@@ -294,11 +294,15 @@ test.describe("Graph operation race conditions", () => {
       await graph.clickRunQuery();
       const canvas = page.locator("falkordb-canvas");
       await expect.poll(() => nodeCount(canvas)).toBe(1);
+      let abortedFetches = 0;
       await page.route(nodeFetch, async route => {
-        if (route.request().method() === "GET" && /\/\d+$/.test(new URL(route.request().url()).pathname)) await route.abort();
-        else await route.continue();
+        if (route.request().method() === "GET" && /\/\d+$/.test(new URL(route.request().url()).pathname)) {
+          abortedFetches += 1;
+          await route.abort();
+        } else await route.continue();
       });
       await expect(doubleClickNode(canvas, "a")).rejects.toThrow();
+      expect(abortedFetches).toBe(1);
       await page.unroute(nodeFetch);
       await doubleClickNode(canvas, "a");
       await expect.poll(() => nodeCount(canvas)).toBe(2);

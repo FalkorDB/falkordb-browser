@@ -509,7 +509,7 @@ export default function ForceGraph({
     }, [graph]);
 
     const handleUnselected = useCallback((evt?: MouseEvent) => {
-        if (consumeClick()) return;
+        if (consumeClick() || !ownsCanvas()) return;
         // A stray tap on the background must not wipe a selection built up one
         // element at a time, exactly as Ctrl-click protects it on desktop. Commit
         // the pending pick rather than dropping it — additive is the mode that
@@ -526,7 +526,7 @@ export default function ForceGraph({
         if (selectedElements.length === 0) return;
         selectedElementsRef.current = [];
         setSelectedElements([]);
-    }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, consumeClick]);
+    }, [selectedElements, setSelectedElements, clearPendingClick, flushPendingClick, multiSelect, consumeClick, ownsCanvas]);
 
     const appearance = useMemo(() => createGraphAppearanceLookup(selectedElements, hoverElement, () => graph.Elements.links, () => graph.TopologyVersion),
         [selectedElements, hoverElement, graph]);
