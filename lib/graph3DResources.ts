@@ -1,5 +1,5 @@
-import type { Data, FalkorDBCanvas } from "@falkordb/canvas";
-import type { GPUCapabilities } from "./gpuCapabilities";
+import type { CanvasDimension, Data, FalkorDBCanvas } from "@falkordb/canvas";
+import type { GPUCapabilities } from "./gpuCapabilities.ts";
 
 export interface GraphSize {
     nodes: number
@@ -48,6 +48,27 @@ export function exceeds3DBudget(size: GraphSize, budget: GraphSize): boolean {
 export function needs3DWarning(size: GraphSize, resources: DeviceResources, approved?: GraphSize): boolean {
     return exceeds3DBudget(size, get3DBudget(resources))
         && (!approved || exceeds3DBudget(size, approved));
+}
+
+export function readDeviceResources(nav: { deviceMemory?: unknown, hardwareConcurrency?: number }, gpu: GPUCapabilities): DeviceResources {
+    return {
+        deviceMemory: typeof nav.deviceMemory === "number" ? nav.deviceMemory : undefined,
+        hardwareConcurrency: nav.hardwareConcurrency,
+        gpu,
+    };
+}
+
+/** A pending warning whose graph fits again leaves 3D: the canvas already fell back to 2D unapproved. */
+export function decide3DCheck(size: GraphSize, resources: DeviceResources, approved: GraphSize | undefined, warningPending: boolean): "warn" | "allow" | "revertTo2D" {
+    if (needs3DWarning(size, resources, approved)) return "warn";
+    return warningPending ? "revertTo2D" : "allow";
+}
+
+/** How a data write waits for a safe renderer once the 3D check has run. */
+export function prepare3DStep(dimension: CanvasDimension, fallbackPending: boolean, fallbackFailed: boolean): "ensure2D" | "awaitFallback" | "useCheck" {
+    if (dimension === "2d") return "ensure2D";
+    if (fallbackPending) return "awaitFallback";
+    return fallbackFailed ? "ensure2D" : "useCheck";
 }
 
 type DataCanvas = Pick<FalkorDBCanvas, "setGraphData">;

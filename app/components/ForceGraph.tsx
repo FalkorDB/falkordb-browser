@@ -12,7 +12,7 @@ import useLongPress from "@/lib/useLongPress";
 import { getNodeUrl } from "@/lib/graphUrls";
 import { setCanvasGraphData, writeCanvasData } from "@/lib/graph3DResources";
 import { createGraphAppearanceLookup } from "@/lib/graphAppearance";
-import { commitCanvasSession, ownsCanvasSession } from "@/lib/canvasSession";
+import { commitCanvasSession, ownsCanvasOperation, ownsCanvasSession } from "@/lib/canvasSession";
 import use3DWarning from "./use3DWarning";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext, GraphTabsContext } from "./provider";
@@ -180,10 +180,7 @@ export default function ForceGraph({
         const canvas = canvasRef.current;
         const session = { ...sessionRef.current, epoch: getConnectionEpoch() };
         const apply = () => {
-            if (canvasRef.current === canvas
-                && sessionRef.current.graph === session.graph && sessionRef.current.data === session.data
-                && sessionRef.current.tabId === session.tabId && getConnectionEpoch() === session.epoch
-                && ownsCanvasSession(canvas, { ...session, restore: sessionRef.current.restore })) canvas.setViewport(viewport);
+            if (ownsCanvasOperation(canvas, session, { canvas: canvasRef.current, session: sessionRef.current, epoch: getConnectionEpoch() })) canvas.setViewport(viewport);
         };
         apply();
         // A viewport that arrives alongside fresh results (a tab rebuilt from its
@@ -228,10 +225,8 @@ export default function ForceGraph({
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const session = { graph, data, tabId: activeTabId, epoch: startEpoch };
-        const isCurrentOwner = () => getConnectionEpoch() === startEpoch && isCurrent()
-            && sessionRef.current.graph === graph && sessionRef.current.data === data
-            && sessionRef.current.tabId === activeTabId && canvasRef.current === canvas
-            && ownsCanvasSession(canvas, { ...session, restore: sessionRef.current.restore });
+        const isCurrentOwner = () => isCurrent()
+            && ownsCanvasOperation(canvas, session, { canvas: canvasRef.current, session: sessionRef.current, epoch: getConnectionEpoch() });
         if (!isCurrentOwner()) return;
 
         const result = await securedFetch(getNodeUrl(graph.Id, node.id, isReadOnly), {
@@ -278,10 +273,7 @@ export default function ForceGraph({
 
         if (!canvas || !canvasLoaded) return;
         const session = { graph, data, tabId: activeTabId, epoch: startEpoch };
-        const isCurrentOwner = () => getConnectionEpoch() === startEpoch
-            && sessionRef.current.graph === graph && sessionRef.current.data === data
-            && sessionRef.current.tabId === activeTabId && canvasRef.current === canvas
-            && ownsCanvasSession(canvas, { ...session, restore: sessionRef.current.restore });
+        const isCurrentOwner = () => ownsCanvasOperation(canvas, session, { canvas: canvasRef.current, session: sessionRef.current, epoch: getConnectionEpoch() });
         if (!isCurrentOwner()) return;
 
         const expandedNodes: Node[] = [];
@@ -303,11 +295,13 @@ export default function ForceGraph({
             }),
             links: graph.Elements.links
         };
+        // Drop the removed nodes' links before awaiting, so a discarded repaint cannot leave dangling links in the model.
+        const relationships = graph.removeLinks(nodes.map(n => n.id));
 
         await deleteNeighbors(expandedNodes);
         if (!isCurrentOwner()) return;
 
-        setRelationships(graph.removeLinks(nodes.map(n => n.id)));
+        setRelationships(relationships);
 
         await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements, nodeShape), isCurrentOwner);
     }, [canvasRef, canvasLoaded, graph, data, activeTabId, setRelationships, nodeShape]);

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Data } from "@falkordb/canvas";
-import { get3DBudget, needs3DWarning, register3DCheck, setCanvasGraphData, writeCanvasData } from "./graph3DResources.ts";
+import { decide3DCheck, get3DBudget, needs3DWarning, prepare3DStep, readDeviceResources, register3DCheck, setCanvasGraphData, writeCanvasData } from "./graph3DResources.ts";
 
 test("3D budgets use conservative defaults when resource hints are missing or invalid", () => {
     for (const resources of [{}, { deviceMemory: NaN, hardwareConcurrency: 0 }, { deviceMemory: Infinity }, { hardwareConcurrency: 32 }]) {
@@ -141,5 +141,43 @@ test("cleanup and caller cancellation discard delayed writes", async () => {
         ready.resolve(true);
         assert.equal(await pending, false);
         assert.equal(written, false);
+    }
+});
+
+test("a write that is already superseded skips the renderer check", async () => {
+    let checked = false;
+    let written = false;
+    const canvas = { setGraphData: () => { written = true; } };
+    const cleanup = register3DCheck(canvas, () => { checked = true; return true; });
+    assert.equal(await setCanvasGraphData(canvas, { nodes: [], links: [] }, () => false), false);
+    assert.equal(checked, false);
+    assert.equal(written, false);
+    cleanup();
+});
+
+test("device resources keep only a numeric memory hint", () => {
+    const gpu = { webgl2: "available" as const };
+    assert.deepEqual(readDeviceResources({ deviceMemory: 8, hardwareConcurrency: 4 }, gpu), { deviceMemory: 8, hardwareConcurrency: 4, gpu });
+    assert.deepEqual(readDeviceResources({ deviceMemory: "8", hardwareConcurrency: 4 }, gpu), { deviceMemory: undefined, hardwareConcurrency: 4, gpu });
+});
+
+test("the 3D check warns over budget and leaves 3D when a pending warning's graph fits again", () => {
+    const resources = { deviceMemory: 8, hardwareConcurrency: 8 };
+    const large = { nodes: 5000, links: 0 };
+    const small = { nodes: 10, links: 0 };
+    assert.equal(decide3DCheck(large, resources, undefined, false), "warn");
+    assert.equal(decide3DCheck(large, resources, large, false), "allow");
+    assert.equal(decide3DCheck(small, resources, undefined, true), "revertTo2D");
+    assert.equal(decide3DCheck(small, resources, undefined, false), "allow");
+});
+
+test("data writes wait for 2D, a pending fallback, or a failed fallback's retry before trusting the check", () => {
+    for (const [dimension, pending, failed, step] of [
+        ["2d", true, true, "ensure2D"],
+        ["3d", true, true, "awaitFallback"],
+        ["3d", false, true, "ensure2D"],
+        ["3d", false, false, "useCheck"],
+    ] as const) {
+        assert.equal(prepare3DStep(dimension, pending, failed), step);
     }
 });

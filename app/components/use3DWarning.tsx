@@ -4,7 +4,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { CanvasDimension } from "@falkordb/canvas";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { needs3DWarning, register3DCheck, type DeviceResources, type GraphSize } from "@/lib/graph3DResources";
+import { decide3DCheck, prepare3DStep, readDeviceResources, register3DCheck, type GraphSize } from "@/lib/graph3DResources";
 import type { GraphRef } from "@/lib/utils";
 import { getGPUCapabilities, type GPUCapabilities } from "@/lib/gpuCapabilities";
 
@@ -49,14 +49,10 @@ export default function use3DWarning(dimension: CanvasDimension, setDimension: (
     const check3D = useCallback((size: GraphSize) => {
         if (dimensionRef.current !== "3d") return true;
         const gpu = getGPUCapabilities();
-        const resources: DeviceResources = {
-            deviceMemory: "deviceMemory" in navigator && typeof navigator.deviceMemory === "number" ? navigator.deviceMemory : undefined,
-            hardwareConcurrency: navigator.hardwareConcurrency,
-            gpu,
-        };
-        if (!needs3DWarning(size, resources, approvedRef.current)) {
+        const decision = decide3DCheck(size, readDeviceResources(navigator, gpu), approvedRef.current, pendingRef.current);
+        if (decision !== "warn") {
             fallbackFailedRef.current = false;
-            if (pendingRef.current) {
+            if (decision === "revertTo2D") {
                 dimensionRef.current = "2d";
                 approvedRef.current = undefined;
                 pendingRef.current = false;
@@ -73,11 +69,12 @@ export default function use3DWarning(dimension: CanvasDimension, setDimension: (
 
     const prepareData = useCallback(async (size: GraphSize) => {
         const allowed = check3D(size);
-        if (dimensionRef.current === "2d") return await ensure2D();
         const fallback = fallbackRef.current;
-        if (fallback) return await fallback;
-        if (fallbackFailedRef.current) return await ensure2D();
-        return allowed;
+        switch (prepare3DStep(dimensionRef.current, fallback !== undefined, fallbackFailedRef.current)) {
+            case "ensure2D": return await ensure2D();
+            case "awaitFallback": return await fallback!;
+            default: return allowed;
+        }
     }, [check3D, ensure2D]);
     const getRequestedDimension = useCallback(() => dimensionRef.current, []);
 

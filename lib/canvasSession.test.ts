@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { commitCanvasSession, ownsCanvasSession, renewCanvasSession } from "./canvasSession.ts";
+import { commitCanvasSession, ownsCanvasOperation, ownsCanvasSession, renewCanvasSession } from "./canvasSession.ts";
 import { register3DCheck, writeCanvasData } from "./graph3DResources.ts";
 import { getConnectionEpoch, setActiveConnectionIdGlobal } from "./active-connection.ts";
 
@@ -101,4 +101,24 @@ test("rollback renews only the preserved canvas and never revives an old write",
     ready.resolve(true);
     assert.equal(await pending, false);
     setActiveConnectionIdGlobal(null);
+});
+
+test("an operation owns the canvas only while its live view, epoch and committed session all match", () => {
+    const canvas = {};
+    const restore = {};
+    const session = { graph: {}, data: {}, tabId: "a", epoch: 3 };
+    const live = { canvas, session: { graph: session.graph, data: session.data, tabId: "a", restore }, epoch: 3 };
+    assert.equal(ownsCanvasOperation(canvas, session, live), false);
+    commitCanvasSession(canvas, { ...session, restore });
+    assert.equal(ownsCanvasOperation(canvas, session, live), true);
+    for (const stale of [
+        { ...live, canvas: null },
+        { ...live, epoch: 4 },
+        { ...live, session: { ...live.session, graph: {} } },
+        { ...live, session: { ...live.session, data: {} } },
+        { ...live, session: { ...live.session, tabId: "b" } },
+        { ...live, session: { ...live.session, restore: {} } },
+    ]) {
+        assert.equal(ownsCanvasOperation(canvas, session, stale), false);
+    }
 });

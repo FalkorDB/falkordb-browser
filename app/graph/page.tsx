@@ -19,7 +19,7 @@ import { isGraphUnconfirmed } from "@/lib/graphTabs";
 import { getConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import GraphSubHeader from "./GraphSubHeader";
 import { setCanvasGraphData } from "@/lib/graph3DResources";
-import { ownsCanvasSession } from "@/lib/canvasSession";
+import { ownsCanvasOperation } from "@/lib/canvasSession";
 
 const GraphInfoPanel = dynamicImport(() => import("./graphInfo"), {
     ssr: false,
@@ -648,8 +648,9 @@ export default function Page() {
         }
 
         const canvas = canvasRef.current;
-        const mayRepaint = () => isCurrentOwner() && canvasRef.current === canvas && !!canvas
-            && ownsCanvasSession(canvas, { graph, data: graphOwnerRef.current.data, tabId: activeTabId, epoch: startEpoch });
+        const mayRepaint = () => isCurrentOwner() && !!canvas && ownsCanvasOperation(canvas,
+            { graph, data: graphOwnerRef.current.data, tabId: activeTabId, epoch: startEpoch },
+            { canvas: canvasRef.current, session: { ...graphOwnerRef.current, tabId: graphOwnerRef.current.activeTabId }, epoch: getConnectionEpoch() });
         let repaintSkipped = false;
         if (result.ok && canvas && mayRepaint()) {
             repaintSkipped = !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), mayRepaint) && isCurrentOwner();
@@ -726,8 +727,9 @@ export default function Page() {
             else setSelectedElements([]);
         }
         const canvas = canvasRef.current;
-        const mayRepaint = () => isCurrentOwner() && canvasRef.current === canvas && !!canvas
-            && ownsCanvasSession(canvas, { graph, data: graphOwnerRef.current.data, tabId: activeTabId, epoch: startEpoch });
+        const mayRepaint = () => isCurrentOwner() && !!canvas && ownsCanvasOperation(canvas,
+            { graph, data: graphOwnerRef.current.data, tabId: activeTabId, epoch: startEpoch },
+            { canvas: canvasRef.current, session: { ...graphOwnerRef.current, tabId: graphOwnerRef.current.activeTabId }, epoch: getConnectionEpoch() });
         let repaintSkipped = false;
         if (canvas && mayRepaint()) {
             repaintSkipped = !await setCanvasGraphData(canvas, convertToCanvasData(graph.Elements), mayRepaint) && isCurrentOwner();

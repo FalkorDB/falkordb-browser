@@ -23,6 +23,22 @@ export function ownsCanvasSession(canvas: object, session: CanvasSession): boole
         && (!session.restore || committed.restore === session.restore);
 }
 
+export interface LiveCanvasOwner {
+    canvas: object | null | undefined
+    session: Omit<CanvasSession, "epoch">
+    epoch: number
+}
+
+/** Whether an operation started as `session` on `canvas` still owns the live view and the committed canvas. */
+export function ownsCanvasOperation(canvas: object, session: CanvasSession, live: LiveCanvasOwner): boolean {
+    return live.canvas === canvas
+        && live.epoch === session.epoch
+        && live.session.graph === session.graph
+        && live.session.data === session.data
+        && live.session.tabId === session.tabId
+        && ownsCanvasSession(canvas, { ...session, restore: live.session.restore });
+}
+
 /** Renew only the preserved view after a confirmed connection-switch rollback. */
 export function renewCanvasSession(canvas: object, session: CanvasSession): boolean {
     const committed = committedSessions.get(canvas);

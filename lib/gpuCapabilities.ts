@@ -31,10 +31,10 @@ export function readGPUCapabilities(canvas: Pick<HTMLCanvasElement, "getContext"
         };
     } catch (error) {
         console.warn("Could not check WebGL2 capabilities; using conservative 3D budgets.", error);
-        return { webgl2: "unknown" };
     } finally {
         gl?.getExtension("WEBGL_lose_context")?.loseContext();
     }
+    return { webgl2: "unknown" };
 }
 
 export function getGPUCapabilities(): GPUCapabilities {
