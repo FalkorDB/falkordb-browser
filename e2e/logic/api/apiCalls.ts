@@ -4,11 +4,13 @@
 
 import { getAdminToken } from "@/e2e/infra/utils";
 import { APIRequestContext } from "playwright";
+import { request } from "@playwright/test";
 import { EventSource } from "eventsource";
 import {
   deleteRequest,
   getRequest,
   patchRequest,
+  postMultipartRequest,
   postRequest,
 } from "../../infra/api/apiRequests";
 import urls from "../../config/urls.json";
@@ -301,6 +303,56 @@ export default class ApiCalls {
         `Failed to get graph count. \n Error: ${(error as Error).message}`
       );
     }
+  }
+
+  /** POST /api/csv-temp — multipart upload of one `file` part. `body.key` is set on 201. */
+  async uploadCsvTemp(
+    content: string | Buffer,
+    filename = "data.csv"
+  ): Promise<{ status: number; body: any }> {
+    const result = await postMultipartRequest(urls.api.csvTempUrl, {
+      file: {
+        name: filename,
+        mimeType: "text/csv",
+        buffer: Buffer.from(content),
+      },
+    });
+    return { status: result.status(), body: await result.json() };
+  }
+
+  /** POST /api/csv-temp/direct — `data` is sent as is so malformed bodies can be tried. */
+  async requestCsvDirectUpload(data: unknown): Promise<{ status: number; body: any }> {
+    const result = await postRequest(`${urls.api.csvTempUrl}/direct`, data);
+    return { status: result.status(), body: await result.json() };
+  }
+
+  /**
+   * GET /api/csv-temp/:id — the serve endpoint FalkorDB fetches without a session, so this sends
+   * none (an empty storage state); `query` is the raw `?o=..&t=..`.
+   */
+  async getCsvTemp(id: string, query = ""): Promise<{ status: number; body: string }> {
+    const sessionless = await request.newContext({ storageState: { cookies: [], origins: [] } });
+    try {
+      const result = await getRequest(`${urls.api.csvTempUrl}/${id}${query}`, undefined, undefined, sessionless);
+      return { status: result.status(), body: await result.text() };
+    } finally {
+      await sessionless.dispose();
+    }
+  }
+
+  /** DELETE /api/csv-temp/:id — returns the status (204 even when the file is already gone). */
+  async deleteCsvTemp(id: string): Promise<number> {
+    const result = await deleteRequest(`${urls.api.csvTempUrl}/${id}`);
+    return result.status();
+  }
+
+  /**
+   * POST /api/graph/:graph/load-csv. A passing validation answers 200 with a streamed JSON
+   * body: `{ message, result }` on success or `{ error: { message, status } }` on a query error.
+   */
+  async loadCsv(graph: string, data: unknown): Promise<{ status: number; body: any }> {
+    const result = await postRequest(`${urls.api.graphUrl}${graph}/load-csv`, data);
+    return { status: result.status(), body: await result.json() };
   }
 
   async addGraphNodeLabel(

@@ -1,6 +1,7 @@
 {
     "api": {
         "graphUrl": "http://localhost:3000/api/graph/",
+        "csvTempUrl": "http://localhost:3000/api/csv-temp",
         "LoginApiUrl": "http://localhost:3000/api/auth/providers",
         "LogoutApiUrl": "http://localhost:3000/api/auth/signout",
         "settingsConfig": "http://localhost:3000/api/graph/config/",
