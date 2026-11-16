@@ -47,10 +47,10 @@ export function urlPath(url: string | null | undefined): string {
  * Global user preferences use plain keys. Per-connection data (e.g. query history)
  * is prefixed with host:port: to match the runtime connection-scoped storage.
  */
-export const initializeLocalStorage = (host = "localhost", port = 6379, username = "default") => {
+export const initializeLocalStorage = (host = "localhost", port = 6379, username = "default", seedTimeout = true) => {
     const prefix = `${host}:${port}:${username}:`;
     return `
-        if (!localStorage.getItem("timeout")) localStorage.setItem("timeout", "0");
+        ${seedTimeout ? 'if (!localStorage.getItem("timeout")) localStorage.setItem("timeout", "0");' : ""}
         if (!localStorage.getItem("limit")) localStorage.setItem("limit", "300");
         if (!localStorage.getItem("defaultQuery")) localStorage.setItem("defaultQuery", "");
         if (!localStorage.getItem("runDefaultQuery")) localStorage.setItem("runDefaultQuery", "false");
@@ -62,6 +62,22 @@ export const initializeLocalStorage = (host = "localhost", port = 6379, username
         if (!localStorage.getItem("appDownloadPrompt")) localStorage.setItem("appDownloadPrompt", "false");
     `;
 };
+
+/**
+ * Waits until the app has moved a seeded plain `secretKey` into the encrypted,
+ * connection-scoped `<host>:<port>:<user>:chatApiKeys` entry. The migration takes
+ * server round-trips after load, and until it lands the AI features report
+ * "No API Key Provided".
+ */
+export async function waitForChatKeyMigration(page: Page, timeout = 15000): Promise<void> {
+  await page.waitForFunction(() => {
+    if (localStorage.getItem("secretKey") !== null) return false;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      if (localStorage.key(i)?.endsWith(":chatApiKeys")) return true;
+    }
+    return false;
+  }, undefined, { timeout });
+}
 
 /**
  * Init script that mimics canvas fingerprinting protection (Brave Shields,

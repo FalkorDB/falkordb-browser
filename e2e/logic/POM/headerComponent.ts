@@ -1,6 +1,6 @@
 import { Locator, Page } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForURL } from "@/e2e/infra/utils";
+import { interactWhenVisible, waitForElementToNotBeVisible, waitForURL } from "@/e2e/infra/utils";
 import urls from '../../config/urls.json'
 
 export default class HeaderComponent extends BasePage {
@@ -154,17 +154,11 @@ export default class HeaderComponent extends BasePage {
         return newPage;
     }
 
-    async getApiDocumentationLinkHref(): Promise<string | null> {
-        await this.waitForPageIdle();
-        await this.clickOnHelpBtn();
-        return await this.apiDocumentationButton.getAttribute('href');
-    }
-
     async clickOnApiDocumentation(): Promise<Page> {
         await this.waitForPageIdle();
         await this.clickOnHelpBtn();
         await this.clickOnApiDocumentationBtn();
-        await this.page.waitForURL('**/docs**', { timeout: 5000 });
+        await this.page.waitForURL('**/docs**');
         return this.page;
     }
 
@@ -190,8 +184,11 @@ export default class HeaderComponent extends BasePage {
     }
 
     async closePopUp(): Promise<void> {
+        // Outside clicks are ignored while the Help menu closes or the drawer slides in.
+        await waitForElementToNotBeVisible(this.page.getByRole("menu"));
+        await this.aboutPopUp.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
         await this.page.mouse.click(10, 10);
-        await this.page.waitForTimeout(1000);
+        await waitForElementToNotBeVisible(this.aboutPopUp);
     }
 
     async clickOnAbout(): Promise<void> {

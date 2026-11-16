@@ -35,6 +35,10 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId(`chatAssistantMessage-${type}`);
   }
 
+  private get chatErrorSettingsLink(): Locator {
+    return this.chatAssistantMessage("Error").getByRole("link", { name: "Go to Settings", exact: true });
+  }
+
   private get chatConfidenceBadge(): Locator {
     return this.page.getByTestId("chatConfidenceBadge");
   }
@@ -205,6 +209,14 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
+  async pressEnterInChatInput(): Promise<void> {
+    await interactWhenVisible(
+      this.chatInput,
+      (el) => el.press("Enter"),
+      "Chat Input Enter"
+    );
+  }
+
   // Get Content Methods
   async getChatInputValue(): Promise<string> {
     return interactWhenVisible(
@@ -235,6 +247,14 @@ export default class ChatComponent extends GraphPage {
       this.chatUserMessages.first(),
       (el) => el.textContent(),
       "First User Message"
+    );
+  }
+
+  async getChatErrorSettingsLinkHref(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatErrorSettingsLink,
+      (el) => el.getAttribute("href"),
+      "Chat Error Settings Link"
     );
   }
 
@@ -342,16 +362,6 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
-  async isNodeVisibleInCanvas(nodeName: string): Promise<boolean> {
-    // Wait for canvas to render
-    await this.waitForTimeout(1000);
-    
-    // Check if node with the given name exists in the canvas
-    // Try to find tooltip or node element containing the name
-    const nodeElement = this.page.locator(`[data-tooltip*="${nodeName}"], text="${nodeName}"`).first();
-    const visible = await nodeElement.isVisible().catch(() => false);
-    return visible;
-  }
 
   // Footer Locators
   private get chatFooter(): Locator {
@@ -409,6 +419,10 @@ export default class ChatComponent extends GraphPage {
       (el) => el.textContent(),
       "Chat Footer Model"
     );
+  }
+
+  async waitForChatFooterModel(model: string): Promise<void> {
+    await expect(this.chatFooterModel).toHaveText(model);
   }
 
   async waitForChatConfidenceBadge(): Promise<boolean> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server, Minus, Plus } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
@@ -87,6 +87,7 @@ export default function BrowserSettings() {
         resetSettings,
         saveSettings,
         replayTutorial,
+        settingsLoaded,
     } = useContext(BrowserSettingsContext);
 
     const { prefixConnectionId } = useContext(ConnectionContext);
@@ -97,6 +98,7 @@ export default function BrowserSettings() {
     const router = useRouter();
 
     const [isResetting, setIsResetting] = useState(false);
+    const [draftsReady, setDraftsReady] = useState(false);
     const [modelDisplayNames, setModelDisplayNames] = useState<string[]>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [isManualLocalModelLoad, setIsManualLocalModelLoad] = useState(false);
@@ -316,8 +318,15 @@ export default function BrowserSettings() {
         setNewChatModelSource(chatModelSource);
         setNewLocalLlmProvider(localLlmProvider);
         setNewLocalLlmEndpoint(localLlmEndpoint);
+        // Batched with the draft copies above, so the page never reports ready while a field still shows a default.
+        setDraftsReady(settingsLoaded);
+    }, [settingsLoaded, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewGraphsSortOrder, graphsSortOrder, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, rowHeight]);
+
+    // Kept apart from the effect above: auto-selecting a model after a list loads changes the saved
+    // model, and re-running that effect would discard unsaved provider/endpoint edits and the key editor.
+    useEffect(() => {
         setNewModel(model);
-    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewGraphsSortOrder, graphsSortOrder, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
+    }, [model, setNewModel]);
 
     useEffect(() => {
         setHasChanges(
@@ -707,7 +716,7 @@ export default function BrowserSettings() {
     };
 
     return (
-        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
+        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden" data-testid="browserSettingsPage" aria-busy={!settingsLoaded || !draftsReady}>
             <div className="flex items-start justify-between gap-2 px-2 mobile:items-center">
                 <div className="min-w-0 flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar mobile:max-h-none mobile:overflow-visible">
                     <h1 className="text-3xl font-semibold mobile:text-xl">Browser Settings</h1>
@@ -1105,7 +1114,7 @@ export default function BrowserSettings() {
                                                     <label className="text-sm font-medium">
                                                         {isLoadingModels ? "Live models" : "Model"}
                                                     </label>
-                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <span data-testid="modelsStatusMessage" className="flex items-center gap-1 text-xs text-muted-foreground">
                                                         {isLoadingModels && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                                         {modelsMessage}
                                                     </span>

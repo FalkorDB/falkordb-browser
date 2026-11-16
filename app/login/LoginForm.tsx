@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useContext, useEffect, useRef, useState } from "react";
+import { FormEvent, useContext, useEffect, useState } from "react";
 import { Check, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -10,12 +10,12 @@ import { IndicatorContext } from "../components/provider";
 import { useToast } from "@/components/ui/use-toast";
 import { securedFetch } from "@/lib/utils";
 import { matchUrl, parseUrlString, validateUrl } from "./urlUtils";
+import { type CertificateSlot, createCertificateReadTracker } from "./certificateReadTracker";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
 
 type LoginMode = "manual" | "url";
-type CertificateSlot = "ca" | "cert" | "key";
 
 const handlePortIsNumber = (value: string) => !/^\d+$/.test(value);
 
@@ -120,13 +120,13 @@ export default function LoginForm({
   const [clientCertFileName, setClientCertFileName] = useState<string>("");
   const [clientKey, setClientKey] = useState<string>();
   const [clientKeyFileName, setClientKeyFileName] = useState<string>("");
-  const readVersions = useRef({ ca: 0, cert: 0, key: 0 });
-  const pendingReads = useRef(new Set<CertificateSlot>());
+  const [readTracker] = useState(createCertificateReadTracker);
   const [isReading, setIsReading] = useState(false);
 
-  const finishRead = (slot: CertificateSlot) => {
-    pendingReads.current.delete(slot);
-    setIsReading(pendingReads.current.size > 0);
+  const finishRead = (slot: CertificateSlot, version: number) => {
+    if (!readTracker.finish(slot, version)) return false;
+    setIsReading(readTracker.hasPending());
+    return true;
   };
 
   useEffect(() => {
@@ -244,7 +244,7 @@ export default function LoginForm({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (pendingReads.current.size > 0) return;
+    if (readTracker.hasPending()) return;
 
     // Pre-submit validation for URL mode
     if (loginMode === "url") {
@@ -354,21 +354,18 @@ export default function LoginForm({
   // `load`, so the failure has to be reported from `onerror`.
   const readPemAsBase64 = (slot: CertificateSlot, file: File, onRead: (base64: string, name: string) => void) => {
     clearError();
-    const version = ++readVersions.current[slot];
-    pendingReads.current.add(slot);
+    const version = readTracker.start(slot);
     setIsReading(true);
     const reader = new FileReader();
 
     reader.onload = () => {
-      if (version !== readVersions.current[slot]) return;
-      finishRead(slot);
+      if (!finishRead(slot, version)) return;
       clearError();
       onRead((reader.result as string).split(',').pop() ?? "", file.name);
     };
 
     reader.onerror = () => {
-      if (version !== readVersions.current[slot]) return;
-      finishRead(slot);
+      if (!finishRead(slot, version)) return;
       setError({
         message: <p className="text-xs text-destructive">{`Could not read ${file.name}`}</p>,
         show: true,
@@ -449,10 +446,7 @@ export default function LoginForm({
                   setRawUrl(buildUrl({ host, port, username, password, TLS: checked as boolean }));
                   clearError();
                   if (!checked) {
-                    readVersions.current.ca += 1;
-                    readVersions.current.cert += 1;
-                    readVersions.current.key += 1;
-                    pendingReads.current.clear();
+                    readTracker.invalidateAll();
                     setIsReading(false);
                     setCA(undefined);
                     setUploadedFileName("");

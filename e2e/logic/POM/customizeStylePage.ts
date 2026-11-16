@@ -4,12 +4,17 @@ import {
   interactWhenVisible,
   waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
-import { EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
+import { EMPTY_DISPLAY_NAME, labelStyleKey, relationshipStyleKey } from "@/app/api/graph/model";
 import GraphInfoPage from "./graphInfoPage";
+import type { RelationshipStyle } from "./graphPage";
 
 export default class CustomizeStylePage extends GraphInfoPage {
   private customizeStyleButton(label: string): Locator {
     return this.page.getByTestId(`customizeStyle${label}`);
+  }
+
+  private customizeRelationshipStyleButton(relationship: string): Locator {
+    return this.page.getByTestId(`customizeRelationshipStyle${relationship}`);
   }
 
   private labelButton(label: string): Locator {
@@ -89,6 +94,19 @@ export default class CustomizeStylePage extends GraphInfoPage {
     );
   }
 
+  async clickCustomizeRelationshipStyleButton(relationship: string): Promise<void> {
+    await interactWhenVisible(
+      this.graphInfoEdgeButton(relationship),
+      (el) => el.click(),
+      `Graph Info Edge Button ${relationship}`
+    );
+    await interactWhenVisible(
+      this.customizeRelationshipStyleButton(relationship),
+      (el) => el.click(),
+      `Customize Relationship Style Button ${relationship}`
+    );
+  }
+
   async isPanelVisible(): Promise<boolean> {
     return waitForElementToBeVisible(this.panelTitle);
   }
@@ -111,6 +129,16 @@ export default class CustomizeStylePage extends GraphInfoPage {
       (el) => el.click(),
       "First Color Button"
     );
+  }
+
+  async getColorByIndex(index: number): Promise<string> {
+    const label = await interactWhenVisible(
+      this.colorButtons.nth(index),
+      (el) => el.getAttribute("aria-label"),
+      `Color Button ${index}`
+    );
+    if (!label) throw new Error(`Color Button ${index} has no aria-label`);
+    return label.replace("Select color ", "");
   }
 
   async selectColorByIndex(index: number): Promise<void> {
@@ -170,26 +198,32 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return color;
   }
 
-  async getLabelStyleFromLocalStorage(label: string): Promise<{
-    color?: string;
-    size?: number;
-  } | null> {
-    const style = await this.page.evaluate((labelName) => {
-      // labelStyle_ is now connection-scoped, so find the key that ends with `labelStyle_{label}`
-      const suffix = `labelStyle_${labelName}`;
+  /** Styles are stored under a connection-scoped prefix, so match the key by its suffix. */
+  private async getScopedStyleFromLocalStorage<T>(suffix: string): Promise<T | null> {
+    return this.page.evaluate((keySuffix) => {
       const matches: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (!key || !key.endsWith(suffix)) continue;
+        if (!key || !key.endsWith(keySuffix)) continue;
         const value = localStorage.getItem(key);
         if (value !== null) matches.push(value);
       }
       if (matches.length > 1) {
-        throw new Error(`Ambiguous scoped label style for ${suffix}`);
+        throw new Error(`Ambiguous scoped style for ${keySuffix}`);
       }
       return matches.length === 1 ? JSON.parse(matches[0]) : null;
-    }, label);
-    return style;
+    }, suffix);
+  }
+
+  async getLabelStyleFromLocalStorage(label: string): Promise<{
+    color?: string;
+    size?: number;
+  } | null> {
+    return this.getScopedStyleFromLocalStorage(labelStyleKey(label));
+  }
+
+  async getRelationshipStyleFromLocalStorage(relationship: string): Promise<RelationshipStyle | null> {
+    return this.getScopedStyleFromLocalStorage(relationshipStyleKey(relationship));
   }
 
   async getSelectedSizeButtonIndex(): Promise<number> {
@@ -245,6 +279,10 @@ export default class CustomizeStylePage extends GraphInfoPage {
 
   async isSaveButtonVisible(): Promise<boolean> {
     return waitForElementToBeVisible(this.saveStyleButton);
+  }
+
+  async isSaveButtonNotVisible(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.saveStyleButton);
   }
 
   async clickRgbPickerButton(): Promise<void> {

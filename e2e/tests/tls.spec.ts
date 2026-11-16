@@ -68,7 +68,7 @@ test.describe(`@tls TLS Login tests`, () => {
         const page = await browser.getPage();
         const certificatePath = testInfo.outputPath('retry-certificate.crt');
         await writeFile(certificatePath, 'test certificate');
-        const readError = login.readError(certificatePath);
+        const readError = login.fileReadError(path.basename(certificatePath));
 
         await page.addInitScript(() => {
             const readAsDataURL = FileReader.prototype.readAsDataURL;
@@ -118,7 +118,7 @@ test.describe(`@tls TLS Login tests`, () => {
         const page = await browser.getPage();
         const certificatePath = testInfo.outputPath('overlapping-certificate.crt');
         await writeFile(certificatePath, 'test certificate');
-        const readError = login.readError(certificatePath);
+        const readError = login.fileReadError(path.basename(certificatePath));
 
         await page.addInitScript(() => {
             const readAsDataURL = FileReader.prototype.readAsDataURL;
@@ -242,7 +242,7 @@ test.describe(`@tls TLS Login tests`, () => {
         const page = await browser.getPage();
         const certificatePath = testInfo.outputPath('immediate-error.crt');
         await writeFile(certificatePath, 'test certificate');
-        const readError = login.readError(certificatePath);
+        const readError = login.fileReadError(path.basename(certificatePath));
 
         await page.addInitScript(() => {
             let count = 0;
@@ -358,7 +358,7 @@ test.describe(`@tls TLS Login tests`, () => {
         await page.evaluate(() => window.dispatchEvent(new Event("fail-first-read")));
         await page.waitForFunction(() => document.documentElement.dataset.firstReadFailed === "true");
         await expect(login.logInButton).toBeEnabled();
-        await expect(login.readError(certificatePath)).toBeHidden();
+        await expect(login.fileReadError(path.basename(certificatePath))).toBeHidden();
         await login.clickEnableTLS();
         const secondUpload = login.uploadCertificate(certificatePath);
         await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
