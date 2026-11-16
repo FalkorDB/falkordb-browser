@@ -1287,7 +1287,7 @@ test.describe("@admin Graph tabs", () => {
         const page = await browser.getPage();
         await graph.waitForPageIdle();
         // The add button stays disabled until the tabs are ready; the loop's isDisabled() check does not wait.
-        await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
+        await expect(graph.addTabButton).toBeEnabled({ timeout: 15000 });
 
         // Read the limit actually in force instead of assuming the default, so
         // the assertion below can be exact. Mirrors clampMaxTabs (lib/graphTabs).
@@ -1297,12 +1297,12 @@ test.describe("@admin Graph tabs", () => {
         });
 
         for (let i = 0; i < limit + 2; i += 1) {
-            if (await page.getByTestId("graphTabAdd").isDisabled()) break;
+            if (await graph.addTabButton.isDisabled()) break;
             await graph.addStripTab();
         }
 
         await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(limit);
-        await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
+        await expect(graph.addTabButton).toBeDisabled();
     });
 
     // A share link carries the tab's graph and query, not its id, so it opens
