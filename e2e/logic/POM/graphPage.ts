@@ -759,6 +759,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("tableTab");
   }
 
+  protected get schemaTab(): Locator {
+    return this.page.getByTestId("schemaTab");
+  }
+
   private get metadataTab(): Locator {
     return this.page.getByTestId("metadataTab");
   }
@@ -1287,6 +1291,10 @@ export default class GraphPage extends BasePage {
 
   async clickGraphTab(): Promise<void> {
     await interactWhenVisible(this.graphTab, (el) => el.click(), "Graph Tab");
+  }
+
+  async clickSchemaTab(): Promise<void> {
+    await interactWhenVisible(this.schemaTab, (el) => el.click(), "schema tab");
   }
 
   // GRAPH TAB STRIP
