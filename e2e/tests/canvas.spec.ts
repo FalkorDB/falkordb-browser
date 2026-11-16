@@ -48,7 +48,8 @@ test.describe('Canvas Tests', () => {
             const searchQuery = `Person${node}`;
             await graph.searchElementInCanvas(searchQuery);
             await graph.hoverAtCanvasCenter();
-            expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
+            await expect(graph.nodeCanvasToolTip).toBeVisible();
+            await expect(graph.nodeCanvasToolTip).toHaveText(searchQuery);
             await apicalls.removeGraph(graphName);
         });
     });
@@ -153,7 +154,8 @@ test.describe('Canvas Tests', () => {
         await graph.getNodesScreenPositions();
         await graph.searchElementInCanvas("Alice");
         await graph.hoverAtCanvasCenter();
-        expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
+        await expect(graph.nodeCanvasToolTip).toBeVisible();
+        await expect(graph.nodeCanvasToolTip).toHaveText("Alice");
         await apicalls.removeGraph(graphName);
     });
 
@@ -171,7 +173,8 @@ test.describe('Canvas Tests', () => {
         await graph.searchTextAndSelectInCanvas("lic", "Alice");
         await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
-        expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
+        await expect(graph.nodeCanvasToolTip).toBeVisible();
+        await expect(graph.nodeCanvasToolTip).toHaveText("Alice");
         await apicalls.removeGraph(graphName);
     });
 
@@ -254,8 +257,8 @@ test.describe('Canvas Tests', () => {
         await graph.searchElementInCanvas("Bob");
         await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
-        expect(await graph.isNodeCanvasToolTipVisible());
-        expect(await graph.getNodeCanvasToolTip()).toBe("Bob");
+        await expect(graph.nodeCanvasToolTip).toBeVisible();
+        await expect(graph.nodeCanvasToolTip).toHaveText("Bob");
         await apicalls.removeGraph(graphName);
     });
 
@@ -590,10 +593,9 @@ test.describe('Canvas Tests', () => {
         const nodes = await graph.getNodesScreenPositions();
         expect(nodes.length).toBeGreaterThanOrEqual(2);
         await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
-        await graph.waitForTimeout(300);
 
         // Focus mode is active and a node is selected → non-selected nodes are dimmed
-        expect(await graph.isFocusActive()).toBe(true);
+        await expect.poll(() => graph.isFocusActive()).toBe(true);
         expect(await graph.getSelectionCount()).toBeGreaterThan(0);
 
         await apicalls.removeGraph(graphName);
@@ -616,8 +618,7 @@ test.describe('Canvas Tests', () => {
         }
         const nodes = await graph.getNodesScreenPositions();
         await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
-        await graph.waitForTimeout(300);
-        expect(await graph.isFocusActive()).toBe(true);
+        await expect.poll(() => graph.isFocusActive()).toBe(true);
 
         // Turn focus mode back off — dimming should be fully restored
         await graph.clickDimControl();
@@ -649,10 +650,10 @@ test.describe('Canvas Tests', () => {
         const links = await graph.getLinksScreenPositions();
         expect(links.length).toBeGreaterThan(0);
         await graph.clickCanvasElement(links[0].midX, links[0].midY);
-        await graph.waitForTimeout(300);
 
+        // Selection is deferred by the double-click window, so poll.
         // The selected link is in selectedElements → focus mode is active → Carol is dimmed
-        expect(await graph.isFocusActive()).toBe(true);
+        await expect.poll(() => graph.isFocusActive()).toBe(true);
         expect(await graph.getSelectionCount()).toBeGreaterThan(0);
 
         await apicalls.removeGraph(graphName);
@@ -799,7 +800,8 @@ test.describe('Canvas Tests', () => {
             expect(nodes.length).toBe(10);
             for (const node of nodes) {
                 await page.mouse.move(node.screenX, node.screenY);
-                expect(await graph.getNodeCanvasToolTip()).toBe(node.data.name);
+                await expect(graph.nodeCanvasToolTip).toBeVisible();
+                await expect(graph.nodeCanvasToolTip).toHaveText(node.data.name);
             }
 
             await graph.elementClick(nodes[0].screenX, nodes[0].screenY);

@@ -1,5 +1,5 @@
-import { Locator } from "@playwright/test";
-import { interactWhenVisible } from "@/e2e/infra/utils";
+import { Locator, expect } from "@playwright/test";
+import { interactWhenVisible, waitForElementToNotBeVisible } from "@/e2e/infra/utils";
 import HeaderComponent from "./headerComponent";
 
 export default class SettingsTokensPage extends HeaderComponent {
@@ -110,10 +110,6 @@ export default class SettingsTokensPage extends HeaderComponent {
   }
 
   // Helper methods
-  async waitFor(ms: number): Promise<void> {
-    await this.page.waitForTimeout(ms);
-  }
-
   getRowByText(text: string): Locator {
     return this.page.getByRole("row").filter({ hasText: text });
   }
@@ -257,12 +253,14 @@ export default class SettingsTokensPage extends HeaderComponent {
   async navigateToTokensTab(): Promise<void> {
     await this.waitForPageIdle();
     await this.clickTokensTab();
-    await this.waitFor(500);
+    // Rows are read without retrying, so wait for the list to finish loading.
+    await expect(
+      this.page.getByRole("table").or(this.page.getByText("No active tokens"))
+    ).toBeVisible();
   }
 
   async clickGenerateToken(): Promise<void> {
     await this.clickGenerateTokenButton();
-    await this.waitFor(300);
   }
 
   async fillTokenName(name: string): Promise<void> {
@@ -271,7 +269,6 @@ export default class SettingsTokensPage extends HeaderComponent {
 
   async selectExpiration(expiration: "30d" | "60d" | "90d" | "never"): Promise<void> {
     await this.clickExpirationSelect();
-    await this.waitFor(300);
     
     const expirationMap = {
       "30d": "30 days",
@@ -285,12 +282,11 @@ export default class SettingsTokensPage extends HeaderComponent {
 
   async confirmGenerateToken(): Promise<void> {
     await this.clickGenerateTokenConfirmButton();
-    await this.waitFor(1000);
   }
 
   async cancelGenerateToken(): Promise<void> {
     await this.clickCancelGenerateButton();
-    await this.waitFor(300);
+    await waitForElementToNotBeVisible(this.generateTokenConfirmButton);
   }
 
   async generateToken(name: string, expiration: "30d" | "60d" | "90d" | "never" = "never"): Promise<string | null> {
@@ -298,10 +294,6 @@ export default class SettingsTokensPage extends HeaderComponent {
     await this.fillTokenName(name);
     await this.selectExpiration(expiration);
     await this.confirmGenerateToken();
-    
-    // Wait for token to be generated and displayed
-    await this.waitFor(1000);
-    
     const token = await this.getGeneratedToken();
     return token;
   }
@@ -317,13 +309,12 @@ export default class SettingsTokensPage extends HeaderComponent {
   async copyToken(): Promise<string | null> {
     const token = await this.getGeneratedToken();
     await this.clickCopyTokenButton();
-    await this.waitFor(300);
     return token;
   }
 
   async dismissTokenDisplay(): Promise<void> {
     await this.clickDismissTokenButton();
-    await this.waitFor(300);
+    await waitForElementToNotBeVisible(this.dismissTokenButton);
   }
 
   async verifyTokenExists(name: string): Promise<boolean> {
@@ -348,12 +339,14 @@ export default class SettingsTokensPage extends HeaderComponent {
   async revokeToken(name: string): Promise<void> {
     await this.clickRevokeButtonByName(name);
     await this.clickRevokeConfirmButton();
-    await this.waitFor(1000);
+    // The open dialog hides the table from role queries, so check the include-hidden row.
+    await expect(this.revokeConfirmButton).toBeHidden();
+    await expect(this.rowBehindDialog(name)).toHaveCount(0);
   }
 
   async cancelRevokeToken(): Promise<void> {
     await this.clickCancelRevokeButton();
-    await this.waitFor(300);
+    await waitForElementToNotBeVisible(this.revokeConfirmButton);
   }
 
   async isGenerateButtonDisabled(): Promise<boolean> {
