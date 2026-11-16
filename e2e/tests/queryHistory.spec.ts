@@ -6,6 +6,26 @@ import urls from '../config/urls.json';
 import QueryHistory from "../logic/POM/queryHistoryComponent";
 import { getRandomString } from "../infra/utils";
 
+/**
+ * Runs `body`, then removes `graphs` (read after `body`, so it may add to the list).
+ * removeGraph resolves with the HTTP status instead of throwing on error responses, so check it;
+ * a leak fails the test only when the body passed, so cleanup never replaces the test's own error.
+ */
+async function withGraphCleanup(apicalls: ApiCalls, graphs: string[], body: () => Promise<void>): Promise<void> {
+    let bodyFailed = true;
+    try {
+        await body();
+        bodyFailed = false;
+    } finally {
+        const results = await Promise.allSettled(graphs.map((name) => apicalls.removeGraph(name, "admin")));
+        const failures = results.flatMap((result, index) => {
+            if (result.status === "rejected") return [`${graphs[index]}: ${String(result.reason)}`];
+            return result.value.status >= 400 ? [`${graphs[index]}: HTTP ${result.value.status}`] : [];
+        });
+        if (failures.length > 0 && !bodyFailed) throw new Error(`Failed to remove graph(s): ${failures.join("; ")}`);
+    }
+}
+
 test.describe('Query history Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
@@ -186,7 +206,7 @@ test.describe('Query history Tests', () => {
     test(`@admin favorite filter shows only favorites and clearing the selected favorite removes the star`, async () => {
         const graphName = getRandomString('queryhistory');
         await apicalls.addGraph(graphName);
-        try {
+        await withGraphCleanup(apicalls, [graphName], async () => {
             const tag = getRandomString('fav');
             const [plainA, favorite, plainB] = [`RETURN '${tag}-a'`, `RETURN '${tag}-b'`, `RETURN '${tag}-c'`];
             const favoriteName = `name-${tag}`;
@@ -219,15 +239,13 @@ test.describe('Query history Tests', () => {
 
             await graph.clickHistoryFavFilter();
             await expect(graph.selectQueryHistory(favorite)).toHaveCount(0);
-        } finally {
-            await apicalls.removeGraph(graphName, "admin");
-        }
+        });
     });
 
     test(`@admin delete selected removes only those entries`, async () => {
         const graphName = getRandomString('queryhistory');
         await apicalls.addGraph(graphName);
-        try {
+        await withGraphCleanup(apicalls, [graphName], async () => {
             const tag = getRandomString('delete');
             const [deletedA, deletedB, kept] = [`RETURN '${tag}-a'`, `RETURN '${tag}-b'`, `RETURN '${tag}-c'`];
             const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
@@ -252,15 +270,13 @@ test.describe('Query history Tests', () => {
             const stored = await graph.getStoredQueryHistory();
             expect(stored).not.toContain(deletedA);
             expect(stored).not.toContain(deletedB);
-        } finally {
-            await apicalls.removeGraph(graphName, "admin");
-        }
+        });
     });
 
     test(`@admin export selected downloads a .cypher file with those queries`, async () => {
         const graphName = getRandomString('queryhistory');
         await apicalls.addGraph(graphName);
-        try {
+        await withGraphCleanup(apicalls, [graphName], async () => {
             const tag = getRandomString('export');
             const [exportedA, exportedB, skipped] = [`RETURN '${tag}-a'`, `RETURN '${tag}-b'`, `RETURN '${tag}-c'`];
             const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
@@ -277,17 +293,14 @@ test.describe('Query history Tests', () => {
             expect(content).toBe(
                 `// graph: ${graphName}\n${exportedA}\n;\n\n// graph: ${graphName}\n${exportedB}\n;\n`
             );
-        } finally {
-            await apicalls.removeGraph(graphName, "admin");
-        }
+        });
     });
 
     test(`@admin search and graph filter narrow the list; select-all affects visible rows only`, async () => {
         const firstGraph = getRandomString('queryhistory');
         const secondGraph = getRandomString('queryhistory');
         const created: string[] = [];
-        let bodyFailed = true;
-        try {
+        await withGraphCleanup(apicalls, created, async () => {
             await apicalls.addGraph(firstGraph);
             created.push(firstGraph);
             await apicalls.addGraph(secondGraph);
@@ -330,23 +343,13 @@ test.describe('Query history Tests', () => {
             await expect(graph.selectQueryHistory(beta)).toBeVisible();
             await expect(graph.historySelectedCount).toHaveText("1");
             await expect(graph.historySelectAllButton).toHaveAttribute("aria-label", "Select all queries");
-            bodyFailed = false;
-        } finally {
-            const results = await Promise.allSettled(created.map((name) => apicalls.removeGraph(name, "admin")));
-            const failures = results.flatMap((result, index) => {
-                if (result.status === "rejected") return [`${created[index]}: ${String(result.reason)}`];
-                // removeGraph resolves with the HTTP status instead of throwing on error responses
-                return result.value.status >= 400 ? [`${created[index]}: HTTP ${result.value.status}`] : [];
-            });
-            // Only fail on a leak when the body passed, so cleanup never replaces the test's own error
-            if (failures.length > 0 && !bodyFailed) throw new Error(`Failed to remove graph(s): ${failures.join("; ")}`);
-        }
+        });
     });
 
     test(`@admin wrap lines toggles; editing a history query and running it adds a new entry`, async () => {
         const graphName = getRandomString('queryhistory');
         await apicalls.addGraph(graphName);
-        try {
+        await withGraphCleanup(apicalls, [graphName], async () => {
             const tag = getRandomString('edit');
             const [original, edited] = [`RETURN '${tag}-original'`, `RETURN '${tag}-edited'`];
             const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
@@ -373,9 +376,7 @@ test.describe('Query history Tests', () => {
             await graph.clickQueryHistoryButton();
             await expect(graph.selectQueryHistory(edited)).toBeVisible();
             await expect(graph.selectQueryHistory(original)).toBeVisible();
-        } finally {
-            await apicalls.removeGraph(graphName, "admin");
-        }
+        });
     });
 
 });
