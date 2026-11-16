@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { createServer } from "node:http";
 import GraphPage from "../logic/POM/graphPage";
 import AiAssistComponent from "../logic/POM/aiAssistComponent";
-import { getRandomString, initializeLocalStorage } from "../infra/utils";
+import { getRandomString, initializeLocalStorage, waitForChatKeyMigration } from "../infra/utils";
 import configuredUrls from "../config/urls.json";
 
 const baseUrl = process.env.E2E_BASE_URL ?? configuredUrls.localHost;
@@ -171,6 +171,7 @@ test("@admin optimize asks for per-request guidance without a remembered-consent
     await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const ai = new AiAssistComponent(page);
     await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+    await waitForChatKeyMigration(page);
     for (const guidance of ["Prioritize latency.", ""]) {
       await ai.openOptimize();
       await expect(ai.optimizeGuidance).toHaveValue("");
