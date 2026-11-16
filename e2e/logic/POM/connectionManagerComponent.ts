@@ -71,7 +71,7 @@ export default class ConnectionManagerComponent extends BasePage {
 
     // Tells connections of the same user apart by the server port in their label.
     connectionOnPort(port: number): Locator {
-        return this.connectionItems.filter({ hasText: new RegExp(`@[^:]+:${port}`) });
+        return this.connectionItems.filter({ hasText: new RegExp(`@[^:]+:${port}(?!\\d)`) });
     }
 
     activeMarkerOnPort(port: number): Locator {

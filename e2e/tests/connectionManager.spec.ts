@@ -133,6 +133,7 @@ test.describe("Connection Manager Tests: own session", () => {
     expect(primaryId).toBeTruthy();
     await manager.closeDropdown();
     let secondaryId: string | undefined;
+    let cleanup: PromiseSettledResult<number>[] = [];
     try {
       await apiCall.addGraphOnConnection(page.request, primaryGraph, primaryId!);
       await manager.submitAdditionalConnection(ADMIN_USERNAME, "", SECONDARY_SERVER);
@@ -161,11 +162,13 @@ test.describe("Connection Manager Tests: own session", () => {
       await switchConnection(PRIMARY_PORT, primaryId!, primaryGraph);
       await switchConnection(SECONDARY_SERVER.port, secondaryId!, secondaryGraph);
     } finally {
-      await Promise.allSettled([
+      cleanup = await Promise.allSettled([
         apiCall.removeGraphOnConnection(page.request, primaryGraph, primaryId!),
-        secondaryId ? apiCall.removeGraphOnConnection(page.request, secondaryGraph, secondaryId) : undefined,
+        ...(secondaryId ? [apiCall.removeGraphOnConnection(page.request, secondaryGraph, secondaryId)] : []),
       ]);
     }
+    // Reached only when the scenario passed, so a cleanup failure never masks its error.
+    expect(cleanup.map((result) => (result.status === "fulfilled" ? result.value : result.reason))).toEqual(cleanup.map(() => 200));
   });
 
   test.describe("with an added read-write connection", () => {
@@ -249,6 +252,9 @@ test.describe("Connection Manager Tests: own session", () => {
       await expect(manager.connectionItems).toHaveCount(2);
       await expect(manager.activeMarkerForUser(READ_WRITE_USERNAME)).toHaveCount(1);
       expect(deleteRequests).toEqual([]);
+      const keptSession = await manager.getSession();
+      expect(keptSession.ok()).toBe(true);
+      expect(await keptSession.json()).toMatchObject({ activeConnectionId: secondaryId, user: { role: user.ReadWrite } });
       await manager.requestRemoval(ADMIN_USERNAME);
       await manager.confirmRemoval();
       await expect(manager.logoutDialog).toBeHidden();
