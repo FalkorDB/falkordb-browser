@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { once } from "node:events";
 import FileTokenStorage from "./FileTokenStorage.ts";
 import type { TokenData } from "./ITokenStorage.ts";
 
@@ -63,6 +64,62 @@ test("concurrent first use never truncates an existing token file", async (t) =>
     assert.equal((JSON.parse(await fs.readFile(file, "utf8")) as { tokens: TokenData[] }).tokens.length, 10);
 });
 
+test("paused first-use initialization never exposes a partial snapshot to another process", async (t) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-paused-init-test-"));
+    const file = path.join(dir, "tokens.json");
+    t.after(async () => {
+        for (const name of await fs.readdir(dir)) await fs.unlink(path.join(dir, name));
+        await fs.rmdir(dir);
+    });
+    const worker = `
+        import { promises as fs } from "node:fs";
+        import FileTokenStorage from ${JSON.stringify(new URL("./FileTokenStorage.ts", import.meta.url).href)};
+        const writeFile = fs.writeFile;
+        let first = true;
+        fs.writeFile = async (target, content, options) => {
+            if (!first) return writeFile(target, content, options);
+            first = false;
+            await writeFile(target, "", options);
+            process.stdout.write("initializing\\n");
+            await new Promise(resolve => process.stdin.once("data", resolve));
+            process.stdin.pause();
+            return writeFile(target, content, { ...options, flag: "w" });
+        };
+        await new FileTokenStorage(process.argv[1]).createToken(JSON.parse(process.argv[2]));
+    `;
+    const initializer = execute(process.execPath, [
+        "--input-type=module", "-e", worker, file, JSON.stringify(token("first")),
+    ], { timeout: 10_000 });
+    const { stdout, stdin } = initializer.child;
+    assert.ok(stdout && stdin);
+    const initialized = once(stdout, "data");
+    const completed = initializer.then(() => undefined);
+    await Promise.race([initialized, completed.then(() => { throw new Error("Initializer exited before pausing"); })]);
+    let competingWrite: Promise<void> | undefined;
+    let competingRead: Promise<TokenData | null> | undefined;
+    try {
+        const attemptedLock = Promise.withResolvers<void>();
+        const mkdir = fs.mkdir;
+        t.mock.method(fs, "mkdir", async (...args: Parameters<typeof fs.mkdir>) => {
+            if (args[0] === `${file}.lock`) attemptedLock.resolve();
+            return mkdir(...args);
+        });
+        const competingStorage = new FileTokenStorage(file);
+        competingWrite = competingStorage.createToken(token("second"));
+        competingRead = competingStorage.fetchTokenById("first");
+        await attemptedLock.promise;
+        await assert.rejects(fs.readFile(file, "utf8"), { code: "ENOENT" });
+    } finally {
+        stdin.end("continue");
+        await completed;
+        await Promise.all([competingWrite, competingRead]);
+    }
+    const storage = new FileTokenStorage(file);
+    assert.ok(await storage.fetchTokenById("first"));
+    assert.ok(await storage.fetchTokenById("second"));
+    assert.deepEqual(await fs.readdir(dir), ["tokens.json"]);
+});
+
 test("corrupt storage rejects writes instead of replacing all records with an empty snapshot", async (t) => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-corrupt-test-"));
     const file = path.join(dir, "tokens.json");
@@ -74,6 +131,45 @@ test("corrupt storage rejects writes instead of replacing all records with an em
         assert.equal(await fs.readFile(file, "utf8"), contents);
     }
 });
+
+test("initial publication failure releases the lock and allows a later initialization", async (t) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-init-failure-test-"));
+    const file = path.join(dir, "tokens.json");
+    t.after(async () => {
+        for (const name of await fs.readdir(dir)) await fs.unlink(path.join(dir, name));
+        await fs.rmdir(dir);
+    });
+    t.mock.method(console, "error", () => {});
+    const rename = t.mock.method(fs, "rename", async () => { throw new Error("publication failed"); });
+    const storage = new FileTokenStorage(file);
+    await assert.rejects(storage.createToken(token("first")), /Failed to save tokens/);
+    assert.deepEqual(await fs.readdir(dir), []);
+    rename.mock.restore();
+    assert.equal(await storage.fetchTokenById("first"), null);
+    await storage.createToken(token("second"));
+    assert.ok(await storage.fetchTokenById("second"));
+});
+
+for (const target of ["directory", "file"] as const) {
+    test(`storage ${target} permission failures are explicit and preserve records`, async (t) => {
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-permission-test-"));
+        const file = path.join(dir, "tokens.json");
+        t.after(async () => { await fs.unlink(file); await fs.rmdir(dir); });
+        const storage = new FileTokenStorage(file);
+        await storage.createToken(token("existing"));
+        const before = await fs.readFile(file, "utf8");
+        const log = t.mock.method(console, "error", () => {});
+        const chmod = fs.chmod;
+        const deniedPath = target === "directory" ? dir : file;
+        t.mock.method(fs, "chmod", async (name: Parameters<typeof fs.chmod>[0], mode: Parameters<typeof fs.chmod>[1]) => {
+            if (name === deniedPath) throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+            return chmod(name, mode);
+        });
+        await assert.rejects(storage.fetchTokenById("existing"), /Failed to initialize token storage file/);
+        assert.equal(await fs.readFile(file, "utf8"), before);
+        assert.equal(log.mock.callCount(), 1);
+    });
+}
 
 test("a failed atomic replacement preserves the previous snapshot and releases the lock", async (t) => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-rename-test-"));

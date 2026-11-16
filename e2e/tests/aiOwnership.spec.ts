@@ -99,7 +99,7 @@ for (const invalidation of ["edit", "tab-switch"] as const) {
     await expect(ai.fixWithAiButton).toBeVisible();
 
     if (invalidation === "edit") {
-      await ai.insertQuery("RETURN 99");
+      await ai.editQueryKeepingToast("RETURN 99");
       await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 99");
     } else {
       await ai.addTabButton.click();

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import urls from "../config/urls.json";
 import { getSSEGraphResult } from "../logic/api/apiCalls";
 
@@ -42,6 +42,16 @@ test("@admin Query transports enforce read-only profiling and preserve SSE error
 
     expect((await request.post(`/api/graph/${graph}`)).ok()).toBe(true);
     created = true;
+    const emptyBody = await request.post(`/api/graph/${graph}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(emptyBody.status()).toBe(200);
+    expect(await emptyBody.json()).toEqual({ message: "Graph created successfully" });
+    const malformedBody = await request.post(`/api/graph/${graph}`, {
+      headers: { "Content-Type": "application/json" },
+      data: Buffer.from("{"),
+    });
+    expect(malformedBody.status()).toBe(400);
     const profile = await request.post(`/api/graph/${graph}/profile?readOnly=true`, {
       data: { query: "CREATE (:Forbidden)", timeout: 1 },
     });

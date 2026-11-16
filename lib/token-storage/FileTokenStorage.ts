@@ -30,7 +30,7 @@ class FileTokenStorage implements ITokenStorage {
    */
   private withLock<T>(op: () => Promise<T>): Promise<T> {
     const locked = async () => {
-      await this.ensureFileExists();
+      await this.ensureDirectoryExists();
       const lockPath = `${this.filePath}.lock`;
       const deadline = Date.now() + 10_000;
       while (true) {
@@ -46,6 +46,7 @@ class FileTokenStorage implements ITokenStorage {
         }
       }
       try {
+        await this.ensureFileExists(true);
         return await op();
       } finally {
         try {
@@ -69,29 +70,35 @@ class FileTokenStorage implements ITokenStorage {
     }
   }
 
-  /**
-   * Ensures the storage file and directory exist
-   */
-  private async ensureFileExists(): Promise<void> {
+  private async ensureDirectoryExists(): Promise<void> {
     try {
       // Ensure directory exists with restrictive permissions (owner-only)
       const dir = path.dirname(this.filePath);
       await fs.mkdir(dir, { recursive: true, mode: 0o700 });
       // Enforce permissions on pre-existing directory
       await fs.chmod(dir, 0o700);
-
-      try {
-        await fs.writeFile(this.filePath, JSON.stringify({ tokens: [] }, null, 2), {
-          encoding: 'utf8', mode: 0o600, flag: 'wx',
-        });
-      } catch (error) {
-        if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
-      }
-      await fs.chmod(this.filePath, 0o600);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to ensure token storage file exists:', error);
       throw new Error('Failed to initialize token storage file');
+    }
+  }
+
+  private async ensureFileExists(lockHeld = false): Promise<void> {
+    await this.ensureDirectoryExists();
+    try {
+      await fs.chmod(this.filePath, 0o600);
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+        console.error('Failed to access token storage file:', error);
+        throw new Error('Failed to initialize token storage file', { cause: error });
+      }
+      if (lockHeld) {
+        await this.writeTokens([]);
+      } else {
+        // The lock holder checks again and atomically publishes the initial snapshot.
+        await this.withLock(() => Promise.resolve());
+      }
     }
   }
 

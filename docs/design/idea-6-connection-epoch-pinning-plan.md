@@ -15,6 +15,19 @@ breaking.**
 
 ## 0. Background — primitives that already exist
 
+### Tab restoration during connection bootstrap
+
+`useGraphTabs` in `app/providers.tsx` uses the active connection ID as its
+connection key, falling back to the signed session's prefix connection ID only
+while initial connection discovery has not supplied an active ID. Restoration
+requires a non-null ID and a ready storage prefix. Once an active ID exists, it
+must match the prefix ID; a pending connection switch cannot restore another
+connection's tabs. Graph-list, timeout, and tutorial recovery readiness still
+control when restoration may finish.
+
+The delayed-discovery and create-dialog scenarios in `e2e/tests/graphTabs.spec.ts`
+cover this bootstrap window as well as loss of readiness during restoration.
+
 `lib/utils.ts`
 - `_activeConnectionId` — injected as `X-Connection-Id` by `securedFetch`, `uploadFileWithProgress`,
   `getSSEGraphResult`, `getMetaStats`, `getMemoryUsage`. A request **snapshots** it **synchronously

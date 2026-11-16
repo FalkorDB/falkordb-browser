@@ -8,7 +8,6 @@ const DISCOVERY_ROUTE = "**/api/connections/preconfigured";
 // next-auth appends the authorization params to the callback, so the pattern
 // has to survive the empty "?" it leaves behind on a plain credentials sign-in.
 const SIGN_IN_ROUTE = "**/api/auth/callback/credentials*";
-const VALIDATE_URL_ROUTE = "**/api/validate-url";
 
 const signInFields = (request: Request) => {
     const body = request.postData();
@@ -54,7 +53,7 @@ test.describe("@admin Login connection details", () => {
         // Exercise the real form/signIn client without needing a database or
         // creating sessions that could affect parallel login tests.
         await page.route(SIGN_IN_ROUTE, route =>
-            route.fulfill({ json: { url: `${urls.loginUrl}?error=CredentialsSignin` } }));
+            route.fulfill({ json: { url: `${urls.loginUrl}?error=CredentialsSignin&code=invalid_credentials` } }));
         await page.goto(urls.loginUrl);
         await expect(login.portField).toBeVisible();
     });
@@ -95,19 +94,20 @@ test.describe("@admin Login connection details", () => {
         await expect(login.falkordbUrlField).toHaveValue("falkor://other%25:next%40password@other.example:6381");
     });
 
-    // The real /api/validate-url answers { result: false } without connecting
-    // for any URL that carries credentials, so the form goes on to sign in.
-    test("submits decoded URL credentials after URL validation", async ({ page }) => {
+    test("submits decoded URL credentials without a separate probe", async ({ page }) => {
         const url = "rediss://user%25:pass%40word@db.example:6380";
-        const validated = page.waitForRequest(VALIDATE_URL_ROUTE);
+        const probes: string[] = [];
+        page.on("request", request => {
+            if (new URL(request.url()).pathname === "/api/validate-url") probes.push(request.url());
+        });
         const signedIn = page.waitForRequest(SIGN_IN_ROUTE);
         await login.connectWithUrl(url);
-        expect((await validated).postDataJSON()).toEqual({ url });
         const body = signInFields(await signedIn);
         expect(Object.fromEntries(["host", "port", "username", "password", "tls"].map(key => [key, body.get(key)]))).toEqual({
             host: "db.example", port: "6380", username: "user%", password: "pass@word", tls: "true",
         });
         await expect(login.credentialsErrorMessage).toBeVisible();
+        expect(probes).toEqual([]);
     });
 
     for (const { title, field, remove, missingPairError } of [

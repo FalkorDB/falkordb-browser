@@ -4,7 +4,7 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import { readOwnedTutorialGraphs } from "../infra/tutorialGraphs";
 import GraphPage from "../logic/POM/graphPage";
 import ApiCalls from "../logic/api/apiCalls";
-import { getRandomString } from "../infra/utils";
+import { getQueryRequestParam, getRandomString } from "../infra/utils";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
 import { INITIAL_TAB_ID, tabScopedKey } from "../../lib/graphTabs";
 
@@ -126,7 +126,7 @@ test.describe("@admin Graph tabs", () => {
         await graph.selectGraphByName(graphOne);
         await graph.insertQuery("MATCH (n) RETURN n");
         const firstRun = page.waitForResponse(response =>
-            new URL(response.url()).searchParams.get("query")?.startsWith("MATCH (n) RETURN n") === true,
+            getQueryRequestParam(response.request(), "query")?.startsWith("MATCH (n) RETURN n") === true,
         );
         await graph.clickRunQuery();
         await firstRun;
@@ -147,17 +147,17 @@ test.describe("@admin Graph tabs", () => {
         });
         // The empty selector is disabled, so recovery comes from the periodic refresh.
         await page.evaluate(() => localStorage.setItem("refreshInterval", "1"));
-        const isRestoredQuery = (requestUrl: string) => {
-            const url = new URL(requestUrl);
+        const isRestoredQuery = (request: import("@playwright/test").Request) => {
+            const url = new URL(request.url());
             return url.pathname === `/api/graph/${graphOne}`
-                && url.searchParams.get("query")?.startsWith("MATCH (n) RETURN n") === true;
+                && getQueryRequestParam(request, "query")?.startsWith("MATCH (n) RETURN n") === true;
         };
         const restoredQueries: string[] = [];
         // Info and count polls run GRAPH.QUERY on a writable connection, which
         // would re-create the graph if it had been dropped.
         const graphPolls: string[] = [];
         page.on("request", request => {
-            if (isRestoredQuery(request.url())) restoredQueries.push(request.url());
+            if (isRestoredQuery(request)) restoredQueries.push(request.url());
             const { pathname } = new URL(request.url());
             if (pathname === `/api/graph/${graphOne}` || pathname.startsWith(`/api/graph/${graphOne}/`)) graphPolls.push(request.url());
         });
@@ -182,7 +182,7 @@ test.describe("@admin Graph tabs", () => {
         await expect.poll(() => graphPolls.length, { timeout: 15000 }).toBeGreaterThan(0);
         expect(restoredQueries).toHaveLength(0);
 
-        const restoredQuery = page.waitForRequest(request => isRestoredQuery(request.url()));
+        const restoredQuery = page.waitForRequest(isRestoredQuery);
         await page.reload({ waitUntil: "domcontentloaded" });
         await restoredQuery;
         await expect(graph.stripTab(graphOne)).toBeVisible();
@@ -430,7 +430,7 @@ test.describe("@admin Graph tabs", () => {
         await graph.selectGraphByName(graphOne);
         await graph.insertQuery("MATCH (n) RETURN n");
         const firstRun = page.waitForResponse(response =>
-            new URL(response.url()).searchParams.get("query")?.startsWith("MATCH (n) RETURN n") === true,
+            getQueryRequestParam(response.request(), "query")?.startsWith("MATCH (n) RETURN n") === true,
         );
         await graph.clickRunQuery();
         await firstRun;
@@ -463,7 +463,7 @@ test.describe("@admin Graph tabs", () => {
         });
         page.on("request", request => {
             const url = new URL(request.url());
-            if (url.pathname === `/api/graph/${graphOne}` && url.searchParams.get("query")?.startsWith("MATCH (n) RETURN n")) {
+            if (url.pathname === `/api/graph/${graphOne}` && getQueryRequestParam(request, "query")?.startsWith("MATCH (n) RETURN n")) {
                 restoredQueries.push(request.url());
             }
         });
@@ -471,7 +471,7 @@ test.describe("@admin Graph tabs", () => {
             const restoredQuery = page.waitForResponse(response => {
                 const url = new URL(response.url());
                 return url.pathname === `/api/graph/${graphOne}`
-                    && url.searchParams.get("query")?.startsWith("MATCH (n) RETURN n") === true;
+                    && getQueryRequestParam(response.request(), "query")?.startsWith("MATCH (n) RETURN n") === true;
             });
             await page.reload({ waitUntil: "domcontentloaded" });
             await restoredQuery;
@@ -496,6 +496,26 @@ test.describe("@admin Graph tabs", () => {
             releaseDiscovery();
             releaseRefresh();
         }
+    });
+
+    test("A failed connection discovery preserves signed-session tab restoration and persistence", async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await graph.selectGraphByName(graphOne);
+        let failedDiscoveries = 0;
+        await page.route("**/api/connections", route => {
+            failedDiscoveries += 1;
+            return route.fulfill({ status: 503, json: { message: "Temporarily unavailable" } });
+        });
+        await page.reload();
+        await expect.poll(() => failedDiscoveries).toBeGreaterThan(0);
+        await expect(graph.stripTab(graphOne)).toBeVisible();
+        await graph.insertQuery("RETURN 42");
+        await expect(graph.editorContainer).toHaveAttribute("data-value", "RETURN 42");
+        await graph.waitForPageIdle();
+        await page.reload();
+        await expect(graph.stripTab(graphOne)).toBeVisible();
+        await expect(graph.editorContainer).toHaveAttribute("data-value", "RETURN 42");
     });
 
     test("A graph created during same-connection discovery is selected after bootstrap", async () => {
@@ -902,7 +922,7 @@ test.describe("@admin Graph tabs", () => {
 
         await graph.selectGraphByName(graphOne);
         await graph.insertQuery("MATCH (n) RETURN n");
-        const firstRun = page.waitForResponse((response) => new URL(response.url()).searchParams.get("query")?.startsWith("MATCH (n) RETURN n") ?? false);
+        const firstRun = page.waitForResponse((response) => getQueryRequestParam(response.request(), "query")?.startsWith("MATCH (n) RETURN n") ?? false);
         await graph.clickRunQuery();
         await firstRun;
         await graph.waitForPageIdle();
@@ -918,11 +938,11 @@ test.describe("@admin Graph tabs", () => {
             await route.fulfill({ json: { configs: [["TIMEOUT_MAX", 12000]] } });
         });
 
-        const restoredQueries: URL[] = [];
+        const restoredQueries: string[] = [];
         page.on("request", (request) => {
             const url = new URL(request.url());
-            if (/^\/api\/graph\/[^/]+$/.test(url.pathname) && url.searchParams.get("query")?.startsWith("MATCH (n) RETURN n")) {
-                restoredQueries.push(url);
+            if (/^\/api\/graph\/[^/]+$/.test(url.pathname) && getQueryRequestParam(request, "query")?.startsWith("MATCH (n) RETURN n")) {
+                restoredQueries.push(getQueryRequestParam(request, "timeout")!);
             }
         });
 
@@ -946,8 +966,8 @@ test.describe("@admin Graph tabs", () => {
             await expect.poll(() => restoredQueries.length, { timeout: 15000 }).toBeGreaterThan(0);
             expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
             await expect.poll(() => graph.getStripTabCount()).toBe(1);
-            for (const url of restoredQueries) {
-                expect(Number(url.searchParams.get("timeout"))).toBe(12);
+            for (const timeout of restoredQueries) {
+                expect(Number(timeout)).toBe(12);
             }
         } finally {
             releaseConfig();
@@ -962,7 +982,7 @@ test.describe("@admin Graph tabs", () => {
         await graph.selectGraphByName(graphOne);
         await graph.insertQuery("MATCH (n) RETURN n");
         const firstRun = page.waitForResponse((response) =>
-            new URL(response.url()).searchParams.get("query")?.startsWith("MATCH (n) RETURN n") ?? false,
+            getQueryRequestParam(response.request(), "query")?.startsWith("MATCH (n) RETURN n") ?? false,
         );
         await graph.clickRunQuery();
         await firstRun;
@@ -975,12 +995,12 @@ test.describe("@admin Graph tabs", () => {
         const restoredQuery = page.waitForRequest((request) => {
             const url = new URL(request.url());
             return /^\/api\/graph\/[^/]+$/.test(url.pathname)
-                && url.searchParams.get("query")?.startsWith("MATCH (n) RETURN n") === true;
+                && getQueryRequestParam(request, "query")?.startsWith("MATCH (n) RETURN n") === true;
         });
         await page.reload({ waitUntil: "domcontentloaded" });
         const request = await restoredQuery;
         expect(new URL(page.url()).searchParams.get("tab")).toBe(savedTabId);
-        expect(new URL(request.url()).searchParams.get("timeout")).toBe("60");
+        expect(getQueryRequestParam(request, "timeout")).toBe("60");
         await expect(graph.stripTab(graphOne)).toBeVisible();
     });
 
@@ -1010,7 +1030,7 @@ test.describe("@admin Graph tabs", () => {
         });
         const defaultRun = page.waitForRequest(request => {
             const url = new URL(request.url());
-            return url.pathname === `/api/graph/${graphOne}` && url.searchParams.get("query") === defaultQuery;
+            return url.pathname === `/api/graph/${graphOne}` && getQueryRequestParam(request, "query") === defaultQuery;
         }, { timeout: 15000 });
         try {
             await page.goto(urls.graphUrl);
@@ -1151,7 +1171,7 @@ test.describe("@admin Graph tabs", () => {
             const graph = await browser.createNewPage(TutorialPanel, urls.graphUrl);
             const page = await browser.getPage();
             await graph.selectGraphByName(graphOne);
-            await graph.insertQuery("MATCH (n) RETURN n");
+            await graph.insertQuery("MATCH (n:RestorationClose) RETURN n");
             await graph.clickRunQuery();
             await graph.waitForPageIdle();
             if (create) {

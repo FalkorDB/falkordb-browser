@@ -122,7 +122,8 @@ active connection; it never reconstructs missing records or opens a client to
 the user's database. Reading the record may open a token-store database client.
 The UI signs out when no stored connections remain.
 
-File-backed token storage uses atomic replacements and an exclusive
+File-backed token storage uses atomic publication (including the initial empty
+snapshot), atomic replacements, and an exclusive
 `<token-file>.lock` directory (the full configured token path with `.lock`
 appended; by default `.data/api_tokens.json.lock`) to serialize
 writers. A writer waits up to 10 seconds for the lock, then fails explicitly.
@@ -375,6 +376,9 @@ Custom expiration dates use the selected local calendar day, ending at
 
 Graph editing waits for saved tabs and the query timeout to initialize for the
 current connection, while information panels and Chat remain accessible.
+During initial connection discovery, restoration uses the signed session's
+connection ID until the active connection is loaded. A connection switch never
+restores tabs from a different connection's storage prefix.
 If timeout configuration does not respond within five seconds, restoration uses
 the 60-second fallback.
 

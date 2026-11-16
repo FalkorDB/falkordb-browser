@@ -14,6 +14,46 @@ const swaggerSpec = {
         bearerFormat: "JWT",
         description: "JWT token obtained from the login endpoint",
       },
+      sessionCookie: {
+        type: "apiKey",
+        in: "cookie",
+        name: "authjs.session-token",
+        description: "Browser session cookie; named __Secure-authjs.session-token on HTTPS deployments",
+      },
+    },
+    schemas: {
+      SessionConnection: {
+        type: "object",
+        required: ["id", "role", "host", "port", "tls"],
+        properties: {
+          id: { type: "string" },
+          username: { type: "string" },
+          role: { type: "string", enum: ["Admin", "Read-Write", "Read-Only"] },
+          host: { type: "string" },
+          port: { type: "integer" },
+          tls: { type: "boolean" },
+          ca: { type: "string" },
+          cert: { type: "string" },
+        },
+      },
+      AddConnectionError: {
+        type: "object",
+        required: ["message", "code"],
+        properties: {
+          code: {
+            type: "string",
+            enum: ["credentials_required", "invalid_credentials", "connection_failed"],
+          },
+          message: {
+            type: "string",
+            enum: [
+              "This database requires credentials. Please enter your username and password.",
+              "Invalid credentials. Please check your username and password.",
+              "Could not connect to the database. Please check your connection settings and server logs.",
+            ],
+          },
+        },
+      },
     },
   },
   security: [
@@ -52,6 +92,136 @@ const swaggerSpec = {
     }
   ],
   paths: {
+    "/api/auth/migrate-session": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Validate the session's stored active connection",
+        description: "Compatibility endpoint: returns an existing usable connection owned by this session. Never recreates a missing or revoked connection and never connects to the user's database. Cookie requests require a trusted Origin or same-origin Fetch Metadata.",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": {
+            description: "The stored connection remains usable",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["connection"],
+                  properties: { connection: { $ref: "#/components/schemas/SessionConnection" } },
+                },
+              },
+            },
+          },
+          "401": {
+            description: "No usable stored active connection; sign in again",
+            headers: {
+              "X-Session-Invalid": { schema: { type: "string", enum: ["1"] } },
+            },
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["message", "code"],
+                  properties: {
+                    message: { type: "string", enum: ["No active connection. Please sign in again."] },
+                    code: { type: "string", enum: ["SESSION_INVALID"] },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Untrusted request origin" },
+          "500": { description: "Stored connection validation failed" },
+        },
+      },
+    },
+    "/api/connections": {
+      get: {
+        tags: ["Authentication"],
+        summary: "List the current session's connections",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": {
+            description: "Stored connections",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["connections"],
+                  properties: {
+                    connections: { type: "array", items: { $ref: "#/components/schemas/SessionConnection" } },
+                  },
+                },
+              },
+            },
+          },
+          "401": { description: "Not authenticated" },
+          "400": { description: "Untrusted request origin" },
+          "500": { description: "Internal server error" },
+        },
+      },
+      post: {
+        tags: ["Authentication"],
+        summary: "Add a connection to the current session",
+        description: "Connect with another ACL user. Cookie requests require a trusted Origin or same-origin Fetch Metadata. Classified failures return safe messages, not raw database errors.",
+        security: [{ sessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  host: { type: "string", description: "Defaults to the session's host" },
+                  port: { oneOf: [{ type: "string" }, { type: "number" }] },
+                  username: { type: "string" },
+                  password: { type: "string", format: "password" },
+                  tls: { oneOf: [{ type: "boolean" }, { type: "string" }] },
+                  ca: { type: "string" },
+                  cert: { type: "string" },
+                  key: { type: "string", format: "password" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Connection added",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["connection"],
+                  properties: { connection: { $ref: "#/components/schemas/SessionConnection" } },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Untrusted origin, invalid JSON or fields (message only), or classified credentials_required, invalid_credentials, or connection_failed error",
+            content: {
+              "application/json": {
+                schema: {
+                  anyOf: [
+                    { $ref: "#/components/schemas/AddConnectionError" },
+                    { type: "object", required: ["message"], properties: { message: { type: "string" } } },
+                  ],
+                },
+              },
+            },
+          },
+          "401": { description: "Not authenticated" },
+          "503": {
+            description: "connection_failed: connection refused or connection establishment timed out",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AddConnectionError" } } },
+          },
+          "500": {
+            description: "connection_failed: unexpected failure without a diagnostic message",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AddConnectionError" } } },
+          },
+        },
+      },
+    },
     "/api/auth/tokens/credentials": {
       post: {
         tags: ["Authentication"],
@@ -644,7 +814,7 @@ const swaggerSpec = {
       post: {
         tags: ["Graph"],
         summary: "Execute a query or verify a graph",
-        description: "Execute a Cypher query using a JSON body, or verify graph access when no query body is supplied",
+        description: "Execute a Cypher query using a JSON body, or verify graph access when no query body is supplied. An empty body is accepted even with Content-Type: application/json; malformed nonempty JSON returns 400.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {

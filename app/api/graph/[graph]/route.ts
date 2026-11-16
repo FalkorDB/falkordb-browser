@@ -89,7 +89,8 @@ export async function POST(
 
     try {
       if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() === "application/json") {
-        const body = await request.json() as { query?: unknown; timeout?: unknown };
+        const content = await request.text();
+        const body = (content ? JSON.parse(content) : null) as { query?: unknown; timeout?: unknown } | null;
         if (body && typeof body === "object" && body.query !== undefined) {
           if (typeof body.query !== "string") {
             return NextResponse.json(

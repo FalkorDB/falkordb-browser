@@ -158,9 +158,12 @@ test.describe("Connection Manager Tests: own session", () => {
     await manager.submitAdditionalConnection(READ_WRITE_USERNAME, "first-attempt");
     const response = await rejectedResponse;
     expect(response.status()).toBe(400);
-    expect((await response.json()).message).toMatch(/^Authentication failed/);
+    expect(await response.json()).toMatchObject({
+      code: "invalid_credentials",
+      message: "Invalid credentials. Please check your username and password.",
+    });
     await expect(manager.addConnectionSubmit).toBeDisabled();
-    await expect(manager.addDialog).toContainText("Failed to add connection");
+    await expect(manager.addDialog).toContainText("Invalid credentials. Please check your username and password.");
     await manager.fillAdditionalPassword(user.password);
     await expect(manager.addConnectionSubmit).toBeEnabled();
     await manager.submitConnectionForm();

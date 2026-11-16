@@ -1932,9 +1932,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // for tutorial recovery, which may still be removing old samples.
   const tabsReady = (tutorialOpen || graphNamesLoaded) && timeoutLoaded && tutorialRecoveryReady;
   const graphTabs = useGraphTabs({
-    prefixReady: prefixReady && activeConnectionId !== null && activeConnectionId === prefixConnectionId,
+    prefixReady: prefixReady && (activeConnectionId ?? prefixConnectionId) !== null
+      && (activeConnectionId === null || activeConnectionId === prefixConnectionId),
     canRestore: tabsReady,
-    connectionKey: activeConnectionId,
+    connectionKey: activeConnectionId ?? prefixConnectionId,
     // The tutorial gets a strip of its own; the user's tabs come back with it.
     tutorialOpen,
     initialTabId: initialTabIdRef.current,
