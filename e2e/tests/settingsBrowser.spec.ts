@@ -1009,7 +1009,7 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
         await expect(settings.modelsStatusMessage).toHaveText("3 local Ollama models loaded.");
 
         await settings.searchModels("QWEN");
-        await expect.poll(() => settings.isModelVisible("llama3.2")).toBe(false);
+        await expect.poll(() => settings.isModelShown("llama3.2")).toBe(false);
         expect(await settings.isModelVisible("qwen2.5")).toBe(true);
         expect(await settings.isModelVisible("phi3")).toBe(false);
 
@@ -1019,7 +1019,7 @@ test.describe('@browser Browser Settings AI recovery tests', () => {
         expect(noModelsText).toContain("Try a different search term");
 
         await settings.clearModelSearch();
-        await expect.poll(() => settings.isModelVisible("llama3.2")).toBe(true);
+        await expect.poll(() => settings.isModelShown("llama3.2")).toBe(true);
         expect(await settings.isModelVisible("qwen2.5")).toBe(true);
         expect(await settings.isModelVisible("phi3")).toBe(true);
         expect(await settings.isModelSelected("llama3.2")).toBe(true);
