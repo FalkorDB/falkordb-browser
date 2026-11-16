@@ -42,6 +42,10 @@ test("only POSTs to the credentials callback are inspected", async () => {
         method: "POST", body, headers,
     })), false);
     assert.equal(await isPreconfiguredSignIn(new Request(SIGN_IN_URL, { method: "POST", body, headers })), true);
+    // A byte body sets no Content-Type, so it is read as a form.
+    assert.equal(await isPreconfiguredSignIn(new Request(SIGN_IN_URL, {
+        method: "POST", body: new TextEncoder().encode(body), headers,
+    })), true);
 });
 
 test("an unsized or oversized sign-in counts as preconfigured without being read", async () => {

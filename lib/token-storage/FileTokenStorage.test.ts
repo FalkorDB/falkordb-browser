@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, mock, test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { promises as fs } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import os, { tmpdir } from "node:os";
 import path, { join } from "node:path";
 import { execFile } from "node:child_process";
@@ -481,10 +481,10 @@ test("paused first-use initialization never exposes a partial snapshot to anothe
     let competingRead: Promise<TokenData | null> | undefined;
     try {
         const attemptedLock = Promise.withResolvers<void>();
-        const mkdir = fs.mkdir;
-        t.mock.method(fs, "mkdir", async (...args: Parameters<typeof fs.mkdir>) => {
-            if (args[0] === `${file}.lock`) attemptedLock.resolve();
-            return mkdir(...args);
+        const rename = fs.rename;
+        t.mock.method(fs, "rename", async (from: Parameters<typeof fs.rename>[0], to: Parameters<typeof fs.rename>[1]) => {
+            if (to === `${file}.lock`) attemptedLock.resolve();
+            return rename(from, to);
         });
         const competingStorage = new FileTokenStorage(file);
         competingWrite = competingStorage.createToken(token("second"));
@@ -596,67 +596,123 @@ test("admin and non-admin listings stay scoped to the endpoint with case-insensi
 
 test("lock timeout fails without stealing another writer's lock", async (t) => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-timeout-test-"));
+    t.after(() => fs.rm(dir, { recursive: true, force: true }));
     const file = path.join(dir, "tokens.json");
     const lockPath = `${file}.lock`;
-    t.after(async () => {
-        await fs.rmdir(lockPath);
-        await fs.unlink(file);
-        await fs.rmdir(dir);
-    });
+    const record = path.join(lockPath, "owner-live.json");
+    const owner = JSON.stringify({ pid: process.pid, hostname: os.hostname(), instance: "live", acquiredAt: 0 });
 
     const storage = new FileTokenStorage(file);
     await storage.createToken(token("existing"));
     await fs.mkdir(lockPath);
+    await fs.writeFile(record, owner);
     const before = await fs.readFile(file, "utf8");
     let now = 0;
     t.mock.method(Date, "now", () => now);
-    const mkdir = fs.mkdir;
-    t.mock.method(fs, "mkdir", async (...args: Parameters<typeof fs.mkdir>) => {
-        if (args[0] === lockPath) {
-            now = 10_000;
-            throw Object.assign(new Error("locked"), { code: "EEXIST" });
-        }
-        return mkdir(...args);
+    const rename = fs.rename;
+    t.mock.method(fs, "rename", async (from: Parameters<typeof fs.rename>[0], to: Parameters<typeof fs.rename>[1]) => {
+        if (to === lockPath) now = 10_000;
+        return rename(from, to);
     });
     await assert.rejects(storage.revokeToken("existing", "fixture"), /Timed out acquiring token storage lock/);
-    assert.equal((await fs.stat(lockPath)).isDirectory(), true);
+    assert.equal(await fs.readFile(record, "utf8"), owner);
     assert.equal(await fs.readFile(file, "utf8"), before);
+    assert.deepEqual((await fs.readdir(dir)).sort(), ["tokens.json", "tokens.json.lock"]);
 });
 
-test("lock-release failure is logged without replacing a committed result or original write error", async (t) => {
+test("a failed lock release is retried before the next operation without replacing its result", async (t) => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-release-test-"));
     const file = path.join(dir, "tokens.json");
     const lockPath = `${file}.lock`;
     t.after(() => fs.rm(dir, { recursive: true, force: true }));
     const log = t.mock.method(console, "error", () => {});
-    const rename = fs.rename;
+    let failRelease = true;
     let failWrite = false;
-    t.mock.method(fs, "rename", async (from: Parameters<typeof fs.rename>[0], to: Parameters<typeof fs.rename>[1]) => {
-        if (from === lockPath) throw new Error("release failed");
-        if (failWrite && String(from).endsWith(".tmp")) throw new Error("write failed");
-        return rename(from, to);
+    const unlink = fs.unlink;
+    t.mock.method(fs, "unlink", async (target: Parameters<typeof fs.unlink>[0]) => {
+        if (failRelease && path.dirname(String(target)) === lockPath) throw new Error("release failed");
+        return unlink(target);
     });
+    failSnapshotRename(t.mock, () => failWrite);
     const storage = new FileTokenStorage(file);
+
     await storage.createToken(token("existing"));
     assert.ok(await storage.fetchTokenById("existing"));
     assert.equal(log.mock.callCount(), 1);
     assert.match(String(log.mock.calls[0].arguments[0]), /Failed to release token storage lock/);
     assert.equal((await fs.stat(lockPath)).isDirectory(), true);
-    await fs.rm(lockPath, { recursive: true });
+
+    // While the release keeps failing the next operation fails fast and the lock is kept.
+    await assert.rejects(storage.createToken(token("blocked")), /release failed/);
+    assert.equal((await fs.stat(lockPath)).isDirectory(), true);
+
+    failRelease = false;
+    await storage.createToken(token("after-recovery"));
+    assert.ok(await storage.fetchTokenById("after-recovery"));
+    assert.equal(await storage.fetchTokenById("blocked"), null);
+    await assert.rejects(fs.stat(lockPath), { code: "ENOENT" });
+
+    failRelease = true;
     failWrite = true;
     await assert.rejects(storage.createToken(token("new")), /Failed to save tokens/);
     assert.equal(await storage.fetchTokenById("new"), null);
 });
 
+test("a writer paused before publishing its lock never removes a successor's lock", async (t) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-paused-owner-test-"));
+    t.after(() => fs.rm(dir, { recursive: true, force: true }));
+    const file = path.join(dir, "tokens.json");
+    const lockPath = `${file}.lock`;
+    await new FileTokenStorage(file).createToken(token("existing"));
+    const publishing = Promise.withResolvers<void>();
+    const resumePublishing = Promise.withResolvers<void>();
+    const successorWriting = Promise.withResolvers<void>();
+    const resumeSuccessor = Promise.withResolvers<void>();
+    let records = 0;
+    let snapshots = 0;
+    const writeFile = fs.writeFile;
+    t.mock.method(fs, "writeFile", async (...args: Parameters<typeof fs.writeFile>) => {
+        const target = String(args[0]);
+        if (/owner-[^/\\]+\.json$/.test(target) && ++records === 1) {
+            publishing.resolve();
+            await resumePublishing.promise;
+            throw new Error("disk full");
+        }
+        if (target.endsWith(".tmp") && ++snapshots === 1) {
+            successorWriting.resolve();
+            await resumeSuccessor.promise;
+        }
+        return writeFile(...args);
+    });
+
+    const stalled = new FileTokenStorage(file).createToken(token("stalled"));
+    await publishing.promise;
+    const successorStorage = new FileTokenStorage(file);
+    const successor = successorStorage.createToken(token("successor"));
+    await successorWriting.promise;
+    const held = await fs.readdir(lockPath);
+    assert.equal(held.length, 1);
+
+    resumePublishing.resolve();
+    await assert.rejects(stalled, /disk full/);
+    assert.deepEqual(await fs.readdir(lockPath), held);
+
+    resumeSuccessor.resolve();
+    await successor;
+    assert.ok(await successorStorage.fetchTokenById("successor"));
+    assert.equal(await successorStorage.fetchTokenById("stalled"), null);
+    assert.deepEqual(await fs.readdir(dir), ["tokens.json"]);
+});
+
 describe("abandoned lock recovery", () => {
-    // Each contended mkdir advances the clock to the 10 s acquisition deadline, so a lock that
+    // Each contended rename advances the clock to the 10 s acquisition deadline, so a lock that
     // is not reclaimed times out at once and a reclaimed one is acquired on the next attempt.
     const START = 1_000_000;
     const CONTENDED_AT = START + 10_000;
-
     const STALE_AT = CONTENDED_AT - 5 * 60_000;
+    const RECORD = "owner-previous.json";
 
-    async function contendedStorage(t: TestContext, owner: string | null, lockCreatedAt?: number) {
+    async function contendedStorage(t: TestContext, entries: Record<string, string>, lockCreatedAt?: number) {
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-abandoned-lock-test-"));
         t.after(() => fs.rm(dir, { recursive: true, force: true }));
         const file = path.join(dir, "tokens.json");
@@ -664,14 +720,18 @@ describe("abandoned lock recovery", () => {
         const storage = new FileTokenStorage(file);
         await storage.createToken(token("existing"));
         await fs.mkdir(lockPath);
-        if (owner !== null) await fs.writeFile(path.join(lockPath, "owner.json"), owner);
+        for (const [name, contents] of Object.entries(entries)) await fs.writeFile(path.join(lockPath, name), contents);
         if (lockCreatedAt !== undefined) await fs.utimes(lockPath, new Date(lockCreatedAt), new Date(lockCreatedAt));
         let now = START;
         t.mock.method(Date, "now", () => now);
-        const mkdir = fs.mkdir;
-        t.mock.method(fs, "mkdir", async (...args: Parameters<typeof fs.mkdir>) => {
-            if (args[0] === lockPath) now += 10_000;
-            return mkdir(...args);
+        const rename = fs.rename;
+        t.mock.method(fs, "rename", async (from: Parameters<typeof fs.rename>[0], to: Parameters<typeof fs.rename>[1]) => {
+            if (to === lockPath) {
+                now += 10_000;
+                // As on Windows, any existing directory blocks the lock, even an empty one.
+                if (existsSync(lockPath)) throw Object.assign(new Error("lock held"), { code: "EPERM" });
+            }
+            return rename(from, to);
         });
         return { dir, file, lockPath, storage };
     }
@@ -686,18 +746,23 @@ describe("abandoned lock recovery", () => {
     });
 
     const otherHost = `${os.hostname()}-other`;
+    const none = () => {};
 
-    for (const [description, owner, setup, lockCreatedAt] of [
-        ["its owner exited in an earlier process with the same PID", ownerJson(), () => {}, undefined],
-        ["its owner PID no longer runs on this host", ownerJson({ pid: 999_999 }), (t: TestContext) => killFailing(t, "ESRCH"), undefined],
-        ["its owner on another host acquired it before the stale threshold", ownerJson({ hostname: otherHost, acquiredAt: STALE_AT }), () => {}, undefined],
-        ["it has had no owner record since before the stale threshold", null, () => {}, STALE_AT],
-        ["its owner record is unreadable and older than the stale threshold", "{", () => {}, STALE_AT],
-    ] as const) {
+    type LockCase = [description: string, entries: Record<string, string>, setup: (t: TestContext) => unknown, lockCreatedAt?: number];
+
+    const reclaimed: LockCase[] = [
+        ["its owner exited in an earlier process with the same PID", { [RECORD]: ownerJson() }, none],
+        ["its owner PID no longer runs on this host", { [RECORD]: ownerJson({ pid: 999_999 }) }, t => killFailing(t, "ESRCH")],
+        ["its owner on another host acquired it before the stale threshold", { [RECORD]: ownerJson({ hostname: otherHost, acquiredAt: STALE_AT }) }, none],
+        ["its owner record is malformed and older than the stale threshold", { [RECORD]: "{" }, none, STALE_AT],
+        ["its owner record is null and older than the stale threshold", { [RECORD]: "null" }, none, STALE_AT],
+        ["an interrupted release left it empty before the stale threshold", {}, none, STALE_AT],
+    ];
+    for (const [description, entries, setup, lockCreatedAt] of reclaimed) {
         test(`reclaims a lock when ${description}`, async (t) => {
             setup(t);
             const warning = t.mock.method(console, "warn", () => {});
-            const { dir, file, storage } = await contendedStorage(t, owner, lockCreatedAt);
+            const { dir, file, storage } = await contendedStorage(t, entries, lockCreatedAt);
 
             await storage.createToken(token("after-recovery"));
 
@@ -708,35 +773,39 @@ describe("abandoned lock recovery", () => {
         });
     }
 
-    for (const [description, owner, setup, lockCreatedAt] of [
-        ["has no owner record yet", null, () => {}, undefined],
-        ["has had no owner record for less than the stale threshold", null, () => {}, STALE_AT + 1],
-        ["has no owner record and a lock directory that cannot be inspected", null, (t: TestContext) => {
+    const kept: LockCase[] = [
+        ["is empty and younger than the stale threshold", {}, none, STALE_AT + 1],
+        ["is empty and cannot be inspected", {}, t => {
             const stat = fs.stat;
             t.mock.method(fs, "stat", async (...args: Parameters<typeof fs.stat>) => {
                 if (String(args[0]).endsWith(".lock")) throw new Error("stat failed");
                 return stat(...args);
             });
         }, STALE_AT],
-        ["has an unreadable owner record", "{", () => {}, undefined],
-        ["has an owner record with a non-numeric pid", ownerJson({ pid: "1" }), () => {}, undefined],
-        ["has an owner record without a hostname", ownerJson({ hostname: undefined }), () => {}, undefined],
-        ["has an owner record without an instance", ownerJson({ instance: undefined }), () => {}, undefined],
-        ["has an owner record without an acquisition time", ownerJson({ acquiredAt: undefined }), () => {}, undefined],
-        ["is younger than the abandonment threshold", ownerJson({ acquiredAt: CONTENDED_AT - 29_999 }), () => {}, undefined],
-        ["belongs to another host and is younger than the stale threshold", ownerJson({ hostname: otherHost, acquiredAt: STALE_AT + 1 }), () => {}, undefined],
-        ["belongs to a running process", ownerJson({ pid: 999_999 }), (t: TestContext) => t.mock.method(process, "kill", () => true), undefined],
-        ["belongs to a process this user cannot signal", ownerJson({ pid: 999_999 }), (t: TestContext) => killFailing(t, "EPERM"), undefined],
-    ] as const) {
+        ["holds files other than an owner record, however old", { unrelated: "" }, none, STALE_AT],
+        ["has a malformed owner record younger than the stale threshold", { [RECORD]: "{" }, none],
+        ["has an owner record with a non-numeric pid", { [RECORD]: ownerJson({ pid: "1" }) }, none],
+        ["has an owner record without a hostname", { [RECORD]: ownerJson({ hostname: undefined }) }, none],
+        ["has an owner record without an instance", { [RECORD]: ownerJson({ instance: undefined }) }, none],
+        ["has an owner record without an acquisition time", { [RECORD]: ownerJson({ acquiredAt: undefined }) }, none],
+        ["is younger than the abandonment threshold", { [RECORD]: ownerJson({ acquiredAt: CONTENDED_AT - 29_999 }) }, none],
+        ["belongs to another host and is younger than the stale threshold", { [RECORD]: ownerJson({ hostname: otherHost, acquiredAt: STALE_AT + 1 }) }, none],
+        ["belongs to a running process", { [RECORD]: ownerJson({ pid: 999_999 }) }, t => t.mock.method(process, "kill", () => true)],
+        ["belongs to a process this user cannot signal", { [RECORD]: ownerJson({ pid: 999_999 }) }, t => killFailing(t, "EPERM")],
+    ];
+    for (const [description, entries, setup, lockCreatedAt] of kept) {
         test(`keeps a lock that ${description}`, async (t) => {
             setup(t);
-            const { lockPath, storage } = await contendedStorage(t, owner, lockCreatedAt);
-            const before = await fs.readdir(lockPath);
+            const warning = t.mock.method(console, "warn", () => {});
+            const { lockPath, storage } = await contendedStorage(t, entries, lockCreatedAt);
 
             await assert.rejects(storage.revokeToken("existing", "fixture"), /Timed out acquiring token storage lock/);
 
-            assert.deepEqual(await fs.readdir(lockPath), before);
-            if (owner !== null) assert.equal(await fs.readFile(path.join(lockPath, "owner.json"), "utf8"), owner);
+            assert.deepEqual((await fs.readdir(lockPath)).sort(), Object.keys(entries).sort());
+            for (const [name, contents] of Object.entries(entries)) {
+                assert.equal(await fs.readFile(path.join(lockPath, name), "utf8"), contents);
+            }
+            assert.equal(warning.mock.callCount(), 0);
         });
     }
 
@@ -746,57 +815,120 @@ describe("abandoned lock recovery", () => {
         const writeFile = fs.writeFile;
         let instance = "";
         const capture = t.mock.method(fs, "writeFile", async (...args: Parameters<typeof fs.writeFile>) => {
-            if (String(args[0]).endsWith("owner.json")) instance = JSON.parse(String(args[1])).instance;
+            if (/owner-[^/\\]+\.json$/.test(String(args[0]))) instance = JSON.parse(String(args[1])).instance;
             return writeFile(...args);
         });
         await new FileTokenStorage(path.join(probeDir, "tokens.json")).createToken(token("probe"));
         capture.mock.restore();
         const owner = ownerJson({ instance, acquiredAt: CONTENDED_AT - 60_000 });
-        const { lockPath, storage } = await contendedStorage(t, owner);
+        const { lockPath, storage } = await contendedStorage(t, { [RECORD]: owner });
 
         await assert.rejects(storage.revokeToken("existing", "fixture"), /Timed out acquiring token storage lock/);
-        assert.equal(await fs.readFile(path.join(lockPath, "owner.json"), "utf8"), owner);
+        assert.equal(await fs.readFile(path.join(lockPath, RECORD), "utf8"), owner);
     });
 
-    test("leaves recovery to the reclaimer that already holds the reclaim lock", async (t) => {
-        const { lockPath, storage } = await contendedStorage(t, ownerJson());
-        await fs.mkdir(`${lockPath}.reclaim`);
-
-        await assert.rejects(storage.revokeToken("existing", "fixture"), /Timed out acquiring token storage lock/);
-        assert.equal(await fs.readFile(path.join(lockPath, "owner.json"), "utf8"), ownerJson());
-    });
-
-    test("propagates an unexpected reclaim-lock failure", async (t) => {
-        const { lockPath, storage } = await contendedStorage(t, ownerJson());
-        const mkdir = fs.mkdir;
-        t.mock.method(fs, "mkdir", async (...args: Parameters<typeof fs.mkdir>) => {
-            if (args[0] === `${lockPath}.reclaim`) throw Object.assign(new Error("denied"), { code: "EACCES" });
-            return mkdir(...args);
+    test("keeps a lock and rejects when its owner record cannot be read", async (t) => {
+        const { lockPath, storage } = await contendedStorage(t, { [RECORD]: ownerJson() }, STALE_AT);
+        const readFile = fs.readFile;
+        t.mock.method(fs, "readFile", async (...args: Parameters<typeof fs.readFile>) => {
+            if (String(args[0]).endsWith(RECORD)) throw Object.assign(new Error("denied"), { code: "EACCES" });
+            return readFile(...args);
         });
 
         await assert.rejects(storage.revokeToken("existing", "fixture"), /denied/);
+        assert.deepEqual(await fs.readdir(lockPath), [RECORD]);
     });
 
-    test("propagates an unexpected lock-acquisition failure", async (t) => {
+    test("removes only the observed lock when a replacement takes its place during recovery", async (t) => {
+        const warning = t.mock.method(console, "warn", () => {});
+        const { lockPath, storage } = await contendedStorage(t, { [RECORD]: ownerJson() });
+        const replacement = ownerJson({ instance: "replacement", acquiredAt: CONTENDED_AT });
+        const observed = path.join(lockPath, RECORD);
+        const unlink = fs.unlink;
+        let replaced = false;
+        t.mock.method(fs, "unlink", async (target: Parameters<typeof fs.unlink>[0]) => {
+            if (target === observed && !replaced) {
+                // The previous holder releases and a new writer takes the lock before recovery acts.
+                replaced = true;
+                await fs.rm(lockPath, { recursive: true });
+                await fs.mkdir(lockPath);
+                await fs.writeFile(path.join(lockPath, "owner-replacement.json"), replacement);
+            }
+            return unlink(target);
+        });
+
+        await assert.rejects(storage.revokeToken("existing", "fixture"), /Timed out acquiring token storage lock/);
+        assert.deepEqual(await fs.readdir(lockPath), ["owner-replacement.json"]);
+        assert.equal(await fs.readFile(path.join(lockPath, "owner-replacement.json"), "utf8"), replacement);
+        assert.equal(warning.mock.callCount(), 0);
+    });
+
+    test("recovers an abandoned lock without a reclaim lock that a crashed reclaimer could strand", async (t) => {
+        t.mock.method(console, "warn", () => {});
+        const { dir, file, lockPath, storage } = await contendedStorage(t, { [RECORD]: ownerJson() });
+        // Left behind by a reclaimer of an earlier build that crashed; it no longer gates recovery.
+        await fs.mkdir(`${lockPath}.reclaim`);
+
+        await storage.createToken(token("after-recovery"));
+
+        assert.ok(await new FileTokenStorage(file).fetchTokenById("after-recovery"));
+        assert.deepEqual((await fs.readdir(dir)).sort(), ["tokens.json", "tokens.json.lock.reclaim"]);
+    });
+
+    test("propagates an unexpected failure while removing an abandoned lock", async (t) => {
+        const { lockPath, storage } = await contendedStorage(t, { [RECORD]: ownerJson() });
+        const rmdir = fs.rmdir;
+        t.mock.method(fs, "rmdir", async (...args: Parameters<typeof fs.rmdir>) => {
+            if (args[0] === lockPath) throw Object.assign(new Error("busy"), { code: "EBUSY" });
+            return rmdir(...args);
+        });
+
+        await assert.rejects(storage.revokeToken("existing", "fixture"), /busy/);
+    });
+
+    test("retries when the contended lock is released before it can be inspected", async (t) => {
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-vanished-lock-test-"));
+        t.after(() => fs.rm(dir, { recursive: true, force: true }));
+        const file = path.join(dir, "tokens.json");
+        const rename = fs.rename;
+        let contended = false;
+        t.mock.method(fs, "rename", async (from: Parameters<typeof fs.rename>[0], to: Parameters<typeof fs.rename>[1]) => {
+            if (to === `${file}.lock` && !contended) {
+                contended = true;
+                throw Object.assign(new Error("lock held"), { code: "EEXIST" });
+            }
+            return rename(from, to);
+        });
+        const storage = new FileTokenStorage(file);
+
+        await storage.createToken(token("first"));
+
+        assert.equal(contended, true);
+        assert.ok(await storage.fetchTokenById("first"));
+        assert.deepEqual(await fs.readdir(dir), ["tokens.json"]);
+    });
+
+    test("propagates an unexpected lock-acquisition failure without leaving a staged lock", async (t) => {
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-lock-denied-test-"));
         t.after(() => fs.rm(dir, { recursive: true, force: true }));
         const file = path.join(dir, "tokens.json");
-        const mkdir = fs.mkdir;
-        t.mock.method(fs, "mkdir", async (...args: Parameters<typeof fs.mkdir>) => {
-            if (args[0] === `${file}.lock`) throw Object.assign(new Error("denied"), { code: "EACCES" });
-            return mkdir(...args);
+        const rename = fs.rename;
+        t.mock.method(fs, "rename", async (from: Parameters<typeof fs.rename>[0], to: Parameters<typeof fs.rename>[1]) => {
+            if (to === `${file}.lock`) throw Object.assign(new Error("denied"), { code: "EACCES" });
+            return rename(from, to);
         });
 
         await assert.rejects(new FileTokenStorage(file).createToken(token("first")), /denied/);
+        assert.deepEqual(await fs.readdir(dir), []);
     });
 
-    test("releases the lock when its owner record cannot be written", async (t) => {
+    test("takes no lock when its owner record cannot be written", async (t) => {
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), "token-owner-write-test-"));
         t.after(() => fs.rm(dir, { recursive: true, force: true }));
         const file = path.join(dir, "tokens.json");
         const writeFile = fs.writeFile;
         const failing = t.mock.method(fs, "writeFile", async (...args: Parameters<typeof fs.writeFile>) => {
-            if (String(args[0]).endsWith("owner.json")) throw new Error("disk full");
+            if (/owner-[^/\\]+\.json$/.test(String(args[0]))) throw new Error("disk full");
             return writeFile(...args);
         });
         const storage = new FileTokenStorage(file);

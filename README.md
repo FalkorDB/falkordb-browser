@@ -141,13 +141,16 @@ snapshot), atomic replacements, and an exclusive
 `<token-file>.lock` directory (the full configured token path with `.lock`
 appended; by default `.data/api_tokens.json.lock`) to serialize
 writers. A writer waits up to 10 seconds for the lock, then fails explicitly.
-The lock records its holder; a lock at least 30 seconds old whose holder process
-is gone on the same host is recovered automatically. A lock whose holder cannot be
-checked (held from another host, or without a readable holder record) is recovered
-once it is 5 minutes old, far longer than any write holds it. Only one writer
-recovers a lock at a time, using a `<token-file>.lock.reclaim` directory; if a
-writer crashes while recovering, stop **all** writers before removing that
-directory and restarting. Use FalkorDB-backed
+Each acquisition is published atomically together with its own uniquely named
+holder record, and a writer only ever removes the lock instance it observed, so
+a delayed writer or a recovering one never removes another writer's lock. A lock
+at least 30 seconds old whose holder process is gone on the same host is
+recovered automatically. A lock whose holder cannot be checked (held from
+another host, or with a missing or malformed holder record) is recovered once it
+is 5 minutes old, far longer than any write holds it; a holder record that
+cannot be read (for example, permission denied) keeps the lock and fails the
+write. If releasing the lock fails, the same process retries the release before
+its next write. Stop **all** writers before removing a lock by hand. Use FalkorDB-backed
 token storage for distributed deployments rather than sharing files across
 machines.
 

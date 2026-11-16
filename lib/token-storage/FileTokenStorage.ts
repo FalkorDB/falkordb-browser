@@ -4,37 +4,56 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorage.ts';
 
-const LOCK_OWNER_FILE = 'owner.json';
+// Each acquisition publishes its owner in a uniquely named record, so removal can target one lock instance.
+const LOCK_RECORD = /^owner-[\w-]+\.json$/;
 // A holder keeps the lock for one read (with ~100 ms of retries) and one atomic write.
 const ABANDONED_LOCK_MS = 30_000;
-// A lock whose holder cannot be checked (another host, or no owner record) is presumed abandoned
-// only after this much longer age, far beyond any critical section.
+// A lock whose holder cannot be checked (another host, or no readable owner record) is presumed
+// abandoned only after this much longer age, far beyond any critical section.
 const STALE_UNVERIFIABLE_LOCK_MS = 5 * 60_000;
+const LOCK_WAIT_MS = 10_000;
 // Distinguishes this process from an earlier one that reused its PID (e.g. a restarted container).
 const PROCESS_INSTANCE = crypto.randomUUID();
 
 type LockOwner = { pid: number; hostname: string; instance: string; acquiredAt: number };
+/** A lock's owner record file name (when it has one) and its owner (null when malformed). */
+type LockRecord = { name?: string; owner: LockOwner | null };
 
-function hasErrorCode(error: unknown, code: string): boolean {
-  return error instanceof Error && 'code' in error && error.code === code;
+function hasErrorCode(error: unknown, ...codes: string[]): boolean {
+  return error instanceof Error && 'code' in error && codes.includes(error.code as string);
 }
 
 function uniqueSuffix(): string {
   return `${process.pid}.${Date.now()}.${crypto.randomBytes(6).toString('hex')}`;
 }
 
-async function readLockOwner(lockPath: string): Promise<LockOwner | null> {
+function parseLockOwner(content: string): LockOwner | null {
   try {
-    const owner = JSON.parse(await fs.readFile(path.join(lockPath, LOCK_OWNER_FILE), 'utf8'));
+    const owner = JSON.parse(content);
     return typeof owner?.pid === 'number' && typeof owner.hostname === 'string'
       && typeof owner.instance === 'string' && typeof owner.acquiredAt === 'number' ? owner : null;
   } catch {
-    // Missing or partial owner data: the holder may still be starting, so only the lock's age decides.
     return null;
   }
 }
 
-/** Milliseconds since the lock directory was created; 0 when it cannot be inspected, so it is kept. */
+/**
+ * The lock's owner record, or null when the lock is gone. A missing or malformed record leaves
+ * only the lock's age to decide; any other read failure leaves ownership unknown, so it is
+ * rethrown and the lock is kept.
+ */
+async function readLockRecord(lockPath: string): Promise<LockRecord | null> {
+  try {
+    const name = (await fs.readdir(lockPath)).find(entry => LOCK_RECORD.test(entry));
+    if (!name) return { owner: null };
+    return { name, owner: parseLockOwner(await fs.readFile(path.join(lockPath, name), 'utf8')) };
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return null;
+    throw error;
+  }
+}
+
+/** Milliseconds since the lock directory last changed; 0 when it cannot be inspected, so it is kept. */
 async function lockDirectoryAge(lockPath: string): Promise<number> {
   try {
     return Date.now() - (await fs.stat(lockPath)).mtimeMs;
@@ -54,6 +73,76 @@ function isLockOwnerGone(owner: LockOwner): boolean {
   }
 }
 
+async function isLockAbandoned(lockPath: string, owner: LockOwner | null): Promise<boolean> {
+  if (!owner) return await lockDirectoryAge(lockPath) >= STALE_UNVERIFIABLE_LOCK_MS;
+  if (owner.hostname !== os.hostname()) return Date.now() - owner.acquiredAt >= STALE_UNVERIFIABLE_LOCK_MS;
+  return Date.now() - owner.acquiredAt >= ABANDONED_LOCK_MS && isLockOwnerGone(owner);
+}
+
+/**
+ * Removes one lock instance: its uniquely named owner record, then the lock directory only if
+ * it is empty. A lock is never empty, so a replacement installed meanwhile is left alone.
+ * True when this call freed the lock path.
+ */
+async function removeLock(lockPath: string, record?: string): Promise<boolean> {
+  if (record) {
+    try {
+      await fs.unlink(path.join(lockPath, record));
+    } catch (error) {
+      if (!hasErrorCode(error, 'ENOENT')) throw error;
+    }
+  }
+  try {
+    await fs.rmdir(lockPath);
+    return true;
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT', 'ENOTEMPTY')) return false;
+    throw error;
+  }
+}
+
+/** Removes the observed lock instance when it is abandoned; true when that freed the lock path. */
+async function reclaimAbandonedLock(lockPath: string): Promise<boolean> {
+  const record = await readLockRecord(lockPath);
+  if (!record || !(await isLockAbandoned(lockPath, record.owner))) return false;
+  const removed = await removeLock(lockPath, record.name);
+  if (removed) console.warn('Recovered abandoned token storage lock:', { lockPath, owner: record.owner });
+  return removed;
+}
+
+/**
+ * Takes the lock by renaming a staged directory that already holds this acquisition's owner
+ * record onto the lock path, so a lock never exists without its owner. The rename fails while
+ * another lock holds the path (Windows refuses even an empty directory, hence EPERM).
+ * Returns the owner record's name, which identifies this lock instance.
+ */
+async function acquireLock(lockPath: string): Promise<string> {
+  const record = `owner-${crypto.randomUUID()}.json`;
+  const staging = `${lockPath}.${uniqueSuffix()}.pending`;
+  const owner: LockOwner = { pid: process.pid, hostname: os.hostname(), instance: PROCESS_INSTANCE, acquiredAt: Date.now() };
+  const deadline = owner.acquiredAt + LOCK_WAIT_MS;
+  await fs.mkdir(staging, { mode: 0o700 });
+  try {
+    await fs.writeFile(path.join(staging, record), JSON.stringify(owner), { mode: 0o600, flag: 'wx' });
+    while (true) {
+      try {
+        await fs.rename(staging, lockPath);
+        return record;
+      } catch (error) {
+        if (!hasErrorCode(error, 'EEXIST', 'ENOTEMPTY', 'EPERM')) throw error;
+      }
+      if (await reclaimAbandonedLock(lockPath)) continue;
+      if (Date.now() >= deadline) {
+        throw new Error(`Timed out acquiring token storage lock: ${lockPath}. Stop all writers before removing an abandoned lock.`);
+      }
+      await new Promise(resolve => { setTimeout(resolve, 50); });
+    }
+  } catch (error) {
+    await fs.rm(staging, { recursive: true, force: true });
+    throw error;
+  }
+}
+
 /**
  * File-based token storage implementation
  * Stores tokens in a JSON file (default: .data/api_tokens.json in project root)
@@ -67,6 +156,9 @@ class FileTokenStorage implements ITokenStorage {
   //   (b) drop each other's updates (read N, both push, write N+1).
   private writeQueue: Promise<unknown> = Promise.resolve();
 
+  // Owner record of a lock this instance still holds because releasing it failed.
+  private unreleasedLock?: string;
+
   constructor(filePath?: string) {
     // Default to .data/api_tokens.json in project root
     // Can be overridden via API_TOKEN_STORAGE_PATH environment variable
@@ -77,20 +169,25 @@ class FileTokenStorage implements ITokenStorage {
    * Serialize each snapshot update across processes sharing this local file.
    * A live lock is not stolen: a paused writer could otherwise overwrite a revocation.
    * A lock is recovered when its holder on this host has exited and the lock is far older
-   * than any critical section, or when its holder cannot be checked (another host, or no
-   * owner record) and the lock is older than STALE_UNVERIFIABLE_LOCK_MS.
+   * than any critical section, or when its holder cannot be checked (another host, or a
+   * missing or malformed owner record) and the lock is older than STALE_UNVERIFIABLE_LOCK_MS.
+   * A lock this process failed to release is released before its next operation.
    * Failures do not poison the queue for subsequent callers.
    */
   private withLock<T>(op: () => Promise<T>): Promise<T> {
     const locked = async () => {
       await this.ensureDirectoryExists();
       const lockPath = `${this.filePath}.lock`;
-      await this.acquireLock(lockPath);
+      if (this.unreleasedLock) {
+        await removeLock(lockPath, this.unreleasedLock);
+        this.unreleasedLock = undefined;
+      }
+      const record = await acquireLock(lockPath);
       try {
         await this.ensureFileExists(true);
         return await op();
       } finally {
-        await this.releaseLock(lockPath);
+        await this.releaseLock(lockPath, record);
       }
     };
     const next = this.writeQueue.then(locked, locked);
@@ -98,73 +195,12 @@ class FileTokenStorage implements ITokenStorage {
     return next;
   }
 
-  private async acquireLock(lockPath: string): Promise<void> {
-    const deadline = Date.now() + 10_000;
-    while (true) {
-      try {
-        await fs.mkdir(lockPath, { mode: 0o700 });
-        break;
-      } catch (error) {
-        if (!hasErrorCode(error, 'EEXIST')) throw error;
-        if (await this.reclaimAbandonedLock(lockPath)) continue;
-        if (Date.now() >= deadline) {
-          throw new Error(`Timed out acquiring token storage lock: ${lockPath}. Stop all writers before removing an abandoned lock.`);
-        }
-        await new Promise(resolve => { setTimeout(resolve, 50); });
-      }
-    }
-    const owner: LockOwner = { pid: process.pid, hostname: os.hostname(), instance: PROCESS_INSTANCE, acquiredAt: Date.now() };
+  private async releaseLock(lockPath: string, record: string): Promise<void> {
     try {
-      await fs.writeFile(path.join(lockPath, LOCK_OWNER_FILE), JSON.stringify(owner), { mode: 0o600, flag: 'wx' });
+      await removeLock(lockPath, record);
     } catch (error) {
-      await this.releaseLock(lockPath);
-      throw error;
-    }
-  }
-
-  /** Removes an abandoned lock; reclaimers serialize on a second lock and re-check. */
-  private async reclaimAbandonedLock(lockPath: string): Promise<boolean> {
-    const reclaimPath = `${lockPath}.reclaim`;
-    try {
-      await fs.mkdir(reclaimPath, { mode: 0o700 });
-    } catch (error) {
-      if (hasErrorCode(error, 'EEXIST')) return false;
-      throw error;
-    }
-    let reclaimed = false;
-    try {
-      if (await this.isLockAbandoned(lockPath)) {
-        await this.removeLockDirectory(lockPath);
-        reclaimed = true;
-      }
-    } finally {
-      await fs.rmdir(reclaimPath);
-    }
-    return reclaimed;
-  }
-
-  private async isLockAbandoned(lockPath: string): Promise<boolean> {
-    const owner = await readLockOwner(lockPath);
-    let abandoned: boolean;
-    if (!owner) abandoned = await lockDirectoryAge(lockPath) >= STALE_UNVERIFIABLE_LOCK_MS;
-    else if (owner.hostname !== os.hostname()) abandoned = Date.now() - owner.acquiredAt >= STALE_UNVERIFIABLE_LOCK_MS;
-    else abandoned = Date.now() - owner.acquiredAt >= ABANDONED_LOCK_MS && isLockOwnerGone(owner);
-    if (abandoned) console.warn('Recovered abandoned token storage lock:', { lockPath, owner });
-    return abandoned;
-  }
-
-  // Renaming first frees the lock atomically, so a crash never leaves a lock without its owner.
-  private async removeLockDirectory(lockPath: string): Promise<void> {
-    const released = `${lockPath}.${uniqueSuffix()}.released`;
-    await fs.rename(lockPath, released);
-    await fs.rm(released, { recursive: true, force: true });
-  }
-
-  private async releaseLock(lockPath: string): Promise<void> {
-    try {
-      await this.removeLockDirectory(lockPath);
-    } catch (error) {
-      console.error('Failed to release token storage lock; stop all writers before recovery:', { lockPath, error });
+      this.unreleasedLock = record;
+      console.error('Failed to release token storage lock; retrying before the next operation:', { lockPath, error });
     }
   }
 
