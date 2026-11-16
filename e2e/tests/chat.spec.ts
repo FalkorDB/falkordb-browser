@@ -657,7 +657,9 @@ test.describe("Chat Feature Tests", () => {
       await expect(queryText).toHaveCSS("white-space", "pre-wrap");
       await expect(queryMessage.getByTestId("chatCopyQueryButton")).toBeVisible();
       await expect(queryMessage.getByTestId("chatInsertQueryButton")).toBeVisible();
-      await expect(queryMessage.getByRole("button")).toHaveCount(2);
+      // The long query wraps past the collapse threshold, so the collapse toggle joins copy and insert.
+      await expect(queryMessage.getByRole("button", { name: "Collapse query" })).toBeVisible();
+      await expect(queryMessage.getByRole("button")).toHaveCount(3);
       expect(await queryText.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 
       let queryRequests = 0;
