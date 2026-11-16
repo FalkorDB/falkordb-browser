@@ -319,6 +319,7 @@ export default class CreateElementPanel extends GraphPage {
 
   private async setValue(typeCell: Locator, input: Locator, value: AttributeValue): Promise<void> {
     if (typeof value === "string") {
+      await this.selectType(typeCell, "string");
       await interactWhenVisible(input, (el) => el.fill(value), "Create Element Value");
       return;
     }
