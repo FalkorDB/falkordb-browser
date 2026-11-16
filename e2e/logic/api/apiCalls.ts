@@ -488,6 +488,57 @@ export default class ApiCalls {
     }
   }
 
+  async loadUdf(name: string, code: string): Promise<void> {
+    try {
+      const headers = await getAdminToken();
+      const result = await postRequest(
+        `${urls.api.udfUrl}/${encodeURIComponent(name)}`,
+        { code, replace: false },
+        undefined,
+        headers
+      );
+      if (!result.ok()) {
+        throw new Error(`${result.status()} ${await result.text()}`);
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to load UDF library. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  // Resolves to false instead of throwing when the library is gone, so it can run as cleanup.
+  async deleteUdf(name: string): Promise<boolean> {
+    try {
+      const headers = await getAdminToken();
+      const result = await deleteRequest(
+        `${urls.api.udfUrl}/${encodeURIComponent(name)}`,
+        headers
+      );
+      return result.ok();
+    } catch (error) {
+      throw new Error(
+        `Failed to delete UDF library. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async listUdfs(): Promise<string[]> {
+    try {
+      const headers = await getAdminToken();
+      const result = await getRequest(urls.api.udfUrl, headers);
+      if (!result.ok()) {
+        throw new Error(`${result.status()} ${await result.text()}`);
+      }
+      const { result: libraries } = await result.json();
+      return libraries.map((library: string[]) => library[1]);
+    } catch (error) {
+      throw new Error(
+        `Failed to list UDF libraries. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
   // Token API methods
   async generateToken(data?: {
     name?: string;
