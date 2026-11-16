@@ -4,6 +4,7 @@
 
 import { getAdminToken } from "@/e2e/infra/utils";
 import { APIRequestContext } from "playwright";
+import { request } from "@playwright/test";
 import { EventSource } from "eventsource";
 import {
   deleteRequest,
@@ -276,10 +277,18 @@ export default class ApiCalls {
     return { status: result.status(), body: await result.json() };
   }
 
-  /** GET /api/csv-temp/:id — the unauthenticated serve endpoint; `query` is the raw `?o=..&t=..`. */
+  /**
+   * GET /api/csv-temp/:id — the serve endpoint FalkorDB fetches without a session, so this sends
+   * none (an empty storage state); `query` is the raw `?o=..&t=..`.
+   */
   async getCsvTemp(id: string, query = ""): Promise<{ status: number; body: string }> {
-    const result = await getRequest(`${urls.api.csvTempUrl}/${id}${query}`);
-    return { status: result.status(), body: await result.text() };
+    const sessionless = await request.newContext({ storageState: { cookies: [], origins: [] } });
+    try {
+      const result = await getRequest(`${urls.api.csvTempUrl}/${id}${query}`, undefined, undefined, sessionless);
+      return { status: result.status(), body: await result.text() };
+    } finally {
+      await sessionless.dispose();
+    }
   }
 
   /** DELETE /api/csv-temp/:id — returns the status (204 even when the file is already gone). */
