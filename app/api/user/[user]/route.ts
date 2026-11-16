@@ -4,6 +4,7 @@ import { ROLE, getRoleWithKeys, extractKeysFromACL } from "../model";
 import { updateUser, validateBody } from "../../validate-body";
 import { getCorsHeaders, corsPreflight } from "../../utils";
 import rejectLdapManagedUsers from "../ldap-guard";
+import rejectNonAdmin from "../admin-guard";
 
 export const OPTIONS = corsPreflight;
 
@@ -19,7 +20,10 @@ export async function PATCH(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
+
+    const adminRejection = rejectNonAdmin(user.role, request);
+    if (adminRejection) return adminRejection;
 
     const ldapRejection = await rejectLdapManagedUsers(client, request);
     if (ldapRejection) return ldapRejection;
