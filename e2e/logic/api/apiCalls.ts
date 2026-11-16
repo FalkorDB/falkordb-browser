@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { getAdminToken } from "@/e2e/infra/utils";
-import { APIRequestContext } from "playwright";
+import { APIRequestContext, request as playwrightRequest } from "playwright";
 import { request } from "@playwright/test";
 import { EventSource } from "eventsource";
 import {
@@ -40,6 +40,34 @@ import {
   LogoutResponse,
 } from "./responses/authResponses";
 import { ListTokensResponse, TokenDetailsResponse } from "./responses/tokenResponse";
+
+async function postForStatus(
+  url: string,
+  body: object | string,
+  authenticated: boolean
+): Promise<{ status: number; body: any }> {
+  const headers = {
+    ...(authenticated ? await getAdminToken() : {}),
+    "Content-Type": "application/json",
+  };
+  // Playwright Test seeds new request contexts with the project's storageState, so start empty:
+  // authenticated calls pass their cookies explicitly and unauthenticated ones must carry none.
+  const ctx = await playwrightRequest.newContext({
+    storageState: { cookies: [], origins: [] },
+  });
+  try {
+    // With a JSON Content-Type Playwright JSON-encodes a string that does not parse, so send raw bytes instead.
+    const data = typeof body === "string" ? Buffer.from(body) : body;
+    const response = await postRequest(url, data, ctx, headers);
+    const isJson = response.headers()["content-type"]?.includes("application/json");
+    return {
+      status: response.status(),
+      body: isJson ? await response.json() : await response.text(),
+    };
+  } finally {
+    await ctx.dispose();
+  }
+}
 
 export async function getSSEGraphResult(
   url: string,
@@ -299,7 +327,7 @@ export default class ApiCalls {
   }
 
   /** Raw POST to the graph's load-csv route; hands back the status for asserting refusals. */
-  async loadCsv(
+  async loadCsvWithRequest(
     request: APIRequestContext,
     graph: string,
     key: string,
@@ -953,5 +981,24 @@ export default class ApiCalls {
         `Failed to get models for provider ${provider}. \n Error: ${(error as Error).message}`
       );
     }
+  }
+
+  /**
+   * POSTs to `/api/chat` and hands back the status and parsed body, for asserting
+   * validation refusals. A string `body` is sent as-is, so malformed JSON can be tested.
+   */
+  async postChat(
+    body: object | string,
+    authenticated = true
+  ): Promise<{ status: number; body: any }> {
+    return postForStatus(urls.api.chatUrl, body, authenticated);
+  }
+
+  /** Like `postChat`, for `/api/chat/models`. */
+  async postChatModels(
+    body: object,
+    authenticated = true
+  ): Promise<{ status: number; body: any }> {
+    return postForStatus(urls.api.chatModelsUrl, body, authenticated);
   }
 }
