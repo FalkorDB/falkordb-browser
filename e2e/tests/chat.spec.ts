@@ -5,7 +5,7 @@ import ChatComponent from "../logic/POM/chatComponent";
 import GraphInfoPage from "../logic/POM/graphInfoPage";
 import SettingsBrowserPage from "../logic/POM/settingsBrowserPage";
 import urls from "../config/urls.json";
-import { getRandomString } from "../infra/utils";
+import { getRandomString, waitForChatKeyMigration } from "../infra/utils";
 
 const DEFAULT_CHAT_MODEL = "gpt-4o-mini";
 
@@ -33,19 +33,7 @@ async function createChatPageWithSettings(
   await page.waitForLoadState("networkidle");
   if (apiKey === null) return chat;
 
-
-  // Chat API keys live under a connection-scoped key
-  // (`<host>:<port>:<user>:chatApiKeys`), so resolve it by suffix rather than
-  // reading the bare name.
-  await expect.poll(async () => page.evaluate(() => {
-    if (localStorage.getItem("secretKey") !== null) return false;
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (key && key.endsWith(":chatApiKeys")) return true;
-    }
-    return false;
-  }), { timeout: 15000 }).toBe(true);
-
+  await waitForChatKeyMigration(page);
   return chat;
 }
 
