@@ -59,6 +59,8 @@ For TLS connections, upload a CA certificate and, if required, a client certific
 and key on the login form. Opening the file chooser to retry clears a previous
 read error immediately. When a file selection supersedes an unfinished read,
 its older callbacks are ignored independently for each certificate or key input.
+Log in stays disabled until all current certificate and key reads finish; turning
+TLS off discards pending read results.
 
 > Note: to run the application with a different URL, set the NEXTAUTH_URL environment variable.
 

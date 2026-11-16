@@ -85,6 +85,7 @@ test.describe(`@tls TLS Login tests`, () => {
                     window.addEventListener("complete-file-read", () => {
                         readAsDataURL.call(reader, file);
                     }, { once: true });
+                    document.documentElement.dataset.retryReadStarted = "true";
                     return;
                 }
                 readAsDataURL.call(this, file);
@@ -99,8 +100,9 @@ test.describe(`@tls TLS Login tests`, () => {
         let retryFinished = false;
         const retryUpload = login.uploadCertificate(certificatePath).then(() => { retryFinished = true; });
         try {
+            await page.waitForFunction(() => document.documentElement.dataset.retryReadStarted === "true");
             await expect(readError).toBeHidden();
-            await page.evaluate(() => document.documentElement.getAttribute("data-file-read"));
+            await expect(login.logInButton).toBeDisabled();
             expect(retryFinished).toBe(false);
         } finally {
             await page.evaluate(() => window.dispatchEvent(new Event("complete-file-read")));
@@ -108,6 +110,7 @@ test.describe(`@tls TLS Login tests`, () => {
         }
 
         expect(await login.isCertificateUploaded()).toBe(true);
+        await expect(login.logInButton).toBeEnabled();
     });
 
     test(`ignores an older certificate read error while its retry is pending`, async ({}, testInfo) => {
@@ -124,7 +127,10 @@ test.describe(`@tls TLS Login tests`, () => {
                 reads.push({ reader: this, file });
                 document.documentElement.dataset.readCount = String(reads.length);
             };
-            window.addEventListener("fail-first-read", () => reads[0].reader.dispatchEvent(new ProgressEvent("error")));
+            window.addEventListener("fail-first-read", () => {
+                reads[0].reader.dispatchEvent(new ProgressEvent("error"));
+                requestAnimationFrame(() => { document.documentElement.dataset.firstReadFailed = "true"; });
+            });
             window.addEventListener("complete-second-read", () => readAsDataURL.call(reads[1].reader, reads[1].file));
         });
         await browser.navigateTo(urls.loginUrl);
@@ -136,12 +142,99 @@ test.describe(`@tls TLS Login tests`, () => {
         try {
             await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
             await page.evaluate(() => window.dispatchEvent(new Event("fail-first-read")));
+            await page.waitForFunction(() => document.documentElement.dataset.firstReadFailed === "true");
             await expect(readError).toBeHidden();
         } finally {
             await page.evaluate(() => window.dispatchEvent(new Event("complete-second-read")));
             await Promise.all([firstUpload, retryUpload]);
         }
         expect(await login.isCertificateUploaded()).toBe(true);
+    });
+
+    test(`selects a replacement even if the older read fails while the chooser opens`, async ({}, testInfo) => {
+        const login = await browser.createNewPage(LoginPage);
+        const page = await browser.getPage();
+        const certificatePath = testInfo.outputPath('chooser-retry.crt');
+        await writeFile(certificatePath, 'certificate');
+        await page.addInitScript(() => {
+            const readAsDataURL = FileReader.prototype.readAsDataURL;
+            let firstReader: FileReader | undefined;
+            let count = 0;
+            FileReader.prototype.readAsDataURL = function(file: Blob) {
+                document.documentElement.dataset.readCount = String(++count);
+                if (count === 1) {
+                    firstReader = this;
+                    return;
+                }
+                readAsDataURL.call(this, file);
+            };
+            document.addEventListener("click", event => {
+                if (event.target instanceof HTMLInputElement && event.target.type === "file" && count === 1) {
+                    firstReader?.dispatchEvent(new ProgressEvent("error"));
+                    document.documentElement.dataset.failedDuringChooser = "true";
+                }
+            }, true);
+        });
+        await browser.navigateTo(urls.loginUrl);
+        await login.clickEnableTLS();
+        const firstUpload = login.uploadCertificate(certificatePath);
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
+        await login.uploadCertificate(certificatePath);
+        await firstUpload;
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
+        expect(await page.evaluate(() => document.documentElement.dataset.failedDuringChooser)).toBe("true");
+        expect(await login.isCertificateUploaded()).toBe(true);
+    });
+
+    test(`does not submit credentials until the current certificate read completes`, async ({}, testInfo) => {
+        const login = await browser.createNewPage(LoginPage);
+        const page = await browser.getPage();
+        const certificatePath = testInfo.outputPath('pending-submit.crt');
+        await writeFile(certificatePath, 'certificate');
+        const submittedCertificates: (string | null)[] = [];
+        await page.route("**/api/auth/providers", route => route.fulfill({
+            json: {
+                credentials: {
+                    id: "credentials",
+                    name: "Credentials",
+                    type: "credentials",
+                    signinUrl: new URL("/api/auth/signin/credentials", urls.loginUrl).href,
+                    callbackUrl: new URL("/api/auth/callback/credentials", urls.loginUrl).href,
+                },
+            },
+        }));
+        await page.route("**/api/auth/csrf", route => route.fulfill({ json: { csrfToken: "test-csrf-token" } }));
+        await page.route("**/api/auth/callback/credentials*", async route => {
+            submittedCertificates.push(new URLSearchParams(route.request().postData() ?? "").get("ca"));
+            await route.fulfill({
+                status: 401,
+                json: { url: new URL("/login?error=CredentialsSignin", urls.loginUrl).href },
+            });
+        });
+        await page.addInitScript(() => {
+            const readAsDataURL = FileReader.prototype.readAsDataURL;
+            FileReader.prototype.readAsDataURL = function(file: Blob) {
+                window.addEventListener("complete-file-read", () => readAsDataURL.call(this, file), { once: true });
+                document.documentElement.dataset.readStarted = "true";
+            };
+        });
+        await browser.navigateTo(urls.loginUrl);
+        await login.fillHost("localhost");
+        await login.fillPort("6381");
+        await login.clickEnableTLS();
+        const upload = login.uploadCertificate(certificatePath);
+        try {
+            await page.waitForFunction(() => document.documentElement.dataset.readStarted === "true");
+            await login.submitForm();
+            await expect(login.logInButton).toBeDisabled();
+        } finally {
+            await page.evaluate(() => window.dispatchEvent(new Event("complete-file-read")));
+            await upload;
+        }
+        await expect(login.logInButton).toBeEnabled();
+        await login.clickConnect();
+        await expect.poll(() => submittedCertificates).toEqual(["Y2VydGlmaWNhdGU="]);
+        await expect(login.logInButton).toBeDisabled();
     });
 
     test(`waits for a retry that fails immediately`, async ({}, testInfo) => {
@@ -163,7 +256,7 @@ test.describe(`@tls TLS Login tests`, () => {
         await login.uploadCertificate(certificatePath);
         await expect(readError).toBeVisible();
         await login.uploadCertificate(certificatePath);
-        expect(await page.evaluate(() => document.documentElement.dataset.readCount)).toBe("2");
+        await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
         await expect(readError).toBeVisible();
     });
 
@@ -226,13 +319,16 @@ test.describe(`@tls TLS Login tests`, () => {
         await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
         const keyUpload = login.uploadClientKey(keyPath);
         await page.waitForFunction(() => document.documentElement.dataset.readCount === "2");
+        await expect(login.logInButton).toBeDisabled();
         await page.evaluate(() => window.dispatchEvent(new Event("complete-second-read")));
         await keyUpload;
+        await expect(login.logInButton).toBeDisabled();
         await page.evaluate(() => window.dispatchEvent(new Event("complete-first-read")));
         await certificateUpload;
 
         expect(await login.isClientKeyUploaded()).toBe(true);
         expect(await login.isCertificateUploaded()).toBe(true);
+        await expect(login.logInButton).toBeEnabled();
     });
 
     test(`ignores a pending certificate read after TLS is disabled`, async ({}, testInfo) => {
@@ -247,15 +343,21 @@ test.describe(`@tls TLS Login tests`, () => {
                 reads.push({ reader: this, file });
                 document.documentElement.dataset.readCount = String(reads.length);
             };
-            window.addEventListener("fail-first-read", () => reads[0].reader.dispatchEvent(new ProgressEvent("error")));
+            window.addEventListener("fail-first-read", () => {
+                reads[0].reader.dispatchEvent(new ProgressEvent("error"));
+                requestAnimationFrame(() => { document.documentElement.dataset.firstReadFailed = "true"; });
+            });
             window.addEventListener("complete-second-read", () => readAsDataURL.call(reads[1].reader, reads[1].file));
         });
         await browser.navigateTo(urls.loginUrl);
         await login.clickEnableTLS();
+        await expect(login.logInButton).toBeEnabled();
         const firstUpload = login.uploadCertificate(certificatePath);
         await page.waitForFunction(() => document.documentElement.dataset.readCount === "1");
         await login.clickEnableTLS();
         await page.evaluate(() => window.dispatchEvent(new Event("fail-first-read")));
+        await page.waitForFunction(() => document.documentElement.dataset.firstReadFailed === "true");
+        await expect(login.logInButton).toBeEnabled();
         await expect(login.readError(certificatePath)).toBeHidden();
         await login.clickEnableTLS();
         const secondUpload = login.uploadCertificate(certificatePath);
@@ -263,6 +365,7 @@ test.describe(`@tls TLS Login tests`, () => {
         await page.evaluate(() => window.dispatchEvent(new Event("complete-second-read")));
         await Promise.all([firstUpload, secondUpload]);
         expect(await login.isCertificateUploaded()).toBe(true);
+        await expect(login.logInButton).toBeEnabled();
     });
 
     // A FalkorDB with tls-auth-clients on is unreachable without these two

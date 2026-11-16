@@ -126,6 +126,13 @@ export default class LoginPage extends HeaderComponent {
     );
   }
 
+  async submitForm(): Promise<void> {
+    await this.connectBtn.evaluate((button: HTMLButtonElement) => {
+      if (!button.form) throw new Error("Login button is not attached to a form");
+      button.form.requestSubmit();
+    });
+  }
+
   async fillUsername(username: string): Promise<void> {
     await interactWhenVisible(
       this.usernameInput,
@@ -323,19 +330,9 @@ export default class LoginPage extends HeaderComponent {
     await interactWhenVisible(trigger, (el) => el.click(), "upload input");
     const fileChooser = await fileChooserPromise;
     const readError = this.readError(filePath);
-    await readError.waitFor({ state: "hidden", timeout: 10000 });
     await fileChooser.setFiles(filePath);
 
-    try {
-      await Promise.race([
-        status.waitFor({ state: "visible", timeout: 10000 }),
-        readError.waitFor({ state: "visible", timeout: 10000 }),
-      ]);
-    } catch (error) {
-      console.log(
-        "Certificate upload status not visible, it might be already uploaded or the upload failed."
-      );
-    }
+    await status.or(readError).first().waitFor({ state: "visible", timeout: 10000 });
   }
 
   async waitForSuccessfulLogin(Url: string): Promise<void> {
