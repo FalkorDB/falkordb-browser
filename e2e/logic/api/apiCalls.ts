@@ -551,7 +551,12 @@ export default class ApiCalls {
       : getAdminToken();
   }
 
-  // A string body is sent verbatim, so a test can post malformed JSON.
+  // Playwright re-encodes a string payload that is not valid JSON when the content type is
+  // JSON, so a string is sent as a Buffer to reach the server byte for byte (malformed JSON).
+  private rawJsonBody(body: unknown) {
+    return typeof body === "string" ? Buffer.from(body, "utf8") : body;
+  }
+
   async generateTokenRaw(
     body: unknown
   ): Promise<{ status: number; body: any }> {
@@ -559,7 +564,7 @@ export default class ApiCalls {
       ...(await this.tokenRequestHeaders()),
       "Content-Type": "application/json",
     };
-    const result = await postRequest(`${urls.api.tokenUrl}tokens`, body, undefined, headers);
+    const result = await postRequest(`${urls.api.tokenUrl}tokens`, this.rawJsonBody(body), undefined, headers);
     return { status: result.status(), body: await result.json() };
   }
 
@@ -595,13 +600,12 @@ export default class ApiCalls {
     return { status: result.status(), body: await result.json() };
   }
 
-  // A string body is sent verbatim, so a test can post malformed JSON.
   async generateTokenWithCredentialsRaw(
     body: unknown
   ): Promise<{ status: number; body: any }> {
     const result = await postRequest(
       `${urls.api.tokenUrl}tokens/credentials`,
-      body,
+      this.rawJsonBody(body),
       undefined,
       { "Content-Type": "application/json" }
     );
