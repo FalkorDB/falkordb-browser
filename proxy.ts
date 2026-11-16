@@ -88,7 +88,6 @@ type RateLimitConfig = {
     windowMs: number;
 };
 
-const PRECONFIGURED_SIGN_IN_PATH = "/api/auth/callback/credentials";
 const DEFAULT_PRECONFIGURED_SIGN_IN_MAX_REQUESTS = 10;
 function tooManyRequests() {
     return NextResponse.json(

@@ -7,6 +7,9 @@ import type { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorag
 const LOCK_OWNER_FILE = 'owner.json';
 // A holder keeps the lock for one read (with ~100 ms of retries) and one atomic write.
 const ABANDONED_LOCK_MS = 30_000;
+// A lock whose holder cannot be checked (another host, or no owner record) is presumed abandoned
+// only after this much longer age, far beyond any critical section.
+const STALE_UNVERIFIABLE_LOCK_MS = 5 * 60_000;
 // Distinguishes this process from an earlier one that reused its PID (e.g. a restarted container).
 const PROCESS_INSTANCE = crypto.randomUUID();
 
@@ -26,14 +29,22 @@ async function readLockOwner(lockPath: string): Promise<LockOwner | null> {
     return typeof owner?.pid === 'number' && typeof owner.hostname === 'string'
       && typeof owner.instance === 'string' && typeof owner.acquiredAt === 'number' ? owner : null;
   } catch {
-    // Missing or partial owner data: the holder may still be starting, so the lock is kept.
+    // Missing or partial owner data: the holder may still be starting, so only the lock's age decides.
     return null;
   }
 }
 
-/** True only when the holder provably no longer runs; holders on other hosts are never presumed dead. */
+/** Milliseconds since the lock directory was created; 0 when it cannot be inspected, so it is kept. */
+async function lockDirectoryAge(lockPath: string): Promise<number> {
+  try {
+    return Date.now() - (await fs.stat(lockPath)).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+/** True only when the holder provably no longer runs on this host. */
 function isLockOwnerGone(owner: LockOwner): boolean {
-  if (owner.hostname !== os.hostname()) return false;
   if (owner.pid === process.pid) return owner.instance !== PROCESS_INSTANCE;
   try {
     process.kill(owner.pid, 0);
@@ -64,9 +75,10 @@ class FileTokenStorage implements ITokenStorage {
 
   /**
    * Serialize each snapshot update across processes sharing this local file.
-   * A live lock is never stolen: a paused writer could otherwise overwrite a revocation.
-   * A lock is recovered only when its holder on this host has exited and the lock is
-   * far older than any critical section; other abandoned locks need operator recovery.
+   * A live lock is not stolen: a paused writer could otherwise overwrite a revocation.
+   * A lock is recovered when its holder on this host has exited and the lock is far older
+   * than any critical section, or when its holder cannot be checked (another host, or no
+   * owner record) and the lock is older than STALE_UNVERIFIABLE_LOCK_MS.
    * Failures do not poison the queue for subsequent callers.
    */
   private withLock<T>(op: () => Promise<T>): Promise<T> {
@@ -110,7 +122,7 @@ class FileTokenStorage implements ITokenStorage {
     }
   }
 
-  /** Removes the lock when its holder has exited; reclaimers serialize on a second lock and re-check. */
+  /** Removes an abandoned lock; reclaimers serialize on a second lock and re-check. */
   private async reclaimAbandonedLock(lockPath: string): Promise<boolean> {
     const reclaimPath = `${lockPath}.reclaim`;
     try {
@@ -121,16 +133,24 @@ class FileTokenStorage implements ITokenStorage {
     }
     let reclaimed = false;
     try {
-      const owner = await readLockOwner(lockPath);
-      if (owner && Date.now() - owner.acquiredAt >= ABANDONED_LOCK_MS && isLockOwnerGone(owner)) {
+      if (await this.isLockAbandoned(lockPath)) {
         await this.removeLockDirectory(lockPath);
-        console.warn('Recovered abandoned token storage lock:', { lockPath, pid: owner.pid });
         reclaimed = true;
       }
     } finally {
       await fs.rmdir(reclaimPath);
     }
     return reclaimed;
+  }
+
+  private async isLockAbandoned(lockPath: string): Promise<boolean> {
+    const owner = await readLockOwner(lockPath);
+    let abandoned: boolean;
+    if (!owner) abandoned = await lockDirectoryAge(lockPath) >= STALE_UNVERIFIABLE_LOCK_MS;
+    else if (owner.hostname !== os.hostname()) abandoned = Date.now() - owner.acquiredAt >= STALE_UNVERIFIABLE_LOCK_MS;
+    else abandoned = Date.now() - owner.acquiredAt >= ABANDONED_LOCK_MS && isLockOwnerGone(owner);
+    if (abandoned) console.warn('Recovered abandoned token storage lock:', { lockPath, owner });
+    return abandoned;
   }
 
   // Renaming first frees the lock atomically, so a crash never leaves a lock without its owner.

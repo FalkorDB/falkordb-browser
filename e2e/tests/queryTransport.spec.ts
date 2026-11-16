@@ -1,6 +1,26 @@
 import { expect, test } from "../infra/coverage";
 import urls from "../config/urls.json";
+import type { APIRequestContext } from "@playwright/test";
 import { getSSEGraphResult } from "../logic/api/apiCalls";
+
+/** Signs `request` in to the local FalkorDB and returns the post-login redirect URL. */
+async function signIn(request: APIRequestContext, callbackUrl: string): Promise<string> {
+  const csrf = await (await request.get("/api/auth/csrf")).json();
+  const login = await request.post("/api/auth/callback/credentials", {
+    headers: { "X-Auth-Return-Redirect": "1" },
+    form: {
+      csrfToken: csrf.csrfToken, callbackUrl,
+      host: "localhost", port: "6379", username: "", password: "", tls: "false",
+    },
+  });
+  expect(login.ok()).toBe(true);
+  return (await login.json()).url;
+}
+
+async function signOut(request: APIRequestContext): Promise<void> {
+  const csrf = await (await request.get("/api/auth/csrf")).json();
+  expect((await request.post("/api/auth/signout", { form: { csrfToken: csrf.csrfToken } })).ok()).toBe(true);
+}
 
 test("@admin Query helper preserves non-SSE JSON authentication errors", async () => {
   const origin = new URL(urls.loginUrl).origin;
@@ -18,16 +38,12 @@ test("@admin Query transports enforce read-only profiling and preserve SSE error
   const graph = `transport_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let created = false;
   try {
-    const csrf = await (await request.get("/api/auth/csrf")).json();
-    const login = await request.post("/api/auth/callback/credentials", {
-      headers: { "X-Auth-Return-Redirect": "1" },
-      form: {
-        csrfToken: csrf.csrfToken, callbackUrl: "graph",
-        host: "localhost", port: "6379", username: "", password: "", tls: "false",
-      },
-    });
-    expect(login.ok()).toBe(true);
-    expect((await login.json()).url).toBe(`${origin}/graph`);
+    const anonymous = await request.get(`/api/graph/${graph}`, { params: { query: "RETURN 1" } });
+    const anonymousEvent = await anonymous.text();
+    expect(anonymousEvent).toContain("event: error");
+    expect(JSON.parse(anonymousEvent.split("data: ")[1])).toMatchObject({ message: "Not authenticated", status: 401 });
+
+    expect(await signIn(request, "graph")).toBe(`${origin}/graph`);
 
     const preflight = await request.fetch(`/api/graph/${graph}/profile`, {
       method: "OPTIONS",
@@ -57,6 +73,17 @@ test("@admin Query transports enforce read-only profiling and preserve SSE error
       data: Buffer.from("{"),
     });
     expect(malformedBody.status()).toBe(400);
+    const nonStringQuery = await request.post(`/api/graph/${graph}`, { data: { query: 1 } });
+    expect(nonStringQuery.status()).toBe(400);
+    expect((await nonStringQuery.json()).message).toBe("Invalid parameter query");
+    for (const [data, message] of [
+      [{ query: "" }, "Missing parameter query"],
+      [{ query: "RETURN 1", timeout: "soon" }, "Invalid parameter timeout"],
+    ] as const) {
+      const invalidInput = await (await request.post(`/api/graph/${graph}`, { data })).text();
+      expect(invalidInput).toContain("event: error");
+      expect(JSON.parse(invalidInput.split("data: ")[1])).toEqual({ message, status: 400 });
+    }
     const profile = await request.post(`/api/graph/${graph}/profile?readOnly=true`, {
       data: { query: "CREATE (:Forbidden)", timeout: 1 },
     });
@@ -71,6 +98,20 @@ test("@admin Query transports enforce read-only profiling and preserve SSE error
     });
     expect(readProfile.status()).toBe(200);
     expect((await readProfile.json()).result.length).toBeGreaterThan(0);
+    const textProfile = await request.post(`/api/graph/${graph}/profile`, {
+      headers: { "Content-Type": "text/plain" },
+      data: "RETURN 1",
+    });
+    expect(textProfile.status()).toBe(415);
+    const malformedProfile = await request.post(`/api/graph/${graph}/profile`, {
+      headers: { "Content-Type": "application/json" },
+      data: Buffer.from("{"),
+    });
+    expect(malformedProfile.status()).toBe(400);
+    expect((await malformedProfile.json()).message).toBe("Invalid JSON");
+    const missingQuery = await request.post(`/api/graph/${graph}/profile`, { data: { query: "" } });
+    expect(missingQuery.status()).toBe(400);
+    expect((await missingQuery.json()).message).toBe("Missing parameter query");
     const readOnly = await request.get(`/api/graph/${graph}`, {
       params: { query: "CREATE (:Forbidden)", timeout: 1 },
     });
@@ -105,11 +146,26 @@ test("@admin Query transports enforce read-only profiling and preserve SSE error
       if (created) expect((await request.delete(`/api/graph/${graph}`)).ok()).toBe(true);
     } finally {
       try {
-        const csrf = await (await request.get("/api/auth/csrf")).json();
-        expect((await request.post("/api/auth/signout", { form: { csrfToken: csrf.csrfToken } })).ok()).toBe(true);
+        await signOut(request);
       } finally {
         await request.dispose();
       }
+    }
+  }
+});
+
+test("@admin Sign-in redirects stay on the application origin", async ({ playwright }) => {
+  const origin = new URL(urls.loginUrl).origin;
+  for (const callbackUrl of ["https://untrusted.example/graph", "http://["]) {
+    const request = await playwright.request.newContext({
+      baseURL: origin, storageState: { cookies: [], origins: [] },
+      extraHTTPHeaders: { Origin: origin },
+    });
+    try {
+      expect(new URL(await signIn(request, callbackUrl)).origin).toBe(origin);
+      await signOut(request);
+    } finally {
+      await request.dispose();
     }
   }
 });

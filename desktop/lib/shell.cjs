@@ -135,7 +135,8 @@ function buildServerEnv(baseEnv, { host, port, secrets, dataDir, importDir }) {
         AUTH_TRUST_HOST: "true",
         AUTH_SECRET: secrets.authSecret,
         ENCRYPTION_KEY: secrets.encryptionKey,
-        ALLOWED_ORIGINS: origin,
+        // isAppUrl also lets the window load "localhost" redirects, so accept its requests too.
+        ALLOWED_ORIGINS: `${origin},http://localhost:${port}`,
         API_TOKEN_STORAGE_PATH: path.join(dataDir, "api_tokens.json"),
         CSV_STORAGE: baseEnv.CSV_STORAGE || "local",
         CSV_LOCAL_TEMP_DIR: baseEnv.CSV_LOCAL_TEMP_DIR || importDir,

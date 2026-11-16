@@ -314,7 +314,7 @@ test("buildServerEnv gives the server what the Docker entrypoint would", () => {
     );
 
     assert.equal(env.AUTH_URL, "http://127.0.0.1:3210");
-    assert.equal(env.ALLOWED_ORIGINS, "http://127.0.0.1:3210");
+    assert.equal(env.ALLOWED_ORIGINS, "http://127.0.0.1:3210,http://localhost:3210");
     assert.equal(env.HOSTNAME, HOST, "the server must only listen on loopback");
     assert.equal(env.PORT, "3210");
     assert.equal(env.NODE_ENV, "production");

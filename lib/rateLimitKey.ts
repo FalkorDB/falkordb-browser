@@ -20,10 +20,20 @@ export function readNonNegativeInt(raw: string | undefined, fallback: number): n
 
 export const DEFAULT_TRUSTED_PROXY_HOPS = 1;
 
+const PRECONFIGURED_SIGN_IN_PATH = "/api/auth/callback/credentials";
 const SIGN_IN_BODY_CAP = 16 * 1024;
 
+/**
+ * True for a credentials sign-in that asks for the operator's preconfigured
+ * connection. That sign-in needs no secret, yet each one opens a FalkorDB
+ * client and writes a Token DB row, so it gets a far smaller budget than the
+ * general API limit. A body with no Content-Length, or one over the cap, is
+ * not read at all and counts as preconfigured: the real form is always small
+ * and sized, so this charges a client padding or streaming its way around the
+ * budget (and, at worst, a manual login with an unusually large CA bundle).
+ */
 export async function isPreconfiguredSignIn(request: Request): Promise<boolean> {
-    if (request.method !== "POST" || new URL(request.url).pathname !== "/api/auth/callback/credentials") return false;
+    if (request.method !== "POST" || new URL(request.url).pathname !== PRECONFIGURED_SIGN_IN_PATH) return false;
     const length = readNonNegativeInt(request.headers.get("content-length") ?? undefined, -1);
     if (length < 0 || length > SIGN_IN_BODY_CAP) return true;
     const reader = request.clone().body?.getReader();
@@ -47,6 +57,7 @@ export async function isPreconfiguredSignIn(request: Request): Promise<boolean> 
         }
         return new URLSearchParams(body).getAll("preconfigured").includes("true");
     } catch {
+        // A body this cannot read is one Auth.js cannot read either, so it is not a preconfigured sign-in.
         console.warn("Could not inspect sign-in request");
         return false;
     } finally {

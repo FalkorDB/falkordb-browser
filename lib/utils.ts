@@ -434,7 +434,6 @@ export async function getSSEGraphResult(
       requestUrl.searchParams.delete("query");
       requestUrl.searchParams.delete("timeout");
 
-      let errorReported = false;
       const reportError = (payloadText: string, defaultStatus: number) => {
         let rawMessage: unknown = "";
         let status = defaultStatus;
@@ -452,14 +451,12 @@ export async function getSSEGraphResult(
         if (status === 401 && code === "SESSION_INVALID") {
           triggerSessionInvalidationSignOut();
           setIndicator("offline");
-          errorReported = true;
           return new Error(message);
         }
 
         const friendly = toUserFriendlyMessage(message, status, options?.query ? { query: options.query } : undefined);
         toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, hintAction: friendly.hintAction, query: options?.query });
         if (status === 401 || status >= 500) setIndicator("offline");
-        errorReported = true;
         return new Error(message);
       };
 
@@ -471,7 +468,8 @@ export async function getSSEGraphResult(
         credentials: "same-origin",
       }).then(async (response) => {
         const responseText = await response.text();
-        if (settled || signal?.aborted) return;
+        // The abort listener settles synchronously, so `settled` also covers an abort.
+        if (settled) return;
         const events = responseText.split(/\r?\n\r?\n/);
         for (const rawEvent of events) {
           let eventName = "";
@@ -505,14 +503,8 @@ export async function getSSEGraphResult(
         finishReject(reportError("Invalid server response", response.status));
       }).catch((error: unknown) => {
         if (settled) return;
-        if (signal?.aborted) {
-          finishReject(createAbortError());
-          return;
-        }
-        if (!errorReported) {
-          toast({ title: "Error", description: "Network or server error", variant: "destructive" });
-          setIndicator("offline");
-        }
+        toast({ title: "Error", description: "Network or server error", variant: "destructive" });
+        setIndicator("offline");
         finishReject(error instanceof Error ? error : new Error("Network or server error"));
       });
 

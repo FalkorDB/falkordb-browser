@@ -2,7 +2,7 @@ import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import type { Graph } from "falkordb";
 import { runQuery } from "./run-query.ts";
-import { getCorsHeaders, isOriginAllowed, isRequestOriginTrusted } from "./utils.ts";
+import { getCorsHeaders, isOriginAllowed, isRequestOriginTrusted, resolveAllowedOrigins } from "./utils.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -113,6 +113,27 @@ describe("runQuery", () => {
             }
         });
 
+        it("trusts the configured app URL origin behind a proxy that rewrites Host", (t) => {
+            const previous = { ...process.env };
+            t.after(() => { process.env = previous; });
+            delete process.env.ALLOWED_ORIGINS;
+            delete process.env.NEXTAUTH_URL;
+            delete process.env.TRUST_PROXY_HEADERS;
+            process.env.AUTH_URL = "https://app.example/browser";
+            const request = (origin: string, host = "upstream:3000") => new Request("http://upstream:3000/api/graph", {
+                method: "POST", headers: { host, origin },
+            });
+            assert.equal(isRequestOriginTrusted(request("https://app.example")), true);
+            assert.equal(getCorsHeaders(request("https://app.example"))["Access-Control-Allow-Origin"], "https://app.example");
+            for (const origin of ["https://attacker.example", "http://app.example", "null", "javascript:alert(1)"]) {
+                assert.equal(isRequestOriginTrusted(request(origin)), false);
+            }
+            assert.equal(isRequestOriginTrusted(request("https://app.example", "evil/host")), false);
+            process.env.ALLOWED_ORIGINS = "https://frontend.example";
+            assert.equal(isRequestOriginTrusted(request("https://app.example")), true);
+            assert.equal(isRequestOriginTrusted(request("https://frontend.example")), true);
+        });
+
         it("keeps origin-less API requests usable without treating the API host as a caller", (t) => {
             const previous = { ...process.env };
             t.after(() => { process.env = previous; });
@@ -182,6 +203,25 @@ describe("runQuery", () => {
                     else process.env[key] = value;
                 }
             }
+        });
+    });
+
+    describe("resolveAllowedOrigins", () => {
+        it("adds the configured app URL origin to the valid ALLOWED_ORIGINS entries", () => {
+            assert.deepEqual(resolveAllowedOrigins({
+                ALLOWED_ORIGINS: " https://a.example/path , ftp://b.example, malformed,",
+                AUTH_URL: "https://app.example/browser",
+            }), ["https://a.example", "https://app.example"]);
+            assert.deepEqual(resolveAllowedOrigins({ NEXTAUTH_URL: "http://localhost:3000" }), ["http://localhost:3000"]);
+            assert.deepEqual(resolveAllowedOrigins({ ALLOWED_ORIGINS: "https://app.example", AUTH_URL: "https://app.example" }), ["https://app.example"]);
+        });
+
+        it("ignores an auto or invalid app URL", () => {
+            assert.deepEqual(resolveAllowedOrigins({}), []);
+            assert.deepEqual(resolveAllowedOrigins({ NEXTAUTH_URL: "auto" }), []);
+            assert.deepEqual(resolveAllowedOrigins({ AUTH_URL: "auto", NEXTAUTH_URL: "https://app.example" }), []);
+            assert.deepEqual(resolveAllowedOrigins({ AUTH_URL: "https://app.example", NEXTAUTH_URL: "auto" }), []);
+            assert.deepEqual(resolveAllowedOrigins({ AUTH_URL: "not a url" }), []);
         });
     });
 

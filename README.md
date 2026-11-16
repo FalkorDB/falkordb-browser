@@ -91,6 +91,11 @@ docker run -p 3000:3000 -p 6379:6379 -it --rm falkordb/falkordb:latest
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+For TLS connections, upload a CA certificate and, if required, a client certificate
+and key on the login form. Opening any file chooser clears the previous error, and
+selecting a new file replaces an earlier unfinished upload for that input. Log in
+stays disabled while files are being read; turning TLS off (the checkbox or a `falkor://` URL) discards uploads.
+
 > Note: to run the application with a different URL, set the NEXTAUTH_URL environment variable.
 
 ```
@@ -99,11 +104,20 @@ docker run -p 3000:3000 -e "NEXTAUTH_URL=https://www.yoururl.com" -p 6379:6379 -
 
 For reverse-proxy deployments using `NEXTAUTH_URL=auto`, set `TRUST_PROXY_HEADERS=true` only when the proxy strips or overwrites incoming `X-Forwarded-Host` and `X-Forwarded-Proto` headers.
 
-Cross-origin callers (including other localhost ports) must be explicitly listed
-in `ALLOWED_ORIGINS`. This is a caller-origin list, not an API-host allowlist: a
-separate frontend origin can be listed without listing the API server's origin.
-Without that setting, browser callers must match the request's own origin.
-Origin-less API reads remain supported. Protected reads still require
+Browser requests that send an `Origin` header are accepted only from a trusted
+origin: the configured `AUTH_URL` / `NEXTAUTH_URL` origin (unless `auto`), any
+origin listed in the comma-separated `ALLOWED_ORIGINS`, and, while
+`ALLOWED_ORIGINS` is unset, the request's own origin (so `localhost`,
+`127.0.0.1` and LAN addresses keep working). `Origin: null`, non-http(s) and
+malformed origins are always rejected. Other cross-origin callers (including
+other localhost ports) must be listed in `ALLOWED_ORIGINS`; this is a
+caller-origin list, not an API-host allowlist. Behind a proxy that rewrites the
+`Host` header, set `AUTH_URL` / `NEXTAUTH_URL` to the public URL, or use `auto`
+with `TRUST_PROXY_HEADERS=true` as above. Cookie-authenticated `POST`, `PUT`,
+`PATCH` and `DELETE` requests without an `Origin` header are accepted only from
+the same origin (`Sec-Fetch-Site: same-origin`); scripts should authenticate
+with a personal access token (`Authorization: Bearer …`) instead of a session
+cookie. Origin-less API reads remain supported. Protected reads still require
 authentication; public endpoints remain public. The allowlist is not a
 trusted-host list or a replacement for authorization.
 
@@ -128,9 +142,12 @@ snapshot), atomic replacements, and an exclusive
 appended; by default `.data/api_tokens.json.lock`) to serialize
 writers. A writer waits up to 10 seconds for the lock, then fails explicitly.
 The lock records its holder; a lock at least 30 seconds old whose holder process
-is gone on the same host is recovered automatically. Locks from another host, or
-without a readable holder record, are never stolen: stop **all** writers before
-removing that token file's abandoned lock directory and restarting. Use FalkorDB-backed
+is gone on the same host is recovered automatically. A lock whose holder cannot be
+checked (held from another host, or without a readable holder record) is recovered
+once it is 5 minutes old, far longer than any write holds it. Only one writer
+recovers a lock at a time, using a `<token-file>.lock.reclaim` directory; if a
+writer crashes while recovering, stop **all** writers before removing that
+directory and restarting. Use FalkorDB-backed
 token storage for distributed deployments rather than sharing files across
 machines.
 
@@ -368,6 +385,31 @@ For detailed configuration options and examples, see the [Helm chart documentati
 * run the server `npm run dev`
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
+
+### Upgrading / breaking changes
+
+This release hardens query and token handling. Check these before upgrading:
+
+- **`GET /api/graph/{graph}` always runs read-only.** Send writes (`CREATE`,
+  `MERGE`, …) with `POST /api/graph/{graph}` and a JSON body
+  (`{"query": "…"}`).
+- **Profiling moved to `POST /api/graph/{graph}/profile` with a JSON body.**
+  `GET` returns 405, a non-JSON body 415, and read-only users get 403.
+- **Admins list and revoke only the tokens of their own FalkorDB host:port.**
+  Manage tokens issued for another endpoint by signing in to that endpoint.
+- **`API_TOKEN_FALKORDB_URL` is parsed strictly.** `redis://` / `rediss://`
+  URLs without a port use 6379; an invalid URL, a database other than 0, a query
+  string or a fragment now throws instead of falling back to `PAT_FALKORDB_*`.
+  Since every session is validated against token storage, fix the value before
+  upgrading or logins fail.
+- **Cookie-authenticated scripts must send a trusted `Origin`** for unsafe
+  methods (see the Origin rules above). Use a personal access token
+  (`Authorization: Bearer …`) for scripts instead.
+- **Sessions need their stored connection record.** Without a persistent token
+  volume (`API_TOKEN_STORAGE_PATH` on ephemeral storage, e.g. `docker run`
+  without a volume or Helm without `persistence.enabled`), users must log in
+  again after every restart. Sessions created before connection IDs existed
+  must log in once.
 
 ### Personal access tokens
 

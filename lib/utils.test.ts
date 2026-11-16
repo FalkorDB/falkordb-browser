@@ -713,6 +713,117 @@ it("reports an empty successful POST stream instead of silently rejecting", asyn
   }
 });
 
+describe("getSSEGraphResult POST failures", () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  });
+
+  async function runPost(fetchImpl: typeof fetch, options: { query?: string; signal?: AbortSignal } = {}) {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true, value: { location: { href: "http://localhost/graph" } },
+    });
+    globalThis.fetch = fetchImpl;
+    const toasts: Array<Record<string, unknown>> = [];
+    const indicators: string[] = [];
+    const error = await getSSEGraphResult(
+      "/api/graph/demo?query=RETURN%201",
+      (t) => { toasts.push(t as Record<string, unknown>); },
+      (state) => { indicators.push(state); },
+      { ...options, method: "POST" },
+    ).then(() => assert.fail("expected a rejection"), (reason: unknown) => reason as Error);
+    return { error, toasts, indicators };
+  }
+
+  it("reports a non-OK response with the server message and the query", async () => {
+    const query = "MATCH (n) RETURN n";
+    const { error, toasts, indicators } = await runPost(
+      async () => new Response('{"message":"Boom"}', { status: 500 }),
+      { query },
+    );
+    assert.equal(error.message, "Boom");
+    assert.equal(toasts.length, 1);
+    assert.equal(toasts[0].query, query);
+    assert.deepEqual(indicators, ["offline"]);
+  });
+
+  it("falls back to a generic message for an empty 401 body", async () => {
+    const { error, toasts, indicators } = await runPost(async () => new Response(null, { status: 401 }));
+    assert.equal(error.message, "Request failed");
+    assert.equal(toasts.length, 1);
+    assert.deepEqual(indicators, ["offline"]);
+  });
+
+  it("keeps the indicator untouched for a client error event", async () => {
+    const { error, toasts, indicators } = await runPost(async () => new Response(
+      'event: error\ndata: {"message":"Bad input","status":400}\n\n',
+      { status: 200 },
+    ));
+    assert.equal(error.message, "Bad input");
+    assert.equal(toasts.length, 1);
+    assert.deepEqual(indicators, []);
+  });
+
+  it("rejects a malformed result event as an invalid server response", async (t) => {
+    const consoleError = t.mock.method(console, "error", () => {});
+    const { error, toasts, indicators } = await runPost(async () => new Response("event: result\ndata: {bad\n\n"));
+    assert.equal(error.message, "Invalid server response");
+    assert.equal(toasts.length, 1);
+    assert.deepEqual(indicators, ["offline"]);
+    assert.equal(consoleError.mock.callCount(), 1);
+    assert.equal(consoleError.mock.calls[0].arguments[0], "Failed to parse SSE result event:");
+  });
+
+  it("reports network failures with a generic toast", async () => {
+    for (const [failure, message] of [[new Error("net down"), "net down"], ["net down", "Network or server error"]] as const) {
+      const { error, toasts, indicators } = await runPost(async () => { throw failure; });
+      assert.equal(error.message, message);
+      assert.deepEqual(toasts.map(toast => toast.description), ["Network or server error"]);
+      assert.deepEqual(indicators, ["offline"]);
+    }
+  });
+
+  it("ignores a body-read failure once an abort has settled the request", async () => {
+    const controller = new AbortController();
+    const response = new Response("unused");
+    response.text = () => {
+      controller.abort();
+      return Promise.reject(new Error("body aborted"));
+    };
+    const { error, toasts, indicators } = await runPost(async () => response, { signal: controller.signal });
+    assert.ok(isAbortError(error));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(toasts, []);
+    assert.deepEqual(indicators, []);
+  });
+
+  it("signs out without a toast when the session is invalid", async () => {
+    let signOutAttempts = 0;
+    const { error, toasts, indicators } = await runPost(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/graph/")) {
+        return new Response('{"message":"Expired","code":"SESSION_INVALID"}', { status: 401 });
+      }
+      if (url.endsWith("/csrf")) return Response.json({ csrfToken: "csrf" });
+      signOutAttempts += 1;
+      throw new Error("sign-out unavailable");
+    });
+    assert.equal(error.message, "Expired");
+    assert.deepEqual(toasts, []);
+    assert.deepEqual(indicators, ["offline"]);
+    for (let i = 0; i < 100 && signOutAttempts === 0; i += 1) {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.equal(signOutAttempts, 1);
+    // Let the rejected sign-out release the in-flight guard before the next test.
+    await new Promise(resolve => setImmediate(resolve));
+  });
+});
+
 type MockEventSourceInstance = {
   url: string;
   listeners: Record<string, (event: MessageEvent) => void>;

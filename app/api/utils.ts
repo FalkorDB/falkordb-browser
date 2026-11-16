@@ -137,19 +137,22 @@ export function getRequestOrigin(request?: Request): string | null {
     return normalizeOrigin(`${protocol}://${host}`);
 }
 
-/**
- * Cross-origin callers must be explicitly configured.
- */
-function getAllowedOrigins(): string[] {
-    const envOrigins = process.env.ALLOWED_ORIGINS;
-    if (envOrigins) {
-        return envOrigins
-            .split(',')
-            .map(origin => normalizeOrigin(origin.trim()))
-            .filter((origin): origin is string => Boolean(origin));
-    }
+type OriginEnv = Record<string, string | undefined>;
 
-    return [];
+/**
+ * Caller origins trusted besides the request's own: `ALLOWED_ORIGINS` plus the configured
+ * (non-`auto`) AUTH_URL / NEXTAUTH_URL origin, which a proxy that rewrites Host still serves.
+ */
+export function resolveAllowedOrigins(env: OriginEnv = process.env): string[] {
+    const origins = (env.ALLOWED_ORIGINS ?? "")
+        .split(",")
+        .map(origin => normalizeOrigin(origin.trim()))
+        .filter((origin): origin is string => Boolean(origin));
+    const appUrl = env.AUTH_URL ?? env.NEXTAUTH_URL;
+    const appOrigin = appUrl && appUrl !== AUTO_NEXTAUTH_URL && env.NEXTAUTH_URL !== AUTO_NEXTAUTH_URL
+        ? normalizeOrigin(appUrl)
+        : null;
+    return appOrigin && !origins.includes(appOrigin) ? [...origins, appOrigin] : origins;
 }
 
 export function isOriginAllowed(requestOrigin?: string | null, request?: Request): boolean {
@@ -162,9 +165,7 @@ export function isOriginAllowed(requestOrigin?: string | null, request?: Request
         return false;
     }
 
-    const allowedOrigins = getAllowedOrigins();
-
-    if (allowedOrigins.includes(origin)) {
+    if (resolveAllowedOrigins().includes(origin)) {
         return true;
     }
 
@@ -216,9 +217,7 @@ export function corsHeaders(requestOrigin?: string | null): Record<string, strin
     };
 
     const origin = requestOrigin ? normalizeOrigin(requestOrigin) : null;
-    const allowedOrigins = getAllowedOrigins();
-
-    if (origin && allowedOrigins.includes(origin)) {
+    if (origin && resolveAllowedOrigins().includes(origin)) {
         headers['Access-Control-Allow-Origin'] = origin;
         headers['Access-Control-Allow-Credentials'] = 'true';
     }
