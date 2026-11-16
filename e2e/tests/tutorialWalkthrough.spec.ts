@@ -1771,7 +1771,7 @@ test.describe("Tutorial", () => {
         // Get the list of graphs before tutorial starts
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
-        await tutorial.waitForTimeout(2000);
+        await tutorial.waitForPageIdle();
 
         const graphsBefore = await tutorial.getGraphList();
         expect(graphsBefore).toContain(userGraph);
@@ -1779,8 +1779,8 @@ test.describe("Tutorial", () => {
         // Open a second tab, so the strip the tutorial replaces is one the user
         // can tell apart from the tutorial's own single tab.
         await tutorial.addStripTab();
-        const userTabs = await tutorial.getStripTabCount();
-        expect(userTabs).toBe(2);
+        const userTabs = 2;
+        await expect.poll(() => tutorial.getStripTabCount()).toBe(userTabs);
         // The address bar follows the new blank tab after a short debounce, so the
         // blank tab is the persisted active one; opening the page while a share
         // link is still active would hold the tutorial back.
@@ -1789,7 +1789,6 @@ test.describe("Tutorial", () => {
         // 2. Start the tutorial by setting localStorage and reopening the graph page
         await tutorial.changeLocalStorage("true");
         await browser.navigateTo(urls.graphUrl);
-        await tutorial.waitForTimeout(2000);
 
         // Step 0: "Preparing Tutorial..." — auto-advances after loading demo graphs
         // Step 1: "Welcome to FalkorDB Browser" — has Next button (no advanceOn)
@@ -1830,7 +1829,6 @@ test.describe("Tutorial", () => {
 
         // Step 7: "Graph Info Panel" — no advanceOn, has Next button
         await tutorial.waitForStep("Graph Info Panel");
-        await tutorial.waitForTimeout(1000); // Wait for graph info to load
         await tutorial.clickNextButton();
 
         // Step 8: "Open Label Options" — advanceOn: "click" on graphInfoPersonNode
@@ -1896,7 +1894,7 @@ test.describe("Tutorial", () => {
 
         // Step 22: "Graph Visualization" — no advanceOn, has Next button
         await tutorial.waitForStep("Graph Visualization");
-        await tutorial.waitForTimeout(2000); // Wait for canvas animation
+        await tutorial.waitForCanvasAnimationToEnd();
         await tutorial.clickNextButton();
 
         // Step 23: "Expand Node" — no advanceOn, has Next button (forwards events for optional interaction)
@@ -2075,20 +2073,15 @@ test.describe("Tutorial", () => {
         // 3. After tutorial closes, verify state restoration
         expect(await tutorial.isTutorialNotVisible()).toBeTruthy();
 
-        // Wait for cleanup to complete (demo graphs deleted, user graphs restored)
-        await tutorial.waitForTimeout(3000);
+        // 4. Cleanup is async: this tutorial's demo graphs are deleted, the user's graph is kept
+        await expect.poll(async () => {
+            const graphs = await tutorial.getGraphList();
+            return activeDemoGraphs.filter((g) => graphs.includes(g));
+        }, { timeout: 10_000 }).toEqual([]);
+        expect(await tutorial.getGraphList()).toContain(userGraph);
 
-        // 4. Verify this tutorial's demo graphs are gone
-        const graphsAfter = await tutorial.getGraphList();
-        for (const demoGraph of activeDemoGraphs) {
-            expect(graphsAfter).not.toContain(demoGraph);
-        }
-
-        // 5. Verify the user's original graph is still present
-        expect(graphsAfter).toContain(userGraph);
-
-        // 6. Verify the user's own tabs came back with them
-        expect(await tutorial.getStripTabCount()).toBe(userTabs);
+        // 5. Verify the user's own tabs came back with them
+        await expect.poll(() => tutorial.getStripTabCount()).toBe(userTabs);
 
         // 6. Verify the tutorial flag is set to "false" (completed)
         const tutorialFlag = await page.evaluate(() =>

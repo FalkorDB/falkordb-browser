@@ -87,6 +87,7 @@ export default function BrowserSettings() {
         resetSettings,
         saveSettings,
         replayTutorial,
+        settingsLoaded,
     } = useContext(BrowserSettingsContext);
 
     const { prefixConnectionId } = useContext(ConnectionContext);
@@ -97,6 +98,7 @@ export default function BrowserSettings() {
     const router = useRouter();
 
     const [isResetting, setIsResetting] = useState(false);
+    const [draftsReady, setDraftsReady] = useState(false);
     const [modelDisplayNames, setModelDisplayNames] = useState<string[]>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [isManualLocalModelLoad, setIsManualLocalModelLoad] = useState(false);
@@ -317,7 +319,9 @@ export default function BrowserSettings() {
         setNewLocalLlmProvider(localLlmProvider);
         setNewLocalLlmEndpoint(localLlmEndpoint);
         setNewModel(model);
-    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewGraphsSortOrder, graphsSortOrder, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
+        // Batched with the draft copies above, so the page never reports ready while a field still shows a default.
+        setDraftsReady(settingsLoaded);
+    }, [settingsLoaded, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewGraphsSortOrder, graphsSortOrder, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
 
     useEffect(() => {
         setHasChanges(
@@ -707,7 +711,7 @@ export default function BrowserSettings() {
     };
 
     return (
-        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
+        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden" data-testid="browserSettingsPage" aria-busy={!settingsLoaded || !draftsReady}>
             <div className="flex items-start justify-between gap-2 px-2 mobile:items-center">
                 <div className="min-w-0 flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar mobile:max-h-none mobile:overflow-visible">
                     <h1 className="text-3xl font-semibold mobile:text-xl">Browser Settings</h1>
