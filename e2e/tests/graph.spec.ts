@@ -312,45 +312,53 @@ test.describe("Graph Tests", () => {
   });
 
   test(`@readwrite Validate that a blank graph name is rejected without creating a graph`, async () => {
-    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    const page = await browser.getPage();
-    await browser.setPageToFullScreen();
-    const writes: string[] = [];
-    page.on("request", request => {
-      if (request.method() === "POST" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
-    });
-    await graph.clickCreateGraph();
-    await graph.clickConfirmCreateGraph();
-    await graph.expectEmptyGraphNameError();
-    await expect(graph.insertInput).toBeVisible();
-    await graph.dismissErrorToast();
-    await graph.fillCreateGraphInput("   ");
-    await graph.clickConfirmCreateGraph();
-    await graph.expectEmptyGraphNameError();
-    await expect(graph.insertInput).toBeVisible();
-    await graph.expectNoGraphCreatedToast();
-    expect((await apiCall.getGraphs()).opts).not.toContain("   ");
-    expect(writes).toEqual([]);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "POST" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
+      });
+      await graph.clickCreateGraph();
+      await graph.clickConfirmCreateGraph();
+      await graph.expectEmptyGraphNameError();
+      await expect(graph.insertInput).toBeVisible();
+      await graph.dismissErrorToast();
+      await graph.fillCreateGraphInput("   ");
+      await graph.clickConfirmCreateGraph();
+      await graph.expectEmptyGraphNameError();
+      await expect(graph.insertInput).toBeVisible();
+      await graph.expectNoGraphCreatedToast();
+      expect((await apiCall.getGraphs()).opts).not.toContain("   ");
+      expect(writes).toEqual([]);
+    } finally {
+      await apiCall.removeGraph(encodeURIComponent("   "));
+    }
   });
 
   test(`@readwrite Validate that cancelling the create graph dialog clears the draft name`, async () => {
     const graphName = getRandomString("graph");
-    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    const page = await browser.getPage();
-    await browser.setPageToFullScreen();
-    const writes: string[] = [];
-    page.on("request", request => {
-      if (request.method() === "POST" && new URL(request.url()).pathname === `/api/graph/${encodeURIComponent(graphName)}`) writes.push(request.url());
-    });
-    await graph.clickCreateGraph();
-    await graph.fillCreateGraphInput(graphName);
-    await expect(graph.insertInput).toHaveValue(graphName);
-    await graph.clickCreateCancel();
-    await expect(graph.insertInput).toBeHidden();
-    await graph.clickCreateGraph();
-    await expect(graph.insertInput).toHaveValue("");
-    expect(writes).toEqual([]);
-    expect((await apiCall.getGraphs()).opts).not.toContain(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "POST" && new URL(request.url()).pathname === `/api/graph/${encodeURIComponent(graphName)}`) writes.push(request.url());
+      });
+      await graph.clickCreateGraph();
+      await graph.fillCreateGraphInput(graphName);
+      await expect(graph.insertInput).toHaveValue(graphName);
+      await graph.clickCreateCancel();
+      await expect(graph.insertInput).toBeHidden();
+      await graph.clickCreateGraph();
+      await expect(graph.insertInput).toHaveValue("");
+      expect(writes).toEqual([]);
+      expect((await apiCall.getGraphs()).opts).not.toContain(graphName);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
   });
 
   test(`@admin Validate that modifying a graph name to an existing name is prevented`, async () => {
