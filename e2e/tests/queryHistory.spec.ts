@@ -332,7 +332,11 @@ test.describe('Query history Tests', () => {
             bodyFailed = false;
         } finally {
             const results = await Promise.allSettled(created.map((name) => apicalls.removeGraph(name, "admin")));
-            const failures = results.flatMap((result, index) => result.status === "rejected" ? [`${created[index]}: ${String(result.reason)}`] : []);
+            const failures = results.flatMap((result, index) => {
+                if (result.status === "rejected") return [`${created[index]}: ${String(result.reason)}`];
+                // removeGraph resolves with the HTTP status instead of throwing on error responses
+                return result.value.status >= 400 ? [`${created[index]}: HTTP ${result.value.status}`] : [];
+            });
             // Only fail on a leak when the body passed, so cleanup never replaces the test's own error
             if (failures.length > 0 && !bodyFailed) throw new Error(`Failed to remove graph(s): ${failures.join("; ")}`);
         }
