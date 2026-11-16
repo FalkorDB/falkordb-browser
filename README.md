@@ -127,8 +127,10 @@ snapshot), atomic replacements, and an exclusive
 `<token-file>.lock` directory (the full configured token path with `.lock`
 appended; by default `.data/api_tokens.json.lock`) to serialize
 writers. A writer waits up to 10 seconds for the lock, then fails explicitly.
-Locks are never automatically stolen. After a process crash, stop **all** writers
-before removing that token file's abandoned lock directory and restarting. Use FalkorDB-backed
+The lock records its holder; a lock at least 30 seconds old whose holder process
+is gone on the same host is recovered automatically. Locks from another host, or
+without a readable holder record, are never stolen: stop **all** writers before
+removing that token file's abandoned lock directory and restarting. Use FalkorDB-backed
 token storage for distributed deployments rather than sharing files across
 machines.
 
@@ -544,3 +546,5 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   The Firefox settings project depends on the Chromium settings project because both
   mutate server-wide configuration. Selecting Firefox also runs Chromium first; do not
   bypass this dependency when both projects share a server.
+  The connection manager's server-switching test also needs a second FalkorDB on port 6380
+  (CI runs one as the `falkordb-pat` service): `docker run -d -p 6380:6379 falkordb/falkordb`.

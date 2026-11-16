@@ -438,6 +438,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   useEffect(() => {
     graphNamesLoadedRef.current = graphNamesLoaded;
   }, [graphNamesLoaded]);
+  // Written with every setGraphNamesLoaded call, so it already holds a value
+  // that has not committed yet. Only the fetch effect's clear reads it: going by
+  // the mirror above, a re-run landing between a refresh's publish and its
+  // commit would wipe the list it just published while leaving it "loaded",
+  // and restored tabs would then be held as if the list were unknown.
+  const graphNamesPublishedRef = useRef(graphNamesLoaded);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   // graphRef always points to the current graph so setGraphInfo can mutate
   // graph.GraphInfo in-place without triggering a graph state change.
@@ -750,6 +756,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setHasChanges,
     replayTutorial,
     tutorialOpen,
+    settingsLoaded: timeoutLoaded,
     saveSettings: async () => {
       // Save settings to local storage
       localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString());
@@ -832,7 +839,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHasChanges(false);
     }
 
-  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, graphsSortOrder, newGraphsSortOrder, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
+  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, graphsSortOrder, newGraphsSortOrder, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, timeoutLoaded, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -2707,6 +2714,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setGraphNames([]);
       setGraphNamesUnknown(true);
     }
+    graphNamesPublishedRef.current = true;
     setGraphNamesLoaded(true);
     // Auto-select is graph-scoped: only apply if the graph context is unchanged.
     if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
@@ -2757,6 +2765,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (prev === null && activeConnectionId === bootstrap?.id && getConnectionEpoch() === bootstrap.epoch) return;
     setGraphNamesLoaded(false);
     graphNamesLoadedRef.current = false;
+    graphNamesPublishedRef.current = false;
     setGraphNames(undefined);
     setGraphNamesUnknown(false);
     graphNamesKnownRef.current = false;
@@ -2813,7 +2822,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // no "already fetched" flag can consume a fetch that never started.
   useEffect(() => {
     if (status !== "authenticated") return;
-    handleFetchOptions({ clear: !graphNamesLoadedRef.current });
+    handleFetchOptions({ clear: !graphNamesPublishedRef.current });
   }, [activeConnectionId, handleFetchOptions, status]);
 
   const handleCloseTutorial = () => {
@@ -2917,6 +2926,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         supersedeGraphRefreshes();
         if (requested.includes(graphNameRef.current) && !refreshed.names.includes(graphNameRef.current)) handleSetGraphName("");
         setGraphNames(refreshed.opts);
+        graphNamesPublishedRef.current = true;
         setGraphNamesLoaded(true);
       }
     } catch (error) {
@@ -3542,6 +3552,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     supersedeGraphRefreshes();
 
     setGraphNames(restoredGraphs);
+    graphNamesPublishedRef.current = restoredGraphs !== undefined;
     setGraphNamesLoaded(restoredGraphs !== undefined);
     setUserGraphsBeforeTutorial([]);
     setUserGraphBeforeTutorial("");

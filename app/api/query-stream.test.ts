@@ -82,3 +82,17 @@ test("authentication errors preserve status and connection error code in SSE", a
     message: "Connection expired", code: "CONNECTION_EXPIRED", status: 401,
   });
 });
+
+test("non-JSON authentication errors fall back to their text or a generic message", async (t) => {
+  const warning = t.mock.method(console, "warn", () => {});
+  for (const [body, message] of [["Gateway refused", "Gateway refused"], ["", "Unauthorized"]] as const) {
+    const response = await queryStreamError(new Response(body, { status: 401 }), {});
+    assert.deepEqual(JSON.parse((await response.text()).split("data: ")[1]), { message, status: 401 });
+  }
+  assert.equal(warning.mock.callCount(), 2);
+});
+
+test("a query without a result emits an empty result object", async () => {
+  const response = queryStream(new AbortController().signal, async () => undefined, {});
+  assert.equal(await response.text(), "event: result\ndata: {}\n\n");
+});

@@ -1,5 +1,3 @@
-/* eslint-disable react/destructuring-assignment */
-
 'use client';
 
 import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -188,7 +186,7 @@ export default function CreateElementPanel(props: Props) {
 
     const handleSetEditable = (key: string, value?: Value) => {
         setEditable(key);
-        setEditVal(value || "");
+        setEditVal(value ?? "");
         setEditType(typeof value === "undefined" ? "string" : typeof value as ValueType);
     };
 
@@ -291,6 +289,7 @@ export default function CreateElementPanel(props: Props) {
         switch (valueType) {
             case "boolean":
                 return <Switch
+                    data-testid={actionType === "set" ? "CreateElementPanelEditValue" : "CreateElementPanelNewValue"}
                     className="data-[state=unchecked]:bg-border"
                     checked={value as boolean}
                     onCheckedChange={(checked) => setValue(checked)}
@@ -300,7 +299,13 @@ export default function CreateElementPanel(props: Props) {
                     className="w-full"
                     ref={actionType === "set" ? setInputRef : undefined}
                     value={value as number}
+                    data-testid={actionType === "set" ? "CreateElementPanelEditValue" : "CreateElementPanelNewValue"}
                     onChange={(e) => {
+                        // Number("") is 0, which would silently store 0 for an empty field.
+                        if (e.target.value.trim() === "") {
+                            setValue("");
+                            return;
+                        }
                         const num = Number(e.target.value);
                         if (!Number.isNaN(num)) setValue(num);
                     }}
@@ -308,6 +313,7 @@ export default function CreateElementPanel(props: Props) {
                 />;
             default:
                 return <Input
+                    data-testid={actionType === "set" ? "CreateElementPanelEditValue" : "CreateElementPanelNewValue"}
                     className="w-full"
                     ref={actionType === "set" ? setInputRef : undefined}
                     value={value as string}
@@ -415,8 +421,9 @@ export default function CreateElementPanel(props: Props) {
     };
 
     return (
-        <div className="DataPanel p-4 gap-1 relative">
+        <div data-testid="CreateElementPanel" className="DataPanel p-4 gap-1 relative">
             <Button
+                data-testid="CreateElementPanelClose"
                 className="absolute top-2 right-2"
                 title="Close"
                 onClick={onClose}
@@ -425,7 +432,7 @@ export default function CreateElementPanel(props: Props) {
             </Button>
             <fieldset className="flex min-w-0 flex-col gap-2" disabled={!tabsReady} inert={tabsReady ? undefined : true}>
                 <div className="flex items-center justify-between pr-5">
-                    <h1 className="text-lg font-semibold">Create {type ? "Node" : "Edge"}</h1>
+                    <h1 data-testid="CreateElementPanelTitle" className="text-lg font-semibold">Create {type ? "Node" : "Edge"}</h1>
                     {
                         type
                             ? <Circle className="text-foreground/50" size={20} />
@@ -433,7 +440,7 @@ export default function CreateElementPanel(props: Props) {
                     }
                 </div>
                 <div className="flex flex-col gap-2 font-medium text-sm text-nowrap">
-                    <p>Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
+                    <p>Attributes: <span data-testid="CreateElementPanelAttributesCount" className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
                 </div>
                 <ul
                     className="flex flex-wrap gap-2"
@@ -443,6 +450,7 @@ export default function CreateElementPanel(props: Props) {
                     {labels.map((l) => (
                         <li
                             key={l}
+                            data-testid={`CreateElementPanelLabel${l}`}
                             className="flex gap-2 p-1 bg-secondary rounded-full items-center"
                         >
                             <p>{l}</p>
@@ -451,6 +459,7 @@ export default function CreateElementPanel(props: Props) {
                                 selectedLabel={l}
                                 trigger={
                                     <Button
+                                        data-testid={`CreateElementPanelRemoveLabel${l}`}
                                         title="Remove Label"
                                     >
                                         <X size={15} />
@@ -467,6 +476,7 @@ export default function CreateElementPanel(props: Props) {
                                 onAddLabel={handleAddLabel}
                                 trigger={
                                     <Button
+                                        data-testid="CreateElementPanelAddLabel"
                                         className="p-2 text-nowrap text-xs justify-center border border-border rounded-full"
                                         label={`Add ${type ? "Label" : "Type"}`}
                                         title={type ? "Add a new label" : "Define the relationship type"}
@@ -500,7 +510,7 @@ export default function CreateElementPanel(props: Props) {
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                     >
-                                        <p className="w-full truncate">{key}:</p>
+                                        <p data-testid={`CreateElementPanelAttributeKey${key}`} className="w-full truncate">{key}:</p>
                                     </div>
                                     <div
                                         className={cn("flex w-full px-2 border-b border-border", rowHeightClass)}
@@ -513,6 +523,7 @@ export default function CreateElementPanel(props: Props) {
                                                 : (
                                                     <div className="flex w-full flex-col gap-1 justify-center">
                                                         <Button
+                                                            data-testid={`CreateElementPanelAttributeValue${key}`}
                                                             className="disabled:opacity-100 disabled:cursor-default w-full justify-start"
                                                             title={isComplex ? "Complex values cannot be edited" : "Click to edit the attribute value"}
                                                             variant="button"
@@ -551,11 +562,12 @@ export default function CreateElementPanel(props: Props) {
                                         }
                                     </div>
                                     <div
+                                        data-testid={editable === key ? "CreateElementPanelEditType" : undefined}
                                         className={cn("flex items-center px-2 border-b border-border", rowHeightClass)}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                     >
-                                        {editable === key ? getNewTypeInput("set") : <p className="w-full truncate">{typeof value}</p>}
+                                        {editable === key ? getNewTypeInput("set") : <p data-testid={`CreateElementPanelAttributeType${key}`} className="w-full truncate">{typeof value}</p>}
                                     </div>
                                     <div
                                         className={cn("flex items-center gap-1 justify-start px-2 border-b border-border", rowHeightClass)}
@@ -566,6 +578,7 @@ export default function CreateElementPanel(props: Props) {
                                             editable === key ?
                                                 <>
                                                     <Button
+                                                        data-testid="CreateElementPanelSaveAttribute"
                                                         variant="button"
                                                         title="Save"
                                                         onClick={() => handleUpdateAttribute(key)}
@@ -573,6 +586,7 @@ export default function CreateElementPanel(props: Props) {
                                                         <Check size={20} />
                                                     </Button>
                                                     <Button
+                                                        data-testid="CreateElementPanelCancelEditAttribute"
                                                         variant="button"
                                                         title="Cancel"
                                                         onClick={() => {
@@ -592,6 +606,7 @@ export default function CreateElementPanel(props: Props) {
                                                         </HelpTip>
                                                     ) : (
                                                         <Button
+                                                            data-testid={`CreateElementPanelEditAttribute${key}`}
                                                             variant="button"
                                                             title="Edit"
                                                             onClick={() => handleSetEditable(key, value)}
@@ -602,6 +617,7 @@ export default function CreateElementPanel(props: Props) {
                                                     {tabsReady && <DialogComponent
                                                         trigger={
                                                             <Button
+                                                                data-testid={`CreateElementPanelDeleteAttribute${key}`}
                                                                 variant="button"
                                                                 title="Delete Attribute"
                                                             >
@@ -613,11 +629,13 @@ export default function CreateElementPanel(props: Props) {
                                                     >
                                                         <div className="flex justify-end gap-4">
                                                             <Button
+                                                                data-testid="CreateElementPanelDeleteAttributeConfirm"
                                                                 variant="Delete"
                                                                 label="Delete"
                                                                 onClick={() => setAttributes(prev => prev.filter(([k]) => k !== key))}
                                                             />
                                                             <CloseDialog
+                                                                data-testid="CreateElementPanelDeleteAttributeCancel"
                                                                 label="Cancel"
                                                                 variant="Cancel"
                                                             />
@@ -631,6 +649,7 @@ export default function CreateElementPanel(props: Props) {
                         })}
                         <div className="flex items-center px-2 border-b border-border h-14">
                             <Input
+                                data-testid="CreateElementPanelNewKey"
                                 className="w-full"
                                 placeholder="Key"
                                 onKeyDown={handleAddKeyDown}
@@ -641,11 +660,12 @@ export default function CreateElementPanel(props: Props) {
                         <div className="flex items-center px-2 border-b border-border h-14">
                             {getCellEditableContent()}
                         </div>
-                        <div className="flex items-center px-2 border-b border-border h-14">
+                        <div data-testid="CreateElementPanelNewType" className="flex items-center px-2 border-b border-border h-14">
                             {getNewTypeInput()}
                         </div>
                         <div className="flex items-center gap-1 justify-start px-2 border-b border-border h-14">
                             <Button
+                                data-testid="CreateElementPanelAddAttribute"
                                 variant="button"
                                 title="Add"
                                 onClick={handleAddAttribute}
@@ -653,6 +673,7 @@ export default function CreateElementPanel(props: Props) {
                                 <Plus size={20} />
                             </Button>
                             <Button
+                                data-testid="CreateElementPanelCancelNewAttribute"
                                 variant="button"
                                 title="Cancel"
                                 onClick={() => {
@@ -711,7 +732,7 @@ export default function CreateElementPanel(props: Props) {
                     !type && selectedNodes && setSelectedNodes &&
                     <div className="w-full flex flex-col gap-2">
                         <div className="w-full flex justify-between p-4 items-center">
-                            <div style={{ backgroundColor: selectedNodes[0].color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
+                            <div data-testid="CreateElementPanelSourceNode" style={{ backgroundColor: selectedNodes[0].color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <p className="truncate">{handleGetNodeTextPriority(selectedNodes[0])}</p>
@@ -722,7 +743,7 @@ export default function CreateElementPanel(props: Props) {
                                 </Tooltip>
                             </div>
                             <ArrowRight strokeWidth={1} size={30} />
-                            <div style={{ backgroundColor: selectedNodes[1].color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
+                            <div data-testid="CreateElementPanelTargetNode" style={{ backgroundColor: selectedNodes[1].color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <p className="truncate">{handleGetNodeTextPriority(selectedNodes[1])}</p>
@@ -734,6 +755,7 @@ export default function CreateElementPanel(props: Props) {
                             </div>
                         </div>
                         <Button
+                            data-testid="CreateElementPanelSwap"
                             className="flex-col-reverse"
                             label="Swap"
                             title="Swap the order of selected nodes"
@@ -749,6 +771,7 @@ export default function CreateElementPanel(props: Props) {
                         handleOnCreate();
                     }}>
                         <Button
+                            data-testid="CreateElementPanelCreate"
                             indicator={indicator}
                             label={`Create new ${type ? "node" : "edge"}`}
                             title={`Add a new ${type ? "node" : "edge"} to the graph`}

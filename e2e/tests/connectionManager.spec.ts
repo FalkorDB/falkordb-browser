@@ -3,11 +3,17 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import ConnectionManagerComponent from "../logic/POM/connectionManagerComponent";
 import urls from "../config/urls.json";
 import LoginPage from "../logic/POM/loginPage";
-import { initializeLocalStorage } from "../infra/utils";
+import GraphPage from "../logic/POM/graphPage";
+import ApiCalls from "../logic/api/apiCalls";
+import { getRandomString, initializeLocalStorage } from "../infra/utils";
 import { user, userRoles } from "../config/user.json";
 
 // The admin login connects as the server's default user.
 const ADMIN_USERNAME = "default";
+// CI runs a second FalkorDB on 6380 next to the one the tests log in to on 6379; the
+// switching test needs it locally too (`docker run -d -p 6380:6379 falkordb/falkordb`).
+const PRIMARY_PORT = 6379;
+const SECONDARY_SERVER = { host: "localhost", port: 6380 };
 const READ_WRITE_USERNAME = userRoles.find(({ role }) => role === "readwrite")!.name;
 
 test("@admin Removed connections cannot be recovered from session fields", async ({ playwright }) => {
@@ -175,6 +181,56 @@ test.describe("Connection Manager Tests: own session", () => {
     await expect(manager.activeMarkerForUser(READ_WRITE_USERNAME)).toHaveCount(1);
   });
 
+  test(`@admin Verify switching connections moves the active marker, the session and the graph list`, async ({ page }) => {
+    test.setTimeout(60_000);
+    const apiCall = new ApiCalls();
+    const graph = new GraphPage(page);
+    const suffix = getRandomString("switch");
+    const primaryGraph = `primary-${suffix}`;
+    const secondaryGraph = `secondary-${suffix}`;
+    await manager.openDropdown();
+    const primaryId = await manager.getConnectionIdOnPort(PRIMARY_PORT);
+    expect(primaryId).toBeTruthy();
+    await manager.closeDropdown();
+    let secondaryId: string | undefined;
+    let cleanup: PromiseSettledResult<number>[] = [];
+    try {
+      await apiCall.addGraphOnConnection(page.request, primaryGraph, primaryId!);
+      await manager.submitAdditionalConnection(ADMIN_USERNAME, "", SECONDARY_SERVER);
+      await expect(manager.addDialog).toBeHidden();
+      await manager.openDropdown();
+      secondaryId = await manager.getConnectionIdOnPort(SECONDARY_SERVER.port);
+      expect(secondaryId).toBeTruthy();
+      await apiCall.addGraphOnConnection(page.request, secondaryGraph, secondaryId!);
+      await expect(manager.activeMarkerOnPort(SECONDARY_SERVER.port)).toHaveCount(1);
+      await expect(manager.activeMarkerOnPort(PRIMARY_PORT)).toHaveCount(0);
+      await manager.closeDropdown();
+
+      const switchConnection = async (port: number, connectionId: string, graphName: string) => {
+        const switchedSession = manager.waitForSessionUpdate();
+        await manager.openDropdown();
+        await manager.selectConnectionOnPort(port);
+        expect(await (await switchedSession).json()).toMatchObject({ activeConnectionId: connectionId });
+        await manager.openDropdown();
+        await expect(manager.connectionItems).toHaveCount(2);
+        await expect(manager.activeMarkerOnPort(port)).toHaveCount(1);
+        await manager.closeDropdown();
+        await expect.poll(() => graph.readGraphNamesInList(suffix)).toEqual([graphName]);
+        await graph.closeGraphList();
+      };
+      // The list shows only the active server's graphs.
+      await switchConnection(PRIMARY_PORT, primaryId!, primaryGraph);
+      await switchConnection(SECONDARY_SERVER.port, secondaryId!, secondaryGraph);
+    } finally {
+      cleanup = await Promise.allSettled([
+        apiCall.removeGraphOnConnection(page.request, primaryGraph, primaryId!),
+        ...(secondaryId ? [apiCall.removeGraphOnConnection(page.request, secondaryGraph, secondaryId)] : []),
+      ]);
+    }
+    // Reached only when the scenario passed, so a cleanup failure never masks its error.
+    expect(cleanup.map((result) => (result.status === "fulfilled" ? result.value : result.reason))).toEqual(cleanup.map(() => 200));
+  });
+
   test.describe("with an added read-write connection", () => {
     test.beforeEach(async () => {
       await manager.submitAdditionalConnection(READ_WRITE_USERNAME, user.password);
@@ -227,7 +283,7 @@ test.describe("Connection Manager Tests: own session", () => {
       await expect(manager.logoutDialog).toBeHidden();
       await expect(manager.connectionItems).toHaveCount(1);
       await expect(manager.activeMarkerForUser(ADMIN_USERNAME)).toHaveCount(1);
-      await manager.closeDropdown();
+      // The reload below closes the menu; after the removal dialog, Escape leaves it open.
       const restoredSession = manager.waitForSessionUpdate();
       await manager.refreshPage();
       const restored = await restoredSession;
@@ -236,6 +292,39 @@ test.describe("Connection Manager Tests: own session", () => {
       await manager.openDropdown();
       await expect(manager.connectionItems).toHaveCount(1);
       await expect(manager.connectionForUser(ADMIN_USERNAME)).toContainText("Admin");
+    });
+
+    test(`@admin Verify cancelling a removal keeps the connection and confirming it removes only that one`, async ({ page }) => {
+      const deleteRequests: string[] = [];
+      page.on("request", (request) => {
+        const { pathname } = new URL(request.url());
+        if (request.method() === "DELETE" && pathname.startsWith("/api/connections/")) deleteRequests.push(pathname);
+      });
+      await manager.openDropdown();
+      const primaryId = await manager.getConnectionId(ADMIN_USERNAME);
+      const secondaryId = await manager.getConnectionId(READ_WRITE_USERNAME);
+      expect(primaryId).toBeTruthy();
+      expect(secondaryId).toBeTruthy();
+      await manager.requestRemoval(ADMIN_USERNAME);
+      await expect(manager.logoutDialog).toContainText("other connections will remain active");
+      await manager.cancelRemoval();
+      await expect(manager.logoutDialog).toBeHidden();
+      await expect(manager.connectionItems).toHaveCount(2);
+      await expect(manager.activeMarkerForUser(READ_WRITE_USERNAME)).toHaveCount(1);
+      expect(deleteRequests).toEqual([]);
+      const keptSession = await manager.getSession();
+      expect(keptSession.ok()).toBe(true);
+      expect(await keptSession.json()).toMatchObject({ activeConnectionId: secondaryId, user: { role: user.ReadWrite } });
+      await manager.requestRemoval(ADMIN_USERNAME);
+      await manager.confirmRemoval();
+      await expect(manager.logoutDialog).toBeHidden();
+      await expect(manager.connectionItems).toHaveCount(1);
+      await expect(manager.connectionForUser(ADMIN_USERNAME)).toHaveCount(0);
+      await expect(manager.activeMarkerForUser(READ_WRITE_USERNAME)).toHaveCount(1);
+      expect(deleteRequests).toEqual([`/api/connections/${primaryId}`]);
+      const session = await manager.getSession();
+      expect(session.ok()).toBe(true);
+      expect(await session.json()).toMatchObject({ activeConnectionId: secondaryId, user: { role: user.ReadWrite } });
     });
 
     test(`@admin Verify a failed removal retains both connections and retry switches to the remaining one`, async ({ page }) => {

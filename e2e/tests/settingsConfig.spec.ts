@@ -525,7 +525,7 @@ test.describe('@config Settings config tests', () => {
                 const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
                 await settingsConfigPage.navigateToDBConfigurationTab();
                 await settingsConfigPage.searchForElement(input);
-                expect(await settingsConfigPage.getTableRolesCount()).toBe(expected);
+                await expect.poll(() => settingsConfigPage.getTableRolesCount()).toBe(expected);
             });
         });
     });

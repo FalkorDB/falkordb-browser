@@ -5,7 +5,7 @@ import ChatComponent from "../logic/POM/chatComponent";
 import GraphInfoPage from "../logic/POM/graphInfoPage";
 import SettingsBrowserPage from "../logic/POM/settingsBrowserPage";
 import urls from "../config/urls.json";
-import { getRandomString } from "../infra/utils";
+import { getRandomString, waitForChatKeyMigration } from "../infra/utils";
 
 const DEFAULT_CHAT_MODEL = "gpt-4o-mini";
 
@@ -33,19 +33,7 @@ async function createChatPageWithSettings(
   await page.waitForLoadState("networkidle");
   if (apiKey === null) return chat;
 
-
-  // Chat API keys live under a connection-scoped key
-  // (`<host>:<port>:<user>:chatApiKeys`), so resolve it by suffix rather than
-  // reading the bare name.
-  await expect.poll(async () => page.evaluate(() => {
-    if (localStorage.getItem("secretKey") !== null) return false;
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (key && key.endsWith(":chatApiKeys")) return true;
-    }
-    return false;
-  }), { timeout: 15000 }).toBe(true);
-
+  await waitForChatKeyMigration(page);
   return chat;
 }
 
@@ -1283,5 +1271,137 @@ test.describe("Chat Feature Tests", () => {
         { role: "user", content: "My next question" },
       ]);
     });
+  });
+});
+
+// Every request below is refused before the route calls text-to-cypher, so no LLM provider is contacted.
+test.describe("Chat API validation", () => {
+  const apiKey = "sk-proj-e2e-placeholder";
+  const messages = [{ role: "user", content: "How many nodes are there?" }];
+
+  let apiCall: ApiCalls;
+  let graphToRemove: string | undefined;
+
+  test.beforeEach(() => {
+    apiCall = new ApiCalls();
+    graphToRemove = undefined;
+  });
+
+  test.afterEach(async () => {
+    if (!graphToRemove) return;
+    const response = await apiCall.removeGraph(graphToRemove, "admin");
+    if (response.status === 200) return;
+    // Registered before addGraph, so the graph may never have been created
+    const graphs = await apiCall.getGraphs("admin");
+    expect(graphs.opts, "Chat test graph deletion should succeed").not.toContain(graphToRemove);
+  });
+
+  test("@admin POST /api/chat rejects a malformed JSON body", async () => {
+    const response = await apiCall.postChat("{not json");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toBe("Invalid JSON body");
+  });
+
+  const invalidBodies = [
+    { name: "missing messages", body: { graphName: "g", model: DEFAULT_CHAT_MODEL, key: apiKey }, error: "messages: Messages are required" },
+    { name: "empty messages", body: { messages: [], graphName: "g", model: DEFAULT_CHAT_MODEL, key: apiKey }, error: "messages: Messages are required" },
+    { name: "non-array messages", body: { messages: "hi", graphName: "g", model: DEFAULT_CHAT_MODEL, key: apiKey }, error: "messages: Invalid Messages" },
+    { name: "missing graph name", body: { messages, model: DEFAULT_CHAT_MODEL, key: apiKey }, error: "graphName: Graph name is required" },
+    { name: "empty model", body: { messages, graphName: "g", model: "", key: apiKey }, error: "model: Model cannot be empty" },
+    { name: "unknown model source", body: { messages, graphName: "g", model: DEFAULT_CHAT_MODEL, key: apiKey, modelSource: "bogus" }, error: "modelSource: Invalid option" },
+  ];
+
+  for (const { name, body, error } of invalidBodies) {
+    test(`@admin POST /api/chat rejects an invalid body: ${name}`, async () => {
+      const response = await apiCall.postChat(body);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain(error);
+    });
+  }
+
+  // The route guard and the friendly-message fallback return the same text, so without a real provider call this cannot tell them apart.
+  test("@admin POST /api/chat rejects an Anthropic model with an OpenAI-shaped key", async () => {
+    const response = await apiCall.postChat({
+      messages,
+      graphName: getRandomString("chat"),
+      model: "anthropic::claude-sonnet-4-5",
+      key: apiKey,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe(
+      "Model/API key mismatch: You selected a Anthropic model but provided a OpenAI API key. Please update your API key in Settings to match your selected model."
+    );
+  });
+
+  test("@admin POST /api/chat rejects a hosted model without an API key", async () => {
+    const response = await apiCall.postChat({
+      messages,
+      graphName: getRandomString("chat"),
+      model: DEFAULT_CHAT_MODEL,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe(
+      "API key error. Please verify your API key in Settings matches your selected model provider."
+    );
+  });
+
+  test("@admin POST /api/chat answers a graph that does not exist with a friendly 400", async () => {
+    const response = await apiCall.postChat({
+      messages,
+      graphName: getRandomString("chat"),
+      model: DEFAULT_CHAT_MODEL,
+      key: apiKey,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Graph not found. Please select an existing graph.");
+  });
+
+  test("@admin POST /api/chat answers an empty graph with a friendly 400", async () => {
+    const graphName = getRandomString("chat");
+    graphToRemove = graphName;
+    await apiCall.addGraph(graphName);
+
+    const response = await apiCall.postChat({
+      messages,
+      graphName,
+      model: DEFAULT_CHAT_MODEL,
+      key: apiKey,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Your graph is empty. Add some data to your graph before using the chat.");
+  });
+
+  test("@admin POST /api/chat rejects an unauthenticated request", async () => {
+    const response = await apiCall.postChat({
+      messages,
+      graphName: getRandomString("chat"),
+      model: DEFAULT_CHAT_MODEL,
+      key: apiKey,
+    }, false);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe("Not authenticated");
+  });
+
+  for (const key of [undefined, "", "   "]) {
+    test(`@admin POST /api/chat/models requires an API key (key: ${JSON.stringify(key)})`, async () => {
+      const response = await apiCall.postChatModels({ key });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe("API key is required to load live models");
+    });
+  }
+
+  test("@admin POST /api/chat/models rejects an unauthenticated request", async () => {
+    const response = await apiCall.postChatModels({ key: apiKey }, false);
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("Unauthorized");
   });
 });

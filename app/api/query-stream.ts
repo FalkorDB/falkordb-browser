@@ -15,7 +15,7 @@ export function queryStream(
 ): Response {
   const encoder = new TextEncoder();
   let stopped = false;
-  let stop: () => void = () => {};
+  let stop!: () => void;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       stop = () => {

@@ -77,6 +77,22 @@ export const initializeLocalStorage = (host = "localhost", port = 6379, username
 };
 
 /**
+ * Waits until the app has moved a seeded plain `secretKey` into the encrypted,
+ * connection-scoped `<host>:<port>:<user>:chatApiKeys` entry. The migration takes
+ * server round-trips after load, and until it lands the AI features report
+ * "No API Key Provided".
+ */
+export async function waitForChatKeyMigration(page: Page, timeout = 15000): Promise<void> {
+  await page.waitForFunction(() => {
+    if (localStorage.getItem("secretKey") !== null) return false;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      if (localStorage.key(i)?.endsWith(":chatApiKeys")) return true;
+    }
+    return false;
+  }, undefined, { timeout });
+}
+
+/**
  * Init script that mimics canvas fingerprinting protection (Brave Shields,
  * Firefox's resistFingerprinting): single-pixel `getImageData` reads come back
  * with their low bits flipped, deterministically per pixel. force-graph finds

@@ -108,3 +108,31 @@ test("cancels a real HTTP response that ignores Range", async (t) => {
     }
     assert.equal(closed, true);
 });
+
+test("logs a failed cancel of a live response but not of an aborted one", async (t) => {
+    const warning = t.mock.method(console, "warn", () => {});
+    globalThis.fetch = async () => new Response(new ReadableStream({
+        pull(controller) { controller.enqueue(new Uint8Array(1024).fill(65)); },
+        cancel() { throw new Error("cancel failed"); },
+    }, { highWaterMark: 0 }));
+    assert.deepEqual(await validateCsvHeadFromUrl("https://storage.example/file.csv"), { status: "valid" });
+    assert.deepEqual(warning.mock.calls.map(call => call.arguments[0]), ["Failed to cancel CSV header response:"]);
+
+    warning.mock.resetCalls();
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    let started!: () => void;
+    const pulling = new Promise<void>(resolve => { started = resolve; });
+    globalThis.fetch = async (_url, init) => new Response(new ReadableStream({
+        pull: () => new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+            started();
+        }),
+        cancel() { throw new Error("cancel failed"); },
+    }, { highWaterMark: 0 }));
+    const pending = validateCsvHeadFromUrl("https://storage.example/file.csv");
+    await pulling;
+    t.mock.timers.tick(10_000);
+    assert.deepEqual(await pending, { status: "unavailable" });
+    assert.equal(warning.mock.callCount(), 1);
+    assert.match(String(warning.mock.calls[0].arguments[0]), /precheck unavailable/);
+});
