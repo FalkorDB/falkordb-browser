@@ -7,6 +7,7 @@
         "settingsUsers": "http://localhost:3000/api/user",
         "settingsUser": "http://localhost:3000/api/user/",
         "tokenUrl": "http://localhost:3000/api/auth/",
+        "udfUrl": "http://localhost:3000/api/udf",
         "chatModelsUrl": "http://localhost:3000/api/chat/models"
     },
   
@@ -15,6 +16,7 @@
     "loginUrl":"http://localhost:3000/login",
     "graphUrl": "http://localhost:3000/graph",
     "settingsUrl": "http://localhost:3000/settings",
+    "udfUrl": "http://localhost:3000/udf",
     "documentationUrl": "https://docs.falkordb.com/",
     "supportUrl": "https://discord.com/invite/jyUgBweNQz",
     "docsUrl": "http://localhost:3000/docs"
