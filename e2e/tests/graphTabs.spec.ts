@@ -1286,6 +1286,8 @@ test.describe("@admin Graph tabs", () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const page = await browser.getPage();
         await graph.waitForPageIdle();
+        // The add button stays disabled until the tabs are ready; the loop's isDisabled() check does not wait.
+        await expect(page.getByTestId("graphTabAdd")).toBeEnabled({ timeout: 15000 });
 
         // Read the limit actually in force instead of assuming the default, so
         // the assertion below can be exact. Mirrors clampMaxTabs (lib/graphTabs).
