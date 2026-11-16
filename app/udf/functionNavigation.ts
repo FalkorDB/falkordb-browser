@@ -70,14 +70,27 @@ const FUNCTION_PATTERNS: FunctionPattern[] = [
     confirm: closesIntoArrow,
   },
   { build: (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\s*:\\s*(?:async\\s*)?function\\b`) },
+  // `falkor.register('name', impl)` — the registered name may differ from the
+  // implementation it points at, so this is the only anchor for such libraries.
+  // It outranks a bare `name(`, which may just be a call site.
+  { build: (name: string) => new RegExp(`register\\s*\\(\\s*['"\`]${escapeRegExp(name)}['"\`]`) },
   // Any `name(` — covers class methods, shorthand object methods and
   // declaration styles the patterns above don't spell out.
   { build: (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\s*\\(`) },
-  // `falkor.register('name', impl)` — the registered name may differ from the
-  // implementation it points at, so this is the only anchor for such libraries.
-  { build: (name: string) => new RegExp(`register\\s*\\(\\s*['"\`]${escapeRegExp(name)}['"\`]`) },
   { build: (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\b`) },
 ];
+
+/**
+ * Replaces comments with spaces so a name mentioned in one is not taken for the
+ * code, keeping every line and column where it was. Strings are skipped, not
+ * blanked: `register('name')` lives in one, and so can a `//`. Quoted strings
+ * stop at a line end, so a quote inside a regex literal cannot swallow code.
+ */
+const blankComments = (source: string) =>
+  source.replace(
+    /\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\[\s\S]|[^`\\])*`/g,
+    (match) => (match.startsWith("/") ? match.replace(/[^\n]/g, " ") : match)
+  );
 
 export const findFunctionLocation = (source: string, functionName: string): FunctionLocation | null => {
   if (!source || !functionName) return null;
@@ -85,7 +98,7 @@ export const findFunctionLocation = (source: string, functionName: string): Func
   const name = stripNamespace(functionName);
   if (!name) return null;
 
-  const lines = source.split(/\r?\n/);
+  const lines = blankComments(source).split(/\r?\n/);
 
   for (let p = 0; p < FUNCTION_PATTERNS.length; p += 1) {
     const { build, confirm } = FUNCTION_PATTERNS[p];
@@ -95,10 +108,10 @@ export const findFunctionLocation = (source: string, functionName: string): Func
       const match = pattern.exec(lines[i]);
 
       if (match && (!confirm || confirm(lines, i))) {
-        const offset = match[0].indexOf(name);
+        // Every pattern embeds the name literally, so it is always in the match.
         return {
           lineNumber: i + 1,
-          column: match.index + (offset < 0 ? 0 : offset) + 1,
+          column: match.index + match[0].indexOf(name) + 1,
           length: name.length,
         };
       }
