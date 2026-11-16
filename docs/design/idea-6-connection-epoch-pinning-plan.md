@@ -213,8 +213,12 @@ for a graph not in the list: on a writable connection they run `GRAPH.QUERY`, wh
 a dropped graph, so they start only once a list confirms it.
 Expose `handleFetchOptions` on `GraphContext` (move its declaration above the context memo). A
 separate effect, ordered after the reset effect and keyed on `activeConnectionId`, `status` and
-`handleFetchOptions`, calls `handleFetchOptions({ clear: !graphNamesLoadedRef.current })`, so an
+`handleFetchOptions`, calls `handleFetchOptions({ clear: !graphNamesPublishedRef.current })`, so an
 offline/tutorial deferral retries through the callback's dependencies instead of a "fetched" flag.
+`graphNamesPublishedRef` is written alongside every `setGraphNamesLoaded` call rather than mirrored
+after commit: a re-run (e.g. a session `status` flip) landing between a refresh's publish and its commit
+would otherwise clear the list it just published, leaving it loaded but unknown, so restored tabs would be
+held and never run.
 `setGraphNamesLoaded(true)` always runs for the current refresh (even when the fetch rejects), because
 restored tabs and the editor wait on it.
 

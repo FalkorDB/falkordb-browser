@@ -1,5 +1,5 @@
 /* eslint-disable no-await-in-loop */
-import { Locator } from "@playwright/test";
+import { Locator, expect } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import {
   interactWhenVisible,
@@ -635,10 +635,9 @@ export default class SettingsBrowserPage extends BasePage {
       const isExpanded = await toggle.getAttribute('aria-expanded');
       if (isExpanded !== 'true') {
         await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
       }
     }
-    // Allow time for expansion animations / DOM updates
-    await this.page.waitForTimeout(200);
   }
 
   async searchModels(searchText: string): Promise<void> {
@@ -729,22 +728,17 @@ export default class SettingsBrowserPage extends BasePage {
     // Expand whatever categories are currently shown (respects active search filter)
     // so we can check whether the model is present in the filtered results.
     await this.expandAllCategories();
+    return this.isModelShown(providerName);
+  }
 
+  // Checks without expanding categories: an active search auto-expands every matching
+  // category, so clicking toggles while polling would race the 200 ms search debounce.
+  async isModelShown(providerName: string): Promise<boolean> {
     const modelButton = this.getModelButton(providerName);
     if (await modelButton.count() > 0) {
-      try {
-        return await modelButton.isVisible();
-      } catch {
-        return false;
-      }
+      return modelButton.first().isVisible();
     }
-
-    try {
-      const buttonByText = this.getModelButtonByDisplayText(providerName);
-      return await buttonByText.first().isVisible();
-    } catch {
-      return false;
-    }
+    return this.getModelButtonByDisplayText(providerName).first().isVisible();
   }
 
   async isCategoryVisible(categoryName: string): Promise<boolean> {
@@ -775,7 +769,8 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async reloadPage(): Promise<void> {
-    await this.page.reload();
+    await this.page.reload({ waitUntil: "networkidle" });
+    await this.waitForSettingsLoaded();
   }
 
   /**
@@ -783,9 +778,6 @@ export default class SettingsBrowserPage extends BasePage {
    * Returns the raw model values (data-testid values)
    */
   async getAvailableModels(): Promise<string[]> {
-    // Wait for models to load
-    await this.page.waitForTimeout(500);
-
     // Expand all collapsible categories so model buttons are rendered in the DOM
     await this.expandAllCategories();
 
@@ -981,13 +973,24 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.locator('#rowHeightExpandMultiple');
   }
 
+  private get browserSettingsPage(): Locator {
+    return this.page.getByTestId("browserSettingsPage");
+  }
+
+  /** Saved settings load asynchronously; until then sliders show defaults and edits get overwritten. */
+  async waitForSettingsLoaded(): Promise<void> {
+    await expect(this.browserSettingsPage).toHaveAttribute("aria-busy", "false");
+  }
+
   private async getSliderValue(slider: Locator): Promise<number> {
+    await this.waitForSettingsLoaded();
     const thumb = slider.locator('[role="slider"]');
     const raw = await thumb.getAttribute('aria-valuenow');
     return Number(raw ?? 0);
   }
 
   private async setSliderByStep(slider: Locator, targetValue: number, step: number): Promise<void> {
+    await this.waitForSettingsLoaded();
     const thumb = slider.locator('[role="slider"]');
     await thumb.focus();
     const raw = await thumb.getAttribute('aria-valuenow');
