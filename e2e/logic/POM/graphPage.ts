@@ -1959,8 +1959,18 @@ export default class GraphPage extends BasePage {
       }
     );
 
+    const wasSelected = await this.getSelectedGraphName() === graphName;
     await this.clickSelect();
-    await graphListResponse;
+    const response = await graphListResponse;
+    const { opts } = response.ok() ? await response.json() as { opts: string[] } : { opts: [] };
+    // Opening the list refreshes it, and a list holding exactly one graph is
+    // auto-selected. Parallel tests drop their graphs, so ours can become the
+    // only one right then: the selection change closes the list under us.
+    if (!wasSelected && opts.length === 1 && opts[0] === graphName) {
+      await expect(this.select("Graph")).toHaveText(graphName);
+      await expect(this.search()).toBeHidden();
+      return;
+    }
     await this.fillSearch(graphName);
     await waitForElementToBeVisible(this.selectItem("Graph", graphName), 500, 20);
     await this.clickSelectItem(graphName); // selecting the first item in list after search
