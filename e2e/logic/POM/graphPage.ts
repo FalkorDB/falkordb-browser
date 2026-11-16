@@ -1638,6 +1638,12 @@ export default class GraphPage extends BasePage {
     await this.refreshPage();
   }
 
+  private get listedGraphNames(): Locator {
+    return this.page.locator(
+      '//ul[@data-testid="queryList"]//p[contains(@data-testid, "selectGraph")]'
+    );
+  }
+
   /**
    * The graph names as the select list renders them, in display order, narrowed
    * to the graphs matching `searchTerm` so a shared server doesn't affect it.
@@ -1648,13 +1654,28 @@ export default class GraphPage extends BasePage {
   ): Promise<string[]> {
     await this.clickSelect();
     await this.fillSearch(searchTerm);
-    const names = this.page.locator(
-      '//ul[@data-testid="queryList"]//p[contains(@data-testid, "selectGraph")]'
-    );
+    const names = this.listedGraphNames;
     // The search is debounced, so the unfiltered list is still on screen for a
     // moment; wait for it to settle on the matches before reading the order.
     await expect(names).toHaveCount(expectedCount);
     return (await names.allInnerTexts()).map((name) => name.trim());
+  }
+
+  /**
+   * One read of the graph names the select list shows for `searchTerm`, opening
+   * the list when it is closed. It does not wait for the list to settle, so poll
+   * it; close the list with `closeGraphList` before leaving the page's graph view.
+   */
+  async readGraphNamesInList(searchTerm: string): Promise<string[]> {
+    if (!(await this.search().isVisible())) await this.clickSelect();
+    await this.fillSearch(searchTerm);
+    const names = this.listedGraphNames;
+    return (await names.allInnerTexts()).map((name) => name.trim());
+  }
+
+  async closeGraphList(): Promise<void> {
+    await this.page.keyboard.press("Escape");
+    await expect(this.search()).toBeHidden();
   }
 
   async verifyGraphExists(graphName: string, apiCall?: any): Promise<boolean> {
