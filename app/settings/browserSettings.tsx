@@ -87,6 +87,7 @@ export default function BrowserSettings() {
         resetSettings,
         saveSettings,
         replayTutorial,
+        settingsLoaded,
     } = useContext(BrowserSettingsContext);
 
     const { prefixConnectionId } = useContext(ConnectionContext);
@@ -707,7 +708,7 @@ export default function BrowserSettings() {
     };
 
     return (
-        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
+        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden" data-testid="browserSettingsPage" aria-busy={!settingsLoaded}>
             <div className="flex items-start justify-between gap-2 px-2 mobile:items-center">
                 <div className="min-w-0 flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar mobile:max-h-none mobile:overflow-visible">
                     <h1 className="text-3xl font-semibold mobile:text-xl">Browser Settings</h1>

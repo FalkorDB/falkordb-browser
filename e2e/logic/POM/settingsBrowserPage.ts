@@ -730,6 +730,7 @@ export default class SettingsBrowserPage extends BasePage {
 
   async reloadPage(): Promise<void> {
     await this.page.reload({ waitUntil: "networkidle" });
+    await this.waitForSettingsLoaded();
   }
 
   /**
@@ -932,13 +933,24 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.locator('#rowHeightExpandMultiple');
   }
 
+  private get browserSettingsPage(): Locator {
+    return this.page.getByTestId("browserSettingsPage");
+  }
+
+  /** Saved settings load asynchronously; until then sliders show defaults and edits get overwritten. */
+  async waitForSettingsLoaded(): Promise<void> {
+    await expect(this.browserSettingsPage).toHaveAttribute("aria-busy", "false");
+  }
+
   private async getSliderValue(slider: Locator): Promise<number> {
+    await this.waitForSettingsLoaded();
     const thumb = slider.locator('[role="slider"]');
     const raw = await thumb.getAttribute('aria-valuenow');
     return Number(raw ?? 0);
   }
 
   private async setSliderByStep(slider: Locator, targetValue: number, step: number): Promise<void> {
+    await this.waitForSettingsLoaded();
     const thumb = slider.locator('[role="slider"]');
     await thumb.focus();
     const raw = await thumb.getAttribute('aria-valuenow');

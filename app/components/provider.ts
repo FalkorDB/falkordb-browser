@@ -154,6 +154,8 @@ type BrowserSettingsContextType = {
   resetSettings: () => void;
   replayTutorial: () => void;
   tutorialOpen: boolean;
+  /** False until the saved settings are read; edits made before then are overwritten. */
+  settingsLoaded: boolean;
 };
 
 type GraphContextType = {
@@ -523,6 +525,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
     resetSettings: () => { },
     replayTutorial: () => { },
     tutorialOpen: false,
+    settingsLoaded: false,
   }
 );
 

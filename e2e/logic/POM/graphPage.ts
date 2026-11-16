@@ -824,22 +824,17 @@ export default class GraphPage extends BasePage {
   private async ensureGraphInfoPanelOpen(): Promise<void> {
     // Bounded: boundingBox() waits forever on a selector that matches nothing,
     // which turns a typo into an opaque test timeout instead of a fallback.
-    const box = await this.graphInfoPanel.boundingBox({ timeout: 5000 }).catch(() => null);
-    if (!box || box.width < 50) {
-      await interactWhenVisible(
-        this.graphInfoToggle,
-        (el) => el.click(),
-        "Graph Info Toggle"
-      );
-      // `visible` is meaningless here (see above) and a fixed sleep is either
-      // flaky or wasted time — poll the same width the check above uses.
-      await expect
-        .poll(
-          async () => (await this.graphInfoPanel.boundingBox().catch(() => null))?.width ?? 0,
-          { timeout: 5000 }
-        )
-        .toBeGreaterThan(50);
-    }
+    const panelWidth = async () =>
+      (await this.graphInfoPanel.boundingBox({ timeout: 1000 }).catch(() => null))?.width ?? 0;
+    // /graph auto-expands the panel after mount. If that lands between reading
+    // a collapsed width and clicking the toggle, the click collapses it again,
+    // so re-read and retry instead of trusting one measurement.
+    await expect(async () => {
+      if ((await panelWidth()) > 50) return;
+      await this.graphInfoToggle.click({ timeout: 2000 });
+      // `visible` is meaningless here (see above) — poll the same width instead.
+      await expect.poll(panelWidth, { timeout: 2000 }).toBeGreaterThan(50);
+    }).toPass({ timeout: 15000 });
   }
 
   private get duplicateGraphInput(): Locator {
