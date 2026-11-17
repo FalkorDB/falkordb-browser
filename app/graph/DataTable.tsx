@@ -305,7 +305,8 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                 body: JSON.stringify({
                     value: val,
                     valueType,
-                    type
+                    type,
+                    addOnly: actionType === "added"
                 })
             }, toast, setIndicator, cid);
 

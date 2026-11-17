@@ -1571,6 +1571,11 @@ const swaggerSpec = {
                     type: "boolean",
                     description: "REQUIRED: Set to true for nodes, false for relationships",
                     example: true
+                  },
+                  addOnly: {
+                    type: "boolean",
+                    description: "When true, add the property only if it does not already exist",
+                    example: true
                   }
                 },
                 required: ["value", "type"]
@@ -1581,6 +1586,9 @@ const swaggerSpec = {
         responses: {
           "200": {
             description: "Property set successfully"
+          },
+          "409": {
+            description: "Add-only request rejected because the property already exists"
           }
         }
       },

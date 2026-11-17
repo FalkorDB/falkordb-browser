@@ -160,6 +160,7 @@ const parameterizedValue = z.union([attributeText, z.number(), z.boolean(), prop
 export const updateGraphElementAttribute = z
   .object({
     type: z.boolean(),
+    addOnly: z.boolean().optional(),
     // Absent for the primitive types, which need no help from Cypher to be built.
     valueType: z.enum(VALUE_TYPES).optional(),
     value: z.union([
