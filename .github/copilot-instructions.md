@@ -161,9 +161,9 @@ A change is not done until the docs that describe it are updated **in the same P
 
 | If you change… | Update… |
 | --- | --- |
-| User-visible behavior or a feature | `README.md` and, for features, `readme-browser.md` (the feature overview) |
+| User-visible behavior or a feature | `README.md` or the matching `docs/` page (`docs/user-guide.md`, `docs/large-graphs-3d.md`, `docs/upgrading.md`) and, for features, `readme-browser.md` (the feature overview) |
 | An API route's request/response | `app/api/swagger/swagger-spec.ts` (`.github/workflows/swagger-check.yml` fails a `route.ts(x)` change without it, unless labeled `no-api-docs` for an unchanged contract; contract changes made only in helpers such as `validate-body.ts` are not caught) |
-| Env vars / config | `.env.local.template`, `README.md`, `helm/falkordb-browser/values.yaml` + its `README.md`, and the Helm templates if the value must reach the pod |
+| Env vars / config | `.env.local.template`, `docs/configuration.md`, `README.md` (Quick start and source setup), `helm/falkordb-browser/values.yaml` + its `README.md`, and the Helm templates if the value must reach the pod |
 | The Cypher grammar | `lib/falkordb-cypher/generated/.grammar-src/Cypher.g4`, run `npm run generate:grammar`, commit the artifacts |
 | Desktop / mobile shell | `desktop/README.md` / `mobile/README.md` |
 | Test/coverage tooling or the gate | `README.md` "Testing", this file, `codecov.yml` comments |
