@@ -17,14 +17,27 @@ import queryData from "../config/queries.json";
 test.describe("Graph Tests", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
+  const graphsToCleanup = new Set<string>();
 
   test.beforeEach(async () => {
     browser = new BrowserWrapper();
     apiCall = new ApiCalls();
+    graphsToCleanup.clear();
   });
 
   test.afterEach(async () => {
     await browser.closeBrowser();
+    const names = [...graphsToCleanup];
+    graphsToCleanup.clear();
+    const results = await Promise.all(names.map(name => apiCall.removeGraph(encodeURIComponent(name), "admin")));
+    for (const [index, result] of results.entries()) {
+      if (result.message.includes("empty key")) continue;
+      expect(result.message).toBe(`${names[index]} graph deleted`);
+    }
+    if (names.length) {
+      const { opts } = await apiCall.getGraphs("admin");
+      for (const name of names) expect(opts).not.toContain(name);
+    }
   });
 
   test("@admin rejected graph creation keeps its name and allows a successful retry", async () => {
@@ -124,6 +137,8 @@ test.describe("Graph Tests", () => {
     const trimmedName = getRandomString("trail");
     const graphName = `${trimmedName} `;
     const encodedName = encodeURIComponent(graphName);
+    graphsToCleanup.add(graphName);
+    graphsToCleanup.add(trimmedName);
     await apiCall.addGraph(encodedName);
     try {
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -139,10 +154,6 @@ test.describe("Graph Tests", () => {
       expect(opts).not.toContain(trimmedName);
     } finally {
       await browser.closeBrowser();
-      await apiCall.removeGraph(encodedName, "admin");
-      if ((await apiCall.getGraphs("admin")).opts.includes(trimmedName)) {
-        await apiCall.removeGraph(trimmedName, "admin");
-      }
     }
   });
 
@@ -540,6 +551,7 @@ test.describe("Graph Tests", () => {
   test("@admin Duplicate trims new names and rejects whitespace-only input", async () => {
     const source = getRandomString("duplicate");
     const target = getRandomString("copy");
+    for (const name of [source, target, ` ${target} `]) graphsToCleanup.add(name);
     await apiCall.addGraph(source);
     try {
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -574,13 +586,6 @@ test.describe("Graph Tests", () => {
       expect((await apiCall.getGraphs("admin")).opts).not.toContain(` ${target} `);
     } finally {
       await browser.closeBrowser();
-      await apiCall.removeGraph(source, "admin");
-      const { opts } = await apiCall.getGraphs("admin");
-      for (const name of [target, ` ${target} `]) {
-        if (opts.includes(name)) {
-          await apiCall.removeGraph(encodeURIComponent(name), "admin");
-        }
-      }
     }
   });
 
@@ -588,6 +593,8 @@ test.describe("Graph Tests", () => {
     test(`@admin Saving an unchanged ${padding}-space graph name does not rename it`, async () => {
       const trimmed = getRandomString("unchanged");
       const source = `${padding !== "trailing" ? " " : ""}${trimmed}${padding !== "leading" ? " " : ""}`;
+      graphsToCleanup.add(source);
+      graphsToCleanup.add(trimmed);
       await apiCall.runQuery(encodeURIComponent(source), "CREATE (:Preserved {value: 42})");
       try {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -613,18 +620,14 @@ test.describe("Graph Tests", () => {
         expect(Number(result.data[0].c)).toBe(1);
       } finally {
         await browser.closeBrowser();
-        const { opts } = await apiCall.getGraphs("admin");
-        for (const name of [source, trimmed]) {
-          if (opts.includes(name)) {
-            await apiCall.removeGraph(encodeURIComponent(name), "admin");
-          }
-        }
       }
     });
   }
 
   test("@admin Saving a padded spelling of an existing graph name does not rename it", async () => {
     const source = getRandomString("unchanged");
+    graphsToCleanup.add(source);
+    graphsToCleanup.add(` ${source} `);
     await apiCall.addGraph(source);
     try {
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -648,13 +651,13 @@ test.describe("Graph Tests", () => {
       expect(opts).not.toContain(` ${source} `);
     } finally {
       await browser.closeBrowser();
-      await apiCall.removeGraph(source, "admin");
     }
   });
 
   test("@admin Rename trims new names and rejects whitespace-only input", async () => {
     const source = getRandomString("rename");
     const target = getRandomString("renamed");
+    for (const name of [source, target, ` ${target} `]) graphsToCleanup.add(name);
     await apiCall.addGraph(source);
     try {
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -682,12 +685,6 @@ test.describe("Graph Tests", () => {
       expect((await apiCall.getGraphs("admin")).opts).not.toContain(` ${target} `);
     } finally {
       await browser.closeBrowser();
-      const { opts } = await apiCall.getGraphs("admin");
-      for (const name of [source, target, ` ${target} `]) {
-        if (opts.includes(name)) {
-          await apiCall.removeGraph(encodeURIComponent(name), "admin");
-        }
-      }
     }
   });
 
