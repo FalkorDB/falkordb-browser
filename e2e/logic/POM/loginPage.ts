@@ -1,4 +1,4 @@
-import { Locator } from "@playwright/test";
+import { Locator, Page } from "@playwright/test";
 import {
   interactWhenVisible,
   waitForElementToBeVisible,
@@ -14,6 +14,13 @@ import HeaderComponent from "./headerComponent";
 type CertificateFile = string | { name: string; contents: string };
 
 export default class LoginPage extends HeaderComponent {
+  constructor(page: Page) {
+    super(page);
+    // Keep file-chooser interception on for the page's lifetime: `waitForEvent("filechooser")` re-arms it
+    // without awaiting, so a back-to-back upload's click can open an unobserved native picker (Firefox).
+    page.on("filechooser", () => {});
+  }
+
   private get connectBtn(): Locator {
     return this.page.getByRole("button", { name: "Log in" });
   }
