@@ -424,3 +424,19 @@ export const resolveEntryTabs = (
     const active = stored.tabs.some(t => t.id === stored.activeTabId) ? stored.activeTabId : stored.tabs[0].id;
     return { tabs: stored.tabs, activeTabId: active };
 };
+
+/**
+ * Whether a selected graph must not be queried yet. Graph queries on a
+ * writable connection re-create a graph that was dropped, so they wait while
+ * the graph list is unknown (a failed list) and stop once a known, loaded list
+ * omits the graph — the provider then clears the selection.
+ */
+export const isGraphUnconfirmed = (
+    name: string,
+    graphNames: string[] | undefined,
+    listUnknown: boolean,
+    listLoaded: boolean,
+): boolean => {
+    if (!name || graphNames?.includes(name)) return false;
+    return listUnknown || (listLoaded && graphNames !== undefined);
+};

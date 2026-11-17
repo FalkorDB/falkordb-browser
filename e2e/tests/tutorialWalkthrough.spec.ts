@@ -3,9 +3,10 @@ import type { Session, SessionConnection } from "next-auth";
 import urls from "../config/urls.json";
 import { expect, test } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
+import { readOwnedTutorialGraphs } from "../infra/tutorialGraphs";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
 import ApiCalls from "../logic/api/apiCalls";
-import { delay, getRandomString } from "../infra/utils";
+import { delay, getQueryRequestParam, getRandomString, initializeLocalStorage } from "../infra/utils";
 import { parseTutorialDemoOwnership, tutorialDemoOwnershipKey } from "../../lib/tutorialDemoGraphs";
 import { createTab, forStorage, TABS_STORAGE_KEY } from "../../lib/graphTabs";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD } from "../../app/utils";
@@ -100,26 +101,7 @@ test.describe("Tutorial", () => {
         let teardownError: unknown;
         try {
             if (browser.getContext()?.pages().some(page => !page.isClosed())) {
-                const page = await browser.getPage();
-                const { ownerId, records } = await page.evaluate(() => {
-                    const ownerId = sessionStorage.getItem("tutorialDemoOwnerId");
-                    if (!ownerId) return { ownerId: null, records: [] };
-                    const suffix = `tutorialDemoGraphOwnership:${ownerId}`;
-                    const records = Object.keys(localStorage)
-                        .filter(key => key.endsWith(suffix))
-                        .map(key => ({ key, stored: localStorage.getItem(key) }));
-                    return { ownerId, records };
-                });
-                if (ownerId) {
-                    const suffix = tutorialDemoOwnershipKey(ownerId);
-                    for (const record of records) {
-                        if (!record.stored || !record.key.endsWith(suffix)) continue;
-                        const scope = record.key.slice(0, -suffix.length);
-                        if (!scope) throw new Error("Tutorial graph ownership has no connection scope");
-                        ownedTutorialGraphs.push(...parseTutorialDemoOwnership(record.stored, scope, ownerId).names);
-                    }
-                    ownedTutorialGraphs = [...new Set(ownedTutorialGraphs)];
-                }
+                ownedTutorialGraphs = await readOwnedTutorialGraphs(await browser.getPage());
             }
         } catch (error) {
             teardownError = error;
@@ -196,16 +178,24 @@ test.describe("Tutorial", () => {
     test("@admin re-opening the tutorial does not duplicate the demo data", async () => {
         test.setTimeout(120_000);
 
-        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
+        await apiCall.addGraph(userGraph);
+        const tutorial = await browser.createNewPage(TutorialPanel);
         const page = await browser.getPage();
+        await browser.setPageToFullScreen();
         await page.addInitScript(() => {
+            // Keep the refreshInterval polls off the accelerated 60s heartbeat cadence (see the Web Locks test below).
+            localStorage.setItem("refreshInterval", "30");
             const nativeInterval = window.setInterval.bind(window);
             Object.defineProperty(window, "setInterval", {
                 value: (handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
                     nativeInterval(handler, timeout === 60000 ? 1000 : timeout, ...args),
             });
         });
+        const graphList = (url: URL) => /^\/api\/graph\/?$/.test(url.pathname);
+        await page.route(graphList, route => route.fulfill({ json: { opts: [userGraph] } }));
+        await page.goto(urls.graphUrl);
+        await expect.poll(() => new URL(page.url()).searchParams.get("graph")).toBe(userGraph);
+        await page.unroute(graphList);
 
         const demoNames: string[] = [];
         const countPeople = async () => {
@@ -242,7 +232,9 @@ test.describe("Tutorial", () => {
 
         try {
             await tutorial.changeLocalStorage("true");
-            await tutorial.refreshPage();
+            // Sole-graph auto-selection adds share parameters. A refresh there
+            // deliberately defers the tutorial, so start from a regular visit.
+            await browser.navigateTo(urls.graphUrl);
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
             const heartbeat = () => page.evaluate(() => {
@@ -454,6 +446,9 @@ test.describe("Tutorial", () => {
         await apiCall.runQuery(failedName, "CREATE (:Mine)");
         await page.addInitScript(() => {
             localStorage.setItem("tutorial", "false");
+            // Only the 60s ownership heartbeat may be accelerated: the e2e-seeded 60s refreshInterval would put the
+            // header memory poll on that cadence too, and its rate-limited (429) toast would replace the cleanup toast.
+            localStorage.setItem("refreshInterval", "30");
             Object.defineProperty(navigator, "locks", { value: undefined, configurable: true });
             const nativeInterval = window.setInterval.bind(window);
             window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
@@ -465,7 +460,7 @@ test.describe("Tutorial", () => {
                 : route.continue());
         page.on("request", request => {
             const url = new URL(request.url());
-            if (url.pathname.startsWith("/api/graph/tutorial-social-") && url.searchParams.get("query")?.includes("CREATE")) {
+            if (url.pathname.startsWith("/api/graph/tutorial-social-") && getQueryRequestParam(request, "query")?.includes("CREATE")) {
                 names.push(decodeURIComponent(url.pathname.split("/")[3]));
             }
         });
@@ -667,21 +662,38 @@ test.describe("Tutorial", () => {
                     }));
                 }
             }, { scope, owners });
+            // Verification lists hang until the sweep gives up; the graph list the
+            // page loads afterwards is answered so the tab strip can unlock.
             let requests = 0;
+            let released = false;
+            let release!: () => void;
+            const gate = new Promise<void>(resolve => { release = resolve; });
             await page.route(url => url.pathname === "/api/graph", async route => {
+                if (released) {
+                    await route.continue();
+                    return;
+                }
                 requests += 1;
                 if (failPublication && requests === 1) {
                     await route.fulfill({ json: { opts: [] } });
+                    return;
                 }
+                await gate;
+                // The page has usually abandoned a held verification by now.
+                await route.continue().catch(() => {});
             });
             try {
                 await page.goto(urls.graphUrl);
                 await expect(page.getByTestId("toast-title").filter({ hasText: "Tutorial cleanup failed" })).toBeVisible({ timeout: 25000 });
+                const sweepRequests = requests;
+                released = true;
+                release();
+                expect(sweepRequests).toBeLessThan(5);
                 await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
-                expect(requests).toBeLessThan(5);
                 expect(await page.evaluate(({ scope, owners }) => owners.every(owner =>
                     localStorage.getItem(`${scope}tutorialDemoGraphOwnership:${owner}`) !== null), { scope, owners })).toBe(true);
             } finally {
+                release();
                 await browser.closeBrowser();
             }
     });
@@ -706,11 +718,12 @@ test.describe("Tutorial", () => {
         page.on("request", request => {
             const url = new URL(request.url());
             if (url.pathname.startsWith("/api/graph/tutorial-social-demo-")
-                && url.searchParams.get("query")?.trim().startsWith("CREATE")) creations.push(url.pathname);
+                && getQueryRequestParam(request, "query")?.trim().startsWith("CREATE")) creations.push(url.pathname);
         });
         await page.goto(urls.graphUrl);
         await expect.poll(() => failures.some(message => message.includes("Failed to load demo graphs")), { timeout: 30000 }).toBe(true);
-        await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+        // Step zero has no spotlight, so wait for setup itself to close before repairing storage.
+        await expect(page.locator("[data-tutorial-overlay]")).toHaveCount(0);
         const ownership = await page.evaluate(() => {
             const owner = sessionStorage.getItem("tutorialDemoOwnerId");
             const key = Object.keys(localStorage).find(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
@@ -738,10 +751,9 @@ test.describe("Tutorial", () => {
             let responseBody = "";
             let completed!: () => void;
             const routeCompleted = new Promise<void>(resolve => { completed = resolve; });
-            await page.route(url => {
-                const query = url.searchParams.get("query") ?? "";
-                return query.startsWith("MATCH p=") && (!advance || query.includes("[:MANAGES]"));
-            }, async route => {
+            await page.route("**/api/graph/**", async route => {
+                const query = getQueryRequestParam(route.request(), "query") ?? "";
+                if (!query.startsWith("MATCH p=") || (advance && !query.includes("[:MANAGES]"))) return route.fallback();
                 heldUrl = new URL(route.request().url());
                 await gate;
                 const response = await route.fetch();
@@ -803,7 +815,8 @@ test.describe("Tutorial", () => {
         let heldUrl: URL | undefined;
         let responseBody: string | undefined;
         const routes: Promise<void>[] = [];
-        await page.route(url => url.pathname === `/api/graph/${name}` && !!url.searchParams.get("query")?.startsWith(query), route => {
+        await page.route(`**/api/graph/${name}{,?*}`, route => {
+            if (!getQueryRequestParam(route.request(), "query")?.startsWith(query)) return route.fallback();
             heldUrl = new URL(route.request().url());
             const pending = (async () => {
                 await gate;
@@ -846,7 +859,7 @@ test.describe("Tutorial", () => {
             await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", query, { timeout: 30000 });
             const request = page.waitForRequest(request => {
                 const url = new URL(request.url());
-                return url.pathname === `/api/graph/${name}` && url.searchParams.get("query")?.startsWith(query) === true;
+                return url.pathname === `/api/graph/${name}` && getQueryRequestParam(request, "query")?.startsWith(query) === true;
             });
             await graph.clickRunQuery(false);
             expect(new URL((await request).url()).searchParams.get("readOnly")).not.toBe("true");
@@ -862,6 +875,7 @@ test.describe("Tutorial", () => {
 
     test("@admin stalled config initialization releases recovery and saved tabs", async ({ page }) => {
         test.setTimeout(60_000);
+        await page.addInitScript(initializeLocalStorage("localhost", 6379, "default", false));
         await apiCall.runQuery(userGraph, "CREATE (:Mine)");
         const tab = forStorage({ ...createTab(), graphName: userGraph });
         await page.addInitScript(({ tab, key }) => {
@@ -897,7 +911,8 @@ test.describe("Tutorial", () => {
             }));
         }, { suffix, names });
         const creations: string[] = [];
-        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+        await page.route("**/api/graph/tutorial-social-*", route => {
+            if (!getQueryRequestParam(route.request(), "query")?.includes("CREATE")) return route.fallback();
             creations.push(route.request().url());
             return route.fulfill({ status: 400, json: { message: "Must not create a pending graph owned by another tutorial" } });
         });
@@ -917,7 +932,7 @@ test.describe("Tutorial", () => {
         const names: string[] = [];
         page.on("request", request => {
             const url = new URL(request.url());
-            if (url.pathname.startsWith("/api/graph/tutorial-social-") && url.searchParams.get("query")?.includes("CREATE")) {
+            if (url.pathname.startsWith("/api/graph/tutorial-social-") && getQueryRequestParam(request, "query")?.includes("CREATE")) {
                 names.push(decodeURIComponent(url.pathname.split("/")[3]));
             }
         });
@@ -1005,7 +1020,8 @@ test.describe("Tutorial", () => {
         const gate = new Promise<void>(resolve => { release = resolve; });
         const routes: Promise<void>[] = [];
         const names: string[] = [];
-        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+        await page.route("**/api/graph/tutorial-social-*", route => {
+            if (!getQueryRequestParam(route.request(), "query")?.includes("CREATE")) return route.fallback();
             names.push(decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]));
             const pending = gate.then(() => route.fulfill({ contentType: "text/event-stream", body: "event: result\ndata: {}\n\n" }));
             routes.push(pending);
@@ -1062,7 +1078,8 @@ test.describe("Tutorial", () => {
         const gate = new Promise<void>(resolve => { release = resolve; });
         const routes: Promise<void>[] = [];
         const names: string[] = [];
-        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+        await page.route("**/api/graph/tutorial-social-*", route => {
+            if (!getQueryRequestParam(route.request(), "query")?.includes("CREATE")) return route.fallback();
             names.push(decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]));
             const pending = gate.then(() => route.continue());
             routes.push(pending);
@@ -1143,7 +1160,9 @@ test.describe("Tutorial", () => {
     test("@admin late tutorial background reads cannot recreate a deleted sample", async ({ page }) => {
         const name = `tutorial-social-demo-${getRandomString("late-read").replaceAll("_", "-")}`;
         await apiCall.runQuery(name, "CREATE (:Mine)");
-        const removed = await page.request.delete(`${urls.api.graphUrl}${name}`);
+        const removed = await page.request.delete(`${urls.api.graphUrl}${name}`, {
+            headers: { Origin: new URL(urls.localHost).origin },
+        });
         expect(removed.ok()).toBe(true);
         for (const suffix of ["/info?type=(label)", "/info?type=(property%20key)", "/0", "/count", "/count/nodes", "/count/edges", "?query=RETURN%201&readOnly=true"]) {
             const response = await page.request.get(`${urls.api.graphUrl}${name}${suffix}`);
@@ -1169,7 +1188,8 @@ test.describe("Tutorial", () => {
         await page.route("**/api/DBVersion", route => route.request().headers()["x-connection-id"] === connections.second.id
             ? route.fulfill({ status: 503, json: { message: "Second connection cannot allocate tutorial samples" } })
             : route.continue());
-        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+        await page.route("**/api/graph/tutorial-social-*", route => {
+            if (!getQueryRequestParam(route.request(), "query")?.includes("CREATE")) return route.fallback();
             const name = decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]);
             createdNames.push(name);
             const pending = (async () => {
@@ -1382,7 +1402,7 @@ test.describe("Tutorial", () => {
                 deleted = response.ok();
                 return route.fulfill({ response });
             }
-            if (url.searchParams.get("query")?.includes("CREATE")) visibleNames.add(graph);
+            if (getQueryRequestParam(request, "query")?.includes("CREATE")) visibleNames.add(graph);
             if (graph === name && deleted) {
                 staleQueries.push(request.url());
                 return route.fulfill({ status: 400, json: { message: "Reclaimed sample must not be queried" } });
@@ -1734,7 +1754,7 @@ test.describe("Tutorial", () => {
         // Get the list of graphs before tutorial starts
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
-        await tutorial.waitForTimeout(2000);
+        await tutorial.waitForPageIdle();
 
         const graphsBefore = await tutorial.getGraphList();
         expect(graphsBefore).toContain(userGraph);
@@ -1742,13 +1762,16 @@ test.describe("Tutorial", () => {
         // Open a second tab, so the strip the tutorial replaces is one the user
         // can tell apart from the tutorial's own single tab.
         await tutorial.addStripTab();
-        const userTabs = await tutorial.getStripTabCount();
-        expect(userTabs).toBe(2);
+        const userTabs = 2;
+        await expect.poll(() => tutorial.getStripTabCount()).toBe(userTabs);
+        // The address bar follows the new blank tab after a short debounce, so the
+        // blank tab is the persisted active one; opening the page while a share
+        // link is still active would hold the tutorial back.
+        await expect(await browser.getPage()).toHaveURL(url => !url.searchParams.has("graph"));
 
-        // 2. Start the tutorial by setting localStorage and refreshing
+        // 2. Start the tutorial by setting localStorage and reopening the graph page
         await tutorial.changeLocalStorage("true");
-        await tutorial.refreshPage();
-        await tutorial.waitForTimeout(2000);
+        await browser.navigateTo(urls.graphUrl);
 
         // Step 0: "Preparing Tutorial..." — auto-advances after loading demo graphs
         // Step 1: "Welcome to FalkorDB Browser" — has Next button (no advanceOn)
@@ -1789,7 +1812,6 @@ test.describe("Tutorial", () => {
 
         // Step 7: "Graph Info Panel" — no advanceOn, has Next button
         await tutorial.waitForStep("Graph Info Panel");
-        await tutorial.waitForTimeout(1000); // Wait for graph info to load
         await tutorial.clickNextButton();
 
         // Step 8: "Open Label Options" — advanceOn: "click" on graphInfoPersonNode
@@ -1855,7 +1877,7 @@ test.describe("Tutorial", () => {
 
         // Step 22: "Graph Visualization" — no advanceOn, has Next button
         await tutorial.waitForStep("Graph Visualization");
-        await tutorial.waitForTimeout(2000); // Wait for canvas animation
+        await tutorial.waitForCanvasAnimationToEnd();
         await tutorial.clickNextButton();
 
         // Step 23: "Expand Node" — no advanceOn, has Next button (forwards events for optional interaction)
@@ -2034,20 +2056,15 @@ test.describe("Tutorial", () => {
         // 3. After tutorial closes, verify state restoration
         expect(await tutorial.isTutorialNotVisible()).toBeTruthy();
 
-        // Wait for cleanup to complete (demo graphs deleted, user graphs restored)
-        await tutorial.waitForTimeout(3000);
+        // 4. Cleanup is async: this tutorial's demo graphs are deleted, the user's graph is kept
+        await expect.poll(async () => {
+            const graphs = await tutorial.getGraphList();
+            return activeDemoGraphs.filter((g) => graphs.includes(g));
+        }, { timeout: 10_000 }).toEqual([]);
+        expect(await tutorial.getGraphList()).toContain(userGraph);
 
-        // 4. Verify this tutorial's demo graphs are gone
-        const graphsAfter = await tutorial.getGraphList();
-        for (const demoGraph of activeDemoGraphs) {
-            expect(graphsAfter).not.toContain(demoGraph);
-        }
-
-        // 5. Verify the user's original graph is still present
-        expect(graphsAfter).toContain(userGraph);
-
-        // 6. Verify the user's own tabs came back with them
-        expect(await tutorial.getStripTabCount()).toBe(userTabs);
+        // 5. Verify the user's own tabs came back with them
+        await expect.poll(() => tutorial.getStripTabCount()).toBe(userTabs);
 
         // 6. Verify the tutorial flag is set to "false" (completed)
         const tutorialFlag = await page.evaluate(() =>
@@ -2059,7 +2076,7 @@ test.describe("Tutorial", () => {
     test("@admin validate that clicking away doesn't dismiss the tutorial", async () => {
         const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
         await tutorial.changeLocalStorage("true");
-        await tutorial.refreshPage();
+        await browser.navigateTo(urls.graphUrl);
         await tutorial.clickAtTopLeftCorner();
         // Nothing to await on: the assertion is that a dismissal the click could
         // have triggered has had time to happen and did not.

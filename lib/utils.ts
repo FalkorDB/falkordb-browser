@@ -383,7 +383,7 @@ export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
-  options?: { query?: string; signal?: AbortSignal; connectionId?: string | null; allowTutorialCreation?: boolean }
+  options?: { query?: string; signal?: AbortSignal; connectionId?: string | null; method?: "POST"; allowTutorialCreation?: boolean }
 ): Promise<unknown> {
   const signal = options?.signal;
   // Already superseded before we even open the stream.
@@ -391,29 +391,15 @@ export async function getSSEGraphResult(
 
   return new Promise((resolve, reject) => {
     let settled = false;
-
-    // Route through an explicit connection id when provided, so every request in
-    // a batch targets the same connection even if the global changes mid-flight.
-    const connId = options?.connectionId !== undefined ? options.connectionId : getActiveConnectionIdGlobal();
-
-    // EventSource doesn't support headers — inject connectionId as a query param.
-    let effectiveUrl = protectTutorialGraphRead(normalizeApiUrl(url), options?.allowTutorialCreation);
-    if (connId) {
-      const sep = effectiveUrl.includes("?") ? "&" : "?";
-      effectiveUrl += `${sep}connectionId=${encodeURIComponent(connId)}`;
-    }
-
-    const evtSource = new EventSource(effectiveUrl);
+    let closeEventSource: (() => void) | undefined;
 
     const onAbort = () => {
-      // Superseded (e.g. graph/connection switch): close silently — no toast, no
-      // indicator change — and reject so callers can drop the result.
       finishReject(createAbortError());
     };
 
     function cleanup() {
       if (signal) signal.removeEventListener("abort", onAbort);
-      evtSource.close();
+      closeEventSource?.();
     }
     function finishResolve(value: unknown) {
       if (settled) return;
@@ -429,6 +415,104 @@ export async function getSSEGraphResult(
     }
 
     if (signal) signal.addEventListener("abort", onAbort);
+
+    // Route through an explicit connection id when provided, so every request in
+    // a batch targets the same connection even if the global changes mid-flight.
+    const connId = options?.connectionId !== undefined ? options.connectionId : getActiveConnectionIdGlobal();
+
+    // EventSource doesn't support headers — inject connectionId as a query param.
+    let effectiveUrl = protectTutorialGraphRead(normalizeApiUrl(url), options?.allowTutorialCreation);
+    if (connId) {
+      const sep = effectiveUrl.includes("?") ? "&" : "?";
+      effectiveUrl += `${sep}connectionId=${encodeURIComponent(connId)}`;
+    }
+
+    if (options?.method === "POST") {
+      const requestUrl = new URL(effectiveUrl, window.location.href);
+      const query = requestUrl.searchParams.get("query");
+      const timeout = requestUrl.searchParams.get("timeout");
+      requestUrl.searchParams.delete("query");
+      requestUrl.searchParams.delete("timeout");
+
+      const reportError = (payloadText: string, defaultStatus: number) => {
+        let rawMessage: unknown = "";
+        let status = defaultStatus;
+        let code: string | undefined;
+        try {
+          const payload = JSON.parse(payloadText) as { message?: unknown; status?: unknown; code?: string };
+          rawMessage = payload.message;
+          status = Number(payload.status) || defaultStatus;
+          code = payload.code;
+        } catch {
+          rawMessage = extractResponseErrorMessage(payloadText);
+        }
+
+        const message = normalizeErrorMessage(rawMessage) || "Request failed";
+        if (status === 401 && code === "SESSION_INVALID") {
+          triggerSessionInvalidationSignOut();
+          setIndicator("offline");
+          return new Error(message);
+        }
+
+        const friendly = toUserFriendlyMessage(message, status, options?.query ? { query: options.query } : undefined);
+        toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, hintAction: friendly.hintAction, query: options?.query });
+        if (status === 401 || status >= 500) setIndicator("offline");
+        return new Error(message);
+      };
+
+      fetch(requestUrl.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, timeout: timeout ?? 0 }),
+        signal,
+        credentials: "same-origin",
+      }).then(async (response) => {
+        const responseText = await response.text();
+        // The abort listener settles synchronously, so `settled` also covers an abort.
+        if (settled) return;
+        const events = responseText.split(/\r?\n\r?\n/);
+        for (const rawEvent of events) {
+          let eventName = "";
+          const data: string[] = [];
+          for (const line of rawEvent.split(/\r?\n/)) {
+            if (line.startsWith("event:")) eventName = line.slice(6).trim();
+            else if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
+          }
+          if (eventName === "result") {
+            try {
+              const result = JSON.parse(data.join("\n"));
+              setIndicator("online");
+              finishResolve(result);
+            } catch (error) {
+              console.error("Failed to parse SSE result event:", error);
+              setIndicator("offline");
+              finishReject(reportError("Invalid server response", response.status));
+            }
+            return;
+          }
+          if (eventName === "error") {
+            finishReject(reportError(data.join("\n"), response.status));
+            return;
+          }
+        }
+        if (!response.ok) {
+          finishReject(reportError(responseText, response.status));
+          return;
+        }
+        setIndicator("offline");
+        finishReject(reportError("Invalid server response", response.status));
+      }).catch((error: unknown) => {
+        if (settled) return;
+        toast({ title: "Error", description: "Network or server error", variant: "destructive" });
+        setIndicator("offline");
+        finishReject(error instanceof Error ? error : new Error("Network or server error"));
+      });
+
+      return;
+    }
+
+    const evtSource = new EventSource(effectiveUrl);
+    closeEventSource = () => evtSource.close();
 
     evtSource.addEventListener("result", (event: MessageEvent) => {
       if (settled) return;
@@ -643,6 +727,9 @@ const USER_READABLE_ERROR_PATTERNS = [
   // Connection errors from /api/connections
   /^cannot connect to falkordb\b/i,
   /^authentication failed\b/i,
+  /^this database requires credentials\. please enter your username and password\.$/i,
+  /^invalid credentials\. please check your username and password\.$/i,
+  /^could not connect to the database\. please check your connection settings and server logs\.$/i,
   /^connection timed out\b/i,
   // Data ingestion / file upload (app/api/upload, app/api/graph/[graph]/upload).
   // These messages are authored for end users, so show them verbatim.
@@ -845,7 +932,7 @@ export async function securedFetch(
   }
 
   if (status >= 300) {
-    const message = extractResponseErrorMessage(await response.text());
+    const message = extractResponseErrorMessage(await response.clone().text());
 
     const friendly = toUserFriendlyMessage(message, status);
     toast({
@@ -868,7 +955,7 @@ export async function securedFetch(
 }
 
 export function prepareArg(arg: string) {
-  return encodeURIComponent(arg.trim());
+  return encodeURIComponent(arg);
 }
 
 /**

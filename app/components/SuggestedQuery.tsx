@@ -96,6 +96,7 @@ export default function SuggestedQuery({
             <pre
                 ref={queryRef}
                 id={contentId}
+                role="group"
                 data-testid={testIds.query}
                 className={collapsed
                     ? "truncate bg-zinc-950 p-3 font-mono text-sm text-emerald-300"

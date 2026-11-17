@@ -1430,6 +1430,9 @@ function TutorialPortal({
                         if (advancePendingRef.current) return;
                         advancePendingRef.current = true;
                         advanceCancelledRef.current = false;
+                        // The selection closes the sub-menu and detaches this item; without
+                        // this the watcher would re-run the effect and cancel the advance.
+                        window.clearInterval(reopenWatcher);
                         advanceRaf1Ref.current = window.requestAnimationFrame(() => {
                             advanceRaf1Ref.current = null;
                             if (advanceCancelledRef.current) return;

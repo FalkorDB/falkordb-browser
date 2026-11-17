@@ -52,10 +52,6 @@ export interface SchemaViewport {
 }
 
 export default class SchemaView extends GraphPage {
-  private get schemaTab(): Locator {
-    return this.page.getByTestId("schemaTab");
-  }
-
   private get schemaTabPanel(): Locator {
     return this.page.getByRole("tabpanel", { name: "Schema" });
   }
@@ -110,14 +106,6 @@ export default class SchemaView extends GraphPage {
   /** The query run time, which only the graph reports. */
   public async isRunTimeVisible(): Promise<boolean> {
     return this.page.getByText(/^RT:/).isVisible();
-  }
-
-  public async clickSchemaTab(): Promise<void> {
-    await interactWhenVisible(
-      this.schemaTab,
-      (el) => el.click(),
-      "schema tab"
-    );
   }
 
   public async clickSchemaZoomIn(): Promise<void> {
@@ -286,6 +274,18 @@ export default class SchemaView extends GraphPage {
 
       return canvas?.getViewport?.();
     });
+  }
+
+  /** Moves the schema camera the way a pan and zoom would. */
+  public async setSchemaViewport(viewport: SchemaViewport): Promise<void> {
+    await this.page.evaluate((target) => {
+      const canvas = document.querySelector(
+        '[data-testid="schemaView"] falkordb-canvas'
+      ) as { setViewport?: (viewport: SchemaViewport) => void } | null;
+
+      if (!canvas?.setViewport) throw new Error("Schema canvas is not mounted");
+      canvas.setViewport(target);
+    }, viewport);
   }
 
   /** Every relationship placement in the schema, sorted and de-duplicated. */

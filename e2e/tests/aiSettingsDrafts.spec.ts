@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { createServer } from "node:http";
 import GraphPage from "../logic/POM/graphPage";
 import AiAssistComponent from "../logic/POM/aiAssistComponent";
-import { getRandomString, initializeLocalStorage } from "../infra/utils";
+import { getRandomString, initializeLocalStorage, waitForChatKeyMigration } from "../infra/utils";
 import configuredUrls from "../config/urls.json";
 
 const baseUrl = process.env.E2E_BASE_URL ?? configuredUrls.localHost;
@@ -40,7 +40,9 @@ test("@admin a retained optimization toast cannot leak URL synchronization after
   await page.route("**/api/chat/optimize", route => route.fulfill({
     status: 422, json: { error: "Unable to reach the AI provider. Please try again." },
   }));
-  const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
+  const created = await page.request.post(`${urls.api.graphUrl}${graphName}`, {
+    headers: { Origin: new URL(baseUrl).origin },
+  });
   expect(created.ok()).toBe(true);
   try {
     await page.clock.install();
@@ -79,7 +81,9 @@ test("@admin a retained optimization toast cannot leak URL synchronization after
   } finally {
     releaseSettingsResponse?.();
     await page.close();
-    const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`);
+    const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    });
     expect(removed.ok()).toBe(true);
   }
 });
@@ -93,7 +97,9 @@ test("@admin Optimize identifies LM Studio as the local data recipient", async (
     localStorage.setItem("model", "openai::local-test-model");
   });
   await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
-  expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+  expect((await page.request.post(`${urls.api.graphUrl}${graphName}`, {
+    headers: { Origin: new URL(baseUrl).origin },
+  })).ok()).toBe(true);
   try {
     await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const ai = new AiAssistComponent(page);
@@ -103,7 +109,9 @@ test("@admin Optimize identifies LM Studio as the local data recipient", async (
     await expect(ai.optimizeDialog).not.toContainText("will be sent to OpenAI");
     await ai.optimizeCancelButton.click();
   } finally {
-    expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+    expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
   }
 });
 
@@ -119,12 +127,15 @@ test("@admin query assistance routes preserve provider error status without leak
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Missing test provider address");
   try {
-    expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+    expect((await page.request.post(`${urls.api.graphUrl}${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
     try {
       for (const feature of ["fix", "optimize"]) {
         for (const status of [401, 429, 503]) {
           providerStatus = status;
           const response = await page.request.post(`${baseUrl}/api/chat/${feature}`, {
+            headers: { Origin: new URL(baseUrl).origin },
             data: {
               query: "RETURN 1",
               errorMessage: "Syntax error",
@@ -143,7 +154,9 @@ test("@admin query assistance routes preserve provider error status without leak
         }
       }
     } finally {
-      expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+      expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`, {
+        headers: { Origin: new URL(baseUrl).origin },
+      })).ok()).toBe(true);
     }
   } finally {
     await new Promise<void>((resolve, reject) => {
@@ -166,11 +179,14 @@ test("@admin optimize asks for per-request guidance without a remembered-consent
     requests.push(route.request().postDataJSON());
     return route.fulfill({ json: { explanation: "Review complete.", suggestions: [], executionPlan: ["Results"] } });
   });
-  expect((await page.request.post(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+  expect((await page.request.post(`${urls.api.graphUrl}${graphName}`, {
+    headers: { Origin: new URL(baseUrl).origin },
+  })).ok()).toBe(true);
   try {
     await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const ai = new AiAssistComponent(page);
     await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 1", { timeout: 30_000 });
+    await waitForChatKeyMigration(page);
     for (const guidance of ["Prioritize latency.", ""]) {
       await ai.openOptimize();
       await expect(ai.optimizeGuidance).toHaveValue("");
@@ -185,7 +201,9 @@ test("@admin optimize asks for per-request guidance without a remembered-consent
       await ai.optimizeCloseButton.click();
     }
   } finally {
-    expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`)).ok()).toBe(true);
+    expect((await page.request.delete(`${urls.api.graphUrl}${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
   }
 });
 
@@ -196,9 +214,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       const graphName = getRandomString("aiQueryCards");
       const query = "RETURN 4242 AS unsent_draft";
       const invalidQuery = "MATCH (n) RETsURN n";
-      const suggestion = feature === "fix"
-        ? `WITH 4242 AS unsent_draft\n${"WITH unsent_draft\n".repeat(40)}RETURN unsent_draft`
-        : "WITH 4242 AS unsent_draft\nWITH unsent_draft\nRETURN unsent_draft";
+      const suggestion = feature === "chat"
+        ? `WITH 4242 AS unsent_draft\n${"WITH unsent_draft\n".repeat(30)}RETURN unsent_draft`
+        : feature === "fix"
+          ? `WITH 4242 AS unsent_draft\n${"WITH unsent_draft\n".repeat(40)}RETURN unsent_draft`
+          : "WITH 4242 AS unsent_draft\nWITH unsent_draft\nRETURN unsent_draft";
       let providerPrompt = "";
       let queryRequests = 0;
       const server = createServer((request, response) => {
@@ -242,7 +262,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             value: { writeText: async (value: string) => { sessionStorage.setItem("copiedQuery", value); } },
           });
         });
-        const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
+        const created = await page.request.post(`${urls.api.graphUrl}${graphName}`, {
+          headers: { Origin: new URL(baseUrl).origin },
+        });
         expect(created.ok()).toBe(true);
         try {
           await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=${encodeURIComponent(query)}`);
@@ -253,8 +275,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
           if (viewport.width < 1100) await expect(page.getByTestId("editorMore")).toBeVisible();
           page.on("request", request => {
             const url = new URL(request.url());
-            const executedQuery = url.searchParams.get("query") ?? "";
-            if (request.method() === "GET"
+            if (decodeURIComponent(url.pathname) !== `/api/graph/${graphName}`) return;
+            const executedQuery = request.method() === "POST" && request.postData()
+              ? (request.postDataJSON() as { query?: string } | null)?.query ?? ""
+              : url.searchParams.get("query") ?? "";
+            if (["GET", "POST"].includes(request.method())
               && decodeURIComponent(url.pathname) === `/api/graph/${graphName}`
               && [query, suggestion, invalidQuery].some(testedQuery => executedQuery.includes(testedQuery))) queryRequests += 1;
           });
@@ -314,9 +339,26 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
             await page.getByTestId("chatToggleButton").click();
             await page.getByTestId("chatInput").fill("Suggest a query");
             await page.getByTestId("chatSendButton").click();
-            await page.getByRole("button", { name: "Collapse query", exact: true }).click();
-            await expect(page.getByRole("button", { name: "Expand query", exact: true })).toHaveAttribute("aria-expanded", "false");
-            await page.getByRole("button", { name: "Expand query", exact: true }).click();
+            const suggestedQuery = page.getByTestId("chatSuggestedQuery");
+            await expect(suggestedQuery).toHaveText(suggestion);
+            await expect(page.getByRole("group", { name: "Suggested query", exact: true })).toHaveText(suggestion);
+            await expect(page.getByTestId("chatSuggestedQuery")).toHaveCSS("word-break", "normal");
+            await expect(page.getByTestId("chatSuggestedQuery")).toHaveCSS("overflow-wrap", "break-word");
+            expect(await page.getByTestId("chatSuggestedQuery").evaluate(element =>
+              parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(14);
+            expect(await suggestedQuery.evaluate(element =>
+              element.scrollWidth <= element.clientWidth)).toBe(true);
+            await expect(suggestedQuery).toHaveAttribute("tabindex", "0");
+            expect(await suggestedQuery.evaluate(element =>
+              element.scrollHeight > element.clientHeight && element.clientHeight <= 288)).toBe(true);
+            await suggestedQuery.focus();
+            await page.keyboard.press("End");
+            await expect.poll(() => suggestedQuery.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+            const collapseButton = page.getByRole("button", { name: "Collapse query" });
+            await expect(collapseButton).toBeVisible();
+            await collapseButton.click();
+            await expect(page.getByRole("button", { name: "Expand query" })).toHaveAttribute("aria-expanded", "false");
+            await page.getByRole("button", { name: "Expand query" }).click();
             await page.getByTestId("chatCopyQueryButton").click();
             expect(await page.evaluate(() => sessionStorage.getItem("copiedQuery"))).toBe(suggestion);
             await expect(editor).toHaveAttribute("data-value", query);
@@ -326,7 +368,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
           await expect(editor).toHaveAttribute("data-value", suggestion);
           expect(queryRequests).toBe(0);
         } finally {
-          const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`);
+          const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`, {
+            headers: { Origin: new URL(baseUrl).origin },
+          });
           expect(removed.ok()).toBe(true);
         }
       } finally {
@@ -373,7 +417,9 @@ for (const { feature, scenario } of cases) {
       await route.fulfill({ json: { error: "Unable to reach the AI provider. Please try again." }, status: 422 });
     });
 
-    const created = await page.request.post(`${urls.api.graphUrl}${graphName}`);
+    const created = await page.request.post(`${urls.api.graphUrl}${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    });
     expect(created.ok()).toBe(true);
     try {
       if (feature === "fix" && scenario === "missing-key") await page.clock.install();
@@ -485,7 +531,9 @@ for (const { feature, scenario } of cases) {
       expect(aiRequests).toBe(scenario === "missing-key" ? 0 : 1);
     } finally {
       releaseSettingsResponse?.();
-      const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`);
+      const removed = await page.request.delete(`${urls.api.graphUrl}${graphName}`, {
+        headers: { Origin: new URL(baseUrl).origin },
+      });
       expect(removed.ok()).toBe(true);
     }
   });

@@ -6,8 +6,12 @@ import {
   waitForURL,
 } from "@/e2e/infra/utils";
 import { existsSync } from "fs";
+import { basename } from "path";
 import urls from "../../config/urls.json";
 import HeaderComponent from "./headerComponent";
+
+// A certificate on disk, or one built in memory for tests that only need the bytes.
+type CertificateFile = string | { name: string; contents: string };
 
 export default class LoginPage extends HeaderComponent {
   private get connectBtn(): Locator {
@@ -28,6 +32,18 @@ export default class LoginPage extends HeaderComponent {
 
   public get usernameField(): Locator {
     return this.usernameInput;
+  }
+
+  public get passwordField(): Locator {
+    return this.passwordInput;
+  }
+
+  public get falkordbUrlField(): Locator {
+    return this.falkordbUrlInput;
+  }
+
+  public get tlsToggle(): Locator {
+    return this.tlsCheckbox;
   }
 
   // Preconfigured connection markers.
@@ -100,6 +116,55 @@ export default class LoginPage extends HeaderComponent {
     return this.page.getByTestId("client-key-uploaded-status");
   }
 
+  private get removeClientCertBtn(): Locator {
+    return this.page.getByTestId("remove-client-cert-btn");
+  }
+
+  private get removeClientKeyBtn(): Locator {
+    return this.page.getByTestId("remove-client-key-btn");
+  }
+
+  // TLS upload markers.
+  public get tlsSection(): Locator {
+    return this.page.locator("#tls-section");
+  }
+
+  public get certificateDropzone(): Locator {
+    return this.uploadCertificateInput;
+  }
+
+  public get certificateStatus(): Locator {
+    return this.certificateUploadedStatus;
+  }
+
+  public get clientCertificateDropzone(): Locator {
+    return this.uploadClientCertInput;
+  }
+
+  public get clientCertificateStatus(): Locator {
+    return this.clientCertUploadedStatus;
+  }
+
+  public get clientKeyDropzone(): Locator {
+    return this.uploadClientKeyInput;
+  }
+
+  public get clientKeyStatus(): Locator {
+    return this.clientKeyUploadedStatus;
+  }
+
+  public get missingClientKeyError(): Locator {
+    return this.page.getByText("Upload the client private key to use this client certificate.");
+  }
+
+  public get missingClientCertificateError(): Locator {
+    return this.page.getByText("Upload the client certificate that matches this private key.");
+  }
+
+  public fileReadError(fileName: string): Locator {
+    return this.page.getByText(`Could not read ${fileName}`, { exact: true });
+  }
+
   // URL mode locators
   private get manualConfigRadio(): Locator {
     return this.page.getByRole("radio", { name: "Manual Configuration" });
@@ -125,6 +190,13 @@ export default class LoginPage extends HeaderComponent {
       (el) => el.click(),
       "connect button"
     );
+  }
+
+  async submitForm(): Promise<void> {
+    await this.connectBtn.evaluate((button: HTMLButtonElement) => {
+      if (!button.form) throw new Error("Login button is not attached to a form");
+      button.form.requestSubmit();
+    });
   }
 
   async fillUsername(username: string): Promise<void> {
@@ -216,6 +288,33 @@ export default class LoginPage extends HeaderComponent {
     );
   }
 
+  async clickRemoveClientCertificateBtn(): Promise<void> {
+    await interactWhenVisible(
+      this.removeClientCertBtn,
+      (el) => el.click(),
+      "remove client certificate button"
+    );
+  }
+
+  async clickRemoveClientKeyBtn(): Promise<void> {
+    await interactWhenVisible(
+      this.removeClientKeyBtn,
+      (el) => el.click(),
+      "remove client key button"
+    );
+  }
+
+  // Makes the browser's next certificate read fail, as an unreadable file would.
+  async failNextFileRead(): Promise<void> {
+    await this.page.evaluate(() => {
+      const original = FileReader.prototype.readAsDataURL;
+      FileReader.prototype.readAsDataURL = function readOnce() {
+        FileReader.prototype.readAsDataURL = original;
+        this.dispatchEvent(new ProgressEvent("error"));
+      };
+    });
+  }
+
   async isCertificateUploaded(): Promise<boolean> {
     return this.isUploaded(this.certificateUploadedStatus);
   }
@@ -280,25 +379,25 @@ export default class LoginPage extends HeaderComponent {
     await this.clickConnect();
   }
 
-  async uploadCertificate(filePath: string): Promise<void> {
+  async uploadCertificate(file: CertificateFile): Promise<void> {
     await this.uploadThroughDropzone(
-      filePath,
+      file,
       this.uploadCertificateInput,
       this.certificateUploadedStatus
     );
   }
 
-  async uploadClientCertificate(filePath: string): Promise<void> {
+  async uploadClientCertificate(file: CertificateFile): Promise<void> {
     await this.uploadThroughDropzone(
-      filePath,
+      file,
       this.uploadClientCertInput,
       this.clientCertUploadedStatus
     );
   }
 
-  async uploadClientKey(filePath: string): Promise<void> {
+  async uploadClientKey(file: CertificateFile): Promise<void> {
     await this.uploadThroughDropzone(
-      filePath,
+      file,
       this.uploadClientKeyInput,
       this.clientKeyUploadedStatus
     );
@@ -313,28 +412,24 @@ export default class LoginPage extends HeaderComponent {
   }
 
   private async uploadThroughDropzone(
-    filePath: string,
+    file: CertificateFile,
     trigger: Locator,
     status: Locator
   ): Promise<void> {
-    if (!existsSync(filePath)) {
-      throw new Error(`Certificate file does not exist: ${filePath}`);
+    if (typeof file === "string" && !existsSync(file)) {
+      throw new Error(`Certificate file does not exist: ${file}`);
     }
     const fileChooserPromise = this.page.waitForEvent("filechooser");
     await interactWhenVisible(trigger, (el) => el.click(), "upload input");
     const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles(filePath);
+    await fileChooser.setFiles(typeof file === "string" ? file : {
+      name: file.name,
+      mimeType: "application/x-pem-file",
+      buffer: Buffer.from(file.contents),
+    });
 
-    try {
-      await status.waitFor({
-        state: "visible",
-        timeout: 10000,
-      });
-    } catch (error) {
-      console.log(
-        "Certificate upload status not visible, it might be already uploaded or the upload failed."
-      );
-    }
+    const fileName = typeof file === "string" ? basename(file) : file.name;
+    await status.or(this.fileReadError(fileName)).first().waitFor({ state: "visible", timeout: 10000 });
   }
 
   async waitForSuccessfulLogin(Url: string): Promise<void> {
@@ -377,6 +472,10 @@ export default class LoginPage extends HeaderComponent {
 
   private get credentialsError(): Locator {
     return this.page.locator("text=Invalid credentials");
+  }
+
+  public get credentialsErrorMessage(): Locator {
+    return this.credentialsError;
   }
 
   async connectWithUrl(url: string): Promise<void> {

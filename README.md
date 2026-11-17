@@ -30,6 +30,9 @@ The search bar now indexes schema, nodes, and metadata. Results are ranked more 
 #### Expanded Settings & User Controls  
 New options let you fine-tune database behavior, toggle visual preferences, and manage users without falling back to CLI tools.
 
+Successful database configuration edits offer **Undo**, which restores the immediately
+preceding value, including zero. Load-time configuration values remain read-only.
+
 #### Node Style Customization  
 Customize the visual appearance of nodes per label. Select custom colors from a palette, adjust node sizes, and choose which property to display as the node caption. All customizations are saved per graph and persist across sessions.
 
@@ -37,6 +40,55 @@ Customize the visual appearance of nodes per label. Select custom colors from a 
 
 | ![image (4)](https://github.com/user-attachments/assets/658fa59f-5316-475c-8bd7-b26651e9902c) | ![FalkorDB browser 06-25](https://github.com/user-attachments/assets/ee907fa6-038c-462b-9240-456a2d2c2a99) |
 |---------------------------------------------------|---------------------------------------------------|
+
+### Graph operation ownership
+
+Expansion, collapse and mutation repaints are tied to the graph, query result,
+tab and connection that started them. A completed server mutation still updates
+its owning graph model when that view is no longer active; only its canvas
+repaint and active-view controls are skipped. Returning to a saved tab reconciles
+its stored positions with the updated model.
+
+### Large graphs in 3D
+
+Before entering 3D, loading results in 3D, restoring a graph, or adding elements,
+the browser checks the graph size against advisory device-adjusted budgets:
+
+| Device hints | Nodes | Relationships |
+|---|---:|---:|
+| RAM hint or logical CPU count at most 2 | 500 | 1,000 |
+| RAM hint or logical CPU count at most 4 | 1,000 | 2,500 |
+| Both hints at least 8 | 4,000 | 10,000 |
+| Other or unavailable hints | 2,000 | 5,000 |
+
+RAM hints are in GiB. If either count exceeds its budget, the graph stays in 2D
+while a warning offers **Use 2D (recommended)** or **Proceed with 3D**. Proceeding
+approves up to those counts for the mounted view; growing beyond either approved
+count warns again. Switching back to 2D or leaving the view clears approval.
+These are conservative heuristics, not benchmarked safe limits: browser resource
+hints are coarse, may be unavailable, and do not expose free GPU memory. Choosing
+3D can still freeze or crash the tab; use query limits to reduce large results.
+
+On the first 3D request, a temporary WebGL2 context checks GPU capabilities once
+per page load and is immediately released. No benchmark or frame-time monitoring
+runs. GPU checks can only lower the CPU/RAM budgets. The first matching row
+applies; a texture/renderbuffer limit means either reported limit:
+
+| GPU capability | Maximum nodes | Maximum relationships |
+|---|---:|---:|
+| WebGL2 unavailable (could not start) | 0 | 0 |
+| Recognized software renderer, or texture/renderbuffer limit at most 4,096 | 500 | 1,000 |
+| Texture/renderbuffer limit at most 8,192 | 1,000 | 2,500 |
+| WebGL2 probe result is `unknown`, or a texture/renderbuffer limit is unavailable | 2,000 | 5,000 |
+| Both texture/renderbuffer limits above 8,192 | 4,000 | 10,000 |
+
+If WebGL2 cannot start, any non-empty graph warns before attempting 3D.
+**Proceed with 3D** still permits an attempt; initialization failures return to
+2D with an error notification. Renderer information, when exposed, is used only
+to recognize software rendering; GPU identification strings are neither retained
+nor sent to a server. Graphics limits indicate supported dimensions, not GPU
+speed or free VRAM. Hidden renderer information does not prove hardware
+acceleration, and cached capabilities do not track later GPU/driver changes.
 
 
 ## Automatic query limiting
@@ -95,6 +147,11 @@ docker run -p 3000:3000 -p 6379:6379 -it --rm falkordb/falkordb:latest
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+For TLS connections, upload a CA certificate and, if required, a client certificate
+and key on the login form. Opening any file chooser clears the previous error, and
+selecting a new file replaces an earlier unfinished upload for that input. Log in
+stays disabled while files are being read; turning TLS off (the checkbox or a `falkor://` URL) discards uploads.
+
 > Note: to run the application with a different URL, set the NEXTAUTH_URL environment variable.
 
 ```
@@ -102,6 +159,101 @@ docker run -p 3000:3000 -e "NEXTAUTH_URL=https://www.yoururl.com" -p 6379:6379 -
 ```
 
 For reverse-proxy deployments using `NEXTAUTH_URL=auto`, set `TRUST_PROXY_HEADERS=true` only when the proxy strips or overwrites incoming `X-Forwarded-Host` and `X-Forwarded-Proto` headers.
+
+Browser requests that send an `Origin` header are accepted only from a trusted
+origin: the configured `AUTH_URL` / `NEXTAUTH_URL` origin (unless `auto`), any
+origin listed in the comma-separated `ALLOWED_ORIGINS`, and, while
+`ALLOWED_ORIGINS` is unset, the request's own origin (so `localhost`,
+`127.0.0.1` and LAN addresses keep working). `Origin: null`, non-http(s) and
+malformed origins are always rejected. Other cross-origin callers (including
+other localhost ports) must be listed in `ALLOWED_ORIGINS`; this is a
+caller-origin list, not an API-host allowlist. Behind a proxy that rewrites the
+`Host` header, set `AUTH_URL` / `NEXTAUTH_URL` to the public URL, or use `auto`
+with `TRUST_PROXY_HEADERS=true` as above. Cookie-authenticated `POST`, `PUT`,
+`PATCH` and `DELETE` requests without an `Origin` header are accepted only from
+the same origin (`Sec-Fetch-Site: same-origin`); scripts should authenticate
+with a personal access token (`Authorization: Bearer …`) instead of a session
+cookie. Origin-less API reads remain supported. Protected reads still require
+authentication; public endpoints remain public. The allowlist is not a
+trusted-host list or a replacement for authorization.
+
+URL login uses the authentication attempt itself to detect missing or invalid
+credentials and reveal the credential fields when needed. Connection failures
+show a separate error; no preliminary database probe is made. The former
+`/api/validate-url` endpoint and its `URL_VALIDATION_ALLOWED_DATABASES` setting
+have been removed. Normal login still accepts user-supplied database addresses,
+so deployments should restrict outbound network access as appropriate.
+
+Session connections must have an active stored connection record. Removing the
+last connection requires a fresh login; old sessions without a connection ID
+must also sign in again instead of reconnecting from cookie fields.
+The compatibility session-migration endpoint only returns an existing usable
+active connection; it never reconstructs missing records or opens a client to
+the user's database. Reading the record may open a token-store database client.
+The UI signs out when no stored connections remain.
+
+File-backed token storage uses atomic publication (including the initial empty
+snapshot), atomic replacements, and an exclusive
+`<token-file>.lock` directory (the full configured token path with `.lock`
+appended; by default `.data/api_tokens.json.lock`) to serialize
+writers. A writer waits up to 10 seconds for the lock, then fails explicitly.
+Each acquisition is published atomically together with its own uniquely named
+holder record, and a writer only ever removes the lock instance it observed, so
+a delayed writer or a recovering one never removes another writer's lock. A lock
+at least 30 seconds old whose holder process is gone on the same host is
+recovered automatically. A lock whose holder cannot be checked (held from
+another host, or with a missing or malformed holder record) is recovered once it
+is 5 minutes old, far longer than any write holds it; a holder record that
+cannot be read (for example, permission denied) keeps the lock and fails the
+write. If releasing the lock fails, the same process retries the release before
+its next write. Stop **all** writers before removing a lock by hand. Use FalkorDB-backed
+token storage for distributed deployments rather than sharing files across
+machines.
+
+`API_TOKEN_FALKORDB_URL` accepts `falkor://`, the legacy `falkordb://` alias,
+`redis://`, and the TLS schemes `falkors://` / `rediss://`. Only database 0 is
+supported; query strings and fragments are rejected. For a private/self-signed
+token-database certificate, mount the issuing CA PEM and set
+`NODE_EXTRA_CA_CERTS=/path/to/ca.pem` **before starting Node**. This extends trust
+for the token store and other Node TLS connections without disabling certificate
+or hostname verification.
+
+Redis URL schemes default to port 6379; the FalkorDB URL aliases and legacy
+`PAT_FALKORDB_*` fallback retain their existing port 6380 default.
+
+Replacing a user's role also clears existing ACL selectors, so selectors cannot
+retain permissions outside the replacement role and key patterns.
+
+Legacy browser-storage migration leaves connection-shaped keys untouched rather
+than guessing ownership, including hostnames beginning with `chat-` or another
+legacy prefix. Desktop secret regeneration atomically replaces the secrets file
+inside an owner-only directory, flushing the temporary file before renaming it
+and flushing the parent directory afterward on POSIX. Windows sharing failures
+are retried a bounded number of times without a non-atomic fallback.
+Ambiguous legacy graph keys that could belong to another connection are left
+untouched rather than copied across scopes; this can require manual recovery.
+
+HTTP CSV header validation inspects and retains at most 8 KiB, then cancels the
+response. A stream chunk and the underlying network transfer may exceed 8 KiB
+when storage ignores Range. The optional precheck has a 10-second deadline.
+If Next.js cannot fetch the URL, it logs an unavailable precheck and lets
+FalkorDB perform the authoritative fetch: the URL may target a network reachable
+only by the database. A successfully inspected empty/binary header still rejects
+the import; database fetch/query failures remain explicit import errors.
+File-URI imports remain validated during upload.
+
+Schema-discovery placement limits, timeouts, and limit-reached UI behavior are
+tracked separately in [#2228](https://github.com/FalkorDB/falkordb-browser/issues/2228);
+no schema limit or sampling change is introduced here.
+
+Aborting a graph-query request stops its SSE output, but does not cancel an
+already-running database query: the current driver has no per-query cancellation
+API. Existing query timeouts still apply; shared database connections are not
+closed to cancel an individual request.
+
+Query-stream infrastructure failures return a generic server-error message;
+raw backend details remain in server logs. Query/input errors retain their
+actionable messages.
 
 > Note: the image ships no default `AUTH_SECRET`. If you do not supply one, a
 > random secret is generated per container, which means every session is
@@ -293,6 +445,46 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Upgrading / breaking changes
+
+This release hardens query and token handling. Check these before upgrading:
+
+- **`GET /api/graph/{graph}` always runs read-only.** Send writes (`CREATE`,
+  `MERGE`, …) with `POST /api/graph/{graph}` and a JSON body
+  (`{"query": "…"}`).
+- **Profiling moved to `POST /api/graph/{graph}/profile` with a JSON body.**
+  `GET` returns 405, a non-JSON body 415, and read-only users get 403.
+- **Admins list and revoke only the tokens of their own FalkorDB host:port.**
+  Manage tokens issued for another endpoint by signing in to that endpoint.
+- **`API_TOKEN_FALKORDB_URL` is parsed strictly.** `redis://` / `rediss://`
+  URLs without a port use 6379; an invalid URL, a database other than 0, a query
+  string or a fragment now throws instead of falling back to `PAT_FALKORDB_*`.
+  Since every session is validated against token storage, fix the value before
+  upgrading or logins fail.
+- **Cookie-authenticated scripts must send a trusted `Origin`** for unsafe
+  methods (see the Origin rules above). Use a personal access token
+  (`Authorization: Bearer …`) for scripts instead.
+- **Sessions need their stored connection record.** Without a persistent token
+  volume (`API_TOKEN_STORAGE_PATH` on ephemeral storage, e.g. `docker run`
+  without a volume or Helm without `persistence.enabled`), users must log in
+  again after every restart. Sessions created before connection IDs existed
+  must log in once.
+
+### Personal access tokens
+
+Custom expiration dates use the selected local calendar day, ending at
+23:59:59.999 in the browser's timezone, including daylight-saving transitions.
+
+### Restoring graph tabs
+
+Graph editing waits for saved tabs and the query timeout to initialize for the
+current connection, while information panels and Chat remain accessible.
+During initial connection discovery, restoration uses the signed session's
+connection ID until the active connection is loaded. A connection switch never
+restores tabs from a different connection's storage prefix.
+If timeout configuration does not respond within five seconds, restoration uses
+the 60-second fallback.
+
 ### Error help
 
 When a Cypher query fails, the browser shows the database's message together with an
@@ -350,9 +542,11 @@ It analyzes the query, available indexes, and `GRAPH.EXPLAIN` output without exe
 the query. Expand **EXPLAIN execution plan** to inspect the plan used in the analysis.
 If index metadata is unavailable, analysis continues with an explicit warning.
 
-Chat, Fix with AI, and Optimize share a suggested-query card with **Copy** and
-**Insert into editor** actions. Neither action runs the query. The card adapts to
-mobile screens, and long Chat queries can be collapsed.
+Fix with AI and Optimize share a suggested-query card with **Copy** and
+**Insert into editor** actions. Chat offers the same actions with compact, fully
+wrapped queries in a keyboard-scrollable, height-limited area, plus a
+**Collapse query**/**Expand query** toggle for queries taller than a few lines.
+Both presentations adapt to mobile screens. Neither action runs the query.
 
 Missing AI configuration and provider errors offer **Go to Settings**. Returning
 to the graph preserves the editor query and unsent Chat input. Debounced URL
@@ -452,3 +646,8 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
+  The Firefox settings project depends on the Chromium settings project because both
+  mutate server-wide configuration. Selecting Firefox also runs Chromium first; do not
+  bypass this dependency when both projects share a server.
+  The connection manager's server-switching test also needs a second FalkorDB on port 6380
+  (CI runs one as the `falkordb-pat` service): `docker run -d -p 6380:6379 falkordb/falkordb`.

@@ -6,6 +6,26 @@ import urls from '../config/urls.json';
 import QueryHistory from "../logic/POM/queryHistoryComponent";
 import { getRandomString } from "../infra/utils";
 
+/**
+ * Runs `body`, then removes `graphs` (read after `body`, so it may add to the list).
+ * removeGraph resolves with the HTTP status instead of throwing on error responses, so check it;
+ * a leak fails the test only when the body passed, so cleanup never replaces the test's own error.
+ */
+async function withGraphCleanup(apicalls: ApiCalls, graphs: string[], body: () => Promise<void>): Promise<void> {
+    let bodyFailed = true;
+    try {
+        await body();
+        bodyFailed = false;
+    } finally {
+        const results = await Promise.allSettled(graphs.map((name) => apicalls.removeGraph(name, "admin")));
+        const failures = results.flatMap((result, index) => {
+            if (result.status === "rejected") return [`${graphs[index]}: ${String(result.reason)}`];
+            return result.value.status >= 400 ? [`${graphs[index]}: HTTP ${result.value.status}`] : [];
+        });
+        if (failures.length > 0 && !bodyFailed) throw new Error(`Failed to remove graph(s): ${failures.join("; ")}`);
+    }
+}
+
 test.describe('Query history Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
@@ -70,7 +90,8 @@ test.describe('Query history Tests', () => {
         const searchQuery = `Alice`;
         await graph.searchElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
-        expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
+        await expect(graph.nodeCanvasToolTip).toBeVisible();
+        await expect(graph.nodeCanvasToolTip).toHaveText(searchQuery);
         await apicalls.removeGraph(graphName);        
     });
 
@@ -180,6 +201,182 @@ test.describe('Query history Tests', () => {
         await expect(graph.editorContainer).toHaveAttribute("data-value", "");
         await expect(graph.editorContainer.locator(".view-lines")).toHaveText("");
         await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin favorite filter shows only favorites and clearing the selected favorite removes the star`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            const tag = getRandomString('fav');
+            const [plainA, favorite, plainB] = [`RETURN '${tag}-a'`, `RETURN '${tag}-b'`, `RETURN '${tag}-c'`];
+            const favoriteName = `name-${tag}`;
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.runQueries([plainA, favorite, plainB]);
+            await graph.clickQueryHistoryButton();
+            for (const query of [plainA, favorite, plainB]) {
+                await expect(graph.selectQueryHistory(query)).toBeVisible();
+            }
+
+            await graph.addHistoryQueryToFavorites(favorite, favoriteName);
+            await expect(graph.historyFavButton(favorite)).toHaveAttribute("aria-label", "Remove from favorites");
+            await expect(graph.selectQueryHistory(favorite)).toContainText(favoriteName);
+
+            await graph.clickHistoryFavFilter();
+            await expect(graph.selectQueryHistory(favorite)).toBeVisible();
+            await expect(graph.selectQueryHistory(plainA)).toHaveCount(0);
+            await expect(graph.selectQueryHistory(plainB)).toHaveCount(0);
+
+            await graph.clickHistoryFavFilter();
+            await expect(graph.selectQueryHistory(plainA)).toBeVisible();
+            await expect(graph.selectQueryHistory(plainB)).toBeVisible();
+
+            await graph.selectHistoryQueries([favorite]);
+            await graph.clickHistoryClearSelected();
+            await expect(graph.historyFavButton(favorite)).toHaveAttribute("aria-label", "Add to favorites");
+            await expect(graph.selectQueryHistory(favorite)).not.toContainText(favoriteName);
+
+            await graph.clickHistoryFavFilter();
+            await expect(graph.selectQueryHistory(favorite)).toHaveCount(0);
+        });
+    });
+
+    test(`@admin delete selected removes only those entries`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            const tag = getRandomString('delete');
+            const [deletedA, deletedB, kept] = [`RETURN '${tag}-a'`, `RETURN '${tag}-b'`, `RETURN '${tag}-c'`];
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.runQueries([deletedA, deletedB, kept]);
+            await graph.clickQueryHistoryButton();
+            await expect(graph.selectQueryHistory(kept)).toBeVisible();
+
+            await expect.poll(() => graph.getStoredQueryHistory()).toContain(deletedA);
+            await graph.selectHistoryQueries([deletedA, deletedB]);
+            await expect(graph.historySelectedCount).toHaveText("2");
+            await graph.clickHistoryDelete();
+
+            await expect(graph.selectQueryHistory(deletedA)).toHaveCount(0);
+            await expect(graph.selectQueryHistory(deletedB)).toHaveCount(0);
+            await expect(graph.selectQueryHistory(kept)).toBeVisible();
+            await expect(graph.historySelectedCount).toHaveText("");
+            await expect(graph.historyDeleteButton).toBeDisabled();
+
+            await expect.poll(() => graph.getStoredQueryHistory()).toContain(kept);
+            const stored = await graph.getStoredQueryHistory();
+            expect(stored).not.toContain(deletedA);
+            expect(stored).not.toContain(deletedB);
+        });
+    });
+
+    test(`@admin export selected downloads a .cypher file with those queries`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            const tag = getRandomString('export');
+            const [exportedA, exportedB, skipped] = [`RETURN '${tag}-a'`, `RETURN '${tag}-b'`, `RETURN '${tag}-c'`];
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.runQueries([exportedA, exportedB, skipped]);
+            await graph.clickQueryHistoryButton();
+            await expect(graph.selectQueryHistory(skipped)).toBeVisible();
+
+            await graph.selectHistoryQueries([exportedA, exportedB]);
+            const { filename, content } = await graph.exportSelectedHistory();
+
+            expect(filename).toMatch(/^falkordb-queries-.+\.cypher$/);
+            expect(content).toBe(
+                `// graph: ${graphName}\n${exportedA}\n;\n\n// graph: ${graphName}\n${exportedB}\n;\n`
+            );
+        });
+    });
+
+    test(`@admin search and graph filter narrow the list; select-all affects visible rows only`, async () => {
+        const firstGraph = getRandomString('queryhistory');
+        const secondGraph = getRandomString('queryhistory');
+        const created: string[] = [];
+        await withGraphCleanup(apicalls, created, async () => {
+            await apicalls.addGraph(firstGraph);
+            created.push(firstGraph);
+            await apicalls.addGraph(secondGraph);
+            created.push(secondGraph);
+            const tag = getRandomString('filter');
+            const [alpha, beta, gamma] = [`RETURN '${tag}-alpha'`, `RETURN '${tag}-beta'`, `RETURN '${tag}-gamma'`];
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(firstGraph);
+            await graph.runQueries([alpha, beta]);
+            await graph.selectGraphByName(secondGraph);
+            await graph.runQueries([gamma]);
+            await graph.clickQueryHistoryButton();
+
+            // The panel opens scoped to the selected graph
+            await expect(graph.selectQueryHistory(gamma)).toBeVisible();
+            await expect(graph.selectQueryHistory(alpha)).toHaveCount(0);
+            await expect(graph.selectQueryHistory(beta)).toHaveCount(0);
+
+            await graph.clickHistoryGraphFilter(firstGraph);
+            await expect(graph.selectQueryHistory(alpha)).toBeVisible();
+            await expect(graph.selectQueryHistory(beta)).toBeVisible();
+            await expect(graph.selectQueryHistory(gamma)).toBeVisible();
+
+            await graph.clickHistoryGraphFilter(secondGraph);
+            await expect(graph.selectQueryHistory(gamma)).toHaveCount(0);
+            await expect(graph.selectQueryHistory(alpha)).toBeVisible();
+            await expect(graph.selectQueryHistory(beta)).toBeVisible();
+
+            await graph.insertSearchQueryInput(`${tag}-alpha`);
+            await expect(graph.selectQueryHistory(beta)).toHaveCount(0);
+            await expect(graph.selectQueryHistory(alpha)).toBeVisible();
+
+            await graph.clickHistorySelectAll();
+            await expect(graph.historySelectedCount).toHaveText("1");
+            await expect(graph.historySelectAllButton).toHaveAttribute("aria-label", "Deselect all queries");
+
+            // Widening the search brings back a row that select-all never touched
+            await graph.insertSearchQueryInput("");
+            await expect(graph.selectQueryHistory(beta)).toBeVisible();
+            await expect(graph.historySelectedCount).toHaveText("1");
+            await expect(graph.historySelectAllButton).toHaveAttribute("aria-label", "Select all queries");
+        });
+    });
+
+    test(`@admin wrap lines toggles; editing a history query and running it adds a new entry`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            const tag = getRandomString('edit');
+            const [original, edited] = [`RETURN '${tag}-original'`, `RETURN '${tag}-edited'`];
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.runQueries([original]);
+            await graph.clickQueryHistoryButton();
+            await graph.selectQueryInHistory(original);
+
+            await expect(graph.historyWrapLinesCheckbox).toHaveAttribute("aria-checked", "false");
+            await expect.poll(() => graph.getHistoryPanelWordWrap()).toBe("off");
+            await graph.clickHistoryWrapLines();
+            await expect(graph.historyWrapLinesCheckbox).toHaveAttribute("aria-checked", "true");
+            await expect.poll(() => graph.getHistoryPanelWordWrap()).toBe("on");
+            await graph.clickHistoryWrapLines();
+            await expect(graph.historyWrapLinesCheckbox).toHaveAttribute("aria-checked", "false");
+            await expect.poll(() => graph.getHistoryPanelWordWrap()).toBe("off");
+
+            await graph.setHistoryPanelQuery(edited);
+            await expect(graph.historyPanelEditor).toContainText(edited);
+            await graph.clickRunInQueryHistory();
+            await expect(graph.historyPanel).toBeHidden();
+
+            await graph.clickQueryHistoryButton();
+            await expect(graph.selectQueryHistory(edited)).toBeVisible();
+            await expect(graph.selectQueryHistory(original)).toBeVisible();
+        });
     });
 
 });

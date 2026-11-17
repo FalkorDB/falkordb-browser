@@ -245,6 +245,12 @@ env:
   hostname: "0.0.0.0"
   # API token storage path (for persistent volume if needed)
   apiTokenStoragePath: ".data/api_tokens.json"
+  # Comma-separated extra browser origins allowed to call the API with the session
+  # cookie (e.g. a separate frontend). The nextauthUrl origin is always allowed.
+  allowedOrigins: ""
+  # Set to "true" only when the ingress/proxy overwrites X-Forwarded-Host and
+  # X-Forwarded-Proto; used to derive the request origin when nextauthUrl is "auto".
+  trustProxyHeaders: ""
 
 # Persistent volume for API tokens and other data
 persistence:

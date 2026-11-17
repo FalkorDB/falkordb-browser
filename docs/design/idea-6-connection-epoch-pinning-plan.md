@@ -15,6 +15,19 @@ breaking.**
 
 ## 0. Background — primitives that already exist
 
+### Tab restoration during connection bootstrap
+
+`useGraphTabs` in `app/providers.tsx` uses the active connection ID as its
+connection key, falling back to the signed session's prefix connection ID only
+while initial connection discovery has not supplied an active ID. Restoration
+requires a non-null ID and a ready storage prefix. Once an active ID exists, it
+must match the prefix ID; a pending connection switch cannot restore another
+connection's tabs. Graph-list, timeout, and tutorial recovery readiness still
+control when restoration may finish.
+
+The delayed-discovery and create-dialog scenarios in `e2e/tests/graphTabs.spec.ts`
+cover this bootstrap window as well as loss of readiness during restoration.
+
 `lib/utils.ts`
 - `_activeConnectionId` — injected as `X-Connection-Id` by `securedFetch`, `uploadFileWithProgress`,
   `getSSEGraphResult`, `getMetaStats`, `getMemoryUsage`. A request **snapshots** it **synchronously
@@ -97,6 +110,10 @@ setIsQueryLoading(false)`), so a switch/graph‑change can't strand it; a new `r
 ## 3. Per‑function changes
 
 ### 3a. Central graph‑name commit — `commitGraphName(name)` (new)
+> Shipped as `handleSetGraphName` in `app/providers.tsx`; `commitGraphName` below is the planned name.
+> One intentional exception: the connection-reset effect calls `bumpContextGen()` itself and then
+> `setGraphName("")` directly, because it also clears the graph, query and labels in one step.
+
 Graph name is set at several sites that currently bypass `handleSetGraphName`:
 `providers.tsx:1407`, `:1417`, `:1498` (reset), plus the new auto‑select. Route **all** through:
 ```ts
@@ -179,18 +196,54 @@ fixed in `selectGraph`). Only the **connection‑reset** path clears it; drive t
 `loading` flag instead of `setGraphNames(undefined)`. The list is **connection‑scoped** (guard by
 connection epoch + `optionsSeq`); the auto‑select is **graph‑scoped** (also guard by `contextGen`):
 ```ts
-const ctx = contextGenRef.current; const oseq = bumpOptionsSeq();
+const oseq = (optionsSeqRef.current += 1); const ctx = contextGenRef.current;
 const cid = getActiveConnectionIdGlobal(); const epoch = getConnectionEpoch();
-if (opts?.clear) setGraphNames(undefined);            // only the reset effect passes { clear: true }
-const res = await fetchOptions(gToast, gInd, indicator, cid);
-if (getConnectionEpoch() === epoch && optionsSeqRef.current === oseq) {
-  if (res) setGraphNames(res.opts);                   // on network error keep the last good list
-  setGraphNamesLoaded(true);
-  if (res?.autoSelect && contextGenRef.current === ctx) commitGraphName(res.autoSelect);
-}
+const generation = getGraphListGeneration();          // a mutation in flight already published a correct list
+const isCurrent = () => getConnectionEpoch() === epoch
+  && getGraphListGeneration() === generation && optionsSeqRef.current === oseq;
+if (options?.clear) setGraphNames(undefined);         // only the connection-reset fetch passes { clear: true }
+const res = await fetchOptions(gToast, gInd, indicator, cid).catch((error: unknown) => {
+  console.error("Failed to fetch graphs:", error);    // a rejection or non-JSON body is a failed refresh
+  gToast({ title: "Error", description: "Failed to fetch graphs", variant: "destructive" });
+  return null;
+});
+if (res) await refreshOffloadedGraphs(cid);           // settle offloaded stubs before publishing the list
+if (!isCurrent()) return;
+if (res) { setGraphNames(res.opts); setGraphNamesUnknown(false); } // on a failed refresh keep the last good list…
+else if (options?.clear) { setGraphNames([]); setGraphNamesUnknown(true); } // …or mark a failed first list as unknown
+setGraphNamesLoaded(true);
+if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
 ```
-Expose `handleFetchOptions` on `GraphContext` (move its declaration above the context memo). The reset
-effect calls `handleFetchOptions({ clear: true })`.
+`gToast`/`gInd` drop toasts and indicator changes once `isCurrent()` is false. A failed first list
+publishes an empty list with `graphNamesUnknown` set: it settles readiness so the page unlocks, but
+`graphNamesKnown` stays false until a list is actually fetched — by this refresh or by the selector's
+(`markGraphNamesKnown`, which also covers an unchanged empty list). Optimistic edits (a created or
+deleted graph) do not clear it, since they confirm only the names they touch. While it is set,
+restoring a tab keeps its graph name and query without running the query, and the "stored tab names
+a dropped graph" check does not clear the selection, so a later successful refresh validates the
+saved graph instead of discarding it. It also holds the graph page's info, memory and count polls
+for a graph not in the list: on a writable connection they run `GRAPH.QUERY`, which would re-create
+a dropped graph, so they start only once a list confirms it.
+Expose `handleFetchOptions` on `GraphContext` (move its declaration above the context memo). A
+separate effect, ordered after the reset effect and keyed on `activeConnectionId`, `status` and
+`handleFetchOptions`, calls `handleFetchOptions({ clear: !graphNamesPublishedRef.current })`, so an
+offline/tutorial deferral retries through the callback's dependencies instead of a "fetched" flag.
+`graphNamesPublishedRef` is written alongside every `setGraphNamesLoaded` call rather than mirrored
+after commit: a re-run (e.g. a session `status` flip) landing between a refresh's publish and its commit
+would otherwise clear the list it just published, leaving it loaded but unknown, so restored tabs would be
+held and never run.
+`setGraphNamesLoaded(true)` always runs for the current refresh (even when the fetch rejects), because
+restored tabs and the editor wait on it.
+
+The reset effect skips the **same‑connection bootstrap** (`null → A` where discovery confirmed the
+session's existing connection, recorded in `sameConnectionBootstrapRef` with the epoch): the loaded list
+and restored tabs are kept, and a later epoch bump invalidates the record. When discovery instead adopts a
+different connection, `pinAndSync` bumps `contextGen` and supersedes in-flight graph lists
+(`supersedeGraphLists`) first: `null → B` bumps no epoch, so a tab query restored, or a graph list read,
+under the session's connection would otherwise commit into B's state. Restored tabs additionally
+wait for the saved query timeout (`lib/timeoutInitialization.ts`), keyed on the session's user and
+connection details plus the storage prefix's connection, so a reload never re‑runs them with
+`timeout=0`.
 
 ### 3i. `selectGraph.tsx` dropdown refresh (`:75‑77`, `:196‑203`) — the 2nd `fetchOptions` caller
 Replace the direct `fetchOptions` call with the provider's guarded `handleFetchOptions` (now on
@@ -276,7 +329,7 @@ pointing at `fetchCount`. No README change.
 6. `providers.tsx`: `fetchMetaStats` forward pin + guarded callbacks.
 7. `providers.tsx`: `fetchCount` optional `isCurrent` before count writes.
 8. `providers.tsx`: `runQuery` capture tokens; pin all; guard after `Promise.all`, after `/explain`, before `Graph.create`, before success apply, in catch, in `finally` (owner‑based loading release).
-9. `providers.tsx`: `handleFetchOptions` guard list + auto‑select via `optionsSeq`+`contextGen`; route auto‑select through `commitGraphName`.
+9. `providers.tsx`: `handleFetchOptions` guard list + auto‑select via `optionsSeq`+`contextGen`; route auto‑select through `commitGraphName` (shipped as `handleSetGraphName`).
 10. `selectGraph.tsx`: use guarded `handleFetchOptions` for the dropdown refresh.
 11. `e2e/tests/connectionSwitchRace.spec.ts`: the 6 races (must fail pre‑fix).
 12. Full CI command set; iterate to green.
