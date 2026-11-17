@@ -5,7 +5,6 @@ import HeaderComponent from "../logic/POM/headerComponent";
 import LoginPage from "../logic/POM/loginPage";
 import MobileGraphPage from "../logic/POM/mobileGraphPage";
 
-const RELEASE_ASSET = "https://github.com/FalkorDB/falkordb-browser/releases/download/v2.7.4/FalkorDB-Browser-mac-arm64.dmg";
 const RELEASE_URL = "https://github.com/FalkorDB/falkordb-browser/releases/tag/v2.7.4";
 // The removed prompt opened 1.5 seconds after becoming eligible.
 const FORMER_PROMPT_DELAY_MS = 2000;
@@ -25,7 +24,7 @@ test.describe("@admin App download removal", () => {
                     tag: "v2.7.4",
                     name: "v2.7.4",
                     publishedAt: "2026-11-05T00:00:00Z",
-                    body: `## Downloads\n[macOS](${RELEASE_ASSET})`,
+                    body: "Bug fixes and improvements.",
                     url: RELEASE_URL,
                 }],
             },
@@ -40,7 +39,7 @@ test.describe("@admin App download removal", () => {
         await expect(downloads.alternateDownloadLink).toHaveCount(0);
         await header.releasesButton.click();
 
-        await expect(downloads.releaseLink("v2.7.4", "macOS")).toHaveAttribute("href", RELEASE_ASSET);
+        await expect(downloads.releaseLink("v2.7.4", "v2.7.4")).toHaveAttribute("href", RELEASE_URL);
         await page.clock.runFor(FORMER_PROMPT_DELAY_MS);
         await expect(downloads.prompt).toHaveCount(0);
     });
