@@ -5,11 +5,13 @@ import { Readable } from "stream";
 import {
     DeleteObjectCommand,
     DeleteObjectsCommand,
+    GetObjectCommand,
     HeadObjectCommand,
     ListObjectsV2Command,
     PutObjectCommand,
     S3Client,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 process.env.S3_BUCKET = "csv-storage-test";
 process.env.S3_ACCESS_KEY_ID = "test-access-key";
@@ -107,6 +109,8 @@ test("store rejects invalid owners, invalid keys, and a missing bucket without s
 });
 
 test("resolveReadUrl signs an owner-scoped GET URL with the read endpoint and configured expiration", async (t) => {
+    const signingDate = new Date("2026-01-01T00:00:00Z");
+    t.mock.timers.enable({ apis: ["Date"], now: signingDate });
     const storage = new S3CsvStorage();
     const sends: unknown[] = [];
     t.mock.method(S3Client.prototype, "send", async (command: unknown) => {
@@ -122,6 +126,17 @@ test("resolveReadUrl signs an owner-scoped GET URL with the read endpoint and co
     assert.equal(url.searchParams.get("X-Amz-Algorithm"), "AWS4-HMAC-SHA256");
     assert.ok(url.searchParams.get("X-Amz-Signature"));
     assert.equal(url.searchParams.get("X-Amz-Expires"), "1234");
+    const expectedGetUrl = new URL(await getSignedUrl(
+        new S3Client({
+            region: "us-east-1",
+            endpoint: "https://read.s3.test:9443",
+            forcePathStyle: true,
+            credentials: { accessKeyId: "test-access-key", secretAccessKey: "test-secret-key" },
+        }),
+        new GetObjectCommand({ Bucket: BUCKET, Key: objectPath(OWNER, KEY) }),
+        { expiresIn: 1234, signingDate }
+    ));
+    assert.equal(url.searchParams.get("X-Amz-Signature"), expectedGetUrl.searchParams.get("X-Amz-Signature"));
     assert.equal(sends.length, 0);
 });
 
