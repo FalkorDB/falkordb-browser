@@ -1,6 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { getRoleWithKeys, extractKeysFromACL, ROLE } from "./model.ts";
+import {
+  getRoleWithKeys,
+  extractKeysFromACL,
+  requiresPasswordReauthentication,
+  persistAclAfterPasswordChange,
+  ROLE,
+} from "./model.ts";
 
 // ---------------------------------------------------------------------------
 // getRoleWithKeys
@@ -93,5 +99,38 @@ describe("extractKeysFromACL", () => {
     const result = extractKeysFromACL(parts);
     assert.ok(!result[0].startsWith("~"), "result must not start with ~");
     assert.deepEqual(result, ["test:*"]);
+  });
+});
+
+describe("requiresPasswordReauthentication", () => {
+  it("requires reauthentication only when the authenticated user changes their own password", () => {
+    assert.equal(requiresPasswordReauthentication("alice", "alice", "NewPassword1!"), true);
+    assert.equal(requiresPasswordReauthentication("alice", "bob", "NewPassword1!"), false);
+    assert.equal(requiresPasswordReauthentication("alice", "alice"), false);
+    assert.equal(requiresPasswordReauthentication(undefined, "alice", "NewPassword1!"), false);
+  });
+});
+
+describe("persistAclAfterPasswordChange", () => {
+  it("does not save ACL when reauthentication is not required", async () => {
+    let saves = 0;
+    const saved = await persistAclAfterPasswordChange(false, async () => { saves += 1; }, () => assert.fail("unexpected error"));
+    assert.equal(saved, undefined);
+    assert.equal(saves, 0);
+  });
+
+  it("reports a successful ACL save", async () => {
+    let saves = 0;
+    const saved = await persistAclAfterPasswordChange(true, async () => { saves += 1; }, () => assert.fail("unexpected error"));
+    assert.equal(saved, true);
+    assert.equal(saves, 1);
+  });
+
+  it("reports and surfaces an ACL save failure", async () => {
+    const error = new Error("ACL file is unavailable");
+    let reported: unknown;
+    const saved = await persistAclAfterPasswordChange(true, async () => { throw error; }, cause => { reported = cause; });
+    assert.equal(saved, false);
+    assert.equal(reported, error);
   });
 });

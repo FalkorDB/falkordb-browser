@@ -3032,6 +3032,14 @@ const swaggerSpec = {
                     message: {
                       type: "string",
                       example: "User role updated"
+                    },
+                    requiresReauthentication: {
+                      type: "boolean",
+                      description: "True when the current user's own password was changed"
+                    },
+                    aclSaved: {
+                      type: "boolean",
+                      description: "When reauthentication is required, indicates whether the ACL changes were saved to disk"
                     }
                   }
                 }

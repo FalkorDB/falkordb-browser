@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useState, useContext, useCallback } from "react";
+import { signOut } from "next-auth/react";
 import { CreateUser, User } from "@/app/api/user/model";
 import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
@@ -114,6 +115,13 @@ export default function Users() {
         }, toast, setIndicator);
 
         if (result.ok) {
+            const response = await result.json() as { requiresReauthentication?: boolean; aclSaved?: boolean };
+            if (response.requiresReauthentication) {
+                const aclSaveFailed = response.aclSaved !== true ? "&aclSaveFailed=true" : "";
+                await signOut({ callbackUrl: `/login?signedOut=true&passwordChanged=true${aclSaveFailed}` });
+                return true;
+            }
+
             setUsers(prev => prev.map(u => u.username === username ? { ...u, role, keys: keys || ["*"] } : u));
             setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: keys.join(", ") || "*" }] } : row));
             toast({

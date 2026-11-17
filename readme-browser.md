@@ -111,6 +111,7 @@ The `/settings` area includes multiple sections:
 - **Users** (Admin)
   - List users and adjust roles.
   - Add and delete users.
+  - Changing your own password signs you out; sign in again with the new password. If ACL persistence fails, the login page warns that the change is active only in memory.
 - **Personal Access Tokens**
   - Generate tokens (with optional expiration).
   - Tokens are shown once at creation (copy-to-clipboard UX).
