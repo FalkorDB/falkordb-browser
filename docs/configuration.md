@@ -1,6 +1,6 @@
 # Configuration and operations
 
-How to run FalkorDB Browser in production: public URLs, authentication, sessions, token storage, preconfigured connections and CSV import storage. Every environment variable is listed in [`.env.local.template`](../.env.local.template); Kubernetes users set the same values through the [Helm chart](../helm/falkordb-browser/README.md).
+How to run FalkorDB Browser in production: public URLs, authentication, sessions, token storage, preconfigured connections and CSV import storage. Most environment variables are listed in [`.env.local.template`](../.env.local.template); a few, such as `API_TOKEN_FALKORDB_URL`, the `PAT_FALKORDB_*` variables and `NODE_EXTRA_CA_CERTS`, are documented only on this page. Kubernetes users set the same values through the [Helm chart](../helm/falkordb-browser/README.md).
 
 ## Authentication secret
 

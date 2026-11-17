@@ -121,6 +121,7 @@ example `docker run -p 6379:6379 -it --rm falkordb/falkordb:latest`.
 git clone https://github.com/FalkorDB/falkordb-browser.git
 cd falkordb-browser
 cp .env.local.template .env.local
+# Replace the ENCRYPTION_KEY placeholder in .env.local with: openssl rand -hex 32
 npm ci
 npm run dev
 ```
@@ -129,7 +130,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Screenshots
 
-| ![image (4)](https://github.com/user-attachments/assets/658fa59f-5316-475c-8bd7-b26651e9902c) | ![FalkorDB browser 06-25](https://github.com/user-attachments/assets/ee907fa6-038c-462b-9240-456a2d2c2a99) |
+| ![Query History panel listing recent Cypher queries next to an editable query](https://github.com/user-attachments/assets/658fa59f-5316-475c-8bd7-b26651e9902c) | ![Graph canvas with a node selected and its properties open for editing](https://github.com/user-attachments/assets/ee907fa6-038c-462b-9240-456a2d2c2a99) |
 |---------------------------------------------------|---------------------------------------------------|
 
 ## Documentation

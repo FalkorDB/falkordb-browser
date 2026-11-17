@@ -10,7 +10,8 @@ the browser checks the graph size against advisory device-adjusted budgets:
 | Both hints at least 8 | 4,000 | 10,000 |
 | Other or unavailable hints | 2,000 | 5,000 |
 
-RAM hints are in GiB. If either count exceeds its budget, the graph stays in 2D
+The first matching row applies, so a device matching several rows gets the most
+restrictive budget. RAM hints are in GiB. If either count exceeds its budget, the graph stays in 2D
 while a warning offers **Use 2D (recommended)** or **Proceed with 3D**. Proceeding
 approves up to those counts for the mounted view; growing beyond either approved
 count warns again. Switching back to 2D or leaving the view clears approval.

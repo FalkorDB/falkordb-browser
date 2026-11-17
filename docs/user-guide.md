@@ -5,7 +5,7 @@ Behavior details for everyday work in FalkorDB Browser. For a tour of every page
 ## Automatic query limiting
 
 When the result limit in Settings is above 0, the browser adds `LIMIT <n>` to a query
-whose final `RETURN` has none. A limit of 0 (shown as ∞) leaves queries unchanged.
+whose final `RETURN` has none. A limit of 0 (shown as ∞) adds no `LIMIT`; trailing semicolons are still removed.
 
 - Trailing semicolons are removed before the limit is added.
 - A non-`UNION` query whose final `RETURN` already has a `LIMIT` keeps it.
@@ -14,6 +14,8 @@ whose final `RETURN` has none. A limit of 0 (shown as ∞) leaves queries unchan
   header stays outside the wrapper.
 - Known limitation: `UNION` queries that contain a `CALL` clause, or start with `EXPLAIN` or
   `PROFILE`, are not wrapped; the limit is added to the last branch only.
+- Known limitation: a final `RETURN` that reads a property named `limit` (e.g.
+  `RETURN n.limit`) is mistaken for an existing `LIMIT`, so no limit is added.
 
 ## Error help
 

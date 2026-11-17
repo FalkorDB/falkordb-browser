@@ -17,8 +17,8 @@ This release hardens query and token handling. Check these before upgrading:
 - **Cookie-authenticated scripts must send a trusted `Origin`** for unsafe
   methods (see [Trusted origins](configuration.md#trusted-origins)). Use a personal access token
   (`Authorization: Bearer …`) for scripts instead.
-- **Sessions need their stored connection record.** Without a persistent token
-  volume (`API_TOKEN_STORAGE_PATH` on ephemeral storage, e.g. `docker run`
-  without a volume or Helm without `persistence.enabled`), users must log in
-  again after every restart. Sessions created before connection IDs existed
+- **Sessions need their stored connection record.** With file token storage (the
+  default when neither `API_TOKEN_FALKORDB_URL` nor `PAT_FALKORDB_HOST` is set), a
+  non-persistent `API_TOKEN_STORAGE_PATH` (e.g. `docker run` without a volume or Helm
+  without `persistence.enabled`) makes users log in again after every restart. Sessions created before connection IDs existed
   must log in once.
