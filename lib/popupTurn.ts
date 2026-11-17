@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 
 /**
  * Whether the What's New popup has the floor: still deciding, or showing news
- * the visitor has not read. The app download popup waits while it does.
+ * the visitor has not read.
  *
  * Kept outside React state on purpose: lifting it into the providers would
  * re-render the whole app (and restart its data loading) every time it flips.
