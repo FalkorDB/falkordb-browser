@@ -1,8 +1,8 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE, resolveGraphReadOnly } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
+import { endStream } from "@/app/api/sse";
 
-// eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
@@ -49,13 +49,14 @@ export async function GET(
       const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
       const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as { edges: number }).edges) || 0;
 
-      writer.write(
+      endStream(
+        writer,
         encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes, edges })}\n\n`)
       );
-      writer.close();
     } catch (error) {
       console.error(error);
-      writer.write(
+      endStream(
+        writer,
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
             message: (error as Error).message || "Internal server error",
@@ -63,11 +64,11 @@ export async function GET(
           })}\n\n`
         )
       );
-      writer.close();
     }
   } catch (error) {
     console.error(error);
-    writer.write(
+    endStream(
+      writer,
       encoder.encode(
         `event: error\ndata: ${JSON.stringify({
           message: "Internal server error",
@@ -75,13 +76,7 @@ export async function GET(
         })}\n\n`
       )
     );
-    writer.close();
   }
-
-  // Clean up if the client disconnects early
-  request.signal.addEventListener("abort", () => {
-    writer.close();
-  });
 
   return new Response(readable, {
     headers: {

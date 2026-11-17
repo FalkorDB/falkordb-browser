@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server.js";
 import { isTutorialDemoGraphName } from "../../lib/tutorialDemoGraphs.ts";
+import { endStream } from "./sse.ts";
 export { runQuery } from "./run-query.ts";
 
 const AUTO_NEXTAUTH_URL = "auto";
@@ -286,8 +287,5 @@ export async function writeGetClientErrorAsSSE(
     }
     const payload: Record<string, unknown> = { message, status };
     if (code) payload.code = code;
-    writer.write(
-        encoder.encode(`event: error\ndata: ${JSON.stringify(payload)}\n\n`)
-    );
-    writer.close();
+    endStream(writer, encoder.encode(`event: error\ndata: ${JSON.stringify(payload)}\n\n`));
 }
