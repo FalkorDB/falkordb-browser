@@ -155,6 +155,30 @@ describe("findFunctionLine ranking and comments", () => {
   });
 });
 
+describe("findFunctionLocation regex literals and shared names", () => {
+  it("does not take comment markers in a regex character class for a comment", () => {
+    const source = ["const operators = /[/*]/;", "function foo() {}", "falkor.register('foo', foo);", "/* end */"].join("\n");
+    assert.deepEqual(findFunctionLocation(source, "foo"), { lineNumber: 2, column: 10, length: 3 });
+  });
+
+  it("does not take an escaped slash in a regex for a line comment", () => {
+    assert.deepEqual(findFunctionLocation("const slash = /\\//; function foo() {}", "foo"), { lineNumber: 1, column: 30, length: 3 });
+  });
+
+  it("keeps a regex returned or passed as an argument", () => {
+    const source = ["function check(s) { return /\\/\\/ foo/.test(s) || split(s, /[/]/); }", "function foo() {}"].join("\n");
+    assert.equal(findFunctionLine(source, "foo"), 2);
+  });
+
+  it("does not take a division for a regex", () => {
+    assert.equal(findFunctionLine("const half = total / 2; // foo()\nfoo();", "foo"), 2);
+  });
+
+  it("points at the registered name when the method shares it", () => {
+    assert.deepEqual(findFunctionLocation("register();\nfalkor.register('register', impl);", "register"), { lineNumber: 2, column: 18, length: 8 });
+  });
+});
+
 describe("findFunctionLine unclosed parameter list", () => {
   it("does not treat a parameter list that never closes as a declaration", () => {
     assert.equal(findFunctionLine("const foo = (a,\n  b\nfoo;", "foo"), 1);

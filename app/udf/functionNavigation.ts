@@ -1,5 +1,12 @@
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/**
+ * The name as the patterns' only capture group, matched with indices (`d`), so
+ * the column comes from the name itself: `register('register', …)` must point
+ * at the quoted name, not at the method that shares it.
+ */
+const named = (name: string) => `(${escapeRegExp(name)})`;
+
 export interface FunctionLocation {
   /** 1-based line of the match. */
   lineNumber: number;
@@ -53,7 +60,7 @@ interface FunctionPattern {
  * declaration always wins over a call site further up the file.
  */
 const FUNCTION_PATTERNS: FunctionPattern[] = [
-  { build: (name: string) => new RegExp(`\\bfunction\\s+${escapeRegExp(name)}\\s*\\(`) },
+  { build: (name: string) => new RegExp(`\\bfunction\\s+${named(name)}\\s*\\(`, "d") },
   // The trailing alternation covers `function`, an arrow parameter list (greedy
   // to the last paren, so defaults may contain calls) and a bare-identifier
   // arrow parameter (`const fn = x => …`). A parameter list with no arrow after
@@ -61,35 +68,39 @@ const FUNCTION_PATTERNS: FunctionPattern[] = [
   {
     build: (name: string) =>
       new RegExp(
-        `\\b(?:const|let|var)\\s+${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\(.*\\)\\s*=>|[A-Za-z_$][\\w$]*\\s*=>)`
+        `\\b(?:const|let|var)\\s+${named(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\(.*\\)\\s*=>|[A-Za-z_$][\\w$]*\\s*=>)`,
+        "d"
       ),
   },
   {
     build: (name: string) =>
-      new RegExp(`\\b(?:const|let|var)\\s+${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?\\([^)]*$`),
+      new RegExp(`\\b(?:const|let|var)\\s+${named(name)}\\s*=\\s*(?:async\\s*)?\\([^)]*$`, "d"),
     confirm: closesIntoArrow,
   },
-  { build: (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\s*:\\s*(?:async\\s*)?function\\b`) },
+  { build: (name: string) => new RegExp(`\\b${named(name)}\\s*:\\s*(?:async\\s*)?function\\b`, "d") },
   // `falkor.register('name', impl)` — the registered name may differ from the
   // implementation it points at, so this is the only anchor for such libraries.
   // It outranks a bare `name(`, which may just be a call site.
-  { build: (name: string) => new RegExp(`register\\s*\\(\\s*['"\`]${escapeRegExp(name)}['"\`]`) },
+  { build: (name: string) => new RegExp(`register\\s*\\(\\s*['"\`]${named(name)}['"\`]`, "d") },
   // Any `name(` — covers class methods, shorthand object methods and
   // declaration styles the patterns above don't spell out.
-  { build: (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\s*\\(`) },
-  { build: (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\b`) },
+  { build: (name: string) => new RegExp(`\\b${named(name)}\\s*\\(`, "d") },
+  { build: (name: string) => new RegExp(`\\b${named(name)}\\b`, "d") },
 ];
 
 /**
  * Replaces comments with spaces so a name mentioned in one is not taken for the
- * code, keeping every line and column where it was. Strings are skipped, not
- * blanked: `register('name')` lives in one, and so can a `//`. Quoted strings
- * stop at a line end, so a quote inside a regex literal cannot swallow code.
+ * code, keeping every line and column where it was. Strings and regex literals
+ * are skipped, not blanked: `register('name')` lives in a string, and either can
+ * hold a `//` or `/*`. Quoted strings stop at a line end, so a stray quote cannot
+ * swallow code. A `/` opens a regex only where a value may start (after an
+ * operator, an opening bracket, `return`/`typeof` or at a line start), so a
+ * division is never mistaken for one.
  */
 const blankComments = (source: string) =>
   source.replace(
-    /\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\[\s\S]|[^`\\])*`/g,
-    (match) => (match.startsWith("/") ? match.replace(/[^\n]/g, " ") : match)
+    /\/\*[\s\S]*?\*\/|\/\/[^\n]*|(?<=(?:^|[(,=:[!&|?{};~^%*+<>-]|\breturn|\btypeof)\s*)\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n[])+\/|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\[\s\S]|[^`\\])*`/gm,
+    (match) => (/^\/[/*]/.test(match) ? match.replace(/[^\n]/g, " ") : match)
   );
 
 export const findFunctionLocation = (source: string, functionName: string): FunctionLocation | null => {
@@ -108,10 +119,10 @@ export const findFunctionLocation = (source: string, functionName: string): Func
       const match = pattern.exec(lines[i]);
 
       if (match && (!confirm || confirm(lines, i))) {
-        // Every pattern embeds the name literally, so it is always in the match.
         return {
           lineNumber: i + 1,
-          column: match.index + match[0].indexOf(name) + 1,
+          // Every pattern captures the name, so its indices are always there.
+          column: match.indices![1]![0] + 1,
           length: name.length,
         };
       }
