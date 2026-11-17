@@ -644,6 +644,11 @@ export default class GraphPage extends BasePage {
     return waitForElementToBeVisible(this.page.locator(".squiggly-error:visible").first());
   }
 
+  // Waits for the marker to clear: Monaco repaints a replaced query's squiggle a frame later.
+  async expectNoEditorErrorMarker(): Promise<void> {
+    await expect(this.page.locator(".squiggly-error:visible")).toHaveCount(0);
+  }
+
   async fixWithAiButtonCount(): Promise<number> {
     return this.page.getByTestId("fix-with-ai").count();
   }
