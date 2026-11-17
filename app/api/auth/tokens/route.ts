@@ -5,12 +5,10 @@ import crypto from "crypto";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient, generateTimeUUID, PAT_BINDING_VERSION } from "../[...nextauth]/options";
 import { storeEncryptedCredential, getAuthSecret } from "../tokenUtils";
-import { getCorsHeaders } from "../../utils";
+import { getCorsHeaders, corsPreflight } from "../../utils";
 import { createToken, validateBody } from "../../validate-body";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 /**
  * Fetches tokens with role-based filtering using storage abstraction

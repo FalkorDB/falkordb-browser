@@ -7,8 +7,10 @@ import {
   waitForElementToNotBeVisible,
   interactWhenVisible,
   waitForElementToBeEnabled,
+  waitForURL,
 } from "@/e2e/infra/utils";
 import BasePage from "@/e2e/infra/ui/basePage";
+import urls from "../../config/urls.json";
 
 export type Element = "Node" | "Relation";
 
@@ -24,6 +26,13 @@ export type ElementLabel = "Relationships" | "Labels";
 export type Type = "Graph" | "Role" | "Type" | "Model" | "Theme" | "Query";
 
 export type UploadMode = "dump" | "csv" | "cypher";
+
+export interface RelationshipStyle {
+  color: string;
+  width: number;
+  fontSize: number;
+  arrowSize: number;
+}
 
 export default class GraphPage extends BasePage {
   // CREATE
@@ -82,8 +91,12 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("uploadGraphCancel");
   }
 
+  public get uploadDialog(): Locator {
+    return this.page.getByRole("dialog", { name: "Upload Data", exact: true });
+  }
+
   public get uploadFileInput(): Locator {
-    return this.page.locator('input[type="file"]');
+    return this.uploadDialog.locator('input[type="file"]');
   }
 
   public get loadCsvTabTrigger(): Locator {
@@ -133,6 +146,11 @@ export default class GraphPage extends BasePage {
   // SEARCH
   public get search(): (type?: Type) => Locator {
     return (type: Type = "Graph") => this.page.getByTestId(`${type}Search`);
+  }
+
+  /** Shown while opening the graph list refreshes it. */
+  public get graphListLoading(): Locator {
+    return this.page.getByTestId("GraphSearchLoading");
   }
 
   // MANAGE
@@ -196,6 +214,15 @@ export default class GraphPage extends BasePage {
       this.page.getByTestId(`elementCanvasSuggestionGraph${name}`);
   }
 
+  // Options only: the virtualized list also renders placeholder `li` rows.
+  public get elementCanvasSuggestions(): Locator {
+    return this.elementCanvasSuggestionList.getByRole("option");
+  }
+
+  public get elementCanvasSelectedSuggestion(): Locator {
+    return this.elementCanvasSuggestionList.getByRole("option", { selected: true });
+  }
+
   // ADD
   public get elementCanvasAdd(): Locator {
     return this.page.getByTestId("elementCanvasAddGraph");
@@ -237,6 +264,20 @@ export default class GraphPage extends BasePage {
 
       return { nodes: shown(data.nodes ?? []), links: shown(data.links ?? []) };
     });
+  }
+
+  /** The style each canvas link is drawn with, read without waiting out the force simulation. */
+  async readRelationshipStyles(relationship: string): Promise<RelationshipStyle[]> {
+    return this.page.evaluate((type) => {
+      const links: (RelationshipStyle & { relationship: string })[] = (window as any).graph?.()?.links ?? [];
+      return links
+        .filter((link) => link.relationship === type)
+        .map(({ color, width, fontSize, arrowSize }) => ({ color, width, fontSize, arrowSize }));
+    }, relationship);
+  }
+
+  async readNodeStyles(): Promise<{ id: number; color: string; size: number }[]> {
+    return (await this.readNodesScreenPositions()).map(({ id, color, size }) => ({ id, color, size }));
   }
 
   // DELETE ELEMENT
@@ -332,6 +373,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("toast-destructive");
   }
 
+  private get errorToastGoToSettingsButton(): Locator {
+    return this.errorToast.getByRole("button", { name: "Go to Settings", exact: true });
+  }
+
   public get toastUnDoButton(): Locator {
     return this.page.getByTestId("toast").getByRole("button", { name: "Undo" });
   }
@@ -353,15 +398,8 @@ export default class GraphPage extends BasePage {
 
     await this.canvasElement.waitFor({ state: "attached", timeout: 10000 });
 
-    const startTime = Date.now();
-    while (Date.now() - startTime < timeout) {
-      const status = await this.canvasElement.getAttribute("data-engine-status");
-      if (status === "stopped") {
-        return;
-      }
-      await this.page.waitForTimeout(500);
-    }
-    throw new Error(`Canvas animation did not stop within ${timeout}ms`);
+    await expect(this.canvasElement, `Canvas animation did not stop within ${timeout}ms`)
+      .toHaveAttribute("data-engine-status", "stopped", { timeout });
   }
 
   async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
@@ -571,6 +609,15 @@ export default class GraphPage extends BasePage {
     );
   }
 
+  async clickErrorToastGoToSettings(): Promise<void> {
+    await interactWhenVisible(
+      this.errorToastGoToSettingsButton,
+      (el) => el.click(),
+      "Error toast Go to Settings"
+    );
+    await waitForURL(this.page, urls.settingsUrl);
+  }
+
   /** Rendered height of the toast against the viewport, and whether its body overflows. */
   async getErrorToastSizing(): Promise<{
     toastHeight: number;
@@ -595,6 +642,11 @@ export default class GraphPage extends BasePage {
   // Monaco renders a diagnostic marker as a `.squiggly-error` decoration in the editor.
   async hasEditorErrorMarker(): Promise<boolean> {
     return waitForElementToBeVisible(this.page.locator(".squiggly-error:visible").first());
+  }
+
+  // Waits for the marker to clear: Monaco repaints a replaced query's squiggle a frame later.
+  async expectNoEditorErrorMarker(): Promise<void> {
+    await expect(this.page.locator(".squiggly-error:visible")).toHaveCount(0);
   }
 
   async fixWithAiButtonCount(): Promise<number> {
@@ -704,12 +756,16 @@ export default class GraphPage extends BasePage {
   }
 
   // TABS
-  private get graphTab(): Locator {
+  public get graphTab(): Locator {
     return this.page.getByTestId("graphTab");
   }
 
   private get tableTab(): Locator {
     return this.page.getByTestId("tableTab");
+  }
+
+  protected get schemaTab(): Locator {
+    return this.page.getByTestId("schemaTab");
   }
 
   private get metadataTab(): Locator {
@@ -782,26 +838,25 @@ export default class GraphPage extends BasePage {
   private async ensureGraphInfoPanelOpen(): Promise<void> {
     // Bounded: boundingBox() waits forever on a selector that matches nothing,
     // which turns a typo into an opaque test timeout instead of a fallback.
-    const box = await this.graphInfoPanel.boundingBox({ timeout: 5000 }).catch(() => null);
-    if (!box || box.width < 50) {
-      await interactWhenVisible(
-        this.graphInfoToggle,
-        (el) => el.click(),
-        "Graph Info Toggle"
-      );
-      // `visible` is meaningless here (see above) and a fixed sleep is either
-      // flaky or wasted time — poll the same width the check above uses.
-      await expect
-        .poll(
-          async () => (await this.graphInfoPanel.boundingBox().catch(() => null))?.width ?? 0,
-          { timeout: 5000 }
-        )
-        .toBeGreaterThan(50);
-    }
+    const panelWidth = async () =>
+      (await this.graphInfoPanel.boundingBox({ timeout: 1000 }).catch(() => null))?.width ?? 0;
+    // /graph auto-expands the panel after mount. If that lands between reading
+    // a collapsed width and clicking the toggle, the click collapses it again,
+    // so re-read and retry instead of trusting one measurement.
+    await expect(async () => {
+      if ((await panelWidth()) > 50) return;
+      await this.graphInfoToggle.click({ timeout: 2000 });
+      // `visible` is meaningless here (see above) — poll the same width instead.
+      await expect.poll(panelWidth, { timeout: 2000 }).toBeGreaterThan(50);
+    }).toPass({ timeout: 15000 });
   }
 
   private get duplicateGraphInput(): Locator {
     return this.page.getByTestId("duplicateGraphInput");
+  }
+
+  private get searchInputGraphs(): Locator {
+    return this.page.getByTestId("searchInputGraphs");
   }
 
   private get duplicateGraphConfirm(): Locator {
@@ -888,6 +943,14 @@ export default class GraphPage extends BasePage {
       this.elementCanvasSearch,
       (el) => el.fill(text),
       `Element Canvas Search Graph`
+    );
+  }
+
+  async pressElementCanvasSearchKey(key: string): Promise<void> {
+    await interactWhenVisible(
+      this.elementCanvasSearch,
+      (el) => el.press(key),
+      `Element Canvas Search Graph key ${key}`
     );
   }
 
@@ -1144,19 +1207,34 @@ export default class GraphPage extends BasePage {
    * screen position. Returns the node's id.
    */
   async clickNodeIn3D(index = 0): Promise<number> {
-    const target = await this.page.evaluate((i) => {
-      const canvas = document.querySelector("falkordb-canvas")!;
-      const node = canvas.getGraphData().nodes[i] as ReturnType<typeof canvas.getGraphData>["nodes"][number] & { z: number };
-      // The 3D renderer is internal to the canvas; only its screen projection is needed here.
-      const { graph3d } = canvas as unknown as {
-        graph3d: { graph: { graph2ScreenCoords(x: number, y: number, z: number): { x: number; y: number } } };
-      };
-      const screen = graph3d.graph.graph2ScreenCoords(node.x!, node.y!, node.z);
-      const rect = canvas.getBoundingClientRect();
-      return { id: node.id, x: rect.left + screen.x, y: rect.top + screen.y };
-    }, index);
-    // Hover first: the library resolves what is under the pointer on move.
-    await this.page.mouse.move(target.x, target.y);
+    let target = { id: -1, x: 0, y: 0, label: "" };
+    // The library resolves what is under the pointer on a throttled frame, and a
+    // click lands on whatever that last resolved, so the click waits for the
+    // hover tooltip to name the target node; any other node's tooltip, current
+    // or stale, means the click would land elsewhere. Until the 3D layout has
+    // landed, the camera may still move to fit it, so the node's position is
+    // read again until the hover holds.
+    await expect(async () => {
+      target = await this.page.evaluate((i) => {
+        const canvas = document.querySelector("falkordb-canvas")!;
+        const node = canvas.getGraphData().nodes[i] as ReturnType<typeof canvas.getGraphData>["nodes"][number] & { z: number };
+        // The 3D renderer is internal to the canvas; only its screen projection
+        // and the tooltip label it gives this node are needed here.
+        const { graph3d } = canvas as unknown as {
+          graph3d: {
+            graph: {
+              graph2ScreenCoords(x: number, y: number, z: number): { x: number; y: number };
+              nodeLabel(): (n: typeof node) => string;
+            };
+          };
+        };
+        const screen = graph3d.graph.graph2ScreenCoords(node.x!, node.y!, node.z);
+        const rect = canvas.getBoundingClientRect();
+        return { id: node.id, x: rect.left + screen.x, y: rect.top + screen.y, label: graph3d.graph.nodeLabel()(node) };
+      }, index);
+      await this.page.mouse.move(target.x, target.y);
+      await expect(this.nodeCanvasToolTip).toHaveText(target.label, { timeout: 1000 });
+    }).toPass({ timeout: 15000 });
     await this.page.mouse.click(target.x, target.y);
     return target.id;
   }
@@ -1220,6 +1298,10 @@ export default class GraphPage extends BasePage {
     await interactWhenVisible(this.graphTab, (el) => el.click(), "Graph Tab");
   }
 
+  async clickSchemaTab(): Promise<void> {
+    await interactWhenVisible(this.schemaTab, (el) => el.click(), "schema tab");
+  }
+
   // GRAPH TAB STRIP
   // The per-connection working contexts in the sub-header. Every test id is
   // keyed on the tab's stable id, so a rename never moves a selector. Tests
@@ -1231,6 +1313,14 @@ export default class GraphPage extends BasePage {
 
   public get addTabButton(): Locator {
     return this.page.getByTestId("graphTabAdd");
+  }
+
+  public get firstTabSelect(): Locator {
+    return this.page.locator('[data-testid^="graphTabSelect-"]').first();
+  }
+
+  public tabSelect(testId: string): Locator {
+    return this.page.getByTestId(testId);
   }
 
   public stripTab(label: string): Locator {
@@ -1390,15 +1480,58 @@ export default class GraphPage extends BasePage {
   }
 
   async clickDuplicateGraphConfirm(): Promise<void> {
+    await this.submitDuplicateGraph();
+    // Wait until the confirmation dialog disappears
+    await waitForElementToNotBeVisible(this.duplicateGraphConfirm);
+    // And wait for the success toast to show up
+    await this.isVisibleToast();
+  }
+
+  async submitDuplicateGraph(): Promise<void> {
     await interactWhenVisible(
       this.duplicateGraphConfirm,
       (el) => el.click(),
       `Confirm Duplicate Graph`
     );
-    // Wait until the confirmation dialog disappears
-    await waitForElementToNotBeVisible(this.duplicateGraphConfirm);
-    // And wait for the success toast to show up
-    await this.isVisibleToast();
+  }
+
+  async searchManagedGraphs(name: string): Promise<void> {
+    await this.searchInputGraphs.fill(name);
+  }
+
+  private managedGraphRow(name: string): Locator {
+    return this.page.getByRole("row").filter({ has: this.tableCheckboxByName(name) });
+  }
+
+  graphNameEditor(name: string): Locator {
+    return this.managedGraphRow(name).getByTestId("inputGraphs");
+  }
+
+  async editManagedGraph(name: string): Promise<void> {
+    const row = this.managedGraphRow(name);
+    await row.hover();
+    await row.getByTestId("editButtonGraphs").click();
+  }
+
+  async submitManagedGraphName(name: string): Promise<void> {
+    await this.managedGraphRow(name).getByTestId("saveButtonGraphs").click();
+  }
+
+  async expectEmptyGraphNameError(): Promise<void> {
+    await expect(this.page.getByText("Graph name cannot be empty", { exact: true })).toBeVisible();
+  }
+
+  async dismissErrorToast(): Promise<void> {
+    await this.errorToast.locator("[toast-close]").click();
+    await expect(this.errorToast).toHaveCount(0);
+  }
+
+  async expectNoGraphCreatedToast(): Promise<void> {
+    await expect(this.page.getByText("Graph created successfully", { exact: true })).toHaveCount(0);
+  }
+
+  async expectGraphNameExistsError(): Promise<void> {
+    await expect(this.page.getByText("Graph name already exists", { exact: true })).toBeVisible();
   }
 
   async clickSaveButton(): Promise<void> {
@@ -1468,10 +1601,6 @@ export default class GraphPage extends BasePage {
     return waitForElementToBeVisible(this.toast);
   }
 
-  async isVisibleNodeCanvasToolTip(): Promise<boolean> {
-    return waitForElementToBeVisible(this.nodeCanvasToolTip);
-  }
-
   async getNodeCanvasToolTipContent(): Promise<string | null> {
     const content = await interactWhenVisible(
       this.nodeCanvasToolTip,
@@ -1522,6 +1651,12 @@ export default class GraphPage extends BasePage {
     await this.refreshPage();
   }
 
+  private get listedGraphNames(): Locator {
+    return this.page.locator(
+      '//ul[@data-testid="queryList"]//p[contains(@data-testid, "selectGraph")]'
+    );
+  }
+
   /**
    * The graph names as the select list renders them, in display order, narrowed
    * to the graphs matching `searchTerm` so a shared server doesn't affect it.
@@ -1532,13 +1667,28 @@ export default class GraphPage extends BasePage {
   ): Promise<string[]> {
     await this.clickSelect();
     await this.fillSearch(searchTerm);
-    const names = this.page.locator(
-      '//ul[@data-testid="queryList"]//p[contains(@data-testid, "selectGraph")]'
-    );
+    const names = this.listedGraphNames;
     // The search is debounced, so the unfiltered list is still on screen for a
     // moment; wait for it to settle on the matches before reading the order.
     await expect(names).toHaveCount(expectedCount);
     return (await names.allInnerTexts()).map((name) => name.trim());
+  }
+
+  /**
+   * One read of the graph names the select list shows for `searchTerm`, opening
+   * the list when it is closed. It does not wait for the list to settle, so poll
+   * it; close the list with `closeGraphList` before leaving the page's graph view.
+   */
+  async readGraphNamesInList(searchTerm: string): Promise<string[]> {
+    if (!(await this.search().isVisible())) await this.clickSelect();
+    await this.fillSearch(searchTerm);
+    const names = this.listedGraphNames;
+    return (await names.allInnerTexts()).map((name) => name.trim());
+  }
+
+  async closeGraphList(): Promise<void> {
+    await this.page.keyboard.press("Escape");
+    await expect(this.search()).toBeHidden();
   }
 
   async verifyGraphExists(graphName: string, apiCall?: any): Promise<boolean> {
@@ -1561,31 +1711,8 @@ export default class GraphPage extends BasePage {
 
     try {
       await this.clickSelect();
-      await this.page.waitForTimeout(1000);
-
       await this.fillSearch(graphName);
-
-      let attempts = 0;
-      const maxAttempts = 5;
-      let isVisible = false;
-
-      while (attempts < maxAttempts) {
-        await this.page.waitForTimeout(1000); // wait for the search results to be populated
-        isVisible = await this.isVisibleSelectItem(graphName);
-
-        if (!isVisible) {
-          break;
-        }
-
-        attempts += 1;
-        if (attempts < maxAttempts) {
-          await this.fillSearch("");
-          await this.page.waitForTimeout(500);
-          await this.fillSearch(graphName);
-        }
-      }
-
-      return isVisible;
+      return await this.isVisibleSelectItem(graphName);
     } catch (error) {
       console.log("Graph selector interaction failed:", error);
       return false;
@@ -1595,7 +1722,7 @@ export default class GraphPage extends BasePage {
   async addGraph(graphName: string, waitForVisibility = true): Promise<void> {
     await this.clickCreateGraph();
     await this.fillCreateGraphInput(graphName);
-    await this.page.waitForTimeout(1000); // wait for the input to be filled
+    await expect(this.insertInput).toHaveValue(graphName);
     await this.clickConfirmCreateGraph();
     if (waitForVisibility) {
       await waitForElementToNotBeVisible(this.createConfirm);
@@ -1615,17 +1742,17 @@ export default class GraphPage extends BasePage {
     await waitForElementToNotBeVisible(this.deleteConfirm);
   }
 
-  async insertQuery(query: string): Promise<void> {
-    await this.clickEditorInput();
+  async insertQuery(query: string, { focus = true }: { focus?: boolean } = {}): Promise<void> {
+    if (focus) await this.clickEditorInput();
     // Set editor content through Monaco to avoid flaky keyboard-based replacement
     // when previous content exists or keybindings intercept keystrokes.
-    await this.page.waitForFunction(() => {
+    await expect.poll(() => this.page.evaluate(() => {
       const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
       const container = document.querySelector('[data-testid="editorContainer"]');
       return !!m
         && !!container
         && m.editor.getEditors().some((e) => container.contains(e.getContainerDomNode()));
-    });
+    }), { timeout: 10000 }).toBe(true);
     await this.page.evaluate((text) => {
       const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
       const container = document.querySelector('[data-testid="editorContainer"]');
@@ -1670,12 +1797,17 @@ export default class GraphPage extends BasePage {
     await this.clickSelect();
     await this.clickManage();
     await this.clickTableCheckboxByName(graphName);
+    await this.clickUploadButton();
+    await waitForElementToBeVisible(this.uploadConfirm);
+  }
+
+  /** Open the Upload Data dialog for the graph already selected in Manage. */
+  async clickUploadButton(): Promise<void> {
     await interactWhenVisible(
       this.uploadBtn,
       (el) => el.click(),
       "Upload Graph Button"
     );
-    await waitForElementToBeVisible(this.uploadConfirm);
   }
 
   /** Switch to the given upload tab (dump / csv / cypher). */
@@ -1687,21 +1819,34 @@ export default class GraphPage extends BasePage {
     );
   }
 
-  /** Attach a file to the Dropzone file input. */
-  async setUploadFile(absoluteFilePath: string): Promise<void> {
-    await this.uploadFileInput.setInputFiles(absoluteFilePath);
+  /** Attach a file (path on disk or in-memory payload) to the Dropzone file input. */
+  async setUploadFile(file: string | { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
+    await this.uploadFileInput.setInputFiles(file);
   }
 
-  /** Submit the upload form and wait for the dialog to close. */
-  async clickUploadConfirm(): Promise<void> {
+  /** Submit the upload form without waiting for the outcome (e.g. a failure that keeps the dialog open). */
+  async submitUpload(): Promise<void> {
     await interactWhenVisible(
       this.uploadConfirm,
       (el) => el.click(),
       "Upload Confirm"
     );
+  }
+
+  /** Submit the upload form and wait for the dialog to close. */
+  async clickUploadConfirm(): Promise<void> {
+    await this.submitUpload();
     // Larger CSV/dump uploads can take well over the default ~5s budget to close
     // the dialog, so wait up to ~15s before falling through to the toast wait.
     await waitForElementToNotBeVisible(this.uploadConfirm, 500, 30);
+  }
+
+  async clickUploadCancel(): Promise<void> {
+    await interactWhenVisible(
+      this.uploadCancel,
+      (el) => el.click(),
+      "Upload Cancel"
+    );
   }
 
   /**
@@ -1734,13 +1879,7 @@ export default class GraphPage extends BasePage {
     body: string,
     withHeaders = true
   ): Promise<void> {
-    await this.openUploadDialog(graphName);
-    await interactWhenVisible(this.loadCsvTabTrigger, (el) => el.click(), "Load CSV Tab");
-    await this.setUploadFile(absoluteFilePath);
-    await interactWhenVisible(this.csvUploadTempConfirm, (el) => el.click(), "Upload CSV Button");
-
-    // Step 2 (query editor + Run) appears once the CSV is stored.
-    await waitForElementToBeVisible(this.loadCsvRunConfirm);
+    await this.uploadCsvToTemp(graphName, absoluteFilePath);
 
     if (!withHeaders) {
       await this.loadCsvWithHeadersCheckbox.uncheck();
@@ -1751,8 +1890,23 @@ export default class GraphPage extends BasePage {
     // binds Enter to submit. `window.monaco` is exposed by EditorComponent.
     await this.setLoadCsvBody(body);
 
-    await interactWhenVisible(this.loadCsvRunConfirm, (el) => el.click(), "Run LOAD CSV");
+    await this.clickLoadCsvRun();
     await waitForElementToBeVisible(this.toast);
+  }
+
+  /** Open the dialog on the Load CSV tab and upload the file to temp storage (step 1), landing on the query step. */
+  async uploadCsvToTemp(graphName: string, absoluteFilePath: string): Promise<void> {
+    await this.openUploadDialog(graphName);
+    await this.selectUploadTab("csv");
+    await this.setUploadFile(absoluteFilePath);
+    await interactWhenVisible(this.csvUploadTempConfirm, (el) => el.click(), "Upload CSV Button");
+
+    // Step 2 (query editor + Run) appears once the CSV is stored.
+    await waitForElementToBeVisible(this.loadCsvRunConfirm);
+  }
+
+  async clickLoadCsvRun(): Promise<void> {
+    await interactWhenVisible(this.loadCsvRunConfirm, (el) => el.click(), "Run LOAD CSV");
   }
 
   /**
@@ -1818,20 +1972,41 @@ export default class GraphPage extends BasePage {
     }
     if (!isEnabled) throw new Error("Graph selector is not enabled after reloading the graph list");
 
-    const graphListResponse = this.page.waitForResponse(
-      (response) => {
-        const { pathname } = new URL(response.url());
-        // Match only the graph-list endpoint, not nested requests such as
-        // /api/graph/<name>?query=... or /api/graph/<name>/memory.
-        return /^\/api\/graph\/?$/.test(pathname) && response.request().method() === "GET";
+    // Any list refresh (on opening, or the periodic one) that finds only our graph
+    // (parallel tests drop theirs) auto-selects it and closes the list, at any
+    // point of this flow. So retry on the actual state instead of ordering steps.
+    // The trigger shows "Select Graph" when nothing is selected, so that label
+    // never proves a graph of the same name is selected.
+    const isSelected = async () => graphName !== "Select Graph"
+      // Raw text: graph names may carry significant whitespace.
+      && await this.select("Graph").textContent() === graphName;
+    await expect(async () => {
+      if (await isSelected()) {
+        if (await this.search().isVisible()) await this.page.keyboard.press("Escape");
+        await expect(this.search()).toBeHidden({ timeout: 2000 });
+        return;
       }
-    );
+      if (!(await this.search().isVisible())) await this.select("Graph").click({ timeout: 2000 });
+      await expect(this.graphListLoading).toBeHidden({ timeout: 10000 });
+      await this.search().fill(graphName, { timeout: 2000 });
+      await this.selectItem("Graph", graphName).click({ timeout: 5000 });
+      await expect(this.search()).toBeHidden({ timeout: 2000 });
+      if (graphName !== "Select Graph") await expect.poll(() => this.select("Graph").textContent(), { timeout: 2000 }).toBe(graphName);
+    }).toPass({ timeout: 45000 });
+  }
 
-    await this.clickSelect();
-    await graphListResponse;
-    await this.fillSearch(graphName);
-    await waitForElementToBeVisible(this.selectItem("Graph", graphName), 500, 20);
-    await this.clickSelectItem(graphName); // selecting the first item in list after search
+  /** The graph page writes the selection, view and layout to the URL once the selection settles. */
+  async waitForSelectedGraphInUrl(graphName: string): Promise<void> {
+    await this.page.waitForURL((url) =>
+      url.searchParams.get("graph") === graphName && url.searchParams.has("view") && url.searchParams.has("layout"));
+  }
+
+  /** The connection ID browser requests must carry in `X-Connection-Id`. */
+  async getActiveConnectionId(): Promise<string | undefined> {
+    const response = await this.page.request.get(new URL("/api/auth/session", urls.localHost).href);
+    if (!response.ok()) throw new Error(`Session request failed with status ${response.status()}`);
+    const { activeConnectionId } = await response.json();
+    return activeConnectionId;
   }
 
   async deleteElementsByPosition(
@@ -1856,7 +2031,6 @@ export default class GraphPage extends BasePage {
   }
 
   async getNotificationToast(): Promise<boolean> {
-    await this.page.waitForTimeout(1000);
     const isVisible = await this.isVisibleToast();
     return isVisible;
   }
@@ -1866,16 +2040,8 @@ export default class GraphPage extends BasePage {
     return status === "running";
   }
 
-  async isNodeCanvasToolTipVisible(): Promise<boolean> {
-    await this.page.waitForTimeout(500);
-    const isVisible = await this.isVisibleNodeCanvasToolTip();
-    return isVisible;
-  }
-
   async getNodeCanvasToolTip(): Promise<string | null> {
-      await this.page.waitForTimeout(1000);
-      const toolTipText = await this.getNodeCanvasToolTipContent();
-      return toolTipText;
+    return this.getNodeCanvasToolTipContent();
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -1915,20 +2081,47 @@ export default class GraphPage extends BasePage {
     await this.page.mouse.up();
   }
 
-  async clickAtCanvasCenter(): Promise<void> {
+  /**
+   * Resolves once the canvas box has held still for `frames` animation frames.
+   * A selection opens the data panel beside the canvas, which shrinks it over a
+   * few frames (expand, then a resize on the next frame, then the canvas's own
+   * ResizeObserver); the graph keeps its centre, so a centre read before that
+   * ends points beside the node.
+   */
+  private async waitForCanvasSizeToSettle(frames = 10): Promise<void> {
+    await this.canvasElement.evaluate((canvas, stableFrames) => new Promise<void>((resolve) => {
+      let last = "";
+      let stable = 0;
+      const check = () => {
+        const { left, top, width, height } = canvas.getBoundingClientRect();
+        const box = `${left},${top},${width},${height}`;
+        stable = box === last ? stable + 1 : 0;
+        last = box;
+        if (stable >= stableFrames) resolve();
+        else requestAnimationFrame(check);
+      };
+      requestAnimationFrame(check);
+    }), frames);
+  }
+
+  private async getCanvasCenter(): Promise<{ x: number; y: number }> {
+    await this.waitForCanvasSizeToSettle();
     const boundingBox = await this.getBoundingBoxCanvasElement();
     if (!boundingBox) throw new Error("Canvas bounding box not found");
-    const centerX = boundingBox.x + boundingBox.width / 2;
-    const centerY = boundingBox.y + boundingBox.height / 2;
-    await this.page.mouse.click(centerX, centerY);
+    return {
+      x: boundingBox.x + boundingBox.width / 2,
+      y: boundingBox.y + boundingBox.height / 2,
+    };
+  }
+
+  async clickAtCanvasCenter(): Promise<void> {
+    const { x, y } = await this.getCanvasCenter();
+    await this.page.mouse.click(x, y);
   }
 
   async hoverAtCanvasCenter(): Promise<void> {
-    const boundingBox = await this.getBoundingBoxCanvasElement();
-    if (!boundingBox) throw new Error("Canvas bounding box not found");
-    const centerX = boundingBox.x + boundingBox.width / 2;
-    const centerY = boundingBox.y + boundingBox.height / 2;
-    await this.page.mouse.move(centerX, centerY);
+    const { x, y } = await this.getCanvasCenter();
+    await this.page.mouse.move(x, y);
   }
 
   async getQuerySearchListText(): Promise<string[]> {
@@ -1950,11 +2143,6 @@ export default class GraphPage extends BasePage {
     }
 
     return texts;
-  }
-
-  async clickElementAt(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y);
-    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -2000,7 +2188,7 @@ export default class GraphPage extends BasePage {
       panel: await GraphPage.boxOf(this.manageContent, "Manage Graphs panel"),
       actions,
       search: await GraphPage.boxOf(
-        this.page.getByTestId("searchInputGraphs"),
+        this.searchInputGraphs,
         "Graphs search box",
       ),
     };

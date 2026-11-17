@@ -3,7 +3,7 @@
 import { ReactNode, RefObject, Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { CustomizingRef, Panel, cn } from "@/lib/utils";
+import { CustomizingRef, Panel, cn, parsePanelSizePercent } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { PanelLeft } from "lucide-react";
@@ -19,6 +19,32 @@ const UdfPanel = dynamic(() => import("../udf/udfPanel"), {
   ssr: false,
 });
 
+/**
+ * Re-applies a persisted panel width on the next frame, holding `restoring` so the
+ * resize it triggers is not saved back. Returns a cancel that also releases the flag,
+ * or saves would stay disabled for the life of the layout.
+ */
+function restorePanelSize(panel: PanelImperativeHandle, storageKey: string, restoring: RefObject<boolean>) {
+  const size = parsePanelSizePercent(localStorage.getItem(storageKey));
+  if (size === undefined) return undefined;
+
+  restoring.current = true;
+  let rafId = requestAnimationFrame(() => {
+    try {
+      panel.resize(`${size}%`);
+    } finally {
+      rafId = requestAnimationFrame(() => {
+        restoring.current = false;
+      });
+    }
+  });
+
+  return () => {
+    cancelAnimationFrame(rafId);
+    restoring.current = false;
+  };
+}
+
 interface ProviderLayoutProps {
   children: ReactNode;
   panelRef: RefObject<PanelImperativeHandle | null>;
@@ -26,6 +52,8 @@ interface ProviderLayoutProps {
   customizingLabel: CustomizingRef | null;
   setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>>;
   tutorialOpen: boolean;
+  /** Changes when the tutorial must start over (e.g. a connection switch), remounting it. */
+  tutorialKey: number;
   /** False until the first-visit tour has been decided on, so What's New cannot open ahead of it. */
   tutorialDecided: boolean;
   onCloseTutorial: () => void;
@@ -40,6 +68,7 @@ export default function ProviderLayout({
   customizingLabel,
   setCustomizingLabel,
   tutorialOpen,
+  tutorialKey,
   tutorialDecided,
   onCloseTutorial,
   onLoadDemoGraphs,
@@ -90,16 +119,7 @@ export default function ProviderLayout({
     if (!currentPanel) return;
     if (currentPanel.isCollapsed()) {
       currentPanel.expand();
-      const stored = localStorage.getItem("panel-size-/graph");
-      if (stored) {
-        isRestoringSize.current = true;
-        requestAnimationFrame(() => {
-          currentPanel.resize(`${JSON.parse(stored)}%`);
-          requestAnimationFrame(() => {
-            isRestoringSize.current = false;
-          });
-        });
-      }
+      restorePanelSize(currentPanel, "panel-size-/graph", isRestoringSize);
     } else {
       currentPanel.collapse();
     }
@@ -123,19 +143,7 @@ export default function ProviderLayout({
 
     if (currentPanel.isCollapsed()) currentPanel.expand();
 
-    const stored = localStorage.getItem("panel-size-/graph");
-    if (!stored) return undefined;
-
-    isRestoringSize.current = true;
-    const rafId = requestAnimationFrame(() => {
-      currentPanel.resize(`${JSON.parse(stored)}%`);
-      // Allow saves again after the restore settles
-      requestAnimationFrame(() => {
-        isRestoringSize.current = false;
-      });
-    });
-
-    return () => cancelAnimationFrame(rafId);
+    return restorePanelSize(currentPanel, "panel-size-/graph", isRestoringSize);
   }, [isGraph, panelRef, isMobile]);
 
   // Restore the UDF panel's persisted width on /udf.
@@ -152,18 +160,7 @@ export default function ProviderLayout({
     const currentPanel = udfPanelRef.current;
     if (!currentPanel) return undefined;
 
-    const stored = localStorage.getItem("panel-size-/udf");
-    if (!stored) return undefined;
-
-    isRestoringUdfSize.current = true;
-    const rafId = requestAnimationFrame(() => {
-      currentPanel.resize(`${JSON.parse(stored)}%`);
-      requestAnimationFrame(() => {
-        isRestoringUdfSize.current = false;
-      });
-    });
-
-    return () => cancelAnimationFrame(rafId);
+    return restorePanelSize(currentPanel, "panel-size-/udf", isRestoringUdfSize);
   }, [isUdf, isMobile]);
 
   const panelContext = useMemo(() => ({
@@ -182,8 +179,9 @@ export default function ProviderLayout({
   return (
     <PanelContext.Provider value={panelContext}>
       {
-        isGraph &&
+        isGraph && tutorialOpen &&
         <Tutorial
+          key={tutorialKey}
           open={tutorialOpen}
           onClose={onCloseTutorial}
           onLoadDemoGraphs={onLoadDemoGraphs}

@@ -23,9 +23,12 @@ on:
     secrets:
       RUN_BROWSER_TESTS:
         required: true
+      CODECOV_TOKEN:
+        required: false
+  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -52,7 +55,7 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
@@ -66,7 +69,6 @@ jobs:
           npm config set fetch-retry-factor 2
           npm config set fetch-retry-mintimeout 10000
           npm config set fetch-retry-maxtimeout 60000
-          npm config set maxsockets 1
           
           # Install with retry logic
           for i in {1..5}; do
@@ -87,10 +89,16 @@ jobs:
               sleep $sleep_time
             fi
           done
+      # Only fills the cache; this job runs no browser, so no system deps.
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium firefox
+        if: steps.cache-npm.outputs.cache-hit != 'true'
+        run: npx playwright install chromium firefox
+      # Unminified and source-mapped, so the e2e coverage maps back to the
+      # sources (see next.config.js).
       - name: Build application
         run: npm run build
+        env:
+          COVERAGE: "1"
       - name: Upload build output
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -138,7 +146,7 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
@@ -178,7 +186,10 @@ jobs:
           export CSV_LOCAL_TEMP_DIR=/tmp/fdb-import
           export CSV_LOCAL_LOAD_URI_MODE=file
           export CSV_TEMP_SIGNING_SECRET=SECRET
-          npm start > nextjs.log 2>&1 &
+          # 3 parallel workers exceed the default 200 req/min per API path.
+          export RATE_LIMIT_MAX_REQUESTS=0
+          export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
+          NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test \
             --grep-invert "@tls|@cluster" \
@@ -188,14 +199,57 @@ jobs:
             --project="[Admin: Settings - Chromium]" \
             --project="[Admin: Mobile] Chromium" \
             --shard=${{ matrix.shard }}/6 \
-            --workers=2 \
-            --reporter=dot,list
+            --workers=3 \
+            --reporter=dot,list,html
+      - name: Stop the server
+        if: ${{ !cancelled() }}
+        run: |
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
+      - name: Build the e2e coverage report
+        if: ${{ !cancelled() }}
+        run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/codecov.json
+          disable_search: true
+          flags: e2e
+          name: e2e-shard-${{ matrix.shard }}
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-shard-${{ matrix.shard }}
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-results-shard-${{ matrix.shard }}-${{ github.run_id }}
-          path: test-results/
+          path: |
+            test-results/
+            !test-results/**/trace.zip
           retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
@@ -203,7 +257,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-shard-${{ matrix.shard }}-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload server logs
@@ -247,7 +303,7 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
@@ -271,15 +327,59 @@ jobs:
           export PAT_FALKORDB_PORT=6380
           export PAT_FALKORDB_USERNAME=default
           export PAT_FALKORDB_GRAPH_NAME=token_management
-          npm start > nextjs.log 2>&1 &
+          export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
+          NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
-          npx playwright test --project="[Stateless] - Chromium" --workers=1 --reporter=dot,list
+          npx playwright test --project="[Stateless] - Chromium" --workers=1 --reporter=dot,list,html
+      - name: Stop the server
+        if: ${{ !cancelled() }}
+        run: |
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
+      - name: Build the e2e coverage report
+        if: ${{ !cancelled() }}
+        run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/codecov.json
+          disable_search: true
+          flags: e2e
+          name: e2e-stateless
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-stateless
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-results-stateless-${{ github.run_id }}
-          path: test-results/
+          path: |
+            test-results/
+            !test-results/**/trace.zip
           retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
@@ -287,7 +387,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-stateless-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload server logs
@@ -320,7 +422,7 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
@@ -411,9 +513,10 @@ jobs:
         env:
           SKIP_SERVER_IDENTITY_CHECK: "true"
         run: |
-          NEXTAUTH_SECRET=SECRET SKIP_SERVER_IDENTITY_CHECK=true ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 & 
+          export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
+          NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" NEXTAUTH_SECRET=SECRET SKIP_SERVER_IDENTITY_CHECK=true ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
-          npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
+          npx playwright test --workers=1 --reporter=dot,list,html --project="[TLS - Chromium]" --project="[TLS - Firefox]"
       - name: Cleanup TLS certificates
         if: always()
         run: |
@@ -422,12 +525,55 @@ jobs:
       - name: Stop FalkorDB TLS container
         if: always()
         run: docker stop falkordb-tls || true
+      - name: Stop the server
+        if: ${{ !cancelled() }}
+        run: |
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
+      - name: Build the e2e coverage report
+        if: ${{ !cancelled() }}
+        run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/codecov.json
+          disable_search: true
+          flags: e2e
+          name: e2e-tls
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-tls
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-results-tls-${{ github.run_id }}
-          path: test-results/
+          path: |
+            test-results/
+            !test-results/**/trace.zip
           retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
@@ -435,7 +581,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-tls-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload server logs
@@ -468,7 +616,7 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
@@ -550,9 +698,10 @@ jobs:
           done
       - name: Run cluster tests
         run: |
-          NEXTAUTH_SECRET=SECRET ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 & 
+          export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
+          NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" NEXTAUTH_SECRET=SECRET ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
-          npx playwright test --grep "@cluster" --workers=4 --reporter=dot,list
+          npx playwright test --grep "@cluster" --workers=4 --reporter=dot,list,html
       - name: Cleanup cluster
         if: always()
         run: |
@@ -561,12 +710,55 @@ jobs:
             docker stop node$i || true
             docker rm node$i || true
           done
+      - name: Stop the server
+        if: ${{ !cancelled() }}
+        run: |
+          # The server writes its V8 coverage as it exits. Only ours: the FalkorDB
+          # service containers run a next-server of their own, as root.
+          if ! pkill -TERM -u "$(id -u)" -f "[n]ext-server"; then
+            echo "::error::Found no Next.js server to stop: the e2e report would have no server coverage"
+            exit 1
+          fi
+          timeout 60s bash -c 'while pgrep -u "$(id -u)" -f "[n]ext-server" > /dev/null; do sleep 1; done'
+          # npm writes V8 coverage too, so look for the server's own.
+          if ! grep -qsF '/.next/server/' coverage/raw/e2e/coverage-*.json; then
+            echo "::error::The Next.js server wrote no V8 coverage"
+            exit 1
+          fi
+      - name: Build the e2e coverage report
+        if: ${{ !cancelled() }}
+        run: REQUIRE_BROWSER_COVERAGE=1 node .github/scripts/coverage-report.mjs e2e coverage/raw/e2e
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/codecov.json
+          disable_search: true
+          flags: e2e
+          name: e2e-cluster
+          # A failed upload (no token on Dependabot's runs, a Codecov outage)
+          # does not fail the tests: coverage-gate.mjs fails the coverage
+          # statuses on any missing upload instead.
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-cluster
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-results-cluster-${{ github.run_id }}
-          path: test-results/
+          path: |
+            test-results/
+            !test-results/**/trace.zip
           retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
@@ -574,7 +766,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-cluster-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload server logs
@@ -607,7 +801,7 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
@@ -646,27 +840,98 @@ jobs:
           timeout 90s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
       - name: Run smoke Playwright tests against local docker build
         run: |
-          npx playwright test \
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/shipped-image \
+            npx playwright test \
             --project="[Smoke] - Chromium" \
             --workers=1 \
-            --reporter=dot,list
+            --reporter=dot,list,html
+      # Keep the shipped-image smoke check above. Coverage uses a separate,
+      # unminified image so public source maps never enter the production image.
+      - name: Build coverage-only browser docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: COVERAGE=1
+          push: false
+          load: true
+          tags: falkordb-browser:coverage
+          cache-from: type=gha
+      - name: Start coverage-only browser container
+        id: docker-coverage
+        run: |
+          docker stop falkordb-browser
+          mkdir -p coverage/raw/e2e-docker-server
+          chmod 777 coverage/raw/e2e-docker-server
+          docker run -d --name falkordb-browser-coverage --network=host \
+            -v "$PWD/coverage/raw/e2e-docker-server:/app/coverage" \
+            -e NODE_V8_COVERAGE=/app/coverage \
+            -e NEXTAUTH_URL=http://localhost:3000/ \
+            -e NEXTAUTH_SECRET="$(openssl rand -hex 32)" \
+            -e ENCRYPTION_KEY="$ENCRYPTION_KEY" \
+            falkordb-browser:coverage
+          timeout 90s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
+      - name: Record existing docker smoke tests
+        run: |
+          E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e-docker-browser" \
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/coverage-image \
+            npx playwright test --project="[Smoke] - Chromium" --workers=1 --reporter=dot,list,html
+      - name: Collect docker coverage and exact build artifacts
+        if: ${{ !cancelled() && steps.docker-coverage.outcome == 'success' }}
+        run: |
+          docker stop --time 60 falkordb-browser-coverage
+          test -n "$(find coverage/raw/e2e-docker-server -name 'coverage-*.json' -print -quit)"
+          mkdir -p .next
+          docker cp falkordb-browser-coverage:/app/.next/. .next/
+          REQUIRE_BROWSER_COVERAGE=1 COVERAGE_SERVER_ROOT=/app \
+            node .github/scripts/coverage-report.mjs e2e \
+              coverage/raw/e2e-docker-browser coverage/raw/e2e-docker-server
+      - name: Upload docker coverage to Codecov
+        if: ${{ !cancelled() && steps.docker-coverage.outcome == 'success' && github.event_name != 'workflow_dispatch' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/codecov.json
+          disable_search: true
+          flags: e2e
+          name: e2e-docker
+          fail_ci_if_error: false
+      - name: Keep the coverage report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-e2e-docker
+          path: coverage/e2e/
+          retention-days: 3
+          if-no-files-found: ignore
+          overwrite: true
       - name: Collect container logs
         if: always()
         run: |
           mkdir -p docker-logs
           docker logs falkordb-browser > docker-logs/falkordb-browser.log 2>&1 || true
           docker logs falkordb-core > docker-logs/falkordb-core.log 2>&1 || true
+          if docker inspect falkordb-browser-coverage > /dev/null 2>&1; then
+            docker logs falkordb-browser-coverage > docker-logs/falkordb-browser-coverage.log 2>&1 || true
+          fi
       - name: Stop and remove containers
         if: always()
         run: |
           docker stop falkordb-browser falkordb-core || true
           docker rm falkordb-browser falkordb-core || true
+          if docker inspect falkordb-browser-coverage > /dev/null 2>&1; then
+            docker stop falkordb-browser-coverage
+            docker rm falkordb-browser-coverage
+          fi
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-results-smoke-docker-${{ github.run_id }}
-          path: test-results/
+          path: |
+            test-results/
+            !test-results/**/trace.zip
           retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
@@ -674,7 +939,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-smoke-docker-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            !playwright-report/**/*.zip
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload container logs

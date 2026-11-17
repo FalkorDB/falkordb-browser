@@ -1,54 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildFixMessages, parseFixResponse, getProviderModelName, getChatCompletionsUrl, resolveFixTarget } from "@/lib/aiFix";
+import { buildFixMessages, parseFixResponse, resolveFixTarget } from "@/lib/aiFix";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { fixRequest, validateBody } from "../../validate-body";
-import { getCorsHeaders } from "../../utils";
+import { getCorsHeaders, corsPreflight } from "../../utils";
+import { MAX_CHAT_BODY_BYTES, OVER_LIMIT, readChatBodyWithLimit } from "../requestBody";
+import { requestAiCompletion } from "../completion";
 
-export async function OPTIONS(request: NextRequest) {
-    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
-const REQUEST_TIMEOUT_MS = 30_000;
-
-// Reject oversized bodies so an authenticated caller can't force a large allocation.
-// The schema field caps sum to ~17 KB; 64 KB is generous.
-const MAX_BODY_BYTES = 64 * 1024;
-
-const OVER_LIMIT = Symbol("over-limit");
-
-// Reads the request body as text while enforcing a hard byte cap, so a missing or inaccurate
-// Content-Length (e.g. chunked transfer) can't bypass the limit. Returns the body text, or
-// OVER_LIMIT once the cap is exceeded (reading is then cancelled).
-async function readBodyWithLimit(request: NextRequest, maxBytes: number): Promise<string | typeof OVER_LIMIT> {
-    const reader = request.body?.getReader();
-    if (!reader) return "";
-    // Decode incrementally with TextDecoder (Web-runtime compatible — no Node Buffer);
-    // { stream: true } correctly handles multi-byte UTF-8 sequences split across chunks.
-    const decoder = new TextDecoder();
-    let text = "";
-    let received = 0;
-    try {
-        for (;;) {
-            // eslint-disable-next-line no-await-in-loop
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (value) {
-                received += value.byteLength;
-                if (received > maxBytes) {
-                    await reader.cancel();
-                    return OVER_LIMIT;
-                }
-                text += decoder.decode(value, { stream: true });
-            }
-        }
-    } finally {
-        reader.releaseLock();
-    }
-    text += decoder.decode(); // flush any trailing partial sequence
-    return text;
-}
-
-// eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
     let session;
     try {
@@ -65,11 +24,11 @@ export async function POST(request: NextRequest) {
     // Fast-fail on an honest Content-Length, then enforce the cap while reading so a missing
     // or inaccurate length can't bypass it.
     const contentLength = Number(request.headers.get("content-length") ?? "");
-    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    if (Number.isFinite(contentLength) && contentLength > MAX_CHAT_BODY_BYTES) {
         return NextResponse.json({ error: "Request body too large" }, { status: 413, headers: getCorsHeaders(request) });
     }
 
-    const raw = await readBodyWithLimit(request, MAX_BODY_BYTES);
+    const raw = await readChatBodyWithLimit(request);
     if (raw === OVER_LIMIT) {
         return NextResponse.json({ error: "Request body too large" }, { status: 413, headers: getCorsHeaders(request) });
     }
@@ -96,34 +55,21 @@ export async function POST(request: NextRequest) {
     const { target, authHeader } = resolved;
 
     try {
-        const url = getChatCompletionsUrl(target);
         const messages = buildFixMessages({ query, errorMessage, hint });
 
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeader },
-            body: JSON.stringify({
-                model: getProviderModelName(model),
-                messages,
-                temperature: 0,
-            }),
-            signal: AbortSignal.any([request.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+        const completion = await requestAiCompletion({
+            target,
+            authHeader,
+            model,
+            messages,
+            signal: request.signal,
         });
 
-        if (!response.ok) {
-            const friendly = response.status === 401
-                ? "The AI provider rejected your API key. Check it in Settings."
-                : "The AI provider couldn't process the request. Please try again.";
-            return NextResponse.json({ error: friendly }, { status: response.status === 401 ? 401 : 422, headers: getCorsHeaders(request) });
+        if (!completion.ok) {
+            return NextResponse.json({ error: completion.error }, { status: completion.status, headers: getCorsHeaders(request) });
         }
 
-        const data = await response.json();
-        const reply: string = data?.choices?.[0]?.message?.content ?? "";
-        if (!reply) {
-            return NextResponse.json({ error: "The AI provider returned an empty response." }, { status: 422, headers: getCorsHeaders(request) });
-        }
-
-        return NextResponse.json(parseFixResponse(reply, query), { headers: getCorsHeaders(request) });
+        return NextResponse.json(parseFixResponse(completion.reply, query), { headers: getCorsHeaders(request) });
     } catch (error) {
         // Avoid logging the query/error/prompt content.
         const name = (error as Error)?.name;

@@ -1,12 +1,16 @@
 {
     "api": {
         "graphUrl": "http://localhost:3000/api/graph/",
+        "csvTempUrl": "http://localhost:3000/api/csv-temp",
         "LoginApiUrl": "http://localhost:3000/api/auth/providers",
         "LogoutApiUrl": "http://localhost:3000/api/auth/signout",
         "settingsConfig": "http://localhost:3000/api/graph/config/",
         "settingsUsers": "http://localhost:3000/api/user",
         "settingsUser": "http://localhost:3000/api/user/",
         "tokenUrl": "http://localhost:3000/api/auth/",
+        "chatUrl": "http://localhost:3000/api/chat",
+        "migrateSessionUrl": "http://localhost:3000/api/auth/migrate-session",
+        "udfUrl": "http://localhost:3000/api/udf",
         "chatModelsUrl": "http://localhost:3000/api/chat/models"
     },
   
@@ -15,6 +19,7 @@
     "loginUrl":"http://localhost:3000/login",
     "graphUrl": "http://localhost:3000/graph",
     "settingsUrl": "http://localhost:3000/settings",
+    "udfUrl": "http://localhost:3000/udf",
     "documentationUrl": "https://docs.falkordb.com/",
     "supportUrl": "https://discord.com/invite/jyUgBweNQz",
     "docsUrl": "http://localhost:3000/docs"

@@ -2,7 +2,8 @@
 
 import { SignInResponse, signIn, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import Image from "next/image";
 import Link from "next/link";
 import { FileText } from "lucide-react";
@@ -11,8 +12,8 @@ import { getTheme } from "@/lib/utils";
 import type { PreconfiguredConnectionInfo } from "@/lib/preconfiguredConnection";
 import Spinning from "@/app/components/ui/spinning";
 import Button from "@/app/components/ui/Button";
-import AppDownloadLink from "@/app/components/AppDownloadLink";
 import LoginForm, { LoginFormCredentials } from "./LoginForm";
+import { LoginError } from "@/lib/login-errors";
 
 const AUTO_CONNECT_FAILED =
   "Could not connect with the preconfigured connection. Check the FALKORDB_* environment variables and the server logs, then retry, or log in manually below.";
@@ -120,7 +121,7 @@ export default function LoginPage() {
     autoConnectAttempt.current
       .then((res) => {
         if (!active) return;
-        if (res?.error) {
+        if (!res || res.error) {
           setAutoConnectError(AUTO_CONNECT_FAILED);
           return;
         }
@@ -176,8 +177,8 @@ export default function LoginPage() {
 
     const res: SignInResponse | undefined = await signIn("credentials", params);
 
-    if (res?.error) {
-      throw new Error("Invalid credentials please recheck username and password or your connection settings. Check server logs for more info.");
+    if (!res || res.error) {
+      throw new LoginError(res?.code);
     }
 
     router.push("/graph");
@@ -239,15 +240,12 @@ export default function LoginPage() {
           <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             <Link
               href="/docs"
+              onNavigate={event => { event.preventDefault(); router.push("/docs"); }}
               className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
             >
               <FileText className="w-4 h-4" />
               API Documentation
             </Link>
-            <AppDownloadLink
-              className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
-              iconSize={16}
-            />
           </div>
         </div>
       </div>

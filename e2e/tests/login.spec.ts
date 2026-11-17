@@ -1,9 +1,62 @@
-import test, { expect } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
 import { userRoles, user } from '../config/user.json';
 import { urlPath } from "../infra/utils";
+
+for (const scenario of [
+    { code: "credentials_required", message: "This database requires credentials.", showCredentials: true },
+    { code: "invalid_credentials", message: "Invalid credentials.", showCredentials: true },
+    { code: "connection_failed", message: "Could not connect to the database.", showCredentials: false },
+]) {
+    test(`@admin URL login handles ${scenario.code} without a separate probe`, async ({ page }) => {
+        await page.route("**/api/connections/preconfigured", route => route.fulfill({
+            json: { configured: false, autoConnect: false },
+        }));
+        await page.route("**/api/auth/session", route => route.fulfill({ json: null }));
+        await page.route("**/api/auth/providers", route => route.fulfill({
+            json: { credentials: { id: "credentials", type: "credentials" } },
+        }));
+        await page.route("**/api/auth/csrf", route => route.fulfill({ json: { csrfToken: "test-csrf" } }));
+        const attempts: URLSearchParams[] = [];
+        await page.route("**/api/auth/callback/credentials**", route => {
+            attempts.push(new URLSearchParams(route.request().postData() ?? ""));
+            return route.fulfill({
+                json: { url: `${urls.loginUrl}?error=CredentialsSignin&code=${scenario.code}` },
+            });
+        });
+        let probes = 0;
+        await page.route("**/api/validate-url", route => {
+            probes += 1;
+            return route.fulfill({ status: 410 });
+        });
+
+        await page.goto(`${urls.loginUrl}?signedOut=true`);
+        await page.getByRole("radio", { name: "FalkorDB URL", exact: true }).click();
+        await page.locator('input[id="FalkorDB URL"]').fill("falkors://database.example:6380");
+        await page.getByRole("button", { name: "Log in", exact: true }).click();
+        await expect(page.getByText(scenario.message, { exact: false })).toBeVisible();
+        expect(attempts).toHaveLength(1);
+        expect(attempts[0].get("host")).toBe("database.example");
+        expect(attempts[0].get("port")).toBe("6380");
+        expect(attempts[0].get("tls")).toBe("true");
+        if (scenario.showCredentials) {
+            await expect(page.locator('input[id="Password"]')).toBeVisible();
+            await page.locator('input[id="Username"]').fill("alice");
+            await page.locator('input[id="Password"]').fill("test-password");
+            await page.getByRole("button", { name: "Log in", exact: true }).click();
+            await expect.poll(() => attempts.length).toBe(2);
+            expect(attempts[1].get("username")).toBe("alice");
+            expect(attempts[1].get("password")).toBe("test-password");
+            expect(attempts[1].get("host")).toBe("database.example");
+            expect(attempts[1].get("tls")).toBe("true");
+        } else {
+            await expect(page.locator('input[id="FalkorDB URL"]')).toBeVisible();
+        }
+        expect(probes).toBe(0);
+    });
+}
 
 test.describe(`Login tests`, () => {
     let browser: BrowserWrapper;
@@ -24,6 +77,12 @@ test.describe(`Login tests`, () => {
         // clickOnConnect waits for the normalized path; poll the exact URL so a
         // transient trailing-slash/param during navigation doesn't flake the check.
         await expect.poll(() => urlPath(login.getCurrentURL()), { timeout: 10000 }).toBe(urlPath(urls.graphUrl));
+    });
+
+    test(`@admin API Documentation link opens the API docs`, async () => {
+        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
+        await login.disconnectConnection();
+        expect(await login.openApiDocumentation()).toBe("/docs");
     });
 
     test(`@admin validate user login with credentials`, async () => {

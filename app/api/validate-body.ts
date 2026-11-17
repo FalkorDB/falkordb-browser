@@ -341,6 +341,17 @@ export const fixRequest = z.object({
     .default(""),
 });
 
+export const optimizeRequest = z.object({
+  query: z.string().trim().min(1, "Query cannot be empty").max(8192, "Query is too long"),
+  guidance: z.string().trim().max(2000, "Optimization guidance is too long").optional(),
+  graphName: z.string().min(1, "Graph name is required").max(255, "Graph name is too long"),
+  key: z.string().max(1024, "API key is too long").optional().default(""),
+  model: z.string().trim().min(1, "Model cannot be empty").max(256, "Model is too long"),
+  modelSource: z.enum(["api-key", "local"]).optional().default("api-key"),
+  localProvider: z.enum(["ollama", "lmstudio"]).optional().default("ollama"),
+  localEndpoint: z.string().max(2048, "Local endpoint is too long").optional(),
+});
+
 // Auth schemas
 // Both mTLS fields carry base64 of a PEM file, produced by FileReader on the
 // client, and are decoded again before they reach the TLS socket. Pinning the
@@ -484,14 +495,6 @@ export const revokeToken = z.object({
       error: (issue) => issue.input === undefined ? "Token is required" : "Invalid Token",
     })
     .min(1, "Token cannot be empty"),
-});
-
-export const validateUrl = z.object({
-  url: z
-    .string({
-      error: (issue) => issue.input === undefined ? "URL is required" : "Invalid URL",
-    })
-    .min(1, "URL cannot be empty"),
 });
 
 // Validation helper function

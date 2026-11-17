@@ -41,3 +41,9 @@ updates:
       - dependency-name: "monaco-editor"
         versions: ["0.56.x"]
 
+      # monocart-coverage-reports 3.x reports never-loaded .tsx files as fully
+      # covered, inflating the coverage gate (.github/scripts/coverage-report.test.mjs
+      # fails). Stay on 2.x until coverage-report.mjs is adapted to 3.x.
+      - dependency-name: "monocart-coverage-reports"
+        versions: [">=3.0.0"]
+

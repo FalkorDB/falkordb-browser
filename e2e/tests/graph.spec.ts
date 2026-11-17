@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-plusplus */
 /* eslint-disable no-await-in-loop */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../infra/coverage";
 import fs from "fs";
 import {
   getRandomString,
@@ -27,12 +27,154 @@ test.describe("Graph Tests", () => {
     await browser.closeBrowser();
   });
 
+  test("@admin rejected graph creation keeps its name and allows a successful retry", async () => {
+    const graphName = getRandomString("createRetry");
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    let attempts = 0;
+    await page.route(`**/api/graph/${graphName}`, async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      attempts += 1;
+      if (attempts === 1) {
+        await route.fulfill({ status: 400, json: { message: "Invalid graph name: retry this operation" } });
+      } else {
+        await route.continue();
+      }
+    });
+    try {
+      await graph.clickCreateGraph();
+      await graph.fillCreateGraphInput(graphName);
+      await graph.clickConfirmCreateGraph();
+      await expect(page.getByText("Invalid graph name: retry this operation", { exact: true })).toBeVisible();
+      await expect(graph.insertInput).toHaveValue(graphName);
+      await expect(graph.createConfirm).toBeEnabled();
+      await expect(page.getByText("Graph created successfully", { exact: true })).toHaveCount(0);
+      await graph.clickConfirmCreateGraph();
+      await expect(graph.insertInput).toBeHidden();
+      await expect.poll(() => graph.getSelectedGraphName()).toBe(graphName);
+      await expect(page.getByText("Graph created successfully", { exact: true })).toBeVisible();
+      expect(attempts).toBe(2);
+      expect((await apiCall.getGraphs()).opts).toContain(graphName);
+    } finally {
+      try {
+        await browser.closeBrowser();
+      } finally {
+        await apiCall.removeGraph(graphName, "admin");
+      }
+    }
+  });
+
+  test("@admin rejected graph deletion preserves the graph until retry succeeds", async () => {
+    const graphName = getRandomString("deleteRetry");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      let attempts = 0;
+      await page.route(`**/api/graph/${graphName}`, async (route) => {
+        if (route.request().method() !== "DELETE") {
+          await route.continue();
+          return;
+        }
+        attempts += 1;
+        if (attempts === 1) {
+          await route.fulfill({ status: 400, json: { message: "Invalid input: deletion rejected" } });
+        } else {
+          await route.continue();
+        }
+      });
+      await graph.clickSelect();
+      await graph.clickManage();
+      await graph.clickTableCheckboxByName(graphName);
+      await graph.clickDelete();
+      await graph.clickDeleteConfirm();
+      await expect(graph.deleteConfirm).toBeHidden();
+      await expect(page.getByText("Invalid input: deletion rejected", { exact: true })).toBeVisible();
+      expect((await apiCall.getGraphs()).opts).toContain(graphName);
+      await expect(page.getByText("Graph(s) deleted successfully", { exact: true })).toHaveCount(0);
+      await expect(graph.tableCheckboxByName(graphName)).not.toBeChecked();
+      await graph.clickTableCheckboxByName(graphName);
+      await graph.clickDelete();
+      await graph.clickDeleteConfirm();
+      await expect(graph.deleteConfirm).toBeHidden();
+      await expect(page.getByText("Graph(s) deleted successfully", { exact: true })).toBeVisible();
+      await expect.poll(async () => (await apiCall.getGraphs()).opts).not.toContain(graphName);
+      expect(attempts).toBe(2);
+    } finally {
+      try {
+        await browser.closeBrowser();
+      } finally {
+        await apiCall.removeGraph(graphName, "admin");
+      }
+    }
+  });
+
   test(`@admin Add graph via API -> verify graph exists via UI`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     expect(await graph.verifyGraphExists(graphName)).toBe(true);
     await apiCall.removeGraph(graphName);
+  });
+
+  test(`@admin selectGraphByName copes with the opening refresh auto-selecting the only graph`, async () => {
+    const graphName = getRandomString("autoSelect");
+    const otherName = getRandomString("autoSelect");
+    try {
+      await apiCall.addGraph(graphName);
+      await apiCall.addGraph(otherName);
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      // Two graphs are listed at load, so nothing is auto-selected yet.
+      await expect(graph.select("Graph")).toBeEnabled();
+      // The refresh made by opening the list then sees only ours, as when parallel tests drop theirs.
+      await page.route("**/api/graph", (route) => (route.request().method() === "GET"
+        ? route.fulfill({ json: { opts: [graphName] } })
+        : route.continue()));
+      await graph.selectGraphByName(graphName);
+      await expect(graph.select("Graph")).toHaveText(graphName);
+      await expect(graph.search()).toBeHidden();
+      // A refresh that selected the target while the list stays open: the helper closes it.
+      await graph.clickSelect();
+      await expect(graph.search()).toBeVisible();
+      await graph.selectGraphByName(graphName);
+      await expect(graph.select("Graph")).toHaveText(graphName);
+      await expect(graph.search()).toBeHidden();
+    } finally {
+      // Close first: the page polls the selected graph, which would re-create it.
+      await browser.closeBrowser();
+      await apiCall.removeGraph(graphName, "admin");
+      await apiCall.removeGraph(otherName, "admin");
+    }
+  });
+
+  test(`@admin Querying a graph whose name ends with a space targets that graph, not a trimmed one`, async () => {
+    const trimmedName = getRandomString("trail");
+    const graphName = `${trimmedName} `;
+    const encodedName = encodeURIComponent(graphName);
+    await apiCall.addGraph(encodedName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery("CREATE (:Trail {name: 'x'})");
+      await graph.clickRunQuery(false);
+      await expect.poll(async () => {
+        const response = await apiCall.runQuery(encodedName, "MATCH (n:Trail) RETURN count(n) AS c");
+        return Number(response.data[0].c);
+      }, { timeout: 15000 }).toBe(1);
+      const { opts } = await apiCall.getGraphs("admin");
+      expect(opts).toContain(graphName);
+      expect(opts).not.toContain(trimmedName);
+    } finally {
+      await browser.closeBrowser();
+      await apiCall.removeGraph(encodedName, "admin");
+      if ((await apiCall.getGraphs("admin")).opts.includes(trimmedName)) {
+        await apiCall.removeGraph(trimmedName, "admin");
+      }
+    }
   });
 
   test(`@admin Validate that the Manage Graphs toolbar and the Delete dialog stay on one row`, async () => {
@@ -175,14 +317,79 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName, "admin");
   });
 
-  test(`@readwrite Validate that creating a graph with an existing name is prevented`, async () => {
+  test(`@readwrite Validate that creating a graph with an existing name is prevented without a request`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
-    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    await graph.addGraph(graphName, false);
-    expect(await graph.getNotificationErrorToast()).toBeTruthy();
-    await apiCall.removeGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "POST" && new URL(request.url()).pathname === `/api/graph/${encodeURIComponent(graphName)}`) writes.push(request.url());
+      });
+      await graph.clickCreateGraph();
+      await graph.fillCreateGraphInput(graphName);
+      await graph.clickConfirmCreateGraph();
+      await graph.expectGraphNameExistsError();
+      await expect(graph.insertInput).toHaveValue(graphName);
+      await graph.expectNoGraphCreatedToast();
+      expect(writes).toEqual([]);
+      const { opts } = await apiCall.getGraphs();
+      expect(opts.filter(name => name === graphName)).toHaveLength(1);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
+  });
+
+  test(`@readwrite Validate that a blank graph name is rejected without creating a graph`, async () => {
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "POST" && /^\/api\/graph(?:\/[^/]*)?$/.test(new URL(request.url()).pathname)) writes.push(request.url());
+      });
+      await graph.clickCreateGraph();
+      await graph.clickConfirmCreateGraph();
+      await graph.expectEmptyGraphNameError();
+      await expect(graph.insertInput).toBeVisible();
+      await graph.dismissErrorToast();
+      await graph.fillCreateGraphInput("   ");
+      await graph.clickConfirmCreateGraph();
+      await graph.expectEmptyGraphNameError();
+      await expect(graph.insertInput).toBeVisible();
+      await graph.expectNoGraphCreatedToast();
+      expect((await apiCall.getGraphs()).opts).not.toContain("   ");
+      expect(writes).toEqual([]);
+    } finally {
+      await apiCall.removeGraph(encodeURIComponent("   "));
+    }
+  });
+
+  test(`@readwrite Validate that cancelling the create graph dialog clears the draft name`, async () => {
+    const graphName = getRandomString("graph");
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "POST" && new URL(request.url()).pathname === `/api/graph/${encodeURIComponent(graphName)}`) writes.push(request.url());
+      });
+      await graph.clickCreateGraph();
+      await graph.fillCreateGraphInput(graphName);
+      await expect(graph.insertInput).toHaveValue(graphName);
+      await graph.clickCreateCancel();
+      await expect(graph.insertInput).toBeHidden();
+      await graph.clickCreateGraph();
+      await expect(graph.insertInput).toHaveValue("");
+      expect(writes).toEqual([]);
+      expect((await apiCall.getGraphs()).opts).not.toContain(graphName);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
   });
 
   test(`@admin Validate that modifying a graph name to an existing name is prevented`, async () => {
@@ -426,6 +633,160 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName, "admin");
   });
 
+  test("@admin Duplicate trims new names and rejects whitespace-only input", async () => {
+    const source = getRandomString("duplicate");
+    const target = getRandomString("copy");
+    await apiCall.addGraph(source);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await graph.clickSelect();
+      await graph.clickManage();
+      await graph.searchManagedGraphs(source);
+      await graph.clickTableCheckboxByName(source);
+      await graph.clickDuplicateGraphBtn();
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "PATCH" && new URL(request.url()).pathname.endsWith("/duplicate")) writes.push(request.url());
+      });
+      await graph.insertDuplicateGraphInput("   ");
+      await graph.submitDuplicateGraph();
+      await graph.expectEmptyGraphNameError();
+      expect(writes).toEqual([]);
+      await graph.insertDuplicateGraphInput(` ${target} `);
+      const duplicateResponsePromise = page.waitForResponse(response =>
+        response.request().method() === "PATCH" &&
+        new URL(response.url()).pathname.endsWith("/duplicate")
+      );
+      await graph.submitDuplicateGraph();
+      const duplicateResponse = await duplicateResponsePromise;
+      expect(duplicateResponse.status()).toBe(200);
+      const { result: duplicatedName } = await duplicateResponse.json();
+      expect(duplicatedName).toBe(target);
+      await expect.poll(async () => (await apiCall.getGraphs("admin")).opts, { timeout: 15000 }).toContain(target);
+      expect(writes).toHaveLength(1);
+      expect(decodeURIComponent(new URL(writes[0]).pathname.split("/")[3])).toBe(target);
+      expect((await apiCall.getGraphs("admin")).opts).not.toContain(` ${target} `);
+    } finally {
+      await browser.closeBrowser();
+      await apiCall.removeGraph(source, "admin");
+      const { opts } = await apiCall.getGraphs("admin");
+      for (const name of [target, ` ${target} `]) {
+        if (opts.includes(name)) {
+          await apiCall.removeGraph(encodeURIComponent(name), "admin");
+        }
+      }
+    }
+  });
+
+  for (const padding of ["leading", "trailing", "both"] as const) {
+    test(`@admin Saving an unchanged ${padding}-space graph name does not rename it`, async () => {
+      const trimmed = getRandomString("unchanged");
+      const source = `${padding !== "trailing" ? " " : ""}${trimmed}${padding !== "leading" ? " " : ""}`;
+      await apiCall.runQuery(encodeURIComponent(source), "CREATE (:Preserved {value: 42})");
+      try {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const page = await browser.getPage();
+        await browser.setPageToFullScreen();
+        await graph.clickSelect();
+        await graph.clickManage();
+        await graph.searchManagedGraphs(trimmed);
+        await graph.editManagedGraph(source);
+        const input = graph.graphNameEditor(source);
+        await expect(input).toHaveValue(source);
+        const writes: string[] = [];
+        page.on("request", request => {
+          if (request.method() === "PATCH" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
+        });
+        await graph.submitManagedGraphName(source);
+        await expect(input).toHaveCount(0);
+        expect(writes).toEqual([]);
+        const { opts } = await apiCall.getGraphs("admin");
+        expect(opts).toContain(source);
+        expect(opts).not.toContain(trimmed);
+        const result = await apiCall.runQuery(encodeURIComponent(source), "MATCH (n:Preserved {value: 42}) RETURN count(n) AS c");
+        expect(Number(result.data[0].c)).toBe(1);
+      } finally {
+        await browser.closeBrowser();
+        const { opts } = await apiCall.getGraphs("admin");
+        for (const name of [source, trimmed]) {
+          if (opts.includes(name)) {
+            await apiCall.removeGraph(encodeURIComponent(name), "admin");
+          }
+        }
+      }
+    });
+  }
+
+  test("@admin Saving a padded spelling of an existing graph name does not rename it", async () => {
+    const source = getRandomString("unchanged");
+    await apiCall.addGraph(source);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await graph.clickSelect();
+      await graph.clickManage();
+      await graph.searchManagedGraphs(source);
+      await graph.editManagedGraph(source);
+      const input = graph.graphNameEditor(source);
+      await input.fill(` ${source} `);
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "PATCH" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
+      });
+      await graph.submitManagedGraphName(source);
+      await expect(input).toHaveCount(0);
+      expect(writes).toEqual([]);
+      const { opts } = await apiCall.getGraphs("admin");
+      expect(opts).toContain(source);
+      expect(opts).not.toContain(` ${source} `);
+    } finally {
+      await browser.closeBrowser();
+      await apiCall.removeGraph(source, "admin");
+    }
+  });
+
+  test("@admin Rename trims new names and rejects whitespace-only input", async () => {
+    const source = getRandomString("rename");
+    const target = getRandomString("renamed");
+    await apiCall.addGraph(source);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const page = await browser.getPage();
+      await browser.setPageToFullScreen();
+      await graph.clickSelect();
+      await graph.clickManage();
+      await graph.searchManagedGraphs(source);
+      await graph.editManagedGraph(source);
+      const input = graph.graphNameEditor(source);
+      const writes: string[] = [];
+      page.on("request", request => {
+        if (request.method() === "PATCH" && /^\/api\/graph\/[^/]+$/.test(new URL(request.url()).pathname)) writes.push(request.url());
+      });
+      await input.fill("   ");
+      await input.press("Enter");
+      await graph.expectEmptyGraphNameError();
+      expect(writes).toEqual([]);
+      await expect(input).toBeVisible();
+      await input.fill(` ${target} `);
+      await input.press("Enter");
+      await expect.poll(async () => (await apiCall.getGraphs("admin")).opts).toContain(target);
+      expect(writes).toHaveLength(1);
+      expect(decodeURIComponent(new URL(writes[0]).pathname.split("/")[3])).toBe(target);
+      expect((await apiCall.getGraphs("admin")).opts).not.toContain(` ${target} `);
+    } finally {
+      await browser.closeBrowser();
+      const { opts } = await apiCall.getGraphs("admin");
+      for (const name of [source, target, ` ${target} `]) {
+        if (opts.includes(name)) {
+          await apiCall.removeGraph(encodeURIComponent(name), "admin");
+        }
+      }
+    }
+  });
+
   test(`@admin Validate duplicate graph functionality via UI and verify via API`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
@@ -434,6 +795,9 @@ test.describe("Graph Tests", () => {
     await browser.setPageToFullScreen();
     await graph.duplicateGraph(graphName);
     const duplicatedGraphName = `${graphName} (copy)`;
+
+    // The UI selects the graph the duplicate created
+    await expect.poll(() => graph.getSelectedGraphName()).toBe(duplicatedGraphName);
 
     const response = await apiCall.getGraphs();
     expect(response.opts.includes(duplicatedGraphName)).toBeTruthy();
@@ -444,5 +808,25 @@ test.describe("Graph Tests", () => {
     expect(duplicatedCount.result.edges).toBe(originalCount.result.edges);
     await apiCall.removeGraph(graphName);
     await apiCall.removeGraph(duplicatedGraphName);
+  });
+
+  test(`@admin Validate duplicate graph API returns the new graph's name`, async () => {
+    const graphName = getRandomString("graph");
+    const duplicatedGraphName = `${graphName} (copy)`;
+    await apiCall.addGraph(graphName);
+    try {
+      await apiCall.runQuery(graphName, CREATE_QUERY);
+
+      const response = await apiCall.duplicateGraph(graphName, duplicatedGraphName);
+      expect(response.result).toBe(duplicatedGraphName);
+
+      const duplicatedCount = await apiCall.getGraphCount(duplicatedGraphName);
+      const originalCount = await apiCall.getGraphCount(graphName);
+      expect(duplicatedCount.result.nodes).toBe(originalCount.result.nodes);
+    } finally {
+      await apiCall.removeGraph(graphName, "admin");
+      // Absent when the duplicate failed
+      await apiCall.removeGraph(duplicatedGraphName, "admin").catch(() => undefined);
+    }
   });
 });

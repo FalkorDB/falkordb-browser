@@ -1,13 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
-export { runQuery } from "./run-query";
+import { NextResponse, type NextRequest } from "next/server.js";
+import { isTutorialDemoGraphName } from "../../lib/tutorialDemoGraphs.ts";
+import { endStream } from "./sse.ts";
+export { runQuery } from "./run-query.ts";
 
 const AUTO_NEXTAUTH_URL = "auto";
 const UNTRUSTED_REQUEST_ORIGIN_MESSAGE = "Untrusted request origin";
 const TRUST_PROXY_HEADERS = "true";
-const LOCALHOST_ORIGINS = new Set([
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]);
 
 /**
  * Determine whether a request must use read-only queries.
@@ -18,6 +16,11 @@ const LOCALHOST_ORIGINS = new Set([
 export function resolveReadOnly(request: NextRequest, userRole?: string): boolean {
     return request.nextUrl.searchParams.get("readOnly") === "true"
         || userRole === "Read-Only";
+}
+
+// Background reads must not recreate a removed sample; explicit mutations use resolveReadOnly.
+export function resolveGraphReadOnly(request: NextRequest, userRole: string | undefined, graphId: string): boolean {
+    return isTutorialDemoGraphName(graphId) || resolveReadOnly(request, userRole);
 }
 
 /**
@@ -135,30 +138,22 @@ export function getRequestOrigin(request?: Request): string | null {
     return normalizeOrigin(`${protocol}://${host}`);
 }
 
+type OriginEnv = Record<string, string | undefined>;
+
 /**
- * Get allowed origins from environment variable or use defaults
+ * Caller origins trusted besides the request's own: `ALLOWED_ORIGINS` plus the configured
+ * (non-`auto`) AUTH_URL / NEXTAUTH_URL origin, which a proxy that rewrites Host still serves.
  */
-function getAllowedOrigins(): string[] {
-    const envOrigins = process.env.ALLOWED_ORIGINS;
-    if (envOrigins) {
-        return envOrigins
-            .split(',')
-            .map(origin => normalizeOrigin(origin.trim()))
-            .filter((origin): origin is string => Boolean(origin));
-    }
-
-    const defaults = [...LOCALHOST_ORIGINS];
-
-    // Add AUTH_URL / NEXTAUTH_URL if configured
-    const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
-    if (authUrl && !isAutoNextAuthUrl()) {
-        const authOrigin = normalizeOrigin(authUrl);
-        if (authOrigin) {
-            defaults.push(authOrigin);
-        }
-    }
-
-    return [...new Set(defaults)];
+export function resolveAllowedOrigins(env: OriginEnv = process.env): string[] {
+    const origins = (env.ALLOWED_ORIGINS ?? "")
+        .split(",")
+        .map(origin => normalizeOrigin(origin.trim()))
+        .filter((origin): origin is string => Boolean(origin));
+    const appUrl = env.AUTH_URL ?? env.NEXTAUTH_URL;
+    const appOrigin = appUrl && appUrl !== AUTO_NEXTAUTH_URL && env.NEXTAUTH_URL !== AUTO_NEXTAUTH_URL
+        ? normalizeOrigin(appUrl)
+        : null;
+    return appOrigin && !origins.includes(appOrigin) ? [...origins, appOrigin] : origins;
 }
 
 export function isOriginAllowed(requestOrigin?: string | null, request?: Request): boolean {
@@ -171,13 +166,11 @@ export function isOriginAllowed(requestOrigin?: string | null, request?: Request
         return false;
     }
 
-    const allowedOrigins = getAllowedOrigins();
-
-    if (allowedOrigins.includes(origin)) {
+    if (resolveAllowedOrigins().includes(origin)) {
         return true;
     }
 
-    if (!process.env.ALLOWED_ORIGINS && isAutoNextAuthUrl()) {
+    if (!process.env.ALLOWED_ORIGINS) {
         return origin === getRequestOrigin(request);
     }
 
@@ -185,23 +178,20 @@ export function isOriginAllowed(requestOrigin?: string | null, request?: Request
 }
 
 export function isRequestOriginTrusted(request: Request): boolean {
-    if (!isAutoNextAuthUrl()) {
+    const requestOrigin = getRequestOrigin(request);
+    const callerOrigin = getHeaderOrigin(request);
+    if (request.headers.has("origin") && !callerOrigin) return false;
+    if (callerOrigin) {
+        return Boolean(requestOrigin) &&
+            isOriginAllowed(callerOrigin, request);
+    }
+
+    if (["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase())) {
         return true;
     }
 
-    const requestOrigin = getRequestOrigin(request);
-    if (!requestOrigin) {
-        return false;
-    }
-
-    const callerOrigin = getHeaderOrigin(request);
-
-    if (process.env.ALLOWED_ORIGINS) {
-        return isOriginAllowed(requestOrigin, request)
-            && (!callerOrigin || isOriginAllowed(callerOrigin, request));
-    }
-
-    return !callerOrigin || callerOrigin === requestOrigin || isSameOriginBrowserRequest(request);
+    return request.headers.get("authorization")?.startsWith("Bearer ") === true
+        || isSameOriginBrowserRequest(request);
 }
 
 export function shouldUseSecureCookies(request: Request): boolean {
@@ -228,9 +218,7 @@ export function corsHeaders(requestOrigin?: string | null): Record<string, strin
     };
 
     const origin = requestOrigin ? normalizeOrigin(requestOrigin) : null;
-    const allowedOrigins = getAllowedOrigins();
-
-    if (origin && allowedOrigins.includes(origin)) {
+    if (origin && resolveAllowedOrigins().includes(origin)) {
         headers['Access-Control-Allow-Origin'] = origin;
         headers['Access-Control-Allow-Credentials'] = 'true';
     }
@@ -254,15 +242,19 @@ export function getCorsHeaders(request?: Request): Record<string, string> {
         normalizedOrigin
         && !headers['Access-Control-Allow-Origin']
         && !process.env.ALLOWED_ORIGINS
-        && isAutoNextAuthUrl()
         && request
-        && (normalizedOrigin === getRequestOrigin(request) || isSameOriginBrowserRequest(request))
+        && normalizedOrigin === getRequestOrigin(request)
     ) {
         headers['Access-Control-Allow-Origin'] = normalizedOrigin;
         headers['Access-Control-Allow-Credentials'] = 'true';
     }
 
     return headers;
+}
+
+/** Shared `OPTIONS` handler: answers a CORS preflight with no body. */
+export async function corsPreflight(request: Request): Promise<NextResponse> {
+    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
 export function rejectUntrustedOrigin(request: Request): NextResponse<{ message: string }> {
@@ -295,8 +287,5 @@ export async function writeGetClientErrorAsSSE(
     }
     const payload: Record<string, unknown> = { message, status };
     if (code) payload.code = code;
-    writer.write(
-        encoder.encode(`event: error\ndata: ${JSON.stringify(payload)}\n\n`)
-    );
-    writer.close();
+    endStream(writer, encoder.encode(`event: error\ndata: ${JSON.stringify(payload)}\n\n`));
 }

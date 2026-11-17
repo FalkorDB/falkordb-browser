@@ -1,6 +1,7 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly } from "@/app/api/utils";
+import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE, resolveGraphReadOnly } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
+import { endStream } from "@/app/api/sse";
 
 /**
  * Stream the node count for a graph as Server-Sent Events.
@@ -35,7 +36,7 @@ export async function GET(
 
     const { client, user } = session;
     const { graph: graphId } = await params;
-    const isReadOnly = resolveReadOnly(request, user.role);
+    const isReadOnly = resolveGraphReadOnly(request, user.role, graphId);
 
     try {
       const graph = client.selectGraph(graphId);
@@ -49,13 +50,14 @@ export async function GET(
       // Extract nodes count from result
       const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
 
-      writer.write(
+      endStream(
+        writer,
         encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes })}\n\n`)
       );
-      writer.close();
     } catch (error) {
       console.error(error);
-      writer.write(
+      endStream(
+        writer,
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
             message: (error as Error).message || "Internal server error",
@@ -63,11 +65,11 @@ export async function GET(
           })}\n\n`
         )
       );
-      writer.close();
     }
   } catch (error) {
     console.error(error);
-    writer.write(
+    endStream(
+      writer,
       encoder.encode(
         `event: error\ndata: ${JSON.stringify({
           message: "Internal server error",
@@ -75,13 +77,7 @@ export async function GET(
         })}\n\n`
       )
     );
-    writer.close();
   }
-
-  // Clean up if the client disconnects early
-  request.signal.addEventListener("abort", () => {
-    writer.close();
-  });
 
   return new Response(readable, {
     headers: {

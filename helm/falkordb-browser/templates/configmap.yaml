@@ -13,6 +13,12 @@ data:
   CYPHER: {{ .Values.env.cypher | quote }}
   HOSTNAME: {{ .Values.env.hostname | quote }}
   API_TOKEN_STORAGE_PATH: {{ .Values.env.apiTokenStoragePath | quote }}
+  {{- with .Values.env.allowedOrigins }}
+  ALLOWED_ORIGINS: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.env.trustProxyHeaders }}
+  TRUST_PROXY_HEADERS: {{ . | quote }}
+  {{- end }}
 {{- if .Values.connection.enabled }}
   {{- include "falkordb-browser.validateConnection" . }}
   {{- /* Only non-empty fields are emitted: an empty value would override the url. */}}

@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useCallback, useContext, Dispatch, SetStateAction } from "react";
+import { useState, useCallback, useContext, useEffect, Dispatch, SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { cn, formatName, HistoryQuery } from "@/lib/utils";
 import { History, Info, MoreHorizontal, Network, Sparkles, Upload } from "lucide-react";
@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
-import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, GraphTabsContext, IndicatorContext, PanelContext } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
@@ -69,10 +69,20 @@ export default function Selector({
     const { isReadOnly } = useContext(ConnectionContext);
     const { cypherLanguageConfig, setCypherLanguageConfig } = useContext(CypherLanguageContext);
     const { panelOpen, onTogglePanel, mobileToolbarSlot } = useContext(PanelContext);
+    const { tabsReady } = useContext(GraphTabsContext);
     const isMobile = useIsMobile();
 
     const [maximize, setMaximize] = useState(false);
     const [actionsOpen, setActionsOpen] = useState(false);
+    useEffect(() => {
+        if (!tabsReady) setActionsOpen(false);
+    }, [tabsReady]);
+    useEffect(() => {
+        if (!tabsReady) {
+            setQueriesOpen?.(false);
+            setUploadOpen(false);
+        }
+    }, [tabsReady, setQueriesOpen, setUploadOpen]);
     const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
         setCypherLanguageConfig(config);
     }, [setCypherLanguageConfig]);
@@ -93,6 +103,10 @@ export default function Selector({
             <p>{isMobile ? "Select Multiple Entities (Press And Hold)" : "Select Multiple Entities (Click + Shift or Ctrl)"}</p>
             <p>Select 2 Nodes to Create Edge</p>
             <p>Expand And Collapse Neighbors ({isMobile ? "Double Tap" : "Double Click"})</p>
+            <p>Rotate In 3D ({isMobile ? "Drag With One Finger" : "Left Drag"})</p>
+            <p>Pan In 3D ({isMobile ? "Drag With Two Fingers" : "Right Drag"})</p>
+            <p>Zoom In 3D ({isMobile ? "Pinch" : "Scroll"})</p>
+            <p>Start 3D Camera Gestures On Empty Space; Drag A Node To Move It</p>
         </div>
     );
 
@@ -180,7 +194,7 @@ export default function Selector({
     );
 
     const editorNode = (
-        <div className="h-full w-1 grow relative overflow-visible">
+        <div className="h-full w-1 grow relative overflow-visible" inert={tabsReady ? undefined : true}>
             <CypherEditor
                 graph={graph}
                 graphName={graphName}
@@ -199,7 +213,7 @@ export default function Selector({
     const uploadDialog = (
         <UploadGraph
             graphName={graphName}
-            disabled={isReadOnly || !graphName}
+            disabled={!tabsReady || isReadOnly || !graphName}
             open={uploadOpen}
             onOpenChange={setUploadOpen}
             mode={uploadMode}
@@ -216,13 +230,14 @@ export default function Selector({
         // rest of the desktop bar folds into the overflow so the tab name keeps
         // the width it needs to be readable.
         const toolbar = (
-            <>
+            <div className="contents" data-testid="mobileSelectorToolbar" aria-busy={!tabsReady}>
                 {graphInfoButton}
-                <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
+                <DropdownMenu open={tabsReady && actionsOpen} onOpenChange={setActionsOpen}>
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
                             data-testid="selectorMore"
+                            disabled={!tabsReady}
                             aria-label="More actions"
                             className={cn(action, "flex items-center justify-center")}
                         >
@@ -233,7 +248,7 @@ export default function Selector({
                         <DropdownMenuItem
                             data-testid="uploadGraphToolbarTrigger"
                             className="gap-3 rounded-lg px-3 py-2.5 text-sm cursor-pointer"
-                            disabled={isReadOnly || !graphName}
+                            disabled={!tabsReady || isReadOnly || !graphName}
                             onSelect={() => {
                                 setUploadMode("cypher");
                                 setUploadOpen(true);
@@ -261,7 +276,7 @@ export default function Selector({
                     </DropdownMenuContent>
                 </DropdownMenu>
                 {chatButton}
-            </>
+            </div>
         );
 
         return (
@@ -301,7 +316,7 @@ export default function Selector({
                     "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary"
                 )}
                 title="Upload data"
-                disabled={isReadOnly || !graphName}
+                disabled={!tabsReady || isReadOnly || !graphName}
                 onClick={() => {
                     // The quick-fix path leaves the dialog on Load CSV; the toolbar is the
                     // ordinary Cypher upload, so it has to say which tab it wants.
@@ -315,14 +330,14 @@ export default function Selector({
             {uploadDialog}
             {editorNode}
             <div className="h-full w-fit flex gap-3 items-center p-2 border border-border rounded-lg bg-background">
-                <Popover open={queriesOpen} onOpenChange={setQueriesOpen}>
+                <Popover open={tabsReady && queriesOpen} onOpenChange={setQueriesOpen}>
                     <PopoverTrigger asChild>
                         <Button
                             aria-label="Query history panel"
                             aria-pressed={queriesOpen}
                             data-testid="queryHistory"
                             className={cn(queriesOpen && "!text-primary")}
-                            disabled={historyQuery.queries.length === 0}
+                            disabled={!tabsReady || historyQuery.queries.length === 0}
                             title={historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
                         >
                             <History />

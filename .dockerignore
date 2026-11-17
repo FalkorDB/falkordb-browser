@@ -7,3 +7,4 @@ node_modules
 # Packaging shells, not part of the image
 desktop
 mobile
+docs

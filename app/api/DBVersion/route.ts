@@ -1,12 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, corsPreflight } from "@/app/api/utils";
 import { isEnterpriseModuleList } from "@/lib/enterprise";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 // eslint-disable-next-line import/prefer-default-export, @typescript-eslint/no-unused-vars
 export async function GET(request: Request) {

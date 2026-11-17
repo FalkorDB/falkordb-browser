@@ -1,9 +1,10 @@
-import test, { expect } from "playwright/test";
+import type { Page, Request, Route } from "@playwright/test";
+import { test, expect } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import SchemaView from "../logic/POM/schemaView";
 import urls from "../config/urls.json";
 import APICalls from "../logic/api/apiCalls";
-import { getRandomString } from "../infra/utils";
+import { getQueryRequestParam, getRandomString } from "../infra/utils";
 import { TABS_STORAGE_KEY } from "@/lib/graphTabs";
 
 /**
@@ -42,6 +43,40 @@ const EXPECTED_TRIPLES = [
 /** Labels of every node the schema view draws for that fixture. */
 const EXPECTED_LABELS = ["City", "Company", "Employee", "Empty", "Person"];
 
+/** Labels the graph info panel reports for MESSY_GRAPH_QUERY; "Empty" only comes from discovery. */
+const GRAPH_INFO_LABELS = ["City", "Company", "Employee", "Person"];
+
+const isSchemaDiscovery = (request: Request) =>
+    getQueryRequestParam(request, "query")?.includes("RETURN DISTINCT source, type(e)") === true;
+
+/** A single server-sent event, as the graph query endpoint streams it. */
+const sseEvent = (event: "result" | "error", data: unknown) => ({
+    contentType: "text/event-stream",
+    body: `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+});
+
+/**
+ * Hands every schema placement discovery request for `graphName` to `handle`
+ * (with its 1-based attempt number) and lets every other graph query through.
+ * Returns a reader for the number of discovery requests seen so far.
+ */
+const interceptSchemaDiscovery = async (
+    page: Page,
+    graphName: string,
+    handle: (route: Route, attempt: number) => Promise<void>,
+): Promise<() => number> => {
+    let attempts = 0;
+    await page.route(`**/api/graph/${graphName}{,?*}`, async (route) => {
+        if (!isSchemaDiscovery(route.request())) {
+            await route.continue();
+            return;
+        }
+        attempts += 1;
+        await handle(route, attempts);
+    });
+    return () => attempts;
+};
+
 test.describe("Schema View Tests", () => {
     let browser: BrowserWrapper;
     let apiCalls: APICalls;
@@ -60,8 +95,58 @@ test.describe("Schema View Tests", () => {
         // Close the page first: the graph page polls for graph info while a graph
         // is selected, and that poll re-creates a graph deleted out from under it.
         await browser.closeBrowser();
-        await apiCalls.removeGraph(GRAPH_NAME);
-        if (extraGraphName) await apiCalls.removeGraph(extraGraphName);
+        await apiCalls.removeGraph(GRAPH_NAME, "admin");
+        if (extraGraphName) await apiCalls.removeGraph(extraGraphName, "admin");
+    });
+
+    test("@admin schema discovery recovers after a rejected request when reopened", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        const page = await browser.getPage();
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        const discoveryAttempts = await interceptSchemaDiscovery(page, GRAPH_NAME, async (route, attempt) => {
+            if (attempt === 1) {
+                await route.fulfill(sseEvent("error", { status: 400, message: "Invalid input: schema discovery rejected" }));
+            } else {
+                await route.continue();
+            }
+        });
+        const rejectedDiscovery = page.waitForResponse(response =>
+            new URL(response.url()).pathname === `/api/graph/${GRAPH_NAME}` && isSchemaDiscovery(response.request()));
+        await schemaView.clickSchemaTab();
+        await rejectedDiscovery;
+        expect(discoveryAttempts()).toBe(1);
+        // Only the rejected placement query reports; the label and key queries still succeed.
+        await expect(schemaView.errorToast).toHaveCount(1);
+        await expect(schemaView.errorToast).toContainText("Invalid input: schema discovery rejected");
+        // Without placements the view still draws the graph info labels, and no relationships.
+        await expect.poll(() => schemaView.getSchemaLabels()).toEqual(GRAPH_INFO_LABELS);
+        expect(await schemaView.getSchemaTripleStrings()).toEqual([]);
+        await schemaView.clickGraphTab();
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+        expect(await schemaView.getSchemaTripleStrings()).toEqual(EXPECTED_TRIPLES);
+        expect(discoveryAttempts()).toBe(2);
+    });
+
+    test("@admin schema discovery ignores malformed and duplicate placement rows", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        const page = await browser.getPage();
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        const placement = { source: "Person", relationship: "KNOWS", target: "Person" };
+        const discoveryAttempts = await interceptSchemaDiscovery(page, GRAPH_NAME, route => route.fulfill(sseEvent("result", {
+            data: [
+                placement, placement, null, [], "invalid", { source: 42, relationship: "BAD", target: "Person" },
+                { source: "Person", target: "Company" },
+            ],
+        })));
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(1);
+        expect(await schemaView.getSchemaTripleStrings()).toEqual(["Person-[KNOWS]->Person"]);
+        // Labels come from graph info independently of the mocked discovery rows.
+        await expect.poll(() => schemaView.getSchemaLabels()).toEqual(GRAPH_INFO_LABELS);
+        expect(discoveryAttempts()).toBe(1);
     });
 
     test("@admin check schema view tab is disabled when no graph is selected", async () => {

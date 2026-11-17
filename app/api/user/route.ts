@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { User, ROLE, extractKeysFromACL, getRoleWithKeys } from "./model";
 import { createUser, deleteUsers, validateBody } from "../validate-body";
-import { getCorsHeaders } from "../utils";
+import { getCorsHeaders, corsPreflight } from "../utils";
 import rejectLdapManagedUsers from "./ldap-guard";
+import rejectNonAdmin from "./admin-guard";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 export async function GET(request: Request) {
   try {
@@ -70,7 +69,10 @@ export async function POST(request: NextRequest) {
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
+
+    const adminRejection = rejectNonAdmin(user.role, request);
+    if (adminRejection) return adminRejection;
 
     const ldapRejection = await rejectLdapManagedUsers(client, request);
     if (ldapRejection) return ldapRejection;
@@ -144,7 +146,10 @@ export async function DELETE(request: NextRequest) {
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
+
+    const adminRejection = rejectNonAdmin(user.role, request);
+    if (adminRejection) return adminRejection;
 
     const ldapRejection = await rejectLdapManagedUsers(client, request);
     if (ldapRejection) return ldapRejection;

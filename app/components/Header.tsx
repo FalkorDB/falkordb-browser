@@ -6,9 +6,10 @@ import { useCallback, useContext, useEffect, useMemo, useState, ReactNode } from
 import { useSession } from "next-auth/react";
 import { Copy, Database, Ellipsis, GitGraph, Loader2, MemoryStick, Server, User } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { cn, securedFetch } from "@/lib/utils";
+import { cn, getConnectionEpoch, securedFetch } from "@/lib/utils";
 import useIsMobile from "@/lib/useIsMobile";
 import ConnectionManager from "./ConnectionManager";
+import { graphCounts } from "./graphCounts";
 
 /**
  * Format version number to include dots (e.g., "11111" -> "1.11.11")
@@ -55,18 +56,10 @@ export default function Header({ mobileLeading = null }: Props) {
     const [usedMemory, setUsedMemory] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
 
-    // GRAPH.LIST covers both loaded and offloaded graphs, and GRAPH.STUBS reports
-    // only the offloaded ones — so the loaded count is the difference.
-    const { totalCount, loadedCount, offloadedCount } = useMemo(() => {
-        const total = graphNames?.length ?? 0;
-        const offloaded = supportsOffload ? offloadedGraphs.length : 0;
-
-        return {
-            totalCount: total,
-            loadedCount: Math.max(total - offloaded, 0),
-            offloadedCount: offloaded,
-        };
-    }, [graphNames, offloadedGraphs, supportsOffload]);
+    const { totalCount, loadedCount, offloadedCount } = useMemo(
+        () => graphCounts(graphNames ?? [], offloadedGraphs, supportsOffload),
+        [graphNames, offloadedGraphs, supportsOffload],
+    );
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -74,24 +67,41 @@ export default function Header({ mobileLeading = null }: Props) {
         setUsedMemory(null);
         const intervalSeconds = Number.isFinite(refreshInterval) && refreshInterval > 0 ? refreshInterval : 30;
         let cancelled = false;
+        let startedPolls = 0;
+        let publishedPoll = 0;
 
         const fetchMemory = async () => {
             if (status !== "authenticated") return;
 
-            const result = await securedFetch("/api/info?section=memory", {
-                method: "GET"
-            }, toast, setIndicator);
+            // A poll may publish unless cancelled, superseded by a newer published poll, or from another connection.
+            const seq = (startedPolls += 1);
+            const epoch = getConnectionEpoch();
+            const publish = (apply: () => void) => {
+                if (cancelled || seq < publishedPoll || getConnectionEpoch() !== epoch) return;
+                publishedPoll = seq;
+                apply();
+            };
+            const setIndicatorIfCurrent = (value: "online" | "offline") => publish(() => setIndicator(value));
 
-            if (!result.ok) return;
+            let data: string;
+            try {
+                const result = await securedFetch("/api/info?section=memory", {
+                    method: "GET"
+                }, toast, setIndicatorIfCurrent);
 
-            const data = (await result.json()).result;
+                if (!result.ok) return;
+
+                data = (await result.json()).result;
+            } catch {
+                setIndicatorIfCurrent("offline");
+                return;
+            }
 
             const match = data.match(/used_memory_human:(\S+)/);
 
             if (!match) return;
-            if (cancelled) return;
 
-            setUsedMemory(match[1]);
+            publish(() => setUsedMemory(match[1]));
         };
 
         fetchMemory();
@@ -160,7 +170,7 @@ export default function Header({ mobileLeading = null }: Props) {
                     <span>[</span>
                     <Tooltip>
                         <TooltipTrigger>
-                            <span className="text-green" data-testid="graphsOnLoadCountValue">{loadedCount}</span>
+                            <span className="text-green-700 dark:text-green" data-testid="graphsOnLoadCountValue">{loadedCount}</span>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>Loaded</p>
@@ -169,7 +179,7 @@ export default function Header({ mobileLeading = null }: Props) {
                     <span>,</span>
                     <Tooltip>
                         <TooltipTrigger>
-                            <span className="text-yellow" data-testid="graphsOffLoadCountValue">{offloadedCount}</span>
+                            <span className="text-yellow-700 dark:text-yellow" data-testid="graphsOffLoadCountValue">{offloadedCount}</span>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>Offloaded</p>

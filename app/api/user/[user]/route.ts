@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { ROLE, getRoleWithKeys, extractKeysFromACL } from "../model";
 import { updateUser, validateBody } from "../../validate-body";
-import { getCorsHeaders } from "../../utils";
+import { getCorsHeaders, corsPreflight } from "../../utils";
 import rejectLdapManagedUsers from "../ldap-guard";
+import rejectNonAdmin from "../admin-guard";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
@@ -21,7 +20,10 @@ export async function PATCH(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
+
+    const adminRejection = rejectNonAdmin(user.role, request);
+    if (adminRejection) return adminRejection;
 
     const ldapRejection = await rejectLdapManagedUsers(client, request);
     if (ldapRejection) return ldapRejection;
@@ -49,7 +51,7 @@ export async function PATCH(
 
       const finalRole = getRoleWithKeys(role, keys);
       if (password) {
-        finalRole.push(`>${password}`);
+        finalRole.push("resetpass", `>${password}`);
       }
       await connection.aclSetUser(username, finalRole);
       return NextResponse.json({ message: "User role updated" }, { status: 200, headers: getCorsHeaders(request) });

@@ -10,7 +10,6 @@ import ApiCalls from "../logic/api/apiCalls";
 const adminAuthFile = 'playwright/.auth/admin.json';
 const readWriteAuthFile = 'playwright/.auth/readwriteuser.json';
 const readOnlyAuthFile = 'playwright/.auth/readonlyuser.json';
-const queryParamsAuthFile = 'playwright/.auth/queryparams.json';
 // Dedicated auth files for sign-out tests — these are invalidated by the
 // sign-out test itself and must not be shared with any other project.
 const signOutReadWriteAuthFile = 'playwright/.auth/signout-readwriteuser.json';
@@ -25,6 +24,8 @@ setup("setup authentication", async () => {
         await loginPage.handleSkipTutorial();
         const context = browserWrapper.getContext();
         await context!.storageState({ path: adminAuthFile });
+        // Closing writes the pages' e2e coverage (e2e/infra/coverage.ts).
+        await browserWrapper.closeBrowser();
         const adminContext = await playwrightRequest.newContext({ storageState: adminAuthFile });
         const apiCall = new ApiCalls();
         await apiCall.createUsers({ username: 'readwriteuser', role: user.ReadWrite, password: user.password}, adminContext);
@@ -43,6 +44,7 @@ setup("setup authentication", async () => {
             await userLoginPage.handleSkipTutorial();
             const userContext = userBrowserWrapper.getContext();
             await userContext!.storageState({ path: file });
+            await userBrowserWrapper.closeBrowser();
         }
 
         // Create and authenticate dedicated sign-out users.
@@ -64,10 +66,11 @@ setup("setup authentication", async () => {
             await userLoginPage.handleSkipTutorial();
             const userContext = userBrowserWrapper.getContext();
             await userContext!.storageState({ path: file });
+            await userBrowserWrapper.closeBrowser();
         }
 
-        // Authenticate using query parameters to pre-fill the login form.
-        // This tests the flow where connection params are passed via URL.
+        // Log in with host, port and username prefilled from the URL: setup
+        // fails if the prefill breaks, since only the password is typed.
         await apiCall.createUsers({ username: 'queryparamsuser', role: user.ReadWrite, password: user.password }, adminContext);
         const queryParamsBrowserWrapper = new BrowserWrapper();
         const queryParamsLoginPage = await queryParamsBrowserWrapper.createNewPage(LoginPage, urls.loginUrl);
@@ -78,9 +81,7 @@ setup("setup authentication", async () => {
             host: 'localhost',
             port: '6379',
         });
-        await queryParamsLoginPage.handleSkipTutorial();
-        const queryParamsContext = queryParamsBrowserWrapper.getContext();
-        await queryParamsContext!.storageState({ path: queryParamsAuthFile });
+        await queryParamsBrowserWrapper.closeBrowser();
 
     } catch (error) {
         console.error("Error during authentication setup:", error);
