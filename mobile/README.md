@@ -139,7 +139,8 @@ One-time setup:
    `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`,
    and the variable `FALKORDB_BROWSER_URL` (the production https address).
 
-3. On that production deployment, point the browser's popup at the APK:
+3. On that production deployment, point `/api/app-links` (and the browser's
+   "Get the app" popup, once it returns) at the APK:
    `ANDROID_APP_URL=https://github.com/FalkorDB/falkordb-browser/releases/latest/download/FalkorDB-Browser-android.apk`
    (`AndroidAppUrl` in `aws/browser-service.yml`). Only there: the APK opens
    that server, so other deployments should leave it unset.
