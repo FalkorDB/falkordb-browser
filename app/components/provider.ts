@@ -373,6 +373,9 @@ type ConnectionContextType = {
   // newest switch, so out-of-order completions don't publish a stale connection.
   beginConnectionSwitch: () => number;
   endConnectionSwitch: () => void;
+  // True while a switch is in flight. Work it superseded can wait for this to
+  // turn false and run again, including after a rejected switch rolls back.
+  switchPending: boolean;
   isLatestSwitch: (ticket: number) => boolean;
 };
 
@@ -686,6 +689,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   updateSession: async () => { },
   beginConnectionSwitch: () => 0,
   endConnectionSwitch: () => { },
+  switchPending: false,
   isLatestSwitch: () => true,
 });
 

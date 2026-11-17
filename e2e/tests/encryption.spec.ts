@@ -79,6 +79,37 @@ test.describe(`@admin Encryption migration tests`, () => {
         await browser.closeBrowser();
     });
 
+    test(`an empty initial load does not suppress later legacy key selection`, async () => {
+        await browser.createNewPage(LoginPage);
+        const page = await browser.getPage();
+        await page.addInitScript(() => {
+            if (sessionStorage.getItem("empty-key-load-initialized")) return;
+            sessionStorage.setItem("empty-key-load-initialized", "true");
+            localStorage.removeItem("secretKey");
+            for (const key of Object.keys(localStorage)) {
+                if (key.endsWith("chatApiKeys") || key.endsWith("selectedChatApiKeyId")) {
+                    localStorage.removeItem(key);
+                }
+            }
+        });
+        await page.goto(urls.graphUrl);
+        await page.waitForLoadState("networkidle");
+        const selectionKey = await page.evaluate(() => {
+            const marker = Object.keys(localStorage).find(key => key.endsWith(":__scopeOwner"));
+            if (!marker) throw new Error("Missing connection scope marker");
+            return marker.replace(/__scopeOwner$/, "selectedChatApiKeyId");
+        });
+        expect(await page.evaluate(key => localStorage.getItem(key), selectionKey)).toBeNull();
+
+        await page.evaluate(() => localStorage.setItem("secretKey", "test-later-legacy-key"));
+        await page.reload({ waitUntil: "networkidle" });
+        const migrated = await waitForMigratedChatApiKeys(page);
+        const keys = JSON.parse(migrated?.decryptedKeys ?? "[]") as Array<{ id: string; key: string }>;
+        expect(keys).toHaveLength(1);
+        expect(keys[0].key).toBe("test-later-legacy-key");
+        await expect.poll(() => page.evaluate(key => localStorage.getItem(key), selectionKey)).toBe(keys[0].id);
+    });
+
     test(`plain text secretKey is migrated to server-side encryption on page load`, async () => {
         await browser.createNewPage(LoginPage);
         await browser.setPageToFullScreen();
