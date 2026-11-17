@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Request } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import { readOwnedTutorialGraphs } from "../infra/tutorialGraphs";
@@ -175,6 +175,8 @@ test.describe("@admin Graph tabs", () => {
         failLists = false;
         await expect(page.getByTestId("selectGraph")).toBeEnabled({ timeout: 15000 });
         await page.getByTestId("selectGraph").click();
+        // The list pages its items, and parallel tests can push ours off the first page.
+        await page.getByTestId("GraphSearch").fill(graphOne);
         await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(graph.stripTab(graphOne)).toBeVisible();
@@ -371,6 +373,8 @@ test.describe("@admin Graph tabs", () => {
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true", { timeout: 15000 });
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
             await page.getByTestId("selectGraph").click();
+            // The list pages its items, and parallel tests can push ours off the first page.
+            await page.getByTestId("GraphSearch").fill(graphOne);
             await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
             await page.keyboard.press("Escape");
         } finally {
@@ -486,6 +490,8 @@ test.describe("@admin Graph tabs", () => {
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
             await page.getByTestId("selectGraph").click();
+            // The list pages its items, and parallel tests can push ours off the first page.
+            await page.getByTestId("GraphSearch").fill(graphOne);
             await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
             await page.keyboard.press("Escape");
             expect(restoredQueries).toHaveLength(1);
@@ -1028,18 +1034,23 @@ test.describe("@admin Graph tabs", () => {
             await configGate;
             await route.continue();
         });
-        const defaultRun = page.waitForRequest(request => {
-            const url = new URL(request.url());
-            return url.pathname === `/api/graph/${graphOne}` && getQueryRequestParam(request, "query") === defaultQuery;
-        }, { timeout: 15000 });
+        // A listener, not a waitForRequest: it cannot reject before it is awaited,
+        // and it is in place before the config deadline could let the query run.
+        let defaultRan = false;
+        const onRequest = (request: Request) => {
+            if (new URL(request.url()).pathname === `/api/graph/${graphOne}`
+                && getQueryRequestParam(request, "query") === defaultQuery) defaultRan = true;
+        };
+        page.on("request", onRequest);
         try {
             await page.goto(urls.graphUrl);
             await expect.poll(() => configRequested, { timeout: 15000 }).toBe(true);
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true", { timeout: 15000 });
             releaseConfig();
-            await defaultRun;
+            await expect.poll(() => defaultRan, { timeout: 15000 }).toBe(true);
         } finally {
             releaseConfig();
+            page.off("request", onRequest);
         }
     });
 

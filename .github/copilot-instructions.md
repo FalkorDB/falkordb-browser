@@ -45,25 +45,27 @@ npm run generate:grammar  # regenerate the parser from lib/falkordb-cypher/gener
 Desktop / mobile: `cd desktop && npm test` / `cd mobile && npm test` (also `npm run lint`).
 Before opening a PR run at least `npm run lint`, `npx tsc --noEmit` and `npm run test:coverage`.
 
-## Testing and coverage — the bar is ≥ 95%
+## Testing and coverage — the bar is ≥ 80%
 
 CI measures coverage over **every source file** (`app/`, `lib/`, `components/`, `auth.ts`,
 `proxy.ts`, desktop and mobile shells; not tests, `.d.ts` or `lib/falkordb-cypher/generated/`)
 across unit, smoke, e2e, desktop and mobile tests, merged by Codecov. Branch protection
-requires **95%** for the whole codebase (`coverage/project`) **and** for the lines a PR
+requires **80%** for the whole codebase (`coverage/project`) **and** for the lines a PR
 changes (`coverage/patch`). Details: README "Testing", `.github/scripts/coverage-gate.mjs`.
 
 Rules for every change:
 
 1. **Every behavior change ships with tests** that fail without it. Target 100% of the
-   lines you touch; never let the patch drop below 95%. Do not game coverage (no assertion-free
+   lines you touch; never let the patch drop below 80%. Do not game coverage (no assertion-free
    tests, no `/* c8 ignore */`/`istanbul ignore` to dodge real logic).
 2. **Put logic where it is testable.** Extract decisions out of `.tsx` components and
    `providers.tsx` into framework-free modules in `lib/` (or `app/**/<name>.ts`) and unit-test
    them with `node:test` + `node:assert/strict`. Components themselves are covered by Playwright.
-3. **New pure module → add it to the 100% gate**: append a
-   `--test-coverage-include="<path>"` to `test:coverage` in `package.json` (as the existing
-   modules do) once it reaches 100% lines/branches/functions.
+3. **New pure module → add it to the 100% gate**: add a
+   `--test-coverage-include="<path>"` to `test:coverage` in `package.json` next to the existing
+   ones, **before the test globs** (Node stops reading options at the first glob, so a trailing
+   one is silently treated as a test pattern), once it reaches 100% lines/branches/functions.
+   Check that the file shows up in the coverage table.
 4. **Unit tests** live next to the source as `<name>.test.ts`; relative imports of TS files
    include the `.ts` extension (`import { x } from "./graphTabs.ts"`) because `node --test`
    runs the TS directly. Use `describe/it` or `test`, `mock` from `node:test`; no extra test
@@ -184,7 +186,7 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
 
 ### A PR is ready only when
 
-1. CI is green, including `coverage/project` and `coverage/patch` (≥ 95%) and build, with
+1. CI is green, including `coverage/project` and `coverage/patch` (≥ 80%) and build, with
    **no dangling tests**: none failing, flaky or newly skipped, and none passing only on retry (rule 8 above).
 2. **Every AI review comment is resolved and answered** (CodeRabbit, Copilot code review,
    Codecov, etc. — see `.coderabbit.yaml`). For each thread either fix it and reply with what

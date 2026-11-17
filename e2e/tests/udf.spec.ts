@@ -1,4 +1,5 @@
 import { readFile } from "fs/promises";
+import type { Route } from "@playwright/test";
 import { expect, test } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import UdfPage from "../logic/POM/udfPage";
@@ -84,6 +85,67 @@ test.describe("UDF page", () => {
     await expectEditorShows(udfPage, secondCode);
     await expect.poll(async () => (await udfPage.getFunctionNames()).sort()).toEqual([...secondFunctions].sort());
     expect(await udfPage.getEditorText()).not.toContain(first);
+  });
+
+  test("@admin a function clicked while its library loads does not jump within the shown one", async () => {
+    const shown = newLibraryName();
+    const loading = newLibraryName();
+    // The shown library names the other one's function (in code, not a comment,
+    // which navigation skips), so a jump there is visible.
+    // A trailing line keeps it off the last line, where loading code leaves the cursor.
+    const shownCode = `${libraryCode(shown, ["alphaOne"])}\nconst elsewhere = "betaOne";\nconst done = true;`;
+    const mentionLine = 4;
+    await apiCall.loadUdf(shown, shownCode);
+    await apiCall.loadUdf(loading, libraryCode(loading, ["betaOne"]));
+    const udfPage = await browser.createNewPage(UdfPage);
+    const page = await browser.getPage();
+    await udfPage.openUdfPage();
+    await udfPage.selectLibrary(shown);
+    await expectEditorShows(udfPage, shownCode);
+
+    const fail = (route: Route) => route.fulfill({ status: 500, json: { message: "unavailable" } });
+    const held: Route[] = [];
+    let holding = true;
+    await page.route(`**/api/udf/${loading}`, (route) => (holding ? held.push(route) : fail(route)));
+    await udfPage.expandLibrary(loading);
+    await expect.poll(() => udfPage.getFunctionNames()).toEqual(["betaOne"]);
+    const selectionBefore = await udfPage.getEditorSelectionLine();
+    expect(selectionBefore).not.toBe(mentionLine);
+    await udfPage.clickFunction("betaOne");
+
+    // The load fails, so the panel goes back to the library the editor shows.
+    // Fail every request for it, including one the click may still be sending.
+    holding = false;
+    await Promise.all(held.map(fail));
+    await expect.poll(() => udfPage.getFunctionNames()).toEqual(["alphaOne"]);
+    expect(await udfPage.getEditorSelectionLine()).toBe(selectionBefore);
+  });
+
+  test("@admin a function clicked while its library loads waits for that load, then jumps to it", async () => {
+    const shown = newLibraryName();
+    const loading = newLibraryName();
+    const shownCode = libraryCode(shown, ["alphaOne"]);
+    const loadingCode = libraryCode(loading, ["betaOne"]);
+    await apiCall.loadUdf(shown, shownCode);
+    await apiCall.loadUdf(loading, loadingCode);
+    const udfPage = await browser.createNewPage(UdfPage);
+    const page = await browser.getPage();
+    await udfPage.openUdfPage();
+    await udfPage.selectLibrary(shown);
+    await expectEditorShows(udfPage, shownCode);
+
+    const held: Route[] = [];
+    await page.route(`**/api/udf/${loading}`, (route) => { held.push(route); });
+    await udfPage.expandLibrary(loading);
+    await expect.poll(() => held.length).toBe(1);
+    await udfPage.clickFunction("betaOne");
+
+    // The click joins the request already in flight instead of sending another.
+    await Promise.all(held.map((route) => route.continue()));
+    await expectEditorShows(udfPage, loadingCode);
+    // `function betaOne` is line 2; a fresh load leaves the cursor on the last line.
+    await expect.poll(() => udfPage.getEditorSelectionLine()).toBe(2);
+    expect(held).toHaveLength(1);
   });
 
   test("@admin export downloads the selected library", async () => {

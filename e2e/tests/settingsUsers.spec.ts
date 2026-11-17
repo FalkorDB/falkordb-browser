@@ -295,11 +295,22 @@ test.describe('@Config Settings users tests', () => {
     test("@admin Edit user -> change password via edit form -> Validate login with new password", async () => {
         const username = getRandomString('user');
         const newPassword = "NewPass1@";
+        const tokenName = getRandomString('new-password-login');
         await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
-        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
-        await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.editUser(username, { password: newPassword, confirmPassword: newPassword });
-        await apiCall.deleteUsers({ users: [{ username }] });
+        try {
+            const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+            await settingsUsersPage.navigateToUserTab();
+            await settingsUsersPage.editUser(username, { password: newPassword, confirmPassword: newPassword });
+
+            // Signing in with credentials authenticates against FalkorDB as that user.
+            const login = (password: string) => apiCall.generateTokenWithCredentialsRaw({ username, password, name: tokenName });
+            await expect.poll(async () => (await login(user.password)).status).toBe(401);
+            expect((await login(newPassword)).status).toBe(200);
+        } finally {
+            const { tokens } = await apiCall.listTokens();
+            await Promise.all(tokens.filter(({ name }) => name === tokenName).map(({ token_id: id }) => apiCall.revokeToken(id)));
+            await apiCall.deleteUsers({ users: [{ username }] });
+        }
     });
 
     test("@admin Searching before the user list loads selects only the clicked user", async () => {

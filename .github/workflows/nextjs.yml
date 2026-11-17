@@ -2,7 +2,8 @@ name: Build
 
 # No path filters: `build`, `codecov/project` and `codecov/patch` are required
 # checks, and a skipped run would leave them pending forever. Codecov reports
-# only for a commit that uploaded coverage, which this workflow always does.
+# only for a commit with a successful upload; non-cancelled push and PR runs
+# attempt one (manual workflow_dispatch runs skip the upload).
 on:
   push:
     branches: ["main", "staging"]
