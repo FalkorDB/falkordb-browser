@@ -33,7 +33,6 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
-import AppDownloadPrompt from "./components/AppDownloadPrompt";
 import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDimension, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
@@ -1276,8 +1275,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     updateSession,
     beginConnectionSwitch,
     endConnectionSwitch,
+    switchPending,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, switchPending, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -2541,6 +2541,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             // The value belongs to another connection. Keep it: switching back
             // to that connection restores access.
             console.warn('Stored API keys belong to a different connection, leaving them untouched');
+            return;
           } else if (error instanceof ServerDecryptError && error.status === 400) {
             // The only permanent refusal: the value predates owner binding and
             // can never be read again.
@@ -2551,6 +2552,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             // A 5xx or a dropped request says nothing about the value itself;
             // deleting on one would destroy a perfectly good key.
             console.error('Failed to decrypt API keys, keeping them for a later attempt:', error);
+            // Runtime credentials were cleared before loading. Do not let a
+            // failed load wipe the stored selection or run the legacy migration.
+            return;
           }
         }
       }
@@ -3637,11 +3641,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                       }
                                     </GraphTabsContext.Provider>
                                     <AiFixDialogs />
-                                    {/* At the root, not on /graph or /login: a saved session skips the
-                                        login page, and the graph page is not where everyone lands.
-                                        It waits until the session and the tutorial have both been decided,
-                                        and until What's New, if there is one, has been read. */}
-                                    <AppDownloadPrompt blocked={tutorialOpen || status === "loading" || (status === "authenticated" && !tutorialDecided)} />
                                   </AiFixContext.Provider>
                                 </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>

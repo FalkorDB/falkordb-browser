@@ -16,11 +16,10 @@ test.describe("@admin Preconfigured connection", () => {
     // project's admin storage state would redirect straight to /graph.
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    // The "Get the app" and What's New popups open a moment after load; keep
-    // them out of the way, as every other suite does (initializeLocalStorage).
+    // Keep the What's New popup out of the way, as every other suite does
+    // (initializeLocalStorage).
     test.beforeEach(async ({ page }) => {
         await page.addInitScript(() => {
-            localStorage.setItem("appDownloadPrompt", "false");
             localStorage.setItem("whatsNewSeen", "v999.0.0");
         });
     });

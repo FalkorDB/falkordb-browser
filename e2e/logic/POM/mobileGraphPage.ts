@@ -15,6 +15,10 @@ export default class MobileGraphPage extends GraphPage {
     return this.page.getByTestId("mobileNavToggle");
   }
 
+  public get releasesButton(): Locator {
+    return this.page.getByTestId("mobileReleasesButton");
+  }
+
   public get headerDetails(): Locator {
     return this.page.getByTestId("headerDetails");
   }

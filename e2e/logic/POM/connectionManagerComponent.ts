@@ -87,6 +87,11 @@ export default class ConnectionManagerComponent extends BasePage {
         await this.dropdownContent.waitFor({ state: "visible", timeout: 5000 });
     }
 
+    async selectConnectionById(id: string): Promise<void> {
+        if (!await this.dropdownContent.isVisible()) await this.openDropdown();
+        await interactWhenVisible(this.page.getByTestId(`connection-item-${id}`), (el) => el.click(), `Select connection ${id}`);
+    }
+
     async closeDropdown(): Promise<void> {
         await this.page.keyboard.press("Escape");
         await this.dropdownContent.waitFor({ state: "hidden" });
