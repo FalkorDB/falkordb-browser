@@ -1,6 +1,6 @@
 import { type Route } from "@playwright/test";
 import { expect, test } from "../infra/coverage";
-import { getRandomString, initializeLocalStorage } from "../infra/utils";
+import { getQueryRequestParam, getRandomString, initializeLocalStorage } from "../infra/utils";
 import configuredUrls from "../config/urls.json";
 import AiAssistComponent from "../logic/POM/aiAssistComponent";
 import ChatComponent from "../logic/POM/chatComponent";
@@ -87,13 +87,16 @@ for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
 
 test("@admin an edit made while the failing query runs gets no Fix with AI", async ({ page }) => {
   const graphName = getRandomString("fixInFlight");
-  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+    headers: { Origin: new URL(baseUrl).origin },
+  })).ok()).toBe(true);
   createdGraphs.push(graphName);
   let held!: (route: Route) => void;
   const failingRun = new Promise<Route>(resolve => { held = resolve; });
+  // The query may travel in the URL or the POST body, so match on the request.
   await page.route(
-    url => url.pathname === `/api/graph/${graphName}` && url.searchParams.get("query")?.startsWith("RETURN missing") === true,
-    route => held(route),
+    url => url.pathname === `/api/graph/${graphName}`,
+    route => (getQueryRequestParam(route.request(), "query")?.startsWith("RETURN missing") ? held(route) : route.fallback()),
   );
   await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
   const ai = new AiAssistComponent(page);

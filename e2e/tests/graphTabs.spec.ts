@@ -175,6 +175,8 @@ test.describe("@admin Graph tabs", () => {
         failLists = false;
         await expect(page.getByTestId("selectGraph")).toBeEnabled({ timeout: 15000 });
         await page.getByTestId("selectGraph").click();
+        // The list pages its items, and parallel tests can push ours off the first page.
+        await page.getByTestId("GraphSearch").fill(graphOne);
         await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(graph.stripTab(graphOne)).toBeVisible();
@@ -371,6 +373,8 @@ test.describe("@admin Graph tabs", () => {
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true", { timeout: 15000 });
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
             await page.getByTestId("selectGraph").click();
+            // The list pages its items, and parallel tests can push ours off the first page.
+            await page.getByTestId("GraphSearch").fill(graphOne);
             await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
             await page.keyboard.press("Escape");
         } finally {
@@ -486,6 +490,8 @@ test.describe("@admin Graph tabs", () => {
             await expect(page.getByTestId("graphPage")).toHaveAttribute("data-graph-names-ready", "true");
             await expect(page.getByTestId("graphTabAdd")).toBeEnabled();
             await page.getByTestId("selectGraph").click();
+            // The list pages its items, and parallel tests can push ours off the first page.
+            await page.getByTestId("GraphSearch").fill(graphOne);
             await expect(page.getByTestId(`selectGraph${graphOne}Button`)).toBeVisible();
             await page.keyboard.press("Escape");
             expect(restoredQueries).toHaveLength(1);
