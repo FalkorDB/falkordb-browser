@@ -350,7 +350,85 @@ test.describe('@browser Browser Settings tests', () => {
         } finally {
             release();
             releaseSwitch();
-            await page.unrouteAll({ behavior: "wait" });
+            // Close the page while the routes still rewrite the fake connection: an
+            // unrouted request carrying it gets SESSION_INVALID, and the resulting real
+            // sign-out deletes the shared read-write user's connections for every test.
+            await browser.closePage();
+        }
+    });
+
+    test("@readwrite models reload after a rejected connection switch rolls back", async () => {
+        const settings = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+        const sessionResponse = await page.request.get(`${urls.localHost}/api/auth/session`);
+        const connectionsResponse = await page.request.get(`${urls.localHost}/api/connections`);
+        expect(sessionResponse.ok()).toBe(true);
+        expect(connectionsResponse.ok()).toBe(true);
+        const session = await sessionResponse.json() as Session;
+        const { connections } = await connectionsResponse.json() as { connections: SessionConnection[] };
+        const first = connections[0];
+        if (!first) throw new Error("Rejected switch test needs an authenticated connection");
+        const second = { ...first, id: getRandomString("rejected-connection"), host: "rejected-secondary.invalid" };
+        let markSwitchRequested!: () => void;
+        const switchRequested = new Promise<void>(resolve => { markSwitchRequested = resolve; });
+        await page.route("**/api/**", route => {
+            const headers = route.request().headers();
+            const url = new URL(route.request().url());
+            if (url.searchParams.get("connectionId") === second.id) url.searchParams.set("connectionId", first.id);
+            return route.continue({
+                url: url.toString(),
+                headers: headers["x-connection-id"] === second.id ? { ...headers, "x-connection-id": first.id } : headers,
+            });
+        });
+        await page.route("**/api/connections", route => route.fulfill({ json: { connections: [first, second] } }));
+        await page.route("**/api/auth/csrf", route => route.fulfill({ json: { csrfToken: "rejected-test-csrf" } }));
+        await page.route("**/api/auth/session", async route => {
+            if (route.request().method() === "POST") {
+                const body = route.request().postDataJSON() as { data?: { activeConnectionId?: string } };
+                if (body.data?.activeConnectionId === second.id) markSwitchRequested();
+            }
+            // The session never adopts `second`, so the switch is rejected and rolls back.
+            await route.fulfill({ json: {
+                ...session,
+                activeConnectionId: first.id,
+                user: { ...session.user, host: first.host, port: first.port },
+            } });
+        });
+        await page.addInitScript(id => localStorage.setItem("lastActiveConnectionId", id), first.id);
+
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        let requested!: () => void;
+        const started = new Promise<void>(resolve => { requested = resolve; });
+        let delayed = false;
+        await page.route("**/api/chat/models**", async route => {
+            if (route.request().postDataJSON().source !== "local") {
+                return route.fulfill({ json: { models: [] } });
+            }
+            if (delayed) return route.fulfill({ json: { models: ["fresh-model"] } });
+            delayed = true;
+            requested();
+            await gate;
+            // The page may have aborted this request; the switch already discarded it.
+            return route.fulfill({ json: { models: ["stale-model"] } }).catch(() => undefined);
+        });
+        try {
+            await page.goto(urls.settingsUrl);
+            await settings.expandChatSection();
+            await settings.selectLocalLlmModelSource();
+            await started;
+            const connections = new ConnectionManagerComponent(page);
+            await connections.selectConnectionById(first.id);
+            await connections.openDropdown();
+            await connections.selectConnectionById(second.id);
+            await switchRequested;
+            release();
+            await expect(settings.modelsStatusMessage).toHaveText(LOCAL_MODELS_LOADED);
+            await settings.expectModelAbsent("stale-model");
+        } finally {
+            release();
+            // Close the page while the routes still rewrite the fake connection (see above).
+            await browser.closePage();
         }
     });
 

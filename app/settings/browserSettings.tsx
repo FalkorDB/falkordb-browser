@@ -90,7 +90,7 @@ export default function BrowserSettings() {
         settingsLoaded,
     } = useContext(BrowserSettingsContext);
 
-    const { activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
+    const { activeConnectionId, prefixConnectionId, switchPending } = useContext(ConnectionContext);
 
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -235,8 +235,11 @@ export default function BrowserSettings() {
         setActiveSelectedChatApiKeyId(nextSelectedId);
     }, [chatApiKeys, selectedChatApiKeyId]);
 
-    // Fetch live models whenever the selected key changes.
+    // Fetch live models whenever the selected key changes. A switch discards the
+    // load in flight, so wait for it to settle; a rejected switch rolls back
+    // without changing `activeConnectionId`, and only `switchPending` reruns this.
     useEffect(() => {
+        if (switchPending) return undefined;
         const requestId = modelFetchRequestIdRef.current + 1;
         modelFetchRequestIdRef.current = requestId;
         const controller = new AbortController();
@@ -329,7 +332,7 @@ export default function BrowserSettings() {
             clearTimeout(timeoutId);
             controller.abort();
         };
-    }, [selectedChatApiKey, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, modelLoadNonce, activeConnectionId, prefixConnectionId]);
+    }, [selectedChatApiKey, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, modelLoadNonce, activeConnectionId, prefixConnectionId, switchPending]);
 
     // Auto-select the best model once the list loads after a key/source change.
     useEffect(() => {

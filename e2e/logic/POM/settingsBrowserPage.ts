@@ -534,8 +534,9 @@ export default class SettingsBrowserPage extends BasePage {
     this.chatApiKeyIds.delete(apiKey);
   }
 
+  // A tracked card keeps its ID after an edit, so also require it to still show this key.
   async isChatApiKeyPresent(apiKey: string): Promise<boolean> {
-    return this.getChatApiKeyCard(apiKey).isVisible();
+    return this.getRevealedChatApiKeyCard(apiKey).or(this.getMaskedChatApiKeyCard(apiKey)).first().isVisible();
   }
 
   async getChatApiKeyCount(): Promise<number> {

@@ -1276,8 +1276,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     updateSession,
     beginConnectionSwitch,
     endConnectionSwitch,
+    switchPending,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, switchPending, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
