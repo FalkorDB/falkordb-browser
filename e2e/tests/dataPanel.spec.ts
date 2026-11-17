@@ -118,6 +118,46 @@ test.describe("Data panel Tests", () => {
     await apicalls.removeGraph(graphName);
   });
 
+  test(`@readwrite Rejects duplicate attribute without overwriting existing value`, async () => {
+    const graphName = getRandomString("duplicateattribute");
+    let graphCreated = false;
+    try {
+      await apicalls.addGraph(graphName);
+      graphCreated = true;
+      await apicalls.runQuery(
+        graphName,
+        'CREATE (:Person {name: "Alice"})'
+      );
+      const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+      await browser.setPageToFullScreen();
+      await graph.selectGraphByName(graphName);
+      await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+      await graph.clickRunQuery();
+      await graph.searchElementInCanvas("Alice");
+
+      await graph.clickDataPanelAddAttribute();
+      await graph.fillDataPanelAddAttributeKey("name");
+      await graph.fillDataPanelAddAttributeValue("Bob");
+      await graph.clickDataPanelAddAttributeConfirm();
+
+      const page = await browser.getPage();
+      const duplicateError = page.getByTestId("toast-destructive")
+        .getByTestId("toast-description");
+      await expect(duplicateError).toHaveText("An attribute with this key already exists");
+
+      const response = await apicalls.runQuery(
+        graphName,
+        FETCH_FIRST_TEN_NODES ?? ""
+      );
+      const person = response.data.find(
+        (item) => item.n.properties.name === "Alice" || item.n.properties.name === "Bob"
+      );
+      expect(person?.n.properties.name).toBe("Alice");
+    } finally {
+      if (graphCreated) await apicalls.removeGraph(graphName);
+    }
+  });
+
   test(`@readwrite Validate adding new boolean attribute for node via ui and validation via API`, async () => {
     const graphName = getRandomString("datapanel");
     await apicalls.addGraph(graphName);
