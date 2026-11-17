@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
-import { ROLE, getRoleWithKeys, extractKeysFromACL } from "../model";
+import {
+  ROLE,
+  getRoleWithKeys,
+  extractKeysFromACL,
+  requiresPasswordReauthentication,
+  persistAclAfterPasswordChange,
+} from "../model";
 import { updateUser, validateBody } from "../../validate-body";
 import { getCorsHeaders, corsPreflight } from "../../utils";
 import rejectLdapManagedUsers from "../ldap-guard";
@@ -48,13 +54,25 @@ export async function PATCH(
       if (!role) throw new Error("Invalid role");
 
       const connection = await client.connection;
+      const requiresReauthentication = requiresPasswordReauthentication(user.username, username, password);
 
       const finalRole = getRoleWithKeys(role, keys);
       if (password) {
         finalRole.push("resetpass", `>${password}`);
       }
       await connection.aclSetUser(username, finalRole);
-      return NextResponse.json({ message: "User role updated" }, { status: 200, headers: getCorsHeaders(request) });
+
+      const aclSaved = await persistAclAfterPasswordChange(
+        requiresReauthentication,
+        () => connection.aclSave(),
+        error => console.error("Failed to persist ACL after changing the current user's password:", error),
+      );
+
+      return NextResponse.json({
+        message: "User role updated",
+        requiresReauthentication,
+        ...(requiresReauthentication ? { aclSaved } : {}),
+      }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(

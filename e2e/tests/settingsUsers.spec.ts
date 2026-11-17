@@ -107,6 +107,45 @@ test.describe('@Config Settings users tests', () => {
         expect(mock.requests).toEqual([{ method: "PATCH", body }, { method: "PATCH", body }]);
     });
 
+    test("@admin Changing your own password requires signing in again with the new password", async () => {
+        const username = getRandomString("selfPassword");
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+        const page = await browser.getPage();
+        let updateRequests = 0;
+        let saveRequests = 0;
+        let signOutRequests = 0;
+        await page.route(/\/api\/user(?:\/.*)?$/, async route => {
+            const request = route.request();
+            const path = new URL(request.url()).pathname.replace(/\/$/, "");
+            if (request.method() === "GET" && path === "/api/user") {
+                await route.fulfill({ json: { result: [{ username, role: "Admin", keys: ["*"] }] } });
+            } else if (path.endsWith("/save")) {
+                saveRequests += 1;
+                await route.fulfill({ json: { message: "Users saved" } });
+            } else if (request.method() === "PATCH") {
+                updateRequests += 1;
+                await route.fulfill({ json: { message: "User role updated", requiresReauthentication: true, aclSaved: false } });
+            } else {
+                await route.fallback();
+            }
+        });
+        await page.route("**/api/auth/signout*", async route => {
+            signOutRequests += 1;
+            const url = new URL("/login?signedOut=true&passwordChanged=true&aclSaveFailed=true", route.request().url());
+            await route.fulfill({ json: { url: url.toString() } });
+        });
+
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.editUser(username, { password: "NewPassword1!" });
+        await expect(page).toHaveURL(/\/login\?signedOut=true&passwordChanged=true&aclSaveFailed=true/);
+        await expect(page.getByTestId("passwordChangedMessage")).toHaveText("Your password was changed. Sign in again with your new password.");
+        await expect(page.getByTestId("aclSaveWarning")).toBeVisible();
+        expect(updateRequests).toBe(1);
+        expect(saveRequests).toBe(0);
+        expect(signOutRequests).toBe(1);
+    });
+
     test("@admin Search before the users load -> select the match -> Validate only that user is selected", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
         const username = getRandomString('user');

@@ -43,3 +43,14 @@ describe("AI assistance OpenAPI documentation", () => {
     assert.equal(optimize.responses["500"].description, "Internal server error");
   });
 });
+
+describe("User password update OpenAPI documentation", () => {
+  it("documents when a user must sign in again after changing their own password", () => {
+    const response = swaggerSpec.paths["/api/user/{user}"].patch.responses["200"]
+      .content["application/json"].schema as JsonSchema;
+    const reauthentication = response.properties?.requiresReauthentication;
+    assert.equal(reauthentication?.type, "boolean");
+    assert.match(String(reauthentication?.description ?? ""), /current user's own password/);
+    assert.equal(response.properties?.aclSaved?.type, "boolean");
+  });
+});
