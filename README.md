@@ -121,7 +121,7 @@ example `docker run -p 6379:6379 -it --rm falkordb/falkordb:latest`.
 git clone https://github.com/FalkorDB/falkordb-browser.git
 cd falkordb-browser
 cp .env.local.template .env.local
-# Replace the ENCRYPTION_KEY placeholder in .env.local with: openssl rand -hex 32
+# Set ENCRYPTION_KEY in .env.local to the output of: openssl rand -hex 32
 npm ci
 npm run dev
 ```

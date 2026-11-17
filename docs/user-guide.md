@@ -14,8 +14,9 @@ whose final `RETURN` has none. A limit of 0 (shown as ∞) adds no `LIMIT`; trai
   header stays outside the wrapper.
 - Known limitation: `UNION` queries that contain a `CALL` clause, or start with `EXPLAIN` or
   `PROFILE`, are not wrapped; the limit is added to the last branch only.
-- Known limitation: a final `RETURN` that reads a property named `limit` (e.g.
-  `RETURN n.limit`) is mistaken for an existing `LIMIT`, so no limit is added.
+- Known limitation: outside wrapped `UNION` queries, a final `RETURN` that reads a
+  property named `limit` (e.g. `RETURN n.limit`) is mistaken for an existing `LIMIT`,
+  so no limit is added.
 
 ## Error help
 
