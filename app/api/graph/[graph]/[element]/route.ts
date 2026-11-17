@@ -6,11 +6,9 @@ import {
   deleteGraphElement,
   validateBody,
 } from "../../../validate-body";
-import { getCorsHeaders, resolveReadOnly } from "../../../utils";
+import { getCorsHeaders, resolveReadOnly, resolveGraphReadOnly, corsPreflight } from "../../../utils";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -27,7 +25,7 @@ export async function GET(
     const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
-    const isReadOnly = resolveReadOnly(request, user.role);
+    const isReadOnly = resolveGraphReadOnly(request, user.role, graphId);
 
     try {
       const graph = client.selectGraph(graphId);

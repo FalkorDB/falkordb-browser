@@ -1,9 +1,11 @@
 /* eslint-disable no-await-in-loop */
-import { Locator } from "@playwright/test";
+import { Locator, expect } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import {
   interactWhenVisible,
+  waitForElementToBeEnabled,
   waitForElementToBeVisible,
+  waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
 
 export default class SettingsBrowserPage extends BasePage {
@@ -87,6 +89,16 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.getByTestId("noModelsFoundMessage");
   }
 
+  // Public so specs can wait on the text with web-first assertions (as graphPage.toast does).
+  public get modelsStatusMessage(): Locator {
+    return this.page.getByTestId("modelsStatusMessage");
+  }
+
+  // Toast
+  public get errorToastDescription(): Locator {
+    return this.page.getByTestId("toast-destructive").getByTestId("toast-description");
+  }
+
   // Wait for Interactive Methods
   async waitForChatSection(): Promise<boolean> {
     return waitForElementToBeVisible(this.chatSectionHeader);
@@ -100,12 +112,32 @@ export default class SettingsBrowserPage extends BasePage {
     return waitForElementToBeVisible(this.saveSettingsButton);
   }
 
+  async waitForSaveSettingsButtonHidden(): Promise<void> {
+    await this.saveSettingsButton.waitFor({ state: "hidden", timeout: 10000 });
+  }
+
   // Click Methods
   async clickChatSectionHeader(): Promise<void> {
     await interactWhenVisible(
       this.chatSectionHeader,
       (el) => el.click(),
       "Chat Section Header"
+    );
+  }
+
+  async clickAddChatApiKeyButton(): Promise<void> {
+    await interactWhenVisible(
+      this.addChatApiKeyButton,
+      (el) => el.click(),
+      "Add Chat API Key Button"
+    );
+  }
+
+  async clickLocalLlmLoadButton(): Promise<void> {
+    await interactWhenVisible(
+      this.localLlmLoadButton,
+      (el) => el.click(),
+      "Local LLM Load Button"
     );
   }
 
@@ -200,6 +232,27 @@ export default class SettingsBrowserPage extends BasePage {
     await this.page.evaluate(() => localStorage.removeItem("chatModelSource"));
   }
 
+  /** Seed a stored model for `source` before the next navigation, as a returning user would have it. */
+  async seedStoredModel(source: string, model: string): Promise<void> {
+    await this.page.addInitScript(({ source: s, model: m }) => {
+      localStorage.setItem("chatModelSource", s);
+      localStorage.setItem("model", m);
+      localStorage.setItem("perSourceModels", JSON.stringify({ [s]: m }));
+    }, { source, model });
+  }
+
+  async getStoredPerSourceModel(source: string): Promise<string | undefined> {
+    return this.page.evaluate((s) => JSON.parse(localStorage.getItem("perSourceModels") ?? "{}")[s], source);
+  }
+
+  async getStoredLocalLlmEndpoint(): Promise<string | null> {
+    return this.page.evaluate(() => localStorage.getItem("localLlmEndpoint"));
+  }
+
+  async getSavedModelFromLocalStorage(): Promise<string | null> {
+    return this.page.evaluate(() => localStorage.getItem("model"));
+  }
+
   /**
    * Wait until the async saveEncryptedSetting call has written the
    * chatModelSource key back into localStorage.
@@ -214,6 +267,10 @@ export default class SettingsBrowserPage extends BasePage {
 
   async isLmStudioProviderSelected(): Promise<boolean> {
     return (await this.localLlmProviderLmStudioButton.getAttribute("aria-pressed")) === "true";
+  }
+
+  async isOllamaProviderSelected(): Promise<boolean> {
+    return (await this.localLlmProviderOllamaButton.getAttribute("aria-pressed")) === "true";
   }
 
   async isOllamaProviderVisible(): Promise<boolean> {
@@ -233,12 +290,10 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async fillLocalLlmEndpoint(endpoint: string): Promise<void> {
+    // fill() replaces the value in one step, so the app never sees a transient empty endpoint.
     await interactWhenVisible(
       this.localLlmEndpointInput,
-      async (el) => {
-        await el.clear();
-        await el.fill(endpoint);
-      },
+      (el) => el.fill(endpoint),
       "Local LLM Endpoint Input"
     );
   }
@@ -312,11 +367,7 @@ export default class SettingsBrowserPage extends BasePage {
 
   async addChatApiKey(apiKey: string): Promise<void> {
     await this.fillChatApiKey(apiKey);
-    await interactWhenVisible(
-      this.addChatApiKeyButton,
-      (el) => el.click(),
-      "Add Chat API Key Button"
-    );
+    await this.clickAddChatApiKeyButton();
     await this.getMaskedChatApiKeyCard(apiKey).waitFor({ state: "visible", timeout: 5000 });
   }
 
@@ -351,71 +402,76 @@ export default class SettingsBrowserPage extends BasePage {
     return (await keyText.textContent()) ?? "";
   }
 
-  private get editingChatApiKeyCard(): Locator {
-    return this.chatApiKeyCards.filter({ has: this.page.getByTestId("chatApiKeyEditInput") });
+  async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<void> {
+    await this.beginEditChatApiKey(currentApiKey);
+    await this.fillChatApiKeyEdit(nextApiKey);
+    await this.clickSaveEditedChatApiKey();
+    await this.getChatApiKeyCard(nextApiKey).waitFor({ state: "visible", timeout: 5000 });
   }
 
+  // The card being edited shows an input instead of chatApiKeyValue, so it is found through that input.
+  private get editingChatApiKeyCard(): Locator {
+    return this.chatApiKeyCards.filter({ has: this.chatApiKeyEditInput });
+  }
+
+  get chatApiKeyEditInput(): Locator {
+    return this.page.getByTestId("chatApiKeyEditInput");
+  }
+
+  get editingChatApiKeyVisibilityButton(): Locator {
+    return this.editingChatApiKeyCard.getByTestId("toggleChatApiKeyVisibilityButton");
+  }
+
+  // Works whether the key is masked or shown. Waits for the input to hold this key, so starting
+  // an edit while another key is being edited does not resolve on the previous key's input.
   async beginEditChatApiKey(apiKey: string): Promise<void> {
-    const maskedCard = this.getMaskedChatApiKeyCard(apiKey);
-    const card = await maskedCard.isVisible() ? maskedCard : this.getChatApiKeyCard(apiKey);
     await interactWhenVisible(
-      card.getByTestId("editChatApiKeyButton"),
+      this.getMaskedChatApiKeyCard(apiKey).or(this.getChatApiKeyCard(apiKey)).first().getByTestId("editChatApiKeyButton"),
       (el) => el.click(),
       "Edit Chat API Key Button"
     );
-    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "visible", timeout: 5000 });
+    await expect(this.chatApiKeyEditInput).toHaveValue(apiKey, { timeout: 5000 });
   }
 
-  async getChatApiKeyEditInputType(): Promise<string | null> {
-    return this.page.getByTestId("chatApiKeyEditInput").getAttribute("type");
+  async toggleEditingChatApiKeyVisibility(): Promise<void> {
+    await interactWhenVisible(
+      this.editingChatApiKeyVisibilityButton,
+      (el) => el.click(),
+      "Editing Chat API Key Visibility Button"
+    );
+  }
+
+  async fillChatApiKeyEdit(value: string): Promise<void> {
+    await interactWhenVisible(
+      this.chatApiKeyEditInput,
+      (el) => el.fill(value),
+      "Chat API Key Edit Input"
+    );
   }
 
   async getChatApiKeyEditValue(): Promise<string> {
-    return this.page.getByTestId("chatApiKeyEditInput").inputValue();
+    return interactWhenVisible(
+      this.chatApiKeyEditInput,
+      (el) => el.inputValue(),
+      "Chat API Key Edit Value"
+    );
   }
 
-  async saveChatApiKeyEdit(): Promise<void> {
+  async clickSaveEditedChatApiKey(): Promise<void> {
     await interactWhenVisible(
       this.page.getByTestId("saveEditedChatApiKeyButton"),
       (el) => el.click(),
       "Save Edited Chat API Key Button"
     );
-    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "detached", timeout: 5000 });
   }
 
-  async cancelChatApiKeyEdit(): Promise<void> {
+  async cancelEditChatApiKey(): Promise<void> {
     await interactWhenVisible(
       this.editingChatApiKeyCard.getByTestId("editChatApiKeyButton"),
       (el) => el.click(),
       "Cancel Edit Chat API Key Button"
     );
-    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "detached", timeout: 5000 });
-  }
-
-  async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<void> {
-    const card = this.getChatApiKeyCard(currentApiKey);
-    await interactWhenVisible(
-      card.getByTestId("editChatApiKeyButton"),
-      (el) => el.click(),
-      "Edit Chat API Key Button"
-    );
-
-    const editInput = this.page.getByTestId("chatApiKeyEditInput");
-    await interactWhenVisible(
-      editInput,
-      async (el) => {
-        await el.clear();
-        await el.fill(nextApiKey);
-      },
-      "Chat API Key Edit Input"
-    );
-
-    await interactWhenVisible(
-      this.page.getByTestId("saveEditedChatApiKeyButton"),
-      (el) => el.click(),
-      "Save Edited Chat API Key Button"
-    );
-    await this.getChatApiKeyCard(nextApiKey).waitFor({ state: "visible", timeout: 5000 });
+    await this.chatApiKeyEditInput.waitFor({ state: "detached", timeout: 5000 });
   }
 
   async deleteChatApiKey(apiKey: string): Promise<void> {
@@ -437,6 +493,10 @@ export default class SettingsBrowserPage extends BasePage {
 
   async isChatApiKeyPresent(apiKey: string): Promise<boolean> {
     return this.getChatApiKeyCard(apiKey).isVisible();
+  }
+
+  async getChatApiKeyCount(): Promise<number> {
+    return this.chatApiKeyCards.count();
   }
 
   async fillMaxSavedMessages(value: number): Promise<void> {
@@ -477,6 +537,10 @@ export default class SettingsBrowserPage extends BasePage {
 
   async isChatApiKeyInputEnabled(): Promise<boolean> {
     return this.chatApiKeyInput.isEnabled();
+  }
+
+  async isAddChatApiKeyButtonEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.addChatApiKeyButton);
   }
 
   async waitForChatApiKeyInputEnabled(): Promise<void> {
@@ -589,10 +653,9 @@ export default class SettingsBrowserPage extends BasePage {
       const isExpanded = await toggle.getAttribute('aria-expanded');
       if (isExpanded !== 'true') {
         await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
       }
     }
-    // Allow time for expansion animations / DOM updates
-    await this.page.waitForTimeout(200);
   }
 
   async searchModels(searchText: string): Promise<void> {
@@ -683,22 +746,17 @@ export default class SettingsBrowserPage extends BasePage {
     // Expand whatever categories are currently shown (respects active search filter)
     // so we can check whether the model is present in the filtered results.
     await this.expandAllCategories();
+    return this.isModelShown(providerName);
+  }
 
+  // Checks without expanding categories: an active search auto-expands every matching
+  // category, so clicking toggles while polling would race the 200 ms search debounce.
+  async isModelShown(providerName: string): Promise<boolean> {
     const modelButton = this.getModelButton(providerName);
     if (await modelButton.count() > 0) {
-      try {
-        return await modelButton.isVisible();
-      } catch {
-        return false;
-      }
+      return modelButton.first().isVisible();
     }
-
-    try {
-      const buttonByText = this.getModelButtonByDisplayText(providerName);
-      return await buttonByText.first().isVisible();
-    } catch {
-      return false;
-    }
+    return this.getModelButtonByDisplayText(providerName).first().isVisible();
   }
 
   async isCategoryVisible(categoryName: string): Promise<boolean> {
@@ -712,6 +770,14 @@ export default class SettingsBrowserPage extends BasePage {
     }
   }
 
+  async isNoModelsFoundMessageNotVisible(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.noModelsFoundMessage);
+  }
+
+  async isModelSearchEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.modelSearchInput);
+  }
+
   async getNoModelsFoundText(): Promise<string> {
     return interactWhenVisible(
       this.noModelsFoundMessage,
@@ -721,7 +787,8 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async reloadPage(): Promise<void> {
-    await this.page.reload();
+    await this.page.reload({ waitUntil: "networkidle" });
+    await this.waitForSettingsLoaded();
   }
 
   /**
@@ -729,9 +796,6 @@ export default class SettingsBrowserPage extends BasePage {
    * Returns the raw model values (data-testid values)
    */
   async getAvailableModels(): Promise<string[]> {
-    // Wait for models to load
-    await this.page.waitForTimeout(500);
-
     // Expand all collapsible categories so model buttons are rendered in the DOM
     await this.expandAllCategories();
 
@@ -927,13 +991,24 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.locator('#rowHeightExpandMultiple');
   }
 
+  private get browserSettingsPage(): Locator {
+    return this.page.getByTestId("browserSettingsPage");
+  }
+
+  /** Saved settings load asynchronously; until then sliders show defaults and edits get overwritten. */
+  async waitForSettingsLoaded(): Promise<void> {
+    await expect(this.browserSettingsPage).toHaveAttribute("aria-busy", "false");
+  }
+
   private async getSliderValue(slider: Locator): Promise<number> {
+    await this.waitForSettingsLoaded();
     const thumb = slider.locator('[role="slider"]');
     const raw = await thumb.getAttribute('aria-valuenow');
     return Number(raw ?? 0);
   }
 
   private async setSliderByStep(slider: Locator, targetValue: number, step: number): Promise<void> {
+    await this.waitForSettingsLoaded();
     const thumb = slider.locator('[role="slider"]');
     await thumb.focus();
     const raw = await thumb.getAttribute('aria-valuenow');

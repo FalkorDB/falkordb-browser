@@ -28,7 +28,10 @@
 grammar Cypher;
 
 oC_Cypher
-      :  SP? oC_Statement ( SP? ';' )? SP? EOF ;
+      :  SP? ( CYPHER ( SP oC_ParameterHeader )* SP? )* oC_Statement ( SP? ';' )? SP? EOF ;
+
+oC_ParameterHeader
+                  :  oC_SchemaName SP? '=' SP? oC_Expression ;
 
 oC_Statement
          :  oC_Query ;
@@ -260,6 +263,16 @@ oC_ProjectionItem
                   | oC_Expression
                   ;
 
+oC_MapProjection
+             :  '{' SP? ( oC_MapProjectionElement ( SP? ',' SP? oC_MapProjectionElement )* )? SP? '}' ;
+
+oC_MapProjectionElement
+                    :  '.' SP? '*'
+                        | '.' SP? oC_PropertyKeyName
+                        | oC_PropertyKeyName SP? ':' SP? oC_Expression
+                        | oC_Variable
+                        ;
+
 oC_Order
      :  ORDER SP BY SP oC_SortItem ( ',' SP? oC_SortItem )* ;
 
@@ -463,7 +476,7 @@ oC_Atom
         | oC_ParenthesizedExpression
         | oC_FunctionInvocation
         | oC_ExistentialSubquery
-        | oC_Variable
+        | oC_Variable ( SP? oC_MapProjection )?
         ;
 
 COUNT : ( 'C' | 'c' ) ( 'O' | 'o' ) ( 'U' | 'u' ) ( 'N' | 'n' ) ( 'T' | 't' ) ;
@@ -759,6 +772,9 @@ oC_SymbolicName
                 | SHORTESTPATH
                 | ALLSHORTESTPATHS
                 | REDUCE
+                | EXISTS
+                | CALL
+                | YIELD
                 | DROP
                 | REMOVE
                 | INDEX
@@ -771,11 +787,14 @@ oC_SymbolicName
                 | HEADERS
                 | FROM
                 | FIELDTERMINATOR
+                | CYPHER
                 ;
 
 FILTER : ( 'F' | 'f' ) ( 'I' | 'i' ) ( 'L' | 'l' ) ( 'T' | 't' ) ( 'E' | 'e' ) ( 'R' | 'r' ) ;
 
 EXTRACT : ( 'E' | 'e' ) ( 'X' | 'x' ) ( 'T' | 't' ) ( 'R' | 'r' ) ( 'A' | 'a' ) ( 'C' | 'c' ) ( 'T' | 't' ) ;
+
+CYPHER : ( 'C' | 'c' ) ( 'Y' | 'y' ) ( 'P' | 'p' ) ( 'H' | 'h' ) ( 'E' | 'e' ) ( 'R' | 'r' ) ;
 
 UnescapedSymbolicName
                      :  IdentifierStart ( IdentifierPart )* ;
@@ -843,7 +862,7 @@ WHITESPACE
               ;
 
 Comment
-       :  ( '/*' ( Comment_1 | ( '*' Comment_2 ) )* '*/' )
+       :  ( '/*' .*? '*/' )
            | ( '//' ( Comment_3 )* CR? ( LF | EOF ) )
            ;
 
@@ -917,4 +936,3 @@ fragment VT : [\u000B] ;
 fragment US : [\u001F] ;
 
 fragment ID_Start : [\p{ID_Start}] ;
-

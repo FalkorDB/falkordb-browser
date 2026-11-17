@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, corsPreflight } from "@/app/api/utils";
 
 const fields = ["used_memory", "used_memory_rss"];
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(request: Request) {

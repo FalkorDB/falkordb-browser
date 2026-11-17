@@ -4,7 +4,7 @@ import { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { X, Palette } from "lucide-react";
 import { CustomizingItem, LabelStyle, LinkStyle, Label, cn, TAB } from "@/lib/utils";
 import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
-import { STYLE_COLORS, getLabelWithFewestElements } from "@/app/api/graph/model";
+import { STYLE_COLORS, getLabelWithFewestElements, labelStyleKey, relationshipStyleKey } from "@/app/api/graph/model";
 import { setConnectionItem } from "@/lib/connection-storage";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -108,7 +108,7 @@ export default function CustomizeStylePanel({ customizing, onClose }: Props) {
         selectedScale !== originalScale;
 
     const saveStyleToStorage = useCallback((style: LabelStyle | LinkStyle) => {
-        const storageKey = `${isNode ? "labelStyle" : "relationshipStyle"}_${item.name}`;
+        const storageKey = isNode ? labelStyleKey(item.name) : relationshipStyleKey(item.name);
         setConnectionItem(storageKey, JSON.stringify(style));
     }, [isNode, item.name]);
 

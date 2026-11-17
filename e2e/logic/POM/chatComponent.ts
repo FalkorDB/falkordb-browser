@@ -9,7 +9,7 @@ import GraphPage from "./graphPage";
 
 export default class ChatComponent extends GraphPage {
   // Chat Toggle Button in Header
-  private get chatToggleButton(): Locator {
+  public get chatToggleButton(): Locator {
     return this.page.getByTestId("chatToggleButton");
   }
 
@@ -18,12 +18,12 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatPanel");
   }
 
-  private get chatCloseButton(): Locator {
+  public get chatCloseButton(): Locator {
     return this.page.getByTestId("chatCloseButton");
   }
 
   // Messages
-  private get chatMessagesList(): Locator {
+  public get chatMessagesList(): Locator {
     return this.page.getByTestId("chatMessagesList");
   }
 
@@ -35,6 +35,10 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId(`chatAssistantMessage-${type}`);
   }
 
+  private get chatErrorSettingsLink(): Locator {
+    return this.chatAssistantMessage("Error").getByRole("link", { name: "Go to Settings", exact: true });
+  }
+
   private get chatConfidenceBadge(): Locator {
     return this.page.getByTestId("chatConfidenceBadge");
   }
@@ -44,17 +48,17 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatForm");
   }
 
-  private get chatInput(): Locator {
+  public get chatInput(): Locator {
     return this.page.getByTestId("chatInput");
   }
 
-  private get chatSendButton(): Locator {
+  public get chatSendButton(): Locator {
     return this.page.getByTestId("chatSendButton");
   }
 
   // Query Actions
-  private get chatRunQueryButton(): Locator {
-    return this.page.getByTestId("chatRunQueryButton");
+  private get chatInsertQueryButton(): Locator {
+    return this.page.getByTestId("chatInsertQueryButton");
   }
 
   private get chatCopyQueryButton(): Locator {
@@ -172,11 +176,11 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
-  async clickChatRunQueryButton(): Promise<void> {
+  async clickChatInsertQueryButton(): Promise<void> {
     await interactWhenVisible(
-      this.chatRunQueryButton,
+      this.chatInsertQueryButton,
       (el) => el.click(),
-      "Chat Run Query Button"
+      "Chat Insert Query Button"
     );
   }
 
@@ -202,6 +206,14 @@ export default class ChatComponent extends GraphPage {
       this.chatInput,
       (el) => el.clear(),
       "Chat Input Clear"
+    );
+  }
+
+  async pressEnterInChatInput(): Promise<void> {
+    await interactWhenVisible(
+      this.chatInput,
+      (el) => el.press("Enter"),
+      "Chat Input Enter"
     );
   }
 
@@ -238,9 +250,19 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
+  async getChatErrorSettingsLinkHref(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatErrorSettingsLink,
+      (el) => el.getAttribute("href"),
+      "Chat Error Settings Link"
+    );
+  }
+
   async getLastAssistantMessageContent(type: string): Promise<string | null> {
     return interactWhenVisible(
-      this.chatAssistantMessage(type).last(),
+      type === "CypherQuery"
+        ? this.chatAssistantMessage(type).last().getByTestId("chatSuggestedQuery")
+        : this.chatAssistantMessage(type).last(),
       (el) => el.textContent(),
       "Last Assistant Message"
     );
@@ -340,16 +362,6 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
-  async isNodeVisibleInCanvas(nodeName: string): Promise<boolean> {
-    // Wait for canvas to render
-    await this.waitForTimeout(1000);
-    
-    // Check if node with the given name exists in the canvas
-    // Try to find tooltip or node element containing the name
-    const nodeElement = this.page.locator(`[data-tooltip*="${nodeName}"], text="${nodeName}"`).first();
-    const visible = await nodeElement.isVisible().catch(() => false);
-    return visible;
-  }
 
   // Footer Locators
   private get chatFooter(): Locator {
@@ -407,6 +419,10 @@ export default class ChatComponent extends GraphPage {
       (el) => el.textContent(),
       "Chat Footer Model"
     );
+  }
+
+  async waitForChatFooterModel(model: string): Promise<void> {
+    await expect(this.chatFooterModel).toHaveText(model);
   }
 
   async waitForChatConfidenceBadge(): Promise<boolean> {

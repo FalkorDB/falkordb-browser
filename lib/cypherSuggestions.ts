@@ -17,7 +17,7 @@ import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS } from "./cypherLang.ts";
 // variables, so they must never be offered as a "did you mean" candidate.
 const EXCLUDED_WORDS = new Set(
   [
-    ...CYPHER_KEYWORDS,
+    ...CYPHER_KEYWORDS.filter(keyword => keyword !== "CYPHER"), // Also a valid symbolic name.
     "NOT", "AND", "OR", "XOR", "IN", "IS", "NULL", "TRUE", "FALSE",
     "DISTINCT", "CONTAINS", "STARTS", "ENDS", "CASE", "WHEN", "THEN",
     "ELSE", "END", "ON", "BY", "ORDER", "DESC", "ASC", "ALL", "ANY",

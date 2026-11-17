@@ -1,11 +1,13 @@
 'use client';
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { withQuery } from "@/lib/editorEchoes";
 import * as monaco from "monaco-editor";
 import { Monaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import { Download, History, Info, ListChecks, ListX, Star, StarX, Trash2, X } from "lucide-react";
 import { cn, getTheme, Query } from "@/lib/utils";
+import { getStatsLines } from "@/lib/queryStats";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,6 +28,9 @@ import useQueryPreflight from "../components/useQueryPreflight";
 import { Explain, Metadata, Profile } from "./MetadataView";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
+
+// The tabs a query can fall back to, in order, when the selected one is empty
+const TABS: Tab[] = ["text", "metadata", "explain", "profile"];
 
 /** Serializes queries into a runnable `.cypher` batch, one statement per query.
  *  The terminator sits on its own line so a trailing `//` comment can't swallow it. */
@@ -315,7 +320,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
     const isTabEnabled = useCallback((tabName: Tab) => {
         if (tabName === "text") return !!currentQuery;
-        if (tabName === "metadata") return !!currentQuery && currentQuery.metadata.length > 0;
+        if (tabName === "metadata") return !!currentQuery && getStatsLines(currentQuery).length > 0;
         if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
         return true;
     }, [currentQuery]);
@@ -331,10 +336,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             return;
         }
 
-        const currentValue = currentQuery?.[tab];
-
-        if (!currentValue || currentValue.length === 0) {
-            const fallbackTab = (Object.keys(currentQuery) as Tab[]).find(isTabEnabled);
+        if (!isTabEnabled(tab)) {
+            const fallbackTab = TABS.find(isTabEnabled);
 
             if (fallbackTab && fallbackTab !== tab) {
                 setTab(fallbackTab);
@@ -779,20 +782,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                         renderWhitespace: "none"
                                     }}
                                     value={historyQuery.query}
-                                    externalKey={historyQuery.counter}
+                                    externalKey={historyQuery.revision}
                                     onChange={(value) => {
-                                        setHistoryQuery(prev => {
-                                            const newHistoryQuery = {
-                                                ...prev,
-                                                query: value || "",
-                                                currentQuery: {
-                                                    ...prev.currentQuery,
-                                                    text: prev.counter ? prev.currentQuery.text : value || ""
-                                                }
-                                            };
-
-                                            return newHistoryQuery;
-                                        });
+                                        setHistoryQuery(prev => ({ ...withQuery(prev, value || ""), fromEditor: true }));
                                     }}
                                     onMount={handleEditorDidMount}
                                 />

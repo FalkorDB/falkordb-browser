@@ -23,7 +23,7 @@
     "@capacitor/ios": "^8.5.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.5.2",
+    "@capacitor/cli": "^8.6.0",
     "@eslint/js": "^9.39.5",
     "@types/node": "^24.9.0",
     "eslint": "^9.39.5",

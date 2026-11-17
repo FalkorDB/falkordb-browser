@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server, Minus, Plus } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { looksServerEncrypted, serverEncrypt } from "@/lib/server-encryption";
+import { selectStoredModel } from "@/lib/storedModelSelection";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionPrefix, removeConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
@@ -86,6 +87,7 @@ export default function BrowserSettings() {
         resetSettings,
         saveSettings,
         replayTutorial,
+        settingsLoaded,
     } = useContext(BrowserSettingsContext);
 
     const { prefixConnectionId } = useContext(ConnectionContext);
@@ -96,6 +98,7 @@ export default function BrowserSettings() {
     const router = useRouter();
 
     const [isResetting, setIsResetting] = useState(false);
+    const [draftsReady, setDraftsReady] = useState(false);
     const [modelDisplayNames, setModelDisplayNames] = useState<string[]>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [isManualLocalModelLoad, setIsManualLocalModelLoad] = useState(false);
@@ -106,6 +109,7 @@ export default function BrowserSettings() {
     const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
     const [editingKeyValue, setEditingKeyValue] = useState("");
     const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
+    const [isEditInputRevealed, setIsEditInputRevealed] = useState(true);
     const [activeSelectedChatApiKeyId, setActiveSelectedChatApiKeyId] = useState("");
     const [modelLoadNonce, setModelLoadNonce] = useState(0);
     const [loadingChatApiKeyId, setLoadingChatApiKeyId] = useState("");
@@ -275,9 +279,10 @@ export default function BrowserSettings() {
     useEffect(() => {
         if (modelDisplayNames.length === 0) return;
         const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
-        // Prefer the stored preference for this source; fall back to first available model.
+        // Prefer the stored preference for this source (migrating legacy unprefixed OpenAI IDs);
+        // fall back to the first available model.
         const storedModel = perSourceModels[currentSourceKey] ?? "";
-        const nextModel = modelDisplayNames.includes(storedModel) ? storedModel : modelDisplayNames[0];
+        const nextModel = selectStoredModel(storedModel, modelDisplayNames);
         if (nextModel !== latestModelRef.current) {
             setNewModel(nextModel);
             setModel(nextModel);
@@ -314,8 +319,15 @@ export default function BrowserSettings() {
         setNewChatModelSource(chatModelSource);
         setNewLocalLlmProvider(localLlmProvider);
         setNewLocalLlmEndpoint(localLlmEndpoint);
+        // Batched with the draft copies above, so the page never reports ready while a field still shows a default.
+        setDraftsReady(settingsLoaded);
+    }, [settingsLoaded, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewGraphsSortOrder, graphsSortOrder, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, rowHeight]);
+
+    // Kept apart from the effect above: auto-selecting a model after a list loads changes the saved
+    // model, and re-running that effect would discard unsaved provider/endpoint edits and the key editor.
+    useEffect(() => {
         setNewModel(model);
-    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewGraphsSortOrder, graphsSortOrder, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
+    }, [model, setNewModel]);
 
     useEffect(() => {
         setHasChanges(
@@ -613,6 +625,7 @@ export default function BrowserSettings() {
         if (!keyToEdit) return;
         setEditingKeyId(id);
         setEditingKeyValue(keyToEdit.key);
+        setIsEditInputRevealed(true);
     };
 
     const handleSaveEditedKey = async (id: string) => {
@@ -680,13 +693,18 @@ export default function BrowserSettings() {
         }
     };
 
+    // An edit opens in plain text without touching the saved choice, so ending it restores
+    // what the user picked. Toggling during the edit masks or reveals the input and becomes that choice.
     const toggleKeyVisibility = (id: string) => {
+        const isEditingKey = editingKeyId === id;
+        const reveal = isEditingKey ? !isEditInputRevealed : !visibleKeyIds.has(id);
+        if (isEditingKey) setIsEditInputRevealed(reveal);
         setVisibleKeyIds(prev => {
             const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
+            if (reveal) {
                 next.add(id);
+            } else {
+                next.delete(id);
             }
             return next;
         });
@@ -704,7 +722,7 @@ export default function BrowserSettings() {
     };
 
     return (
-        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
+        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden" data-testid="browserSettingsPage" aria-busy={!settingsLoaded || !draftsReady}>
             <div className="flex items-start justify-between gap-2 px-2 mobile:items-center">
                 <div className="min-w-0 flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar mobile:max-h-none mobile:overflow-visible">
                     <h1 className="text-3xl font-semibold mobile:text-xl">Browser Settings</h1>
@@ -914,6 +932,7 @@ export default function BrowserSettings() {
                                                             const isVisible = visibleKeyIds.has(apiKey.id);
                                                             const providerName = apiKey.provider === "unknown" ? "Unknown provider" : getProviderDisplayName(apiKey.provider);
                                                             const isEditing = editingKeyId === apiKey.id;
+                                                            const isKeyShown = isEditing ? isEditInputRevealed : isVisible;
                                                             const isLoadingKey = loadingChatApiKeyId === apiKey.id;
 
                                                             return (
@@ -954,8 +973,8 @@ export default function BrowserSettings() {
                                                                                                 toggleKeyVisibility(apiKey.id);
                                                                                             }}
                                                                                         >
-                                                                                            {isVisible ? <EyeOff className="mr-1 inline h-3.5 w-3.5" /> : <Eye className="mr-1 inline h-3.5 w-3.5" />}
-                                                                                            {isVisible ? "Hide" : "Show"}
+                                                                                            {isKeyShown ? <EyeOff className="mr-1 inline h-3.5 w-3.5" /> : <Eye className="mr-1 inline h-3.5 w-3.5" />}
+                                                                                            {isKeyShown ? "Hide" : "Show"}
                                                                                         </button>
                                                                                         <button
                                                                                             type="button"
@@ -1006,7 +1025,9 @@ export default function BrowserSettings() {
                                                                                         <Input
                                                                                             data-testid="chatApiKeyEditInput"
                                                                                             className="flex-1 font-mono text-xs"
-                                                                                            type="text"
+                                                                                            type={isEditInputRevealed ? "text" : "password"}
+                                                                                            spellCheck={false}
+                                                                                            autoComplete="off"
                                                                                             value={editingKeyValue}
                                                                                             onChange={(e) => setEditingKeyValue(e.target.value)}
                                                                                         />
@@ -1102,7 +1123,7 @@ export default function BrowserSettings() {
                                                     <label className="text-sm font-medium">
                                                         {isLoadingModels ? "Live models" : "Model"}
                                                     </label>
-                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <span data-testid="modelsStatusMessage" className="flex items-center gap-1 text-xs text-muted-foreground">
                                                         {isLoadingModels && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                                         {modelsMessage}
                                                     </span>

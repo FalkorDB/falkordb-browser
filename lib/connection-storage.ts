@@ -297,6 +297,9 @@ export function migrateToScopedStorage(): void {
     if (!key) continue;
     // Skip keys that are already scoped (start with the connection prefix)
     if (key.startsWith(_prefix)) continue;
+    // A scoped hostname may itself start with "chat-" or another legacy prefix.
+    // Ambiguous host:port keys must stay with their original connection.
+    if (/^.+:\d+:/.test(key) || couldBeAnotherUserScopedKey(key)) continue;
     for (const p of SCOPED_KEY_PREFIXES) {
       if (key.startsWith(p)) {
         const scopedKey = prefixed(key);

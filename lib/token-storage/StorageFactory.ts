@@ -23,11 +23,10 @@ class StorageFactory {
    * Storage selection logic:
    * - If API_TOKEN_FALKORDB_URL is set → FalkorDBTokenStorage
    * - If PAT_FALKORDB_HOST is set → FalkorDBTokenStorage (uses PAT_FALKORDB_* vars)
-   * - Otherwise → FileTokenStorage (default, single-process dev only)
+   * - Otherwise → FileTokenStorage (default, local filesystem)
    *
-   * NOTE: FileTokenStorage is NOT safe for concurrent use by multiple
-   * processes or parallel test workers. Always configure one of the
-   * FalkorDB env vars in multi-process environments (CI, production).
+   * File storage serializes writers with an exclusive filesystem lock.
+   * Prefer FalkorDB storage for replicas on different machines/filesystems.
    */
   static getStorage(): ITokenStorage {
     if (this.instance) {

@@ -1,0 +1,67 @@
+export interface CanvasSession {
+    graph: object
+    data: object
+    tabId: string
+    epoch: number
+    restore?: object
+}
+
+const committedSessions = new WeakMap<object, CanvasSession>();
+
+export function commitCanvasSession(canvas: object, session: CanvasSession): void {
+    committedSessions.set(canvas, session);
+}
+
+/** A mounted canvas may still show the previous tab while its replacement awaits 2D. */
+export function ownsCanvasSession(canvas: object, session: CanvasSession): boolean {
+    const committed = committedSessions.get(canvas);
+    return committed !== undefined
+        && committed.graph === session.graph
+        && committed.data === session.data
+        && committed.tabId === session.tabId
+        && committed.epoch === session.epoch
+        && (!session.restore || committed.restore === session.restore);
+}
+
+export interface LiveCanvasOwner {
+    canvas: object | null | undefined
+    session: Omit<CanvasSession, "epoch">
+    epoch: number
+}
+
+/** Whether an operation started as `session` on `canvas` still owns the live view and the committed canvas. */
+export function ownsCanvasOperation(canvas: object, session: CanvasSession, live: LiveCanvasOwner): boolean {
+    return live.canvas === canvas
+        && live.epoch === session.epoch
+        && live.session.graph === session.graph
+        && live.session.data === session.data
+        && live.session.tabId === session.tabId
+        && ownsCanvasSession(canvas, { ...session, restore: live.session.restore });
+}
+
+/** Renew only the preserved view after a confirmed connection-switch rollback. */
+export function renewCanvasSession(canvas: object, session: CanvasSession): boolean {
+    const committed = committedSessions.get(canvas);
+    if (!committed
+        || session.epoch <= committed.epoch
+        || !ownsCanvasSession(canvas, { ...session, epoch: committed.epoch })) return false;
+    commitCanvasSession(canvas, session);
+    return true;
+}
+
+const mountedCanvases = new Map<object, () => Omit<CanvasSession, "epoch">>();
+
+/** Tracks a mounted canvas and its live session so a rollback can renew it; returns the untrack function. */
+export function trackMountedCanvas(canvas: object, liveSession: () => Omit<CanvasSession, "epoch">): () => void {
+    mountedCanvases.set(canvas, liveSession);
+    return () => {
+        if (mountedCanvases.get(canvas) === liveSession) mountedCanvases.delete(canvas);
+    };
+}
+
+/** Renews every mounted canvas (Graph and Schema each have their own) after a confirmed rollback. */
+export function renewMountedCanvasSessions(epoch: number): void {
+    mountedCanvases.forEach((liveSession, canvas) => {
+        renewCanvasSession(canvas, { ...liveSession(), epoch });
+    });
+}

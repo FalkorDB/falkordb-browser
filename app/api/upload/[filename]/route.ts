@@ -1,16 +1,14 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import fs from "fs";
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders } from "../../utils";
+import { getCorsHeaders, corsPreflight } from "../../utils";
 import { getStoredUpload, MAX_FILE_SIZE } from "../file-validation";
 
 function hasErrorCode(error: unknown, code: string) {
   return error instanceof Error && "code" in error && error.code === code;
 }
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 export async function GET(
   request: NextRequest,

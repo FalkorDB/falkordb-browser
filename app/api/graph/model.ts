@@ -54,10 +54,13 @@ const validSize = (v: unknown): number | undefined =>
 const definedOnly = <T extends object>(style: T): Partial<T> =>
   Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined)) as Partial<T>;
 
+export const labelStyleKey = (name: string) => `labelStyle_${name}`;
+export const relationshipStyleKey = (name: string) => `relationshipStyle_${name}`;
+
 export function loadLabelStyle(label: Label | InfoLabel): void {
   if (typeof window === "undefined") return;
 
-  const storageKey = `labelStyle_${label.name}`;
+  const storageKey = labelStyleKey(label.name);
   const savedStyle = getConnectionItem(storageKey);
 
   if (savedStyle) {
@@ -77,7 +80,7 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
 export function loadRelationshipStyle(relationship: Relationship | InfoRelationship): void {
   if (typeof window === "undefined") return;
 
-  const storageKey = `relationshipStyle_${relationship.name}`;
+  const storageKey = relationshipStyleKey(relationship.name);
   const savedStyle = getConnectionItem(storageKey);
 
   if (savedStyle) {
@@ -346,6 +349,12 @@ function isLinkCell(cell: NodeCell | LinkCell): cell is LinkCell {
 }
 
 export class Graph {
+  private topologyVersion = 0;
+
+  get TopologyVersion(): number {
+    return this.topologyVersion;
+  }
+
   private id: string;
 
   private columns: string[];
@@ -449,6 +458,7 @@ export class Graph {
 
   set Elements(elements: GraphData) {
     this.elements = elements;
+    this.topologyVersion += 1;
   }
 
   get Columns(): string[] {
@@ -516,7 +526,7 @@ export class Graph {
 
   public static async create(
     id: string,
-    results: { data: Data; metadata: any[] },
+    results: { data: Data },
     showPropertyKeyPrefix: boolean,
     currentLimit: number,
     graphInfo?: GraphInfo,
@@ -748,6 +758,7 @@ export class Graph {
 
       this.linksMap.set(cell.id, link);
       this.elements.links.push(link);
+      this.topologyVersion += 1;
       relation.elements.push(link);
       return link;
     }
@@ -784,7 +795,7 @@ export class Graph {
   }
 
   public async extend(
-    results: { data: Data; metadata: any[] },
+    results: { data: Data },
     collapsed = false,
     isMerge = false
   ): Promise<(Node | Link)[]> {
@@ -960,6 +971,7 @@ export class Graph {
   }
 
   public removeLinks(ids: number[] = []): Relationship[] {
+    this.topologyVersion += 1;
     const links = this.elements.links.filter(
       (link) => ids.includes(link.source) || ids.includes(link.target)
     );
@@ -1009,6 +1021,7 @@ export class Graph {
   }
 
   public removeElements(elements: (Node | Link)[]) {
+    this.topologyVersion += 1;
     elements.forEach((element) => {
       const { id } = element;
       const type = "labels" in element;

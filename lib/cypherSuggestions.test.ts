@@ -85,6 +85,13 @@ describe("extractVariableCandidates", () => {
   it("excludes keyword-like captures (e.g. (NOT x))", () => {
     assert.deepEqual(extractVariableCandidates("MATCH (a) WHERE (NOT a) RETURN a"), ["a"]);
   });
+  it("keeps CYPHER available as a legal variable name", () => {
+    assert.deepEqual(extractVariableCandidates("MATCH (CYPHER) RETURN CYPHER"), ["CYPHER"]);
+    assert.equal(
+      suggestForError("'CYPHE' not defined", { query: "MATCH (CYPHER) RETURN CYPHE" }),
+      "Did you mean CYPHER?"
+    );
+  });
   it("conservatively captures the first identifier of a grouped expression", () => {
     assert.deepEqual(extractVariableCandidates("MATCH (p) WHERE (p.age > 1) RETURN p"), ["p"]);
   });

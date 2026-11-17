@@ -1,10 +1,8 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders } from "../../../utils";
+import { getCorsHeaders, corsPreflight } from "../../../utils";
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -27,7 +25,8 @@ export async function GET(
       if (!query) throw new Error("Missing parameter query");
 
       const graph = client.selectGraph(graphId);
-      const result = await graph.explain(query);
+      // The plan's lines, which the UI renders, as before falkordb 7
+      const result = (await graph.explain(query)).steps;
 
       return NextResponse.json({ result }, { headers: getCorsHeaders(request) });
     } catch (error) {

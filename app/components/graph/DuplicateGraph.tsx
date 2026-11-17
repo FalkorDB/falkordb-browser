@@ -31,17 +31,19 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
 
-        if (duplicateName === "") {
+        const name = duplicateName.trim();
+        if (!name) {
             toast({
                 title: "Error",
                 description: "Graph name cannot be empty",
+                variant: "destructive",
             });
             return;
         }
 
         try {
             setIsLoading(true);
-            const result = await securedFetch(`api/graph/${prepareArg(duplicateName)}/duplicate`, {
+            const result = await securedFetch(`api/graph/${prepareArg(name)}/duplicate`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ sourceName: selectedValue })
@@ -50,7 +52,10 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
             if (getConnectionEpoch() !== startEpoch) return;
             if (!result.ok) return;
 
-            onDuplicate(duplicateName);
+            const { result: newGraphName } = await result.json() as { result: string };
+            if (getConnectionEpoch() !== startEpoch) return;
+
+            onDuplicate(newGraphName);
             onOpenChange(false);
             toast({
                 title: "Graph duplicated successfully",

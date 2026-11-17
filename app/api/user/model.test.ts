@@ -38,8 +38,7 @@ describe("getRoleWithKeys", () => {
   it("preserves all remaining role entries after the key pattern", () => {
     const role = ROLE.get("Read-Only")!;
     const result = getRoleWithKeys(role, ["ns:*"]);
-    // role[0] = "on", then "resetkeys", then "~ns:*", then role.slice(1)
-    const expected = ["on", "resetkeys", "~ns:*", ...role.slice(1)];
+    const expected = ["on", "resetkeys", "~ns:*", "clearselectors", ...role.slice(1)];
     assert.deepEqual(result, expected);
   });
 
@@ -54,6 +53,14 @@ describe("getRoleWithKeys", () => {
     const keyPatternIdx = result.findIndex((v) => v.startsWith("~"));
     assert.ok(resetkeysIdx !== -1, "resetkeys must be present");
     assert.ok(resetkeysIdx < keyPatternIdx, "resetkeys must precede the key pattern");
+  });
+
+  it("clears independent ACL selectors when replacing any role", () => {
+    for (const role of ROLE.values()) {
+      const result = getRoleWithKeys(role, ["allowed:*"]);
+      assert.equal(result.filter(rule => rule === "clearselectors").length, 1);
+      assert.deepEqual(result, ["on", "resetkeys", "~allowed:*", "clearselectors", ...role.slice(1)]);
+    }
   });
 });
 

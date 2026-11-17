@@ -3,7 +3,7 @@ import { getStoredUpload } from "@/app/api/upload/file-validation";
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { getCorsHeaders, resolveReadOnly } from "../../../utils";
+import { getCorsHeaders, resolveReadOnly, corsPreflight } from "../../../utils";
 import { executeCypherBatch } from "./upload-utils";
 
 const CYPHER_BATCH_EXTENSIONS = [".txt", ".cypher"] as const;
@@ -17,9 +17,7 @@ interface UploadBody {
   fileId?: string;
 }
 
-export async function OPTIONS(request: Request) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
+export const OPTIONS = corsPreflight;
 
 export async function POST(
   request: NextRequest,
