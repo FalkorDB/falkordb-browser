@@ -98,26 +98,29 @@ test('preserves the original script response when Chromium omits a recorded sour
   assert.equal(readFileSync(path.join(dir, source), 'utf8'), 'window.originalResponse = true;');
 });
 
-test('missing source without a captured response fails explicitly and still closes the page', async (t) => {
-  t.mock.method(console, 'error', () => {});
+test('a source no worker ever saves fails the report and still closes the page', async () => {
   const fixture = context({ missingSource: true });
   trackContext(fixture.context);
   const page = await fixture.context.newPage();
   await page.close();
   assert.ok(page.isClosed());
-  assert.throws(() => validateBrowserCoverage([dir]), /Browser coverage collection failed.*source/);
+  assert.throws(() => validateBrowserCoverage([dir]), /missing chunk sources/);
 });
 
-test('missing source another worker already saved is not a failure', async () => {
-  const fixture = context({ missingSource: true });
-  trackContext(fixture.context);
-  const page = await fixture.context.newPage();
-  const sourceFile = path.join(dir, `browser-source-${createHash('sha1').update(fixture.url).digest('hex')}.js`);
-  writeFileSync(sourceFile, 'window.otherWorker = true;');
-  await page.close();
-  validateBrowserCoverage([dir]);
-  assert.equal(readFileSync(sourceFile, 'utf8'), 'window.otherWorker = true;');
-});
+for (const when of ['before', 'after']) {
+  test(`a missing source another worker saves ${when} this page closes is not a failure`, async () => {
+    const fixture = context({ missingSource: true });
+    trackContext(fixture.context);
+    const page = await fixture.context.newPage();
+    const sourceFile = path.join(dir, `browser-source-${createHash('sha1').update(fixture.url).digest('hex')}.js`);
+    if (when === 'before') writeFileSync(sourceFile, 'window.otherWorker = true;');
+    await page.close();
+    if (when === 'after') writeFileSync(sourceFile, 'window.otherWorker = true;');
+    assert.deepEqual(readdirSync(dir).filter((name) => name.startsWith('browser-error-')), []);
+    validateBrowserCoverage([dir]);
+    assert.equal(readFileSync(sourceFile, 'utf8'), 'window.otherWorker = true;');
+  });
+}
 
 test('a popup that closes while its recording starts is skipped, not a failure', async () => {
   let failStart;

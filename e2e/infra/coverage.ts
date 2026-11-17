@@ -12,7 +12,7 @@
 
 import { test as base, type BrowserContext, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'crypto';
-import { existsSync, linkSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
+import { linkSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import path from 'path';
 
 const dir = process.env.E2E_COVERAGE_DIR;
@@ -71,16 +71,10 @@ async function save(page: Page) {
         let source = entry.source;
         if (source === undefined) {
             const captured = await capturedSources?.get(url);
-            if (!captured || 'error' in captured) {
-                // savedSources is per worker: another worker may already have saved this chunk.
-                if (existsSync(file)) {
-                    savedSources.add(url);
-                    continue;
-                }
-                throw new Error(`No source available for browser chunk ${url}`, {
-                    cause: captured && 'error' in captured ? captured.error : undefined,
-                });
-            }
+            // Another worker may save this chunk any moment now, so a missing
+            // source is not judged here: the report rejects the run if it is
+            // still missing once every worker is done (validateBrowserCoverage).
+            if (!captured || 'error' in captured) continue;
             source = captured.source;
         }
         const tmp = `${file}.${randomUUID()}.tmp`;
