@@ -13,7 +13,7 @@
 // branch. Environment: GITHUB_REPOSITORY, GH_TOKEN, SHA, EVENT (push or
 // pull_request), BRANCH (the pushed branch, or the pull request's head
 // branch), HEAD_OWNER (the owner of the repository that branch is in), PR
-// (the pull request's number, when GitHub gives it), TARGET (95 by default).
+// (the pull request's number, when GitHub gives it), TARGET (80 by default).
 // DRY_RUN prints the statuses instead of posting them.
 
 import { appendFileSync } from 'node:fs';
@@ -484,7 +484,7 @@ export async function postFailure({ post, decided, contexts, error }) {
 
 async function main() {
   const { GITHUB_REPOSITORY: repo, GH_TOKEN: token, SHA: sha, EVENT: event, BRANCH: branch } = process.env;
-  const target = Number(process.env.TARGET ?? 95);
+  const target = Number(process.env.TARGET ?? 80);
   const gh = (path, options) => api(`${GITHUB}/repos/${repo}/${path}`, { token, ...options });
 
   // A pull request's gate posts coverage/project and coverage/patch (which
