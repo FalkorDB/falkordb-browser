@@ -13,7 +13,6 @@ type TableFile = {
     type: string
 };
 
-/* eslint-disable react/require-default-props */
 interface Props {
     title?: string
     filesCount?: boolean
@@ -24,6 +23,7 @@ interface Props {
     maxFiles?: number
     onFileDrop: (acceptedFiles: File[]) => void
     onDropRejected?: (fileRejections: FileRejection[]) => void
+    onFileDialogOpen?: () => void
 }
 
 const FileProps = [
@@ -32,7 +32,7 @@ const FileProps = [
     "Type",
 ];
 
-function Dropzone({ title = "Upload File", filesCount = false, className = "", withTable = false, disabled = false, accept, maxFiles, onFileDrop, onDropRejected }: Props) {
+function Dropzone({ title = "Upload File", filesCount = false, className = "", withTable = false, disabled = false, accept, maxFiles, onFileDrop, onDropRejected, onFileDialogOpen }: Props) {
 
     const [files, setFiles] = useState<TableFile[]>([]);
 
@@ -53,13 +53,11 @@ function Dropzone({ title = "Upload File", filesCount = false, className = "", w
         onFileDrop(selected);
     }, [onFileDrop]);
 
-    const { getRootProps, getInputProps } = useDropzone({ onDrop, onDropRejected, disabled, accept, maxFiles });
+    const { getRootProps, getInputProps } = useDropzone({ onDrop, onDropRejected, onFileDialogOpen, disabled, accept, maxFiles });
 
     return (
         <div className={cn('flex gap-4', withTable && 'grow', className)}>
-            {/* eslint-disable-next-line react/jsx-props-no-spreading */}
             <div {...getRootProps(withTable ? { className: cn("Dropzone", filesCount && "py-20 px-40") } : {})}>
-                {/* eslint-disable-next-line react/jsx-props-no-spreading */}
                 <input {...getInputProps()} />
                 {
                     withTable ?
@@ -93,7 +91,6 @@ function Dropzone({ title = "Upload File", filesCount = false, className = "", w
                             {
                                 files.length > 0 ?
                                     files.map((row, index) => (
-                                        // eslint-disable-next-line react/no-array-index-key
                                         <TableRow className='border-border' key={index}>
                                             {
                                                 Object.values(row).map((cell) => (

@@ -1,5 +1,4 @@
-import { expect } from "@playwright/test";
-import test from "playwright/test";
+import { expect, test } from "../infra/coverage";
 import { getDefaultQuery } from "@/lib/utils";
 import ApiCalls from "../logic/api/apiCalls";
 import BrowserWrapper from "../infra/ui/browserWrapper";
@@ -7,7 +6,7 @@ import urls from "../config/urls.json";
 import QuerySettingsPage from "../logic/POM/settingsQueryPage";
 import { getRandomString } from "../infra/utils";
 
-test.describe.serial("Query Settings", () => {
+test.describe("Query Settings", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 
@@ -18,6 +17,59 @@ test.describe.serial("Query Settings", () => {
 
   test.afterEach(async () => {
     await browser.closeBrowser();
+  });
+
+  const savedLimit = 41;
+  const savedTimeout = 7;
+
+  async function saveLimitAndTimeoutAndReload(settings: QuerySettingsPage, limit: number, timeout: number) {
+    await settings.fillLimit(limit);
+    await settings.fillTimeout(timeout);
+    await settings.clickSaveQuerySettingsBtn();
+    await settings.refreshPage();
+    await settings.expandQueryExecutionSection();
+  }
+
+  async function expectLimitAndTimeout(settings: QuerySettingsPage, limit: string, timeout: string) {
+    await expect(settings.limitInput).toHaveValue(limit);
+    await expect(settings.timeoutInput).toHaveValue(timeout);
+  }
+
+  async function openSettingsWithSavedLimitAndTimeout(): Promise<QuerySettingsPage> {
+    const settings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
+    await settings.expandQueryExecutionSection();
+    // Limit and timeout start at 0 ("∞") until the stored settings load; filling
+    // earlier would be overwritten by the default limit of 300.
+    await expect(settings.limitInput).toHaveValue("300");
+    await saveLimitAndTimeoutAndReload(settings, savedLimit, savedTimeout);
+    await expectLimitAndTimeout(settings, `${savedLimit}`, `${savedTimeout} seconds`);
+    return settings;
+  }
+
+  test(`@admin Validate that cancelling query settings restores the saved limit and timeout, also after reload`, async () => {
+    const settings = await openSettingsWithSavedLimitAndTimeout();
+    await settings.fillLimit(17);
+    await settings.fillTimeout(23);
+    await expectLimitAndTimeout(settings, "17", "23 seconds");
+    await settings.clickCancelQuerySettingsBtn();
+    await expectLimitAndTimeout(settings, `${savedLimit}`, `${savedTimeout} seconds`);
+    await expect(settings.saveQuerySettingsBtn).toBeHidden();
+    await settings.refreshPage();
+    await settings.expandQueryExecutionSection();
+    await expectLimitAndTimeout(settings, `${savedLimit}`, `${savedTimeout} seconds`);
+  });
+
+  // "∞" is also what the inputs show before the stored settings load, so each
+  // "∞" is asserted after a finite value saved with it: limit and timeout load together.
+  test(`@admin Validate that a zero limit and timeout are saved as infinity and finite values persist again`, async () => {
+    const settings = await openSettingsWithSavedLimitAndTimeout();
+    await saveLimitAndTimeoutAndReload(settings, 0, savedTimeout);
+    await expect(settings.timeoutInput).toHaveValue(`${savedTimeout} seconds`);
+    await expect(settings.limitInput).toHaveValue("∞");
+    await saveLimitAndTimeoutAndReload(settings, savedLimit, 0);
+    await expectLimitAndTimeout(settings, `${savedLimit}`, "∞");
+    await saveLimitAndTimeoutAndReload(settings, 1, 1);
+    await expectLimitAndTimeout(settings, "1", "1 seconds");
   });
 
   test(`@admin Validate that running a query with timeout returns an error`, async () => {
@@ -43,6 +95,7 @@ test.describe.serial("Query Settings", () => {
   const limitQueries = [
     `UNWIND range(1, 10) AS x CREATE (n) RETURN n`,
     `UNWIND range(1, 10) AS x CREATE (n) RETURN n UNION UNWIND range(1, 10) AS x CREATE (n) RETURN n`,
+    `WITH 1 AS y UNWIND range(1, 10) AS x CREATE (n) RETURN n UNION WITH 2 AS y UNWIND range(1, 10) AS x CREATE (n) RETURN n`,
     `CALL { UNWIND range(1, 10) AS x CREATE (n) RETURN n UNION UNWIND range(1, 10) AS x CREATE (n) RETURN n } RETURN n`,
   ];
 

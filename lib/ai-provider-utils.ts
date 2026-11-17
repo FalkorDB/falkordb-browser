@@ -10,6 +10,10 @@ export type AIProvider = "openai" | "anthropic" | "gemini" | "ollama" | "groq" |
  */
 export const KNOWN_PROVIDERS: AIProvider[] = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"];
 
+export function prefixProviderModels(provider: Exclude<AIProvider, "unknown">, models: string[]): string[] {
+    return models.map(model => `${provider}::${model}`);
+}
+
 /**
  * Detects the AI provider based on the API key format
  *
@@ -171,7 +175,7 @@ export function detectProviderFromModel(model: string): AIProvider {
     }
 
     // Fallback: substring heuristics for unprefixed model names
-    if (model.startsWith("gpt") || model.startsWith("o1") || model.startsWith("o3") || model.startsWith("o4")) return "openai";
+    if (/^(?:gpt|chatgpt-|codex-|o\d)/.test(model)) return "openai";
     if (model.includes("claude")) return "anthropic";
     if (model.includes("gemini")) return "gemini";
     if (model.includes("llama") || model.includes("mixtral") || model.includes("phi") || model.includes("deepseek")) return "ollama";

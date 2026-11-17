@@ -6,7 +6,7 @@ import {
   deleteGraphElement,
   validateBody,
 } from "../../../validate-body";
-import { getCorsHeaders, resolveReadOnly, corsPreflight } from "../../../utils";
+import { getCorsHeaders, resolveReadOnly, resolveGraphReadOnly, corsPreflight } from "../../../utils";
 
 export const OPTIONS = corsPreflight;
 
@@ -25,7 +25,7 @@ export async function GET(
     const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
-    const isReadOnly = resolveReadOnly(request, user.role);
+    const isReadOnly = resolveGraphReadOnly(request, user.role, graphId);
 
     try {
       const graph = client.selectGraph(graphId);

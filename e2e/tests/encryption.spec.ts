@@ -208,9 +208,6 @@ test.describe(`@admin Encryption migration tests`, () => {
         });
 
         await login.clickOnConnect();
-        // Wait for the migration effect to run
-        await page.waitForTimeout(3000);
-
         const migrated = await waitForMigratedChatApiKeys(page);
         const migratedKeys = JSON.parse(migrated?.decryptedKeys ?? "[]") as Array<{ key?: string }>;
         const legacyKeyRemains = await page.evaluate(() =>

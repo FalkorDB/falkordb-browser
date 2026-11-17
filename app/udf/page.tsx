@@ -216,7 +216,7 @@ export default function Page() {
                     />
                     : null
             }
-            <div className="w-full h-1 grow [&_.find-widget.visible]:!top-6 [&_.find-widget]:!right-72">
+            <div className="w-full h-1 grow [&_.find-widget.visible]:!top-6 [&_.find-widget]:!right-72" data-testid="udfEditor">
                 <EditorComponent
                     value={selectedUdf?.[5] || "// Select a Library to view its code"}
                     language={UDF_LANGUAGE_NAME}

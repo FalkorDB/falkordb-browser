@@ -1,19 +1,64 @@
 import { interactWhenVisible, waitForElementToBeEnabled } from "@/e2e/infra/utils";
 import { Locator } from "@playwright/test";
+import { readFile } from "fs/promises";
 import GraphPage from "./graphPage";
 
 export default class TableView extends GraphPage {
 
-    private get tableViewTab(): Locator {
+    public get tableViewTab(): Locator {
         return this.page.getByTestId("tableTab");
     }
 
-    private get tableViewTabPanel(): Locator {
+    public get tableViewTabPanel(): Locator {
         return this.page.getByRole('tabpanel', { name: 'Table' });
     }
 
-    private get tableViewTableRows(): Locator {
+    public get tableViewTableRows(): Locator {
         return this.tableViewTabPanel.locator('tbody tr');
+    }
+
+    public get lastColumnCells(): Locator {
+        return this.tableViewTableRows.locator('td:last-child');
+    }
+
+    /** Rendered data rows only: the virtualised table's spacer rows have no test id. */
+    public get dataRows(): Locator {
+        return this.tableViewTabPanel.locator('[data-testid^="tableRowTableView"]');
+    }
+
+    public dataRow(index: number): Locator {
+        return this.tableViewTabPanel.getByTestId(`tableRowTableViewrow-${index}`);
+    }
+
+    /** The row-number cell ("1.", "2.", ...) of a rendered row. */
+    public rowNumber(row: Locator): Locator {
+        return row.locator('td').first();
+    }
+
+    public get searchInput(): Locator {
+        return this.page.getByTestId('searchInputTableView');
+    }
+
+    public async searchTable(text: string): Promise<void> {
+        await this.searchInput.fill(text);
+    }
+
+    public async clearSearchWithEscape(): Promise<void> {
+        await this.searchInput.press('Escape');
+    }
+
+    private get scrollContainer(): Locator {
+        return this.tableViewTabPanel.locator('#tableContent');
+    }
+
+    public async scrollTableTo(position: 'top' | 'bottom'): Promise<void> {
+        await this.scrollContainer.evaluate((el, target) => {
+            el.scrollTo(0, target === 'top' ? 0 : el.scrollHeight);
+        }, position);
+    }
+
+    columnHeader(name: RegExp): Locator {
+        return this.tableViewTabPanel.getByRole('columnheader').filter({ hasText: name });
     }
 
     public async clickTableViewTab(): Promise<void> {
@@ -56,6 +101,19 @@ export default class TableView extends GraphPage {
         await interactWhenVisible(this.exportTableViewButton, async (el: Locator) => {
             await el.click();
         }, 'Export Table View Button');
+    }
+
+    /** Must run before navigation: without the File System Access API the export falls back to a browser download. */
+    public async disableSaveFilePicker(): Promise<void> {
+        await this.page.addInitScript(() => { Reflect.deleteProperty(window, 'showSaveFilePicker'); });
+    }
+
+    public async exportTableAsDownload(): Promise<{ filename: string; content: string }> {
+        const downloadPromise = this.page.waitForEvent('download');
+        await this.clickExportButton();
+        const download = await downloadPromise;
+        const file = await download.path();
+        return { filename: download.suggestedFilename(), content: await readFile(file, 'utf8') };
     }
 
     private get expandAllCellsButton(): Locator {

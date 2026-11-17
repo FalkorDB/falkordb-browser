@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/useAppRouter";
 import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server, Minus, Plus } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { looksServerEncrypted, serverEncrypt } from "@/lib/server-encryption";
-import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
+import { selectStoredModel } from "@/lib/storedModelSelection";
+import { CHAT_API_KEYS_STORAGE_KEY, type ChatKeyState, getSelectedChatApiKey, persistSelectedChatApiKeyId, pickCommittedChatApiKey } from "@/lib/chat-api-key-storage";
 import { getConnectionPrefix, removeConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
 import { GRAPH_SORT_ORDERS, GRAPH_SORT_ORDER_LABELS, type GraphSortOrder } from "@/lib/graphSortOrder";
@@ -34,18 +35,6 @@ const LOCAL_LLM_LABELS: Record<LocalLlmProvider, string> = {
     ollama: "Ollama",
     lmstudio: "LM Studio",
 };
-
-type EditingKeyVisibility = { id: string; wasVisible: boolean };
-
-function withRestoredKeyVisibility(prev: Set<string>, { id, wasVisible }: EditingKeyVisibility): Set<string> {
-    const next = new Set(prev);
-    if (wasVisible) {
-        next.add(id);
-    } else {
-        next.delete(id);
-    }
-    return next;
-}
 
 export default function BrowserSettings() {
     const {
@@ -98,6 +87,7 @@ export default function BrowserSettings() {
         resetSettings,
         saveSettings,
         replayTutorial,
+        settingsLoaded,
     } = useContext(BrowserSettingsContext);
 
     const { activeConnectionId, prefixConnectionId } = useContext(ConnectionContext);
@@ -108,6 +98,7 @@ export default function BrowserSettings() {
     const router = useRouter();
 
     const [isResetting, setIsResetting] = useState(false);
+    const [draftsReady, setDraftsReady] = useState(false);
     const [modelDisplayNames, setModelDisplayNames] = useState<string[]>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [isManualLocalModelLoad, setIsManualLocalModelLoad] = useState(false);
@@ -118,14 +109,17 @@ export default function BrowserSettings() {
     const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
     const [editingKeyValue, setEditingKeyValue] = useState("");
     const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
-    const editingKeyVisibilityRef = useRef<EditingKeyVisibility | null>(null);
+    const [isEditInputRevealed, setIsEditInputRevealed] = useState(true);
+    // Mirrors editingKeyId for saves that finish after an await.
+    const editingKeyIdRef = useRef<string | null>(null);
     // Bumped whenever a key edit starts or ends, so a save that finishes after
     // its edit was cancelled or replaced can be recognised before it commits.
     const editGenerationRef = useRef(0);
-    const keyMutationGenerationRef = useRef(0);
+    // Bumped on unmount: this instance's keyStateRef stops tracking the
+    // provider then, so a pending key save must not commit from it.
+    const unmountGenerationRef = useRef(0);
     const keySelectionGenerationRef = useRef(0);
     const editingSelectionGenerationRef = useRef(0);
-    type ChatKeyState = { keys: typeof chatApiKeys; selectedId: string };
     const keyStateRef = useRef<ChatKeyState>({ keys: chatApiKeys, selectedId: selectedChatApiKeyId });
     useEffect(() => {
         if (keyStateRef.current.keys !== chatApiKeys || keyStateRef.current.selectedId !== selectedChatApiKeyId) {
@@ -134,17 +128,13 @@ export default function BrowserSettings() {
     }, [chatApiKeys, selectedChatApiKeyId]);
     useEffect(() => () => {
         editGenerationRef.current += 1;
-        keyMutationGenerationRef.current += 1;
-        editingKeyVisibilityRef.current = null;
+        unmountGenerationRef.current += 1;
+        editingKeyIdRef.current = null;
     }, []);
 
     const handleCancelEditKey = useCallback(() => {
         editGenerationRef.current += 1;
-        const previousVisibility = editingKeyVisibilityRef.current;
-        editingKeyVisibilityRef.current = null;
-        if (previousVisibility) {
-            setVisibleKeyIds(prev => withRestoredKeyVisibility(prev, previousVisibility));
-        }
+        editingKeyIdRef.current = null;
         setEditingKeyId(null);
         setEditingKeyValue("");
     }, []);
@@ -231,7 +221,7 @@ export default function BrowserSettings() {
         createChangeHandler(setter)(clamp(current + delta, min, max), elementId);
     };
 
-    const selectedChatApiKey = chatApiKeys.find(({ id }) => id === activeSelectedChatApiKeyId);
+    const selectedChatApiKey = chatApiKeys.find(({ id }) => id === activeSelectedChatApiKeyId) ?? chatApiKeys[0];
     const pendingDeleteKey = chatApiKeys.find(({ id }) => id === pendingDeleteKeyId);
     const uiSelectedChatApiKeyId = selectedChatApiKey?.id ?? "";
     const modelProviderForDisplay = newChatModelSource === "local"
@@ -239,11 +229,9 @@ export default function BrowserSettings() {
         : selectedChatApiKey?.provider;
 
     useEffect(() => {
-        const nextSelectedId = selectedChatApiKeyId
-            ? chatApiKeys.some(({ id }) => id === selectedChatApiKeyId)
-                ? selectedChatApiKeyId
-                : chatApiKeys[0]?.id ?? ""
-            : "";
+        const nextSelectedId = chatApiKeys.some(({ id }) => id === selectedChatApiKeyId)
+            ? selectedChatApiKeyId
+            : chatApiKeys[0]?.id ?? "";
         setActiveSelectedChatApiKeyId(nextSelectedId);
     }, [chatApiKeys, selectedChatApiKeyId]);
 
@@ -350,9 +338,10 @@ export default function BrowserSettings() {
             || resultConnection.id !== getActiveConnectionIdGlobal()
             || resultConnection.epoch !== getConnectionEpoch()) return;
         const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
-        // Prefer the stored preference for this source; fall back to first available model.
+        // Prefer the stored preference for this source (migrating legacy unprefixed OpenAI IDs);
+        // fall back to the first available model.
         const storedModel = perSourceModels[currentSourceKey] ?? "";
-        const nextModel = modelDisplayNames.includes(storedModel) ? storedModel : modelDisplayNames[0];
+        const nextModel = selectStoredModel(storedModel, modelDisplayNames);
         if (nextModel !== latestModelRef.current) {
             setNewModel(nextModel);
             setModel(nextModel);
@@ -386,8 +375,15 @@ export default function BrowserSettings() {
         setNewChatModelSource(chatModelSource);
         setNewLocalLlmProvider(localLlmProvider);
         setNewLocalLlmEndpoint(localLlmEndpoint);
+        // Batched with the draft copies above, so the page never reports ready while a field still shows a default.
+        setDraftsReady(settingsLoaded);
+    }, [settingsLoaded, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewGraphsSortOrder, graphsSortOrder, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, rowHeight]);
+
+    // Kept apart from the effect above: auto-selecting a model after a list loads changes the saved
+    // model, and re-running that effect would discard unsaved provider/endpoint edits and the key editor.
+    useEffect(() => {
         setNewModel(model);
-    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewGraphsSortOrder, graphsSortOrder, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
+    }, [model, setNewModel]);
 
     useEffect(() => {
         setHasChanges(
@@ -548,7 +544,7 @@ export default function BrowserSettings() {
     const persistChatApiKeys = async (
         update: (current: ChatKeyState) => ChatKeyState,
         isCurrent: () => boolean = () => true,
-    ): Promise<boolean> => {
+    ): Promise<"saved" | "failed" | "superseded"> => {
         // `serverEncrypt` binds the ciphertext to the connection behind the
         // request, while the storage prefix is resolved only once the promise
         // settles. If the user switches connections in between, writing would
@@ -570,61 +566,70 @@ export default function BrowserSettings() {
                 description: "The connection is still switching. Please try again.",
                 variant: "destructive",
             });
-            return false;
+            return "failed";
         }
         const scope = getConnectionPrefix();
         const epoch = getConnectionEpoch();
-        const mutationGeneration = keyMutationGenerationRef.current;
+        const unmountGeneration = unmountGenerationRef.current;
         const selectionGeneration = keySelectionGenerationRef.current;
+        const dropReason = (): "failed" | "superseded" | null => {
+            if (unmountGenerationRef.current !== unmountGeneration) {
+                toast({
+                    title: "Error",
+                    description: "Settings closed before the API key change was saved. Please try again.",
+                    variant: "destructive",
+                });
+                return "failed";
+            }
+            if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
+                toast({
+                    title: "Error",
+                    description: "The connection changed while saving. Please try again.",
+                    variant: "destructive",
+                });
+                return "failed";
+            }
+            return isCurrent() ? null : "superseded";
+        };
 
         try {
             for (;;) {
-                if (keyMutationGenerationRef.current !== mutationGeneration || !isCurrent()) return false;
-                if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
-                    toast({
-                        title: "Error",
-                        description: "The connection changed while saving. Please try again.",
-                        variant: "destructive",
-                    });
-                    return false;
-                }
+                const dropped = dropReason();
+                if (dropped) return dropped;
                 const snapshot = keyStateRef.current;
                 const { keys, selectedId } = update(snapshot);
                 const encryptedKeys = keys.length > 0 ? await serverEncrypt(JSON.stringify(keys)) : "";
-                if (keyMutationGenerationRef.current !== mutationGeneration || !isCurrent()) return false;
+                const droppedWhileEncrypting = dropReason();
+                if (droppedWhileEncrypting) return droppedWhileEncrypting;
                 if (keys.length > 0 && !encryptedKeys) {
                     toast({
                         title: "Error",
                         description: "Could not encrypt API keys. Please try again.",
                         variant: "destructive",
                     });
-                    return false;
-                }
-                if (getConnectionPrefix() !== scope || getConnectionEpoch() !== epoch) {
-                    toast({
-                        title: "Error",
-                        description: "The connection changed while saving. Please try again.",
-                        variant: "destructive",
-                    });
-                    return false;
+                    return "failed";
                 }
                 // Only a changed key list needs new ciphertext. Recompute the
                 // selection separately if it changed while encryption ran.
                 const latest = keyStateRef.current;
                 if (latest.keys !== snapshot.keys) continue;
-                const updatedSelection = latest === snapshot ? selectedId : update(latest).selectedId;
-                // A later selection wins only if the mutation did not remove it.
-                const keepLaterSelection = keySelectionGenerationRef.current !== selectionGeneration
-                    && (!latest.selectedId || keys.some(({ id }) => id === latest.selectedId));
-                const commitSelectedId = keepLaterSelection ? latest.selectedId : updatedSelection;
-                const selectedApiKey = commitSelectedId ? getSelectedChatApiKey(keys, commitSelectedId) : undefined;
+                const selectedApiKey = pickCommittedChatApiKey(
+                    { keys, selectedId },
+                    snapshot,
+                    latest,
+                    update,
+                    keySelectionGenerationRef.current !== selectionGeneration,
+                );
                 const nextSelectedId = selectedApiKey?.id ?? "";
                 if (keys.length > 0) {
                     setConnectionItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
                 } else {
                     removeConnectionItem(CHAT_API_KEYS_STORAGE_KEY);
                 }
-                // Keep legacy ciphertext that may belong to another connection.
+                // The legacy single-key setting is superseded once this connection
+                // has its own list — but only if the value is ours to drop. A
+                // server-encrypted one may belong to another connection, which the
+                // loader deliberately preserves so switching back recovers it.
                 const legacySecretKey = localStorage.getItem("secretKey");
                 if (legacySecretKey && !looksServerEncrypted(legacySecretKey)) {
                     localStorage.removeItem("secretKey");
@@ -635,7 +640,7 @@ export default function BrowserSettings() {
                 setChatApiKeys(keys);
                 setSelectedChatApiKeyId(nextSelectedId);
                 setSecretKey(selectedApiKey?.key ?? "");
-                return true;
+                return "saved";
             }
         } catch (error) {
             console.error('Failed to encrypt API keys:', error);
@@ -644,7 +649,7 @@ export default function BrowserSettings() {
                 description: "Could not encrypt API keys. Please try again.",
                 variant: "destructive",
             });
-            return false;
+            return "failed";
         }
     };
 
@@ -673,7 +678,7 @@ export default function BrowserSettings() {
                 ],
                 selectedId: id,
             }));
-            if (saved) {
+            if (saved === "saved") {
                 setKeyInput("");
             }
         } finally {
@@ -710,27 +715,16 @@ export default function BrowserSettings() {
         setModelLoadNonce(nonce => nonce + 1);
     };
 
-    const restoreEditingKeyVisibility = (id: string) => {
-        const previousVisibility = editingKeyVisibilityRef.current;
-        if (!previousVisibility || previousVisibility.id !== id) return;
-
-        setVisibleKeyIds(prev => withRestoredKeyVisibility(prev, previousVisibility));
-        editingKeyVisibilityRef.current = null;
-    };
-
     const handleEditKey = (id: string) => {
         const keyToEdit = chatApiKeys.find(item => item.id === id);
         if (!keyToEdit) return;
 
-        if (editingKeyVisibilityRef.current) {
-            restoreEditingKeyVisibility(editingKeyVisibilityRef.current.id);
-        }
-        editingKeyVisibilityRef.current = { id, wasVisible: visibleKeyIds.has(id) };
+        editingKeyIdRef.current = id;
         editingSelectionGenerationRef.current = keySelectionGenerationRef.current;
         editGenerationRef.current += 1;
         setEditingKeyId(id);
         setEditingKeyValue(keyToEdit.key);
-        setVisibleKeyIds(prev => new Set(prev).add(id));
+        setIsEditInputRevealed(true);
     };
 
     const handleSaveEditedKey = async (id: string) => {
@@ -745,41 +739,57 @@ export default function BrowserSettings() {
         const generation = editGenerationRef.current;
         const selectionChangedDuringEdit = keySelectionGenerationRef.current !== editingSelectionGenerationRef.current;
         const isCurrentEdit = () => editGenerationRef.current === generation
-            && editingKeyVisibilityRef.current?.id === id
+            && editingKeyIdRef.current === id
             && keyStateRef.current.keys.some(item => item.id === id);
-        const saved = await persistChatApiKeys(({ keys, selectedId }) => ({
+        const result = await persistChatApiKeys(({ keys, selectedId }) => ({
             keys: keys.map(item => item.id === id
                 ? { ...item, key: trimmedKey, provider, label: item.label || `${providerName} key` }
                 : item),
             selectedId: selectionChangedDuringEdit ? selectedId : id,
         }), isCurrentEdit);
-        if (saved && isCurrentEdit()) {
-            editGenerationRef.current += 1;
-            restoreEditingKeyVisibility(id);
-            setEditingKeyId(null);
-            setEditingKeyValue("");
+        if (result === "saved") {
+            if (isCurrentEdit()) {
+                editGenerationRef.current += 1;
+                editingKeyIdRef.current = null;
+                setEditingKeyId(null);
+                setEditingKeyValue("");
+            }
+            return;
+        }
+        // Typing or saving again supersedes this save while the editor stays
+        // open; warn only when the edit was closed before its save finished.
+        if (result === "superseded"
+            && editingKeyIdRef.current !== id
+            && keyStateRef.current.keys.some(item => item.id === id)) {
+            toast({
+                title: "Error",
+                description: "The API key edit was not saved because editing ended first. Please edit it again.",
+                variant: "destructive",
+            });
         }
     };
 
     const handleDeleteKey = async (id: string) => {
         let deletedSelectedKey = false;
-        const saved = await persistChatApiKeys(({ keys, selectedId }) => {
+        const result = await persistChatApiKeys(({ keys, selectedId }) => {
+            const remainingKeys = keys.filter(item => item.id !== id);
+            // The update may be re-applied to a newer key state; the last run reflects what is committed.
             deletedSelectedKey = selectedId === id;
             return {
-                keys: keys.filter(item => item.id !== id),
-                selectedId: deletedSelectedKey ? "" : selectedId,
+                keys: remainingKeys,
+                selectedId: deletedSelectedKey ? remainingKeys[0]?.id ?? "" : selectedId,
             };
         });
-        if (!saved) return;
+        if (result !== "saved") return;
 
         if (deletedSelectedKey) {
             setModel("");
             setNewModel("");
             localStorage.setItem("model", "");
         }
-        if (editingKeyVisibilityRef.current?.id === id) {
+        if (editingKeyIdRef.current === id) {
             editGenerationRef.current += 1;
-            editingKeyVisibilityRef.current = null;
+            editingKeyIdRef.current = null;
             setEditingKeyId(null);
             setEditingKeyValue("");
         }
@@ -807,16 +817,18 @@ export default function BrowserSettings() {
         }
     };
 
+    // An edit opens in plain text without touching the saved choice, so ending it restores
+    // what the user picked. Toggling during the edit masks or reveals the input and becomes that choice.
     const toggleKeyVisibility = (id: string) => {
-        if (editingKeyVisibilityRef.current?.id === id) {
-            editingKeyVisibilityRef.current.wasVisible = !visibleKeyIds.has(id);
-        }
+        const isEditingKey = editingKeyId === id;
+        const reveal = isEditingKey ? !isEditInputRevealed : !visibleKeyIds.has(id);
+        if (isEditingKey) setIsEditInputRevealed(reveal);
         setVisibleKeyIds(prev => {
             const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
+            if (reveal) {
                 next.add(id);
+            } else {
+                next.delete(id);
             }
             return next;
         });
@@ -834,7 +846,7 @@ export default function BrowserSettings() {
     };
 
     return (
-        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
+        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden" data-testid="browserSettingsPage" aria-busy={!settingsLoaded || !draftsReady}>
             <div className="flex items-start justify-between gap-2 px-2 mobile:items-center">
                 <div className="min-w-0 flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar mobile:max-h-none mobile:overflow-visible">
                     <h1 className="text-3xl font-semibold mobile:text-xl">Browser Settings</h1>
@@ -1044,6 +1056,7 @@ export default function BrowserSettings() {
                                                             const isVisible = visibleKeyIds.has(apiKey.id);
                                                             const providerName = apiKey.provider === "unknown" ? "Unknown provider" : getProviderDisplayName(apiKey.provider);
                                                             const isEditing = editingKeyId === apiKey.id;
+                                                            const isKeyShown = isEditing ? isEditInputRevealed : isVisible;
                                                             const isLoadingKey = loadingChatApiKeyId === apiKey.id;
 
                                                             return (
@@ -1086,8 +1099,8 @@ export default function BrowserSettings() {
                                                                                                 toggleKeyVisibility(apiKey.id);
                                                                                             }}
                                                                                         >
-                                                                                            {isVisible ? <EyeOff className="mr-1 inline h-3.5 w-3.5" /> : <Eye className="mr-1 inline h-3.5 w-3.5" />}
-                                                                                            {isVisible ? "Hide" : "Show"}
+                                                                                            {isKeyShown ? <EyeOff className="mr-1 inline h-3.5 w-3.5" /> : <Eye className="mr-1 inline h-3.5 w-3.5" />}
+                                                                                            {isKeyShown ? "Hide" : "Show"}
                                                                                         </button>
                                                                                         <button
                                                                                             type="button"
@@ -1138,7 +1151,9 @@ export default function BrowserSettings() {
                                                                                         <Input
                                                                                             data-testid="chatApiKeyEditInput"
                                                                                             className="flex-1 font-mono text-xs"
-                                                                                            type={isVisible ? "text" : "password"}
+                                                                                            type={isEditInputRevealed ? "text" : "password"}
+                                                                                            spellCheck={false}
+                                                                                            autoComplete="off"
                                                                                             value={editingKeyValue}
                                                                                             onChange={(e) => {
                                                                                                 editGenerationRef.current += 1;
@@ -1237,7 +1252,7 @@ export default function BrowserSettings() {
                                                     <label className="text-sm font-medium">
                                                         {isLoadingModels ? "Live models" : "Model"}
                                                     </label>
-                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <span data-testid="modelsStatusMessage" className="flex items-center gap-1 text-xs text-muted-foreground">
                                                         {isLoadingModels && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                                         {modelsMessage}
                                                     </span>

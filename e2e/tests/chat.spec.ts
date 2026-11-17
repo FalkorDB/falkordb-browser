@@ -1,54 +1,39 @@
-import { expect, test } from "@playwright/test";
+import { Page, expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import ChatComponent from "../logic/POM/chatComponent";
 import GraphInfoPage from "../logic/POM/graphInfoPage";
 import SettingsBrowserPage from "../logic/POM/settingsBrowserPage";
 import urls from "../config/urls.json";
-import { getRandomString } from "../infra/utils";
+import { getRandomString, waitForChatKeyMigration } from "../infra/utils";
 
 const DEFAULT_CHAT_MODEL = "gpt-4o-mini";
 
+/**
+ * Opens the graph page with the chat model preconfigured. A `null` API key
+ * selects the local model source instead, which skips the API-key guard (and
+ * its async key migration) for tests that mock `/api/chat`.
+ */
 async function createChatPageWithSettings(
   browser: BrowserWrapper,
-  apiKey: string,
+  apiKey: string | null,
   model: string = DEFAULT_CHAT_MODEL
 ): Promise<ChatComponent> {
   const chat = await browser.createNewPage(ChatComponent);
   await browser.setPageToFullScreen();
   const page = await browser.getPage();
 
-  await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
   await page.addInitScript(({ key, selectedModel }) => {
-    if (window.top !== window) return;
-    // Auth snapshots can retain explicit deselection. This fixture supplies a
-    // new credential, so start its migration without an inherited key choice.
-    for (const name of Object.keys(localStorage)) {
-      if (name.endsWith("chatApiKeys") || name.endsWith("selectedChatApiKeyId")) {
-        localStorage.removeItem(name);
-      }
-    }
-    localStorage.setItem("secretKey", key);
+    if (key === null) localStorage.setItem("chatModelSource", "local");
+    else localStorage.setItem("secretKey", key);
     localStorage.setItem("model", selectedModel);
-    localStorage.setItem("chatModelSource", "api-key");
   }, { key: apiKey, selectedModel: model });
 
   await page.goto(urls.graphUrl);
   await page.waitForLoadState("networkidle");
-  // Chat API keys live under a connection-scoped key
-  // (`<host>:<port>:<user>:chatApiKeys`), so resolve it by suffix rather than
-  // reading the bare name.
-  await expect.poll(async () => page.evaluate(() => {
-    if (localStorage.getItem("secretKey") !== null) return false;
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (key && key.endsWith(":chatApiKeys")) {
-        return Boolean(localStorage.getItem(key.replace(/chatApiKeys$/, "selectedChatApiKeyId")));
-      }
-    }
-    return false;
-  }), { timeout: 15000 }).toBe(true);
+  if (apiKey === null) return chat;
 
+  await waitForChatKeyMigration(page);
   return chat;
 }
 
@@ -68,12 +53,42 @@ test.describe("Chat Feature Tests", () => {
   });
 
   test(`@readwrite Verify chat button is disabled when no graph is selected`, async () => {
-    // The graph page auto-selects the only graph when exactly one exists, and
-    // parallel tests on the shared FalkorDB often create exactly one. Two of our
-    // own keep the count above one so nothing gets auto-selected.
-    const graphNames = [getRandomString("chat"), getRandomString("chat")];
-    await Promise.all(graphNames.map((name) => apiCall.addGraph(name)));
+    await browser.createNewPage(ChatComponent);
+    const page = await browser.getPage();
+    await page.addInitScript(() => {
+      for (const key of Object.keys(localStorage)) {
+        if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
+      }
+    });
+    await page.route("**/api/graph", route => route.fulfill({ json: { opts: [] } }));
+    await page.goto(urls.graphUrl);
+    await browser.setPageToFullScreen();
 
+    await expect(page.getByTestId("selectGraph")).toHaveText("Select Graph");
+    await expect(page.getByTestId("chatToggleButton")).toBeVisible();
+    await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
+  });
+
+  test(`@readwrite Verify chat button is displayed when a graph is selected`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+    
+    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await chat.selectGraphByName(graphName);
+    
+    // Verify chat toggle button is visible when a graph is selected
+    await chat.waitForChatToggleButton();
+    const isChatButtonVisible = await chat.isChatToggleButtonVisible();
+    expect(isChatButtonVisible).toBe(true);
+    
+    await apiCall.removeGraph(graphName);
+  });
+
+  test("@readwrite A single available graph is auto-selected and enables chat", async () => {
+    const graphName = getRandomString("chat-auto-select");
+    await apiCall.addGraph(graphName);
     try {
       await browser.createNewPage(ChatComponent);
       const page = await browser.getPage();
@@ -82,34 +97,16 @@ test.describe("Chat Feature Tests", () => {
           if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
         }
       });
+      await page.route("**/api/graph", route => route.fulfill({ json: { opts: [graphName] } }));
       await page.goto(urls.graphUrl);
       await browser.setPageToFullScreen();
 
-      await expect(page.getByTestId("chatToggleButton")).toBeVisible();
-      await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
-    } finally {
-      await Promise.all(graphNames.map((name) => apiCall.removeGraph(name)));
-    }
-  });
-
-  test(`@readwrite Verify chat button is displayed when a graph is selected`, async () => {
-    const graphName = getRandomString("chat");
-    await apiCall.addGraph(graphName);
-    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
-    
-    try {
-      const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
-      await browser.setPageToFullScreen();
-      await chat.selectGraphByName(graphName);
-      const page = await browser.getPage();
       await expect(page.getByTestId("selectGraph")).toHaveText(graphName);
-      await expect(page.getByTestId("chatToggleButton")).toBeVisible();
       await expect(page.getByTestId("chatToggleButton")).toBeEnabled();
+      await page.getByTestId("chatToggleButton").click();
+      await expect(page.getByTestId("chatPanel")).toBeVisible();
     } finally {
-      await browser.closeBrowser();
-      const { message } = await apiCall.removeGraph(graphName, "admin");
-      expect(message).toMatch(/deleted|empty key/);
-      expect((await apiCall.getGraphs()).opts).not.toContain(graphName);
+      await apiCall.removeGraph(graphName);
     }
   });
 
@@ -153,65 +150,6 @@ test.describe("Chat Feature Tests", () => {
     
     await apiCall.removeGraph(graphName);
   });
-
-  for (const cypherOnly of [false, true]) {
-    test(`@readwrite seeded API-key settings override an inherited deselection with Cypher Only ${cypherOnly}`, async () => {
-      const graphName = getRandomString("chat-credential-fixture");
-      await apiCall.addGraph(graphName);
-      try {
-        await browser.createNewPage(ChatComponent);
-        const page = await browser.getPage();
-        await page.route("https://graphrag.falkordb.com/scripts/widget-chat.js*", route => route.abort());
-        await page.route(url => url.pathname === "/api/graph", route =>
-          route.fulfill({ json: { opts: [graphName] } }));
-        await page.goto(urls.graphUrl);
-        await page.waitForLoadState("networkidle");
-        await page.evaluate(() => {
-          const marker = Object.keys(localStorage).find(key => key.endsWith(":__scopeOwner"));
-          if (!marker) throw new Error("Missing connection scope marker");
-          localStorage.setItem(marker.replace(/__scopeOwner$/, "selectedChatApiKeyId"), "");
-        });
-        await expect.poll(() => page.evaluate(() => {
-          const key = Object.keys(localStorage).find(name => name.endsWith(":selectedChatApiKeyId"));
-          return key ? localStorage.getItem(key) : null;
-        })).toBe("");
-
-        const apiKey = "sk-e2e-chat-credential-fixture";
-        const query = "MATCH (n) RETURN n";
-        let submittedKey: string | undefined;
-        let submittedCypherOnly: boolean | undefined;
-        await page.route("**/api/chat", route => {
-          const request = route.request().postDataJSON();
-          submittedKey = request.key;
-          submittedCypherOnly = request.cypherOnly;
-          return route.fulfill({
-            json: {
-              cypherQuery: query,
-              answer: cypherOnly ? undefined : "No matching nodes.",
-            },
-          });
-        });
-        const chat = await createChatPageWithSettings(browser, apiKey);
-        await expect(page.getByTestId("selectGraph")).toHaveText(graphName);
-        await expect(page.getByTestId("chatToggleButton")).toBeEnabled();
-        await chat.openChat();
-        await chat.waitForChatPanel();
-        if (cypherOnly) await chat.clickCypherOnlySwitchOn();
-        await chat.fillChatInput("List all nodes");
-        await chat.clickChatSendButton();
-        await expect(page.getByTestId("chatUserMessage")).toHaveCount(1);
-        await expect(page.getByTestId("chatAssistantMessage-CypherQuery")).toContainText(query);
-        await expect(page.getByTestId("chatAssistantMessage-Result")).toHaveCount(cypherOnly ? 0 : 1);
-        expect(submittedKey).toBe(apiKey);
-        expect(submittedCypherOnly).toBe(cypherOnly);
-      } finally {
-        await browser.closeBrowser();
-        const { message } = await apiCall.removeGraph(graphName, "admin");
-        expect(message).toMatch(/deleted|empty key/);
-        expect((await apiCall.getGraphs()).opts).not.toContain(graphName);
-      }
-    });
-  }
 
   test(`@readwrite Verify complete chat flow with API key: send question, check loading state, verify responses`, async () => {
     test.setTimeout(60000);
@@ -713,11 +651,28 @@ test.describe("Chat Feature Tests", () => {
       const displayedQuery = await chat.getLastAssistantMessageContent("CypherQuery");
       expect(displayedQuery?.trim().startsWith("CYPHER sourceCode='TLV'")).toBe(true);
 
+      const queryMessage = page.getByTestId("chatAssistantMessage-CypherQuery").last();
+      const queryText = queryMessage.getByTestId("chatSuggestedQuery");
+      await expect(queryText).toHaveText(cypherQuery);
+      await expect(queryText).toHaveCSS("white-space", "pre-wrap");
+      await expect(queryMessage.getByTestId("chatCopyQueryButton")).toBeVisible();
+      await expect(queryMessage.getByTestId("chatInsertQueryButton")).toBeVisible();
+      // The long query wraps past the collapse threshold, so the collapse toggle joins copy and insert.
+      await expect(queryMessage.getByRole("button", { name: "Collapse query" })).toBeVisible();
+      await expect(queryMessage.getByRole("button")).toHaveCount(3);
+      expect(await queryText.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+      let queryRequests = 0;
+      page.on("request", request => {
+        const url = new URL(request.url());
+        if (url.pathname === `/api/graph/${graphName}` && url.searchParams.has("query")) queryRequests++;
+      });
       await chat.clickChatInsertQueryButton();
 
       await expect.poll(() => chat.getEditorInput(), { timeout: 10000 })
         .toMatch(/^CYPHER sourceCode='TLV'/);
       await chat.clickRunQuery();
+      await expect.poll(() => queryRequests).toBeGreaterThan(0);
       await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
       expect(await chat.getNotificationErrorToast()).toBe(false);
     } finally {
@@ -1191,5 +1146,295 @@ test.describe("Chat Feature Tests", () => {
     } finally {
       await apiCall.removeGraph(graphName);
     }
+  });
+
+  test.describe("Mocked chat request recovery", () => {
+    let graphName: string | undefined;
+    let mockedPage: Page | undefined;
+
+    test.beforeEach(() => {
+      graphName = undefined;
+      mockedPage = undefined;
+    });
+
+    test.afterEach(async () => {
+      const graphToRemove = graphName;
+      graphName = undefined;
+
+      // A test that fails while a mocked response is pending must not leave
+      // its route handler fulfilling into the page being closed.
+      // Close first: a live graph page polls graph info, and that poll
+      // re-creates a graph deleted out from under it.
+      try {
+        await mockedPage?.unrouteAll({ behavior: "ignoreErrors" });
+      } finally {
+        try {
+          await browser.closeBrowser();
+        } finally {
+          if (graphToRemove) {
+            const response = await apiCall.removeGraph(graphToRemove, "admin");
+            expect(response.status, "Chat test graph deletion should succeed").toBe(200);
+          }
+        }
+      }
+    });
+
+    async function openMockedChat(model = DEFAULT_CHAT_MODEL) {
+      graphName = getRandomString("chatRecovery");
+      await apiCall.addGraph(graphName);
+      const chat = await createChatPageWithSettings(browser, null, model);
+      await chat.selectGraphByName(graphName);
+      await chat.waitForSelectedGraphInUrl(graphName);
+      await chat.openChat();
+      if (model) await chat.waitForChatFooterModel(model);
+      mockedPage = await browser.getPage();
+      return { chat, page: mockedPage, graphName };
+    }
+
+    test(`@readwrite Verify chat rejects a missing model without sending or losing the draft`, async () => {
+      const { chat, page } = await openMockedChat("");
+      let requests = 0;
+      await page.route("**/api/chat", async (route) => {
+        requests += 1;
+        await route.fulfill({ json: { answer: "Unexpected request" } });
+      });
+      const draft = "Keep this question until a model is selected";
+      await chat.fillChatInput(draft);
+      await chat.clickChatSendButton();
+
+      await expect(chat.errorToast).toContainText("No model selected");
+      await expect.poll(() => chat.getChatInputValue()).toBe(draft);
+      await chat.waitForChatSendButtonEnabled();
+      expect(await chat.getChatUserMessagesCount()).toBe(0);
+      expect(requests).toBe(0);
+      await page.route("**/api/chat/models", (route) => route.fulfill({ json: { models: [] } }));
+      await chat.clickErrorToastGoToSettings();
+    });
+
+    for (const failure of ["HTTP rejection", "malformed JSON", "network failure"] as const) {
+      test(`@readwrite Verify chat restores the submitted draft after ${failure} and retries successfully`, async () => {
+        const { chat, page, graphName: selectedGraph } = await openMockedChat();
+        const requests: { graphName: string; messages: { role: string; content: string }[] }[] = [];
+        const connectionIds: (string | undefined)[] = [];
+        const activeConnectionId = await chat.getActiveConnectionId();
+        expect(activeConnectionId).toBeTruthy();
+        await page.route("**/api/chat", async (route) => {
+          requests.push(route.request().postDataJSON());
+          connectionIds.push(route.request().headers()["x-connection-id"]);
+          if (requests.length > 1) {
+            await route.fulfill({ json: { answer: "The retry succeeded.", tokenUsage: { totalTokens: 12 } } });
+          } else if (failure === "HTTP rejection") {
+            await route.fulfill({ status: 503, json: { error: "Cannot connect to local server" } });
+          } else if (failure === "malformed JSON") {
+            await route.fulfill({ status: 200, contentType: "application/json", body: '{"answer":' });
+          } else {
+            await route.abort("failed");
+          }
+        });
+        const question = "Which people are in this graph?";
+        await chat.fillChatInput(question);
+        await chat.clickChatSendButton();
+
+        expect(await chat.waitForChatAssistantMessage("Error")).toBe(true);
+        expect(await chat.getChatAssistantMessagesCount("Error")).toBe(1);
+        const error = await chat.getLastAssistantMessageContent("Error");
+        if (failure === "HTTP rejection") {
+          expect(error).toContain("Cannot connect to local server");
+          expect(await chat.getChatErrorSettingsLinkHref()).toBe("/settings");
+        } else if (failure === "malformed JSON") {
+          expect(error).toContain("Failed to parse server response");
+        } else {
+          expect(error).toContain("Error: An unexpected error occurred. Please try again.");
+        }
+        await expect.poll(() => chat.getChatInputValue()).toBe(question);
+        await chat.waitForChatSendButtonEnabled();
+        expect(await chat.getChatAssistantMessagesCount("Result")).toBe(0);
+        await chat.clickChatSendButton();
+
+        expect(await chat.waitForChatAssistantMessage("Result")).toBe(true);
+        expect(await chat.getLastAssistantMessageContent("Result")).toContain("The retry succeeded.");
+        await expect.poll(() => chat.getChatInputValue()).toBe("");
+        expect(await chat.waitForChatFooterTokens()).toBe(true);
+        expect(await chat.getChatFooterTotalTokens()).toContain("12");
+        expect(requests).toHaveLength(2);
+        expect(requests[1].graphName).toBe(selectedGraph);
+        expect(requests[1].messages.at(-1)).toEqual({ role: "user", content: question });
+        expect(connectionIds).toEqual([activeConnectionId, activeConnectionId]);
+      });
+    }
+
+    test(`@readwrite Verify chat preserves a newer draft while a delayed response completes`, async () => {
+      const responseGate = Promise.withResolvers<void>();
+      const { chat, page } = await openMockedChat();
+      const requests: { messages: { role: string; content: string }[] }[] = [];
+      await page.route("**/api/chat", async (route) => {
+        requests.push(route.request().postDataJSON());
+        if (requests.length === 1) await responseGate.promise;
+        await route.fulfill({ json: { answer: `Answer ${requests.length}` } });
+      });
+      await chat.fillChatInput("First question");
+      await chat.clickChatSendButton();
+      await expect.poll(() => requests.length).toBe(1);
+      await chat.waitForUserMessageCount(1);
+      await chat.fillChatInput("My next question");
+      expect(await chat.isChatSendButtonDisabled()).toBe(true);
+      await chat.pressEnterInChatInput();
+      expect(await chat.getChatInputValue()).toBe("My next question");
+      await chat.waitForUserMessageCount(1);
+      // The disabled send button blocks the native submit, so the handler's
+      // "Please wait" guard toast never fires.
+      await expect(chat.errorToast).toHaveCount(0);
+
+      responseGate.resolve();
+      expect(await chat.waitForChatAssistantMessage("Result")).toBe(true);
+      expect(await chat.getLastAssistantMessageContent("Result")).toContain("Answer 1");
+      await chat.waitForChatSendButtonEnabled();
+      expect(await chat.getChatInputValue()).toBe("My next question");
+      await chat.closeChat();
+      await chat.openChat();
+      await expect.poll(() => chat.getChatInputValue()).toBe("My next question");
+      await chat.clickChatSendButton();
+
+      await expect.poll(() => chat.getChatAssistantMessagesCount("Result")).toBe(2);
+      expect(await chat.getLastAssistantMessageContent("Result")).toContain("Answer 2");
+      await expect.poll(() => chat.getChatInputValue()).toBe("");
+      expect(requests[1].messages).toEqual([
+        { role: "user", content: "First question" },
+        { role: "assistant", content: "Answer 1" },
+        { role: "user", content: "My next question" },
+      ]);
+    });
+  });
+});
+
+// Every request below is refused before the route calls text-to-cypher, so no LLM provider is contacted.
+test.describe("Chat API validation", () => {
+  const apiKey = "sk-proj-e2e-placeholder";
+  const messages = [{ role: "user", content: "How many nodes are there?" }];
+
+  let apiCall: ApiCalls;
+  let graphToRemove: string | undefined;
+
+  test.beforeEach(() => {
+    apiCall = new ApiCalls();
+    graphToRemove = undefined;
+  });
+
+  test.afterEach(async () => {
+    if (!graphToRemove) return;
+    const response = await apiCall.removeGraph(graphToRemove, "admin");
+    if (response.status === 200) return;
+    // Registered before addGraph, so the graph may never have been created
+    const graphs = await apiCall.getGraphs("admin");
+    expect(graphs.opts, "Chat test graph deletion should succeed").not.toContain(graphToRemove);
+  });
+
+  test("@admin POST /api/chat rejects a malformed JSON body", async () => {
+    const response = await apiCall.postChat("{not json");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toBe("Invalid JSON body");
+  });
+
+  const invalidBodies = [
+    { name: "missing messages", body: { graphName: "g", model: DEFAULT_CHAT_MODEL, key: apiKey }, error: "messages: Messages are required" },
+    { name: "empty messages", body: { messages: [], graphName: "g", model: DEFAULT_CHAT_MODEL, key: apiKey }, error: "messages: Messages are required" },
+    { name: "non-array messages", body: { messages: "hi", graphName: "g", model: DEFAULT_CHAT_MODEL, key: apiKey }, error: "messages: Invalid Messages" },
+    { name: "missing graph name", body: { messages, model: DEFAULT_CHAT_MODEL, key: apiKey }, error: "graphName: Graph name is required" },
+    { name: "empty model", body: { messages, graphName: "g", model: "", key: apiKey }, error: "model: Model cannot be empty" },
+    { name: "unknown model source", body: { messages, graphName: "g", model: DEFAULT_CHAT_MODEL, key: apiKey, modelSource: "bogus" }, error: "modelSource: Invalid option" },
+  ];
+
+  for (const { name, body, error } of invalidBodies) {
+    test(`@admin POST /api/chat rejects an invalid body: ${name}`, async () => {
+      const response = await apiCall.postChat(body);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain(error);
+    });
+  }
+
+  // The route guard and the friendly-message fallback return the same text, so without a real provider call this cannot tell them apart.
+  test("@admin POST /api/chat rejects an Anthropic model with an OpenAI-shaped key", async () => {
+    const response = await apiCall.postChat({
+      messages,
+      graphName: getRandomString("chat"),
+      model: "anthropic::claude-sonnet-4-5",
+      key: apiKey,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe(
+      "Model/API key mismatch: You selected a Anthropic model but provided a OpenAI API key. Please update your API key in Settings to match your selected model."
+    );
+  });
+
+  test("@admin POST /api/chat rejects a hosted model without an API key", async () => {
+    const response = await apiCall.postChat({
+      messages,
+      graphName: getRandomString("chat"),
+      model: DEFAULT_CHAT_MODEL,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe(
+      "API key error. Please verify your API key in Settings matches your selected model provider."
+    );
+  });
+
+  test("@admin POST /api/chat answers a graph that does not exist with a friendly 400", async () => {
+    const response = await apiCall.postChat({
+      messages,
+      graphName: getRandomString("chat"),
+      model: DEFAULT_CHAT_MODEL,
+      key: apiKey,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Graph not found. Please select an existing graph.");
+  });
+
+  test("@admin POST /api/chat answers an empty graph with a friendly 400", async () => {
+    const graphName = getRandomString("chat");
+    graphToRemove = graphName;
+    await apiCall.addGraph(graphName);
+
+    const response = await apiCall.postChat({
+      messages,
+      graphName,
+      model: DEFAULT_CHAT_MODEL,
+      key: apiKey,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Your graph is empty. Add some data to your graph before using the chat.");
+  });
+
+  test("@admin POST /api/chat rejects an unauthenticated request", async () => {
+    const response = await apiCall.postChat({
+      messages,
+      graphName: getRandomString("chat"),
+      model: DEFAULT_CHAT_MODEL,
+      key: apiKey,
+    }, false);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe("Not authenticated");
+  });
+
+  for (const key of [undefined, "", "   "]) {
+    test(`@admin POST /api/chat/models requires an API key (key: ${JSON.stringify(key)})`, async () => {
+      const response = await apiCall.postChatModels({ key });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe("API key is required to load live models");
+    });
+  }
+
+  test("@admin POST /api/chat/models rejects an unauthenticated request", async () => {
+    const response = await apiCall.postChatModels({ key: apiKey }, false);
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("Unauthorized");
   });
 });

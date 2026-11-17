@@ -14,6 +14,52 @@ const swaggerSpec = {
         bearerFormat: "JWT",
         description: "JWT token obtained from the login endpoint",
       },
+      sessionCookie: {
+        type: "apiKey",
+        in: "cookie",
+        name: "authjs.session-token",
+        description: "Browser session cookie on HTTP deployments",
+      },
+      sessionCookieSecure: {
+        type: "apiKey",
+        in: "cookie",
+        name: "__Secure-authjs.session-token",
+        description: "Browser session cookie on HTTPS deployments",
+      },
+    },
+    schemas: {
+      SessionConnection: {
+        type: "object",
+        required: ["id", "role", "host", "port", "tls"],
+        properties: {
+          id: { type: "string" },
+          username: { type: "string" },
+          role: { type: "string", enum: ["Admin", "Read-Write", "Read-Only"] },
+          host: { type: "string" },
+          port: { type: "integer" },
+          tls: { type: "boolean" },
+          ca: { type: "string" },
+          cert: { type: "string" },
+        },
+      },
+      AddConnectionError: {
+        type: "object",
+        required: ["message", "code"],
+        properties: {
+          code: {
+            type: "string",
+            enum: ["credentials_required", "invalid_credentials", "connection_failed"],
+          },
+          message: {
+            type: "string",
+            enum: [
+              "This database requires credentials. Please enter your username and password.",
+              "Invalid credentials. Please check your username and password.",
+              "Could not connect to the database. Please check your connection settings and server logs.",
+            ],
+          },
+        },
+      },
     },
   },
   security: [
@@ -29,6 +75,10 @@ const swaggerSpec = {
     {
       name: "Graph",
       description: "Graph management and query endpoints",
+    },
+    {
+      name: "AI Assistance",
+      description: "AI-assisted Cypher query analysis and repair",
     },
     // {
     //   name: "Schema",
@@ -48,6 +98,136 @@ const swaggerSpec = {
     }
   ],
   paths: {
+    "/api/auth/migrate-session": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Validate the session's stored active connection",
+        description: "Compatibility endpoint: returns an existing usable connection owned by this session. Never recreates a missing or revoked connection and never connects to the user's database. Cookie requests require a trusted Origin or same-origin Fetch Metadata.",
+        security: [{ sessionCookie: [] }, { sessionCookieSecure: [] }],
+        responses: {
+          "200": {
+            description: "The stored connection remains usable",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["connection"],
+                  properties: { connection: { $ref: "#/components/schemas/SessionConnection" } },
+                },
+              },
+            },
+          },
+          "401": {
+            description: "No usable stored active connection; sign in again",
+            headers: {
+              "X-Session-Invalid": { schema: { type: "string", enum: ["1"] } },
+            },
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["message", "code"],
+                  properties: {
+                    message: { type: "string", enum: ["No active connection. Please sign in again."] },
+                    code: { type: "string", enum: ["SESSION_INVALID"] },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Untrusted request origin" },
+          "500": { description: "Stored connection validation failed" },
+        },
+      },
+    },
+    "/api/connections": {
+      get: {
+        tags: ["Authentication"],
+        summary: "List the current session's connections",
+        security: [{ sessionCookie: [] }, { sessionCookieSecure: [] }],
+        responses: {
+          "200": {
+            description: "Stored connections",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["connections"],
+                  properties: {
+                    connections: { type: "array", items: { $ref: "#/components/schemas/SessionConnection" } },
+                  },
+                },
+              },
+            },
+          },
+          "401": { description: "Not authenticated" },
+          "400": { description: "Untrusted request origin" },
+          "500": { description: "Internal server error" },
+        },
+      },
+      post: {
+        tags: ["Authentication"],
+        summary: "Add a connection to the current session",
+        description: "Connect with another ACL user. Cookie requests require a trusted Origin or same-origin Fetch Metadata. Classified failures return safe messages, not raw database errors.",
+        security: [{ sessionCookie: [] }, { sessionCookieSecure: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  host: { type: "string", description: "Defaults to the session's host" },
+                  port: { oneOf: [{ type: "string" }, { type: "number" }] },
+                  username: { type: "string" },
+                  password: { type: "string", format: "password" },
+                  tls: { oneOf: [{ type: "boolean" }, { type: "string" }] },
+                  ca: { type: "string" },
+                  cert: { type: "string" },
+                  key: { type: "string", format: "password" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Connection added",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["connection"],
+                  properties: { connection: { $ref: "#/components/schemas/SessionConnection" } },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Untrusted origin, invalid JSON or fields (message only), or classified credentials_required, invalid_credentials, or connection_failed error",
+            content: {
+              "application/json": {
+                schema: {
+                  anyOf: [
+                    { $ref: "#/components/schemas/AddConnectionError" },
+                    { type: "object", required: ["message"], properties: { message: { type: "string" } } },
+                  ],
+                },
+              },
+            },
+          },
+          "401": { description: "Not authenticated" },
+          "503": {
+            description: "connection_failed: connection refused or connection establishment timed out",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AddConnectionError" } } },
+          },
+          "500": {
+            description: "connection_failed: unexpected failure without a diagnostic message",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AddConnectionError" } } },
+          },
+        },
+      },
+    },
     "/api/auth/tokens/credentials": {
       post: {
         tags: ["Authentication"],
@@ -185,7 +365,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "List JWT tokens",
-        description: "Get a list of active JWT tokens. Admins see all tokens, regular users see only their own tokens.",
+        description: "Get active JWT tokens for the authenticated database endpoint. Admins see all users at that endpoint; regular users see only their own tokens. Host matching is case-insensitive.",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
@@ -273,7 +453,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "Get token metadata",
-        description: "Get detailed metadata for a specific JWT token by its token ID. Admins can view any token, regular users can only view their own tokens.",
+        description: "Get metadata for a JWT token at the authenticated database endpoint. Admins can view any user at that endpoint; regular users can only view their own tokens.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -356,7 +536,7 @@ const swaggerSpec = {
             description: "Authentication failed - invalid or missing token"
           },
           "403": {
-            description: "Forbidden - You can only view your own tokens (unless you are an Admin)",
+            description: "Forbidden - Token must belong to your connection; non-admins must also own it",
             content: {
               "application/json": {
                 schema: {
@@ -364,7 +544,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Forbidden: You can only view your own tokens"
+                      example: "Forbidden: You can only view tokens for your connection"
                     }
                   }
                 }
@@ -395,7 +575,7 @@ const swaggerSpec = {
       delete: {
         tags: ["Authentication"],
         summary: "Revoke token by ID",
-        description: "Revoke a specific JWT token by its token ID. Once revoked, the token cannot be used for authentication. Admins can revoke any token, regular users can only revoke their own tokens.",
+        description: "Revoke a JWT token at the authenticated database endpoint. Once revoked, it cannot authenticate. Admins can revoke any user at that endpoint; regular users can only revoke their own tokens.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -451,7 +631,7 @@ const swaggerSpec = {
             description: "Authentication failed - invalid or missing token"
           },
           "403": {
-            description: "Forbidden - You can only revoke your own tokens (unless you are an Admin)",
+            description: "Forbidden - Token must belong to your connection; non-admins must also own it",
             content: {
               "application/json": {
                 schema: {
@@ -459,7 +639,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Forbidden: You can only revoke your own tokens"
+                      example: "Forbidden: You can only revoke tokens for your connection"
                     }
                   }
                 }
@@ -596,8 +776,8 @@ const swaggerSpec = {
     "/api/graph/{graph}": {
       get: {
         tags: ["Graph"],
-        summary: "Execute graph query",
-        description: "Execute a Cypher query on the specified graph (Server-Sent Events)",
+        summary: "Execute a read-only graph query",
+        description: "Execute a read-only Cypher query on the specified graph (Server-Sent Events)",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -623,12 +803,12 @@ const swaggerSpec = {
           {
             in: "query",
             name: "timeout",
-            required: true,
+            required: false,
             schema: {
               type: "number"
             },
-            description: "Query timeout in milliseconds",
-            example: 30000
+            description: "Query timeout in seconds",
+            example: 30
           }
         ],
         responses: {
@@ -639,8 +819,8 @@ const swaggerSpec = {
       },
       post: {
         tags: ["Graph"],
-        summary: "Create or verify a graph",
-        description: "Create a new graph or verify that a graph exists",
+        summary: "Execute a query or verify a graph",
+        description: "Execute a Cypher query using a JSON body, or verify graph access when no query body is supplied. An empty or whitespace-only body is accepted even with Content-Type: application/json; malformed nonempty JSON returns 400.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -653,19 +833,34 @@ const swaggerSpec = {
             description: "Graph name to create or verify"
           }
         ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string", description: "Cypher query to execute" },
+                  timeout: { type: "number", description: "Query timeout in seconds" }
+                }
+              }
+            }
+          }
+        },
         responses: {
           "200": {
-            description: "Graph created or verified successfully",
+            description: "Query returns a Server-Sent Events stream; graph checks return JSON",
             content: {
+              "text/event-stream": {
+                schema: { type: "string" },
+                example: 'event: result\ndata: {"data":[{"value":1}]}\n\n'
+              },
               "application/json": {
                 schema: {
                   type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Graph created successfully"
-                    }
-                  }
+                  required: ["message"],
+                  properties: { message: { type: "string", example: "Graph created successfully" } }
                 }
               }
             }
@@ -769,6 +964,112 @@ const swaggerSpec = {
         }
       }
     },
+    "/api/chat/fix": {
+      post: {
+        tags: ["AI Assistance"],
+        summary: "Suggest a fix for a Cypher query",
+        description: "Analyze a failed Cypher query and return an explanation and optional corrected query. The query is not executed.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query", "errorMessage", "model"],
+                properties: {
+                  query: { type: "string", minLength: 1, maxLength: 8192 },
+                  errorMessage: { type: "string", minLength: 1, maxLength: 4096 },
+                  graphName: { type: "string", maxLength: 255 },
+                  hint: { type: "string", maxLength: 1024 },
+                  key: { type: "string", maxLength: 1024, writeOnly: true, default: "" },
+                  model: { type: "string", minLength: 1, maxLength: 256 },
+                  modelSource: { type: "string", enum: ["api-key", "local"], default: "api-key" },
+                  localProvider: { type: "string", enum: ["ollama", "lmstudio"], default: "ollama" },
+                  localEndpoint: { type: "string", maxLength: 2048, default: "" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Explanation and optional corrected query",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["explanation"],
+                  properties: {
+                    explanation: { type: "string" },
+                    correctedQuery: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Invalid request or unsupported provider" },
+          "401": { description: "Authentication failed or the provider rejected its API key" },
+          "413": { description: "Request body is too large" },
+          "422": { description: "The provider could not complete the request" },
+          "500": { description: "Internal server error" },
+        },
+      },
+    },
+    "/api/chat/optimize": {
+      post: {
+        tags: ["AI Assistance"],
+        summary: "Analyze a Cypher query for optimization opportunities",
+        description: "Analyze the query, its EXPLAIN plan, and available indexes without executing the query.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query", "graphName", "model"],
+                properties: {
+                  query: { type: "string", minLength: 1, maxLength: 8192 },
+                  guidance: { type: "string", maxLength: 2000 },
+                  graphName: { type: "string", minLength: 1, maxLength: 255 },
+                  key: { type: "string", maxLength: 1024, writeOnly: true, default: "" },
+                  model: { type: "string", minLength: 1, maxLength: 256 },
+                  modelSource: { type: "string", enum: ["api-key", "local"], default: "api-key" },
+                  localProvider: { type: "string", enum: ["ollama", "lmstudio"], default: "ollama" },
+                  localEndpoint: { type: "string", maxLength: 2048 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Query analysis and original execution plan",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["explanation", "suggestions", "executionPlan"],
+                  properties: {
+                    explanation: { type: "string" },
+                    suggestions: { type: "array", items: { type: "string" } },
+                    optimizedQuery: { type: "string" },
+                    executionPlan: { type: "array", items: { type: "string" } },
+                    indexWarning: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Invalid request or unable to read the query plan" },
+          "401": { description: "Authentication failed or the provider rejected its API key" },
+          "413": { description: "Request body is too large" },
+          "422": { description: "The provider could not complete the request" },
+          "500": { description: "Internal server error" },
+        },
+      },
+    },
     "/api/graph/{graph}/explain": {
       get: {
         tags: ["Graph"],
@@ -803,10 +1104,10 @@ const swaggerSpec = {
       }
     },
     "/api/graph/{graph}/profile": {
-      get: {
+      post: {
         tags: ["Graph"],
         summary: "Profile query execution",
-        description: "Get detailed profiling information for a valid read-only Cypher query. Update clauses and CALL procedures, including read-only procedures, are not supported.",
+        description: "Get detailed profiling information for a valid read-only Cypher query. Update clauses and CALL procedures, including read-only procedures, are not supported. Requires a writable user and connection; read-only mode returns 403.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -818,23 +1119,30 @@ const swaggerSpec = {
             },
             description: "Graph name"
           },
-          {
-            in: "query",
-            name: "query",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Cypher query to profile"
-          }
         ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string", description: "Cypher query to profile" }
+                }
+              }
+            }
+          }
+        },
         responses: {
           "200": {
             description: "Query profiling information returned successfully"
           },
-          "400": {
-            description: "Missing, invalid or unsupported query: profiling accepts only read-only Cypher without CALL procedures."
-          }
+          "400": { description: "Invalid JSON, missing, invalid or unsupported query, or query profiling failed. Profiling accepts only read-only Cypher without CALL procedures." },
+          "401": { description: "Authentication or an active connection is required" },
+          "403": { description: "Profiling is unavailable in read-only mode" },
+          "415": { description: "Content-Type must be application/json" },
+          "500": { description: "Internal server error" }
         }
       }
     },
@@ -1210,7 +1518,7 @@ const swaggerSpec = {
       post: {
         tags: ["Graph"],
         summary: "Set node/relationship property",
-        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships.",
+        description: "Set a property value on a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use property as the key path segment and supply the name in the propertyKey query parameter.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1238,7 +1546,14 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name"
+            description: "Property key name, or property when propertyKey is supplied"
+          },
+          {
+            in: "query",
+            name: "propertyKey",
+            required: false,
+            schema: { type: "string", minLength: 1 },
+            description: "Exact property name to set; overrides the key in the path. An empty value is rejected with 400"
           }
         ],
         requestBody: {
@@ -1272,7 +1587,7 @@ const swaggerSpec = {
       delete: {
         tags: ["Graph"],
         summary: "Remove node/relationship property",
-        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships.",
+        description: "Remove a property from a node or relationship. IMPORTANT - Use type=true for nodes, type=false for relationships. For an exact property name, use property as the key path segment and supply the name in the propertyKey query parameter.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1300,7 +1615,14 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Property key name"
+            description: "Property key name, or property when propertyKey is supplied"
+          },
+          {
+            in: "query",
+            name: "propertyKey",
+            required: false,
+            schema: { type: "string", minLength: 1 },
+            description: "Exact property name to remove; overrides the key in the path. An empty value is rejected with 400"
           }
         ],
         requestBody: {
@@ -2506,6 +2828,22 @@ const swaggerSpec = {
           "400": {
             description: "Bad request - missing parameters"
           },
+          "403": {
+            description: "Forbidden - only Admin users can manage users, or users are managed by LDAP on this connection",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: only Admin users can manage users"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "409": {
             description: "User already exists"
           },
@@ -2569,6 +2907,22 @@ const swaggerSpec = {
           "400": {
             description: "Bad request"
           },
+          "403": {
+            description: "Forbidden - only Admin users can manage users, or users are managed by LDAP on this connection",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: only Admin users can manage users"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "500": {
             description: "Internal server error"
           }
@@ -2600,6 +2954,22 @@ const swaggerSpec = {
           },
           "400": {
             description: "Bad request"
+          },
+          "403": {
+            description: "Forbidden - only Admin users can manage users, or users are managed by LDAP on this connection",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: only Admin users can manage users"
+                    }
+                  }
+                }
+              }
+            }
           },
           "500": {
             description: "Internal server error"
@@ -2670,6 +3040,22 @@ const swaggerSpec = {
           },
           "400": {
             description: "Bad request - validation error or invalid role"
+          },
+          "403": {
+            description: "Forbidden - only Admin users can manage users, or users are managed by LDAP on this connection",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: only Admin users can manage users"
+                    }
+                  }
+                }
+              }
+            }
           },
           "500": {
             description: "Internal server error"

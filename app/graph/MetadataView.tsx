@@ -37,12 +37,15 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
 
 
     const handleProfile = async () => {
+        if (isReadOnly) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
         try {
-            const result = await securedFetch(getProfileUrl(query.graphName, query.text, isReadOnly), {
-                method: "GET",
+            const result = await securedFetch(getProfileUrl(query.graphName), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: query.text }),
             }, toast, setIndicator, cid);
 
             if (getConnectionEpoch() !== startEpoch) return;
@@ -74,6 +77,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
                     label="Profile"
                     onClick={handleProfile}
                     isLoading={isLoading}
+                    disabled={isReadOnly}
                 />
                 <Button
                     className="cursor-default"
@@ -124,7 +128,7 @@ export function Metadata({ query, hideTitle }: {
     return (
         <>
             {!hideTitle && <h1 className="text-2xl font-bold">Metadata</h1>}
-            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs">
+            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs" data-testid="metadataLines">
                 {getStatsLines(query).map((m, i) => (
                     <li key={i}>{m}</li>
                 ))}
