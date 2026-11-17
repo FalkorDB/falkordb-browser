@@ -109,17 +109,23 @@ export default class UdfPage extends HeaderComponent {
     return (text ?? "").replace(/\u00a0/g, " ");
   }
 
-  /** Expands a library's function list, which also selects the library. */
+  /** Expands a library's function list, which also selects the library; a no-op when it is open. */
   async expandLibrary(name: string): Promise<void> {
     await interactWhenVisible(
-      this.page.getByRole("button", { name: `Toggle ${name} functions` }),
-      (el) => el.click(),
+      this.page.getByRole("button", { name: `Toggle ${name} functions`, exact: true }),
+      async (el) => {
+        if ((await el.getAttribute("aria-expanded")) !== "true") await el.click();
+      },
       `UDF Library ${name} Toggle`
     );
   }
 
   async clickFunction(name: string): Promise<void> {
-    await interactWhenVisible(this.functionNames.filter({ hasText: name }), (el) => el.click(), `UDF Function ${name}`);
+    await interactWhenVisible(
+      this.functionNames.filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) }),
+      (el) => el.click(),
+      `UDF Function ${name}`
+    );
   }
 
   /** 1-based line where the editor's selection starts. */

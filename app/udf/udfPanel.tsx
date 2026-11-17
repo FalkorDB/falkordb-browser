@@ -90,6 +90,8 @@ export default function UdfPanel() {
     const libRequestIdRef = useRef(0);
     // `selectedLib` is optimistic; this is the library the editor actually shows.
     const committedLibRef = useRef(selectedUdf?.[1]);
+    // The library request in flight, so picking that library again joins it.
+    const pendingLibRef = useRef<{ name: string, requestId: number, result: Promise<boolean> }>(undefined);
 
     const selectFunction = (functionName: string) => {
         functionRequestIdRef.current += 1;
@@ -102,18 +104,8 @@ export default function UdfPanel() {
         setExpandedLib(selectedUdf?.[1]);
     }, [selectedUdf]);
 
-    /** Resolves to false when the library did not become the selection: failed, or superseded by a newer pick. */
-    const handleSelectLib = async (libraryName: string): Promise<boolean> => {
-        // Only once it is loaded: while its request is in flight the editor still shows
-        // another library, and a function picked now would be revealed in that one.
-        if (selectedLib === libraryName && committedLibRef.current === libraryName) return true;
-
-        libRequestIdRef.current += 1;
-        const requestId = libRequestIdRef.current;
-
-        setSelectedLib(libraryName);
-        setSelectedUdfFunction(undefined);
-
+    /** Loads a library picked in the panel; false when it failed or a newer pick superseded it. */
+    const fetchLib = async (libraryName: string, requestId: number): Promise<boolean> => {
         // The editor still shows the committed library, so both the highlight and the
         // open section go back to it — never to whatever the last optimistic pick was.
         const rollback = () => {
@@ -153,6 +145,27 @@ export default function UdfPanel() {
             });
             return false;
         }
+    };
+
+    /** Resolves to false when the library did not become the selection: failed, or superseded by a newer pick. */
+    const handleSelectLib = async (libraryName: string): Promise<boolean> => {
+        // Only once it is loaded: while its request is in flight the editor still shows
+        // another library, and a function picked now would be revealed in that one.
+        if (selectedLib === libraryName && committedLibRef.current === libraryName) return true;
+
+        // Still loading: wait for that request rather than sending a second one.
+        const pending = pendingLibRef.current;
+        if (pending?.name === libraryName && pending.requestId === libRequestIdRef.current) return pending.result;
+
+        libRequestIdRef.current += 1;
+        const requestId = libRequestIdRef.current;
+
+        setSelectedLib(libraryName);
+        setSelectedUdfFunction(undefined);
+
+        const result = fetchLib(libraryName, requestId);
+        pendingLibRef.current = { name: libraryName, requestId, result };
+        return result;
     };
 
     const handleLoad = async (name: string) => {

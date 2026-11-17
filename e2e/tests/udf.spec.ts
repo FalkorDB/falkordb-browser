@@ -121,6 +121,33 @@ test.describe("UDF page", () => {
     expect(await udfPage.getEditorSelectionLine()).toBe(selectionBefore);
   });
 
+  test("@admin a function clicked while its library loads waits for that load, then jumps to it", async () => {
+    const shown = newLibraryName();
+    const loading = newLibraryName();
+    const shownCode = libraryCode(shown, ["alphaOne"]);
+    const loadingCode = libraryCode(loading, ["betaOne"]);
+    await apiCall.loadUdf(shown, shownCode);
+    await apiCall.loadUdf(loading, loadingCode);
+    const udfPage = await browser.createNewPage(UdfPage);
+    const page = await browser.getPage();
+    await udfPage.openUdfPage();
+    await udfPage.selectLibrary(shown);
+    await expectEditorShows(udfPage, shownCode);
+
+    const held: Route[] = [];
+    await page.route(`**/api/udf/${loading}`, (route) => { held.push(route); });
+    await udfPage.expandLibrary(loading);
+    await expect.poll(() => held.length).toBe(1);
+    await udfPage.clickFunction("betaOne");
+
+    // The click joins the request already in flight instead of sending another.
+    await Promise.all(held.map((route) => route.continue()));
+    await expectEditorShows(udfPage, loadingCode);
+    // `function betaOne` is line 2; a fresh load leaves the cursor on the last line.
+    await expect.poll(() => udfPage.getEditorSelectionLine()).toBe(2);
+    expect(held).toHaveLength(1);
+  });
+
   test("@admin export downloads the selected library", async () => {
     const name = newLibraryName();
     const code = libraryCode(name, ["addOne", "shout"]);
