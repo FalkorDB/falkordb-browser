@@ -3,7 +3,6 @@ import { getClient } from "../../auth/[...nextauth]/options";
 import {
   ROLE,
   getRoleWithKeys,
-  extractKeysFromACL,
   requiresPasswordReauthentication,
   persistAclAfterPasswordChange,
 } from "../model";
