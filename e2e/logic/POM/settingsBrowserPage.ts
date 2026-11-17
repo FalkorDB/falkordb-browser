@@ -411,21 +411,39 @@ export default class SettingsBrowserPage extends BasePage {
 
   // The card being edited shows an input instead of chatApiKeyValue, so it is found through that input.
   private get editingChatApiKeyCard(): Locator {
-    return this.chatApiKeyCards.filter({ has: this.page.getByTestId("chatApiKeyEditInput") });
+    return this.chatApiKeyCards.filter({ has: this.chatApiKeyEditInput });
   }
 
+  get chatApiKeyEditInput(): Locator {
+    return this.page.getByTestId("chatApiKeyEditInput");
+  }
+
+  get editingChatApiKeyVisibilityButton(): Locator {
+    return this.editingChatApiKeyCard.getByTestId("toggleChatApiKeyVisibilityButton");
+  }
+
+  // Works whether the key is masked or shown. Waits for the input to hold this key, so starting
+  // an edit while another key is being edited does not resolve on the previous key's input.
   async beginEditChatApiKey(apiKey: string): Promise<void> {
     await interactWhenVisible(
-      this.getChatApiKeyCard(apiKey).getByTestId("editChatApiKeyButton"),
+      this.getMaskedChatApiKeyCard(apiKey).or(this.getChatApiKeyCard(apiKey)).first().getByTestId("editChatApiKeyButton"),
       (el) => el.click(),
       "Edit Chat API Key Button"
     );
-    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "visible", timeout: 5000 });
+    await expect(this.chatApiKeyEditInput).toHaveValue(apiKey, { timeout: 5000 });
+  }
+
+  async toggleEditingChatApiKeyVisibility(): Promise<void> {
+    await interactWhenVisible(
+      this.editingChatApiKeyVisibilityButton,
+      (el) => el.click(),
+      "Editing Chat API Key Visibility Button"
+    );
   }
 
   async fillChatApiKeyEdit(value: string): Promise<void> {
     await interactWhenVisible(
-      this.page.getByTestId("chatApiKeyEditInput"),
+      this.chatApiKeyEditInput,
       (el) => el.fill(value),
       "Chat API Key Edit Input"
     );
@@ -433,7 +451,7 @@ export default class SettingsBrowserPage extends BasePage {
 
   async getChatApiKeyEditValue(): Promise<string> {
     return interactWhenVisible(
-      this.page.getByTestId("chatApiKeyEditInput"),
+      this.chatApiKeyEditInput,
       (el) => el.inputValue(),
       "Chat API Key Edit Value"
     );
@@ -453,7 +471,7 @@ export default class SettingsBrowserPage extends BasePage {
       (el) => el.click(),
       "Cancel Edit Chat API Key Button"
     );
-    await this.page.getByTestId("chatApiKeyEditInput").waitFor({ state: "detached", timeout: 5000 });
+    await this.chatApiKeyEditInput.waitFor({ state: "detached", timeout: 5000 });
   }
 
   async deleteChatApiKey(apiKey: string): Promise<void> {

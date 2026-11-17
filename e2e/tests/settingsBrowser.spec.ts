@@ -258,6 +258,95 @@ test.describe('@browser Browser Settings tests', () => {
         expect(await settingsBrowserPage.isChatApiKeyPresent(editedApiKey)).toBe(false);
     });
 
+    test('@readwrite Chat API key visibility stays hidden when editing and cancelling or saving', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const maskedKeyText = `${apiKey.slice(0, 6)}••••••••${apiKey.slice(-4)}`;
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.addChatApiKey(apiKey);
+        expect(await settingsBrowserPage.getMaskedChatApiKeyText(apiKey)).toBe(maskedKeyText);
+
+        await settingsBrowserPage.beginEditChatApiKey(apiKey);
+        await expect(settingsBrowserPage.chatApiKeyEditInput).toHaveAttribute("type", "text");
+        await settingsBrowserPage.cancelEditChatApiKey();
+        expect(await settingsBrowserPage.getMaskedChatApiKeyText(apiKey)).toBe(maskedKeyText);
+
+        await settingsBrowserPage.beginEditChatApiKey(apiKey);
+        await settingsBrowserPage.clickSaveEditedChatApiKey();
+        expect(await settingsBrowserPage.getMaskedChatApiKeyText(apiKey)).toBe(maskedKeyText);
+    });
+
+    test('@readwrite Chat API key visibility preserves an explicit Show choice while editing', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.addChatApiKey(apiKey);
+        await settingsBrowserPage.showChatApiKey(apiKey);
+
+        await settingsBrowserPage.beginEditChatApiKey(apiKey);
+        await settingsBrowserPage.cancelEditChatApiKey();
+        expect(await settingsBrowserPage.getVisibleChatApiKeyText(apiKey)).toBe(apiKey);
+
+        await settingsBrowserPage.beginEditChatApiKey(apiKey);
+        await settingsBrowserPage.clickSaveEditedChatApiKey();
+        expect(await settingsBrowserPage.getVisibleChatApiKeyText(apiKey)).toBe(apiKey);
+    });
+
+    test('@readwrite Chat API key visibility is restored when switching the edit to another key', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const firstApiKey = `sk-e2e-${getRandomString("first-key")}-A001`;
+        const secondApiKey = `sk-e2e-${getRandomString("second-key")}-B002`;
+        const maskedFirstApiKeyText = `${firstApiKey.slice(0, 6)}••••••••${firstApiKey.slice(-4)}`;
+        const maskedSecondApiKeyText = `${secondApiKey.slice(0, 6)}••••••••${secondApiKey.slice(-4)}`;
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.addChatApiKey(firstApiKey);
+        await settingsBrowserPage.addChatApiKey(secondApiKey);
+
+        await settingsBrowserPage.beginEditChatApiKey(firstApiKey);
+        await settingsBrowserPage.beginEditChatApiKey(secondApiKey);
+        expect(await settingsBrowserPage.getMaskedChatApiKeyText(firstApiKey)).toBe(maskedFirstApiKeyText);
+        await settingsBrowserPage.cancelEditChatApiKey();
+        expect(await settingsBrowserPage.getMaskedChatApiKeyText(secondApiKey)).toBe(maskedSecondApiKeyText);
+    });
+
+    test('@readwrite Chat API key can be hidden while editing and keeps that choice', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const maskedKeyText = `${apiKey.slice(0, 6)}••••••••${apiKey.slice(-4)}`;
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.addChatApiKey(apiKey);
+        await settingsBrowserPage.showChatApiKey(apiKey);
+
+        await settingsBrowserPage.beginEditChatApiKey(apiKey);
+        await expect(settingsBrowserPage.editingChatApiKeyVisibilityButton).toHaveText("Hide");
+        await settingsBrowserPage.toggleEditingChatApiKeyVisibility();
+        await expect(settingsBrowserPage.chatApiKeyEditInput).toHaveAttribute("type", "password");
+        await expect(settingsBrowserPage.editingChatApiKeyVisibilityButton).toHaveText("Show");
+        await settingsBrowserPage.cancelEditChatApiKey();
+        expect(await settingsBrowserPage.getMaskedChatApiKeyText(apiKey)).toBe(maskedKeyText);
+
+        await settingsBrowserPage.beginEditChatApiKey(apiKey);
+        await expect(settingsBrowserPage.chatApiKeyEditInput).toHaveAttribute("type", "text");
+        await settingsBrowserPage.toggleEditingChatApiKeyVisibility();
+        await expect(settingsBrowserPage.chatApiKeyEditInput).toHaveAttribute("type", "password");
+        await settingsBrowserPage.toggleEditingChatApiKeyVisibility();
+        await expect(settingsBrowserPage.chatApiKeyEditInput).toHaveAttribute("type", "text");
+        await settingsBrowserPage.clickSaveEditedChatApiKey();
+        expect(await settingsBrowserPage.getVisibleChatApiKeyText(apiKey)).toBe(apiKey);
+    });
+
     test('@readwrite Verify local LLM controls and load tooltip display correctly', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
