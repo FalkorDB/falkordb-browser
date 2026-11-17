@@ -5,7 +5,6 @@ import { expect, test } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import { readOwnedTutorialGraphs } from "../infra/tutorialGraphs";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
-import AppDownloadComponent from "../logic/POM/appDownloadComponent";
 import ApiCalls from "../logic/api/apiCalls";
 import { delay, getQueryRequestParam, getRandomString, initializeLocalStorage } from "../infra/utils";
 import { parseTutorialDemoOwnership, tutorialDemoOwnershipKey } from "../../lib/tutorialDemoGraphs";
@@ -146,7 +145,6 @@ test.describe("Tutorial", () => {
         test.setTimeout(60_000);
         await page.addInitScript(() => {
             localStorage.removeItem("tutorial");
-            localStorage.setItem("appDownloadPrompt", "false");
             localStorage.setItem("whatsNewSeen", "v9999.0.0");
         });
         await page.route("**/api/auth/session", async route => {
@@ -882,7 +880,6 @@ test.describe("Tutorial", () => {
         await page.addInitScript(({ tab, key }) => {
             localStorage.removeItem("timeout");
             localStorage.setItem("tutorial", "false");
-            localStorage.setItem("appDownloadPrompt", "false");
             localStorage.setItem(`localhost:6379:default:${key}`, JSON.stringify({ tabs: [tab], activeTabId: tab.id }));
         }, { tab, key: TABS_STORAGE_KEY });
         let configRequests = 0;
@@ -1742,32 +1739,6 @@ test.describe("Tutorial", () => {
                 const { message } = await apiCall.removeGraph(name, "admin");
                 expect(message).toMatch(/deleted|empty key/);
             }
-        }
-    });
-
-    test("@admin the app download popup waits until the tutorial is closed", async () => {
-        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        const page = await browser.getPage();
-        const app = new AppDownloadComponent(page);
-        // What's New would also wait for the tutorial and then go first; leave it out.
-        await page.route("**/api/releases", (route) => route.fulfill({ json: { releases: [] } }));
-        try {
-            // The suite keeps the popup away with "false"; any other value lets
-            // it open, and the init script only fills in a missing one.
-            await app.evaluate(() => localStorage.setItem("appDownloadPrompt", "true"));
-            await tutorial.changeLocalStorage("true");
-            await browser.navigateTo(urls.graphUrl);
-            await tutorial.waitForStep("Welcome to FalkorDB Browser");
-
-            // Both are first-visit popups: the tour goes first, alone.
-            await tutorial.waitForTimeout(4000);
-            await expect(app.prompt).toBeHidden();
-
-            await tutorial.skip();
-            await expect(app.prompt).toBeVisible({ timeout: 10_000 });
-        } finally {
-            await tutorial.changeLocalStorage("false");
         }
     });
 

@@ -16,6 +16,10 @@ export default class HeaderComponent extends BasePage {
         return this.page.getByRole("button", { name: "Help" })
     }
 
+    public get releasesButton(): Locator {
+        return this.page.getByTestId("releasesButton");
+    }
+
     private get documentationButton(): Locator {
         return this.page.getByRole("link", { name: "Documentation", exact: true })
     }
