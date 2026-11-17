@@ -63,6 +63,7 @@ interface Props {
     }
     children?: React.ReactNode
     submitButtonLabel?: string
+    submitDisabled?: boolean
     className?: string
 }
 
@@ -141,7 +142,7 @@ function toFieldConfig(field: Field, passwordLabels: string[]): FieldConfig {
     }
 }
 
-export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit", className = "" }: Props) {
+export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit", submitDisabled = false, className = "" }: Props) {
     const passwordLabels = fields.filter(field => field.type === "password").map(field => field.label);
 
     return (
@@ -151,7 +152,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             onSubmit={handleSubmit}
             error={error?.show ? error.message : undefined}
             submitLabel={submitButtonLabel}
-            submitDisabled={error?.show}
+            submitDisabled={submitDisabled || error?.show}
             classNames={{
                 // The browser marks an invalid field on its label alone.
                 control: "aria-invalid:border-border",

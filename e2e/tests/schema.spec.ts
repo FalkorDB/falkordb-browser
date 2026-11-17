@@ -1,10 +1,10 @@
-import type { Page, Route } from "@playwright/test";
+import type { Page, Request, Route } from "@playwright/test";
 import { test, expect } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import SchemaView from "../logic/POM/schemaView";
 import urls from "../config/urls.json";
 import APICalls from "../logic/api/apiCalls";
-import { getRandomString } from "../infra/utils";
+import { getQueryRequestParam, getRandomString } from "../infra/utils";
 import { TABS_STORAGE_KEY } from "@/lib/graphTabs";
 
 /**
@@ -46,8 +46,8 @@ const EXPECTED_LABELS = ["City", "Company", "Employee", "Empty", "Person"];
 /** Labels the graph info panel reports for MESSY_GRAPH_QUERY; "Empty" only comes from discovery. */
 const GRAPH_INFO_LABELS = ["City", "Company", "Employee", "Person"];
 
-const isSchemaDiscovery = (url: string) =>
-    new URL(url).searchParams.get("query")?.includes("RETURN DISTINCT source, type(e)") === true;
+const isSchemaDiscovery = (request: Request) =>
+    getQueryRequestParam(request, "query")?.includes("RETURN DISTINCT source, type(e)") === true;
 
 /** A single server-sent event, as the graph query endpoint streams it. */
 const sseEvent = (event: "result" | "error", data: unknown) => ({
@@ -66,8 +66,8 @@ const interceptSchemaDiscovery = async (
     handle: (route: Route, attempt: number) => Promise<void>,
 ): Promise<() => number> => {
     let attempts = 0;
-    await page.route(`**/api/graph/${graphName}?*`, async (route) => {
-        if (!isSchemaDiscovery(route.request().url())) {
+    await page.route(`**/api/graph/${graphName}{,?*}`, async (route) => {
+        if (!isSchemaDiscovery(route.request())) {
             await route.continue();
             return;
         }
@@ -112,7 +112,7 @@ test.describe("Schema View Tests", () => {
             }
         });
         const rejectedDiscovery = page.waitForResponse(response =>
-            new URL(response.url()).pathname === `/api/graph/${GRAPH_NAME}` && isSchemaDiscovery(response.url()));
+            new URL(response.url()).pathname === `/api/graph/${GRAPH_NAME}` && isSchemaDiscovery(response.request()));
         await schemaView.clickSchemaTab();
         await rejectedDiscovery;
         expect(discoveryAttempts()).toBe(1);

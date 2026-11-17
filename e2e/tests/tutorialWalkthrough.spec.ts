@@ -5,9 +5,8 @@ import { expect, test } from "../infra/coverage";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import { readOwnedTutorialGraphs } from "../infra/tutorialGraphs";
 import TutorialPanel from "../logic/POM/tutorialPanelComponent";
-import AppDownloadComponent from "../logic/POM/appDownloadComponent";
 import ApiCalls from "../logic/api/apiCalls";
-import { delay, getRandomString } from "../infra/utils";
+import { delay, getQueryRequestParam, getRandomString, initializeLocalStorage } from "../infra/utils";
 import { parseTutorialDemoOwnership, tutorialDemoOwnershipKey } from "../../lib/tutorialDemoGraphs";
 import { createTab, forStorage, TABS_STORAGE_KEY } from "../../lib/graphTabs";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD } from "../../app/utils";
@@ -146,7 +145,6 @@ test.describe("Tutorial", () => {
         test.setTimeout(60_000);
         await page.addInitScript(() => {
             localStorage.removeItem("tutorial");
-            localStorage.setItem("appDownloadPrompt", "false");
             localStorage.setItem("whatsNewSeen", "v9999.0.0");
         });
         await page.route("**/api/auth/session", async route => {
@@ -233,6 +231,8 @@ test.describe("Tutorial", () => {
 
         try {
             await tutorial.changeLocalStorage("true");
+            // Sole-graph auto-selection adds share parameters. A refresh there
+            // deliberately defers the tutorial, so start from a regular visit.
             await browser.navigateTo(urls.graphUrl);
             await tutorial.waitForStep("Welcome to FalkorDB Browser");
             expect(await countPeople()).toBe(9);
@@ -459,7 +459,7 @@ test.describe("Tutorial", () => {
                 : route.continue());
         page.on("request", request => {
             const url = new URL(request.url());
-            if (url.pathname.startsWith("/api/graph/tutorial-social-") && url.searchParams.get("query")?.includes("CREATE")) {
+            if (url.pathname.startsWith("/api/graph/tutorial-social-") && getQueryRequestParam(request, "query")?.includes("CREATE")) {
                 names.push(decodeURIComponent(url.pathname.split("/")[3]));
             }
         });
@@ -717,11 +717,12 @@ test.describe("Tutorial", () => {
         page.on("request", request => {
             const url = new URL(request.url());
             if (url.pathname.startsWith("/api/graph/tutorial-social-demo-")
-                && url.searchParams.get("query")?.trim().startsWith("CREATE")) creations.push(url.pathname);
+                && getQueryRequestParam(request, "query")?.trim().startsWith("CREATE")) creations.push(url.pathname);
         });
         await page.goto(urls.graphUrl);
         await expect.poll(() => failures.some(message => message.includes("Failed to load demo graphs")), { timeout: 30000 }).toBe(true);
-        await expect(page.getByTestId("tutorialSpotlight")).toHaveCount(0);
+        // Step zero has no spotlight, so wait for setup itself to close before repairing storage.
+        await expect(page.locator("[data-tutorial-overlay]")).toHaveCount(0);
         const ownership = await page.evaluate(() => {
             const owner = sessionStorage.getItem("tutorialDemoOwnerId");
             const key = Object.keys(localStorage).find(key => key.endsWith(`tutorialDemoGraphOwnership:${owner}`));
@@ -749,10 +750,9 @@ test.describe("Tutorial", () => {
             let responseBody = "";
             let completed!: () => void;
             const routeCompleted = new Promise<void>(resolve => { completed = resolve; });
-            await page.route(url => {
-                const query = url.searchParams.get("query") ?? "";
-                return query.startsWith("MATCH p=") && (!advance || query.includes("[:MANAGES]"));
-            }, async route => {
+            await page.route("**/api/graph/**", async route => {
+                const query = getQueryRequestParam(route.request(), "query") ?? "";
+                if (!query.startsWith("MATCH p=") || (advance && !query.includes("[:MANAGES]"))) return route.fallback();
                 heldUrl = new URL(route.request().url());
                 await gate;
                 const response = await route.fetch();
@@ -814,7 +814,8 @@ test.describe("Tutorial", () => {
         let heldUrl: URL | undefined;
         let responseBody: string | undefined;
         const routes: Promise<void>[] = [];
-        await page.route(url => url.pathname === `/api/graph/${name}` && !!url.searchParams.get("query")?.startsWith(query), route => {
+        await page.route(`**/api/graph/${name}{,?*}`, route => {
+            if (!getQueryRequestParam(route.request(), "query")?.startsWith(query)) return route.fallback();
             heldUrl = new URL(route.request().url());
             const pending = (async () => {
                 await gate;
@@ -857,7 +858,7 @@ test.describe("Tutorial", () => {
             await expect(page.getByTestId("editorContainer")).toHaveAttribute("data-value", query, { timeout: 30000 });
             const request = page.waitForRequest(request => {
                 const url = new URL(request.url());
-                return url.pathname === `/api/graph/${name}` && url.searchParams.get("query")?.startsWith(query) === true;
+                return url.pathname === `/api/graph/${name}` && getQueryRequestParam(request, "query")?.startsWith(query) === true;
             });
             await graph.clickRunQuery(false);
             expect(new URL((await request).url()).searchParams.get("readOnly")).not.toBe("true");
@@ -873,12 +874,12 @@ test.describe("Tutorial", () => {
 
     test("@admin stalled config initialization releases recovery and saved tabs", async ({ page }) => {
         test.setTimeout(60_000);
+        await page.addInitScript(initializeLocalStorage("localhost", 6379, "default", false));
         await apiCall.runQuery(userGraph, "CREATE (:Mine)");
         const tab = forStorage({ ...createTab(), graphName: userGraph });
         await page.addInitScript(({ tab, key }) => {
             localStorage.removeItem("timeout");
             localStorage.setItem("tutorial", "false");
-            localStorage.setItem("appDownloadPrompt", "false");
             localStorage.setItem(`localhost:6379:default:${key}`, JSON.stringify({ tabs: [tab], activeTabId: tab.id }));
         }, { tab, key: TABS_STORAGE_KEY });
         let configRequests = 0;
@@ -908,7 +909,8 @@ test.describe("Tutorial", () => {
             }));
         }, { suffix, names });
         const creations: string[] = [];
-        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+        await page.route("**/api/graph/tutorial-social-*", route => {
+            if (!getQueryRequestParam(route.request(), "query")?.includes("CREATE")) return route.fallback();
             creations.push(route.request().url());
             return route.fulfill({ status: 400, json: { message: "Must not create a pending graph owned by another tutorial" } });
         });
@@ -928,7 +930,7 @@ test.describe("Tutorial", () => {
         const names: string[] = [];
         page.on("request", request => {
             const url = new URL(request.url());
-            if (url.pathname.startsWith("/api/graph/tutorial-social-") && url.searchParams.get("query")?.includes("CREATE")) {
+            if (url.pathname.startsWith("/api/graph/tutorial-social-") && getQueryRequestParam(request, "query")?.includes("CREATE")) {
                 names.push(decodeURIComponent(url.pathname.split("/")[3]));
             }
         });
@@ -1016,7 +1018,8 @@ test.describe("Tutorial", () => {
         const gate = new Promise<void>(resolve => { release = resolve; });
         const routes: Promise<void>[] = [];
         const names: string[] = [];
-        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+        await page.route("**/api/graph/tutorial-social-*", route => {
+            if (!getQueryRequestParam(route.request(), "query")?.includes("CREATE")) return route.fallback();
             names.push(decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]));
             const pending = gate.then(() => route.fulfill({ contentType: "text/event-stream", body: "event: result\ndata: {}\n\n" }));
             routes.push(pending);
@@ -1073,7 +1076,8 @@ test.describe("Tutorial", () => {
         const gate = new Promise<void>(resolve => { release = resolve; });
         const routes: Promise<void>[] = [];
         const names: string[] = [];
-        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+        await page.route("**/api/graph/tutorial-social-*", route => {
+            if (!getQueryRequestParam(route.request(), "query")?.includes("CREATE")) return route.fallback();
             names.push(decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]));
             const pending = gate.then(() => route.continue());
             routes.push(pending);
@@ -1154,7 +1158,9 @@ test.describe("Tutorial", () => {
     test("@admin late tutorial background reads cannot recreate a deleted sample", async ({ page }) => {
         const name = `tutorial-social-demo-${getRandomString("late-read").replaceAll("_", "-")}`;
         await apiCall.runQuery(name, "CREATE (:Mine)");
-        const removed = await page.request.delete(`${urls.api.graphUrl}${name}`);
+        const removed = await page.request.delete(`${urls.api.graphUrl}${name}`, {
+            headers: { Origin: new URL(urls.localHost).origin },
+        });
         expect(removed.ok()).toBe(true);
         for (const suffix of ["/info?type=(label)", "/info?type=(property%20key)", "/0", "/count", "/count/nodes", "/count/edges", "?query=RETURN%201&readOnly=true"]) {
             const response = await page.request.get(`${urls.api.graphUrl}${name}${suffix}`);
@@ -1180,7 +1186,8 @@ test.describe("Tutorial", () => {
         await page.route("**/api/DBVersion", route => route.request().headers()["x-connection-id"] === connections.second.id
             ? route.fulfill({ status: 503, json: { message: "Second connection cannot allocate tutorial samples" } })
             : route.continue());
-        await page.route(url => url.pathname.startsWith("/api/graph/tutorial-social-") && !!url.searchParams.get("query")?.includes("CREATE"), route => {
+        await page.route("**/api/graph/tutorial-social-*", route => {
+            if (!getQueryRequestParam(route.request(), "query")?.includes("CREATE")) return route.fallback();
             const name = decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]);
             createdNames.push(name);
             const pending = (async () => {
@@ -1393,7 +1400,7 @@ test.describe("Tutorial", () => {
                 deleted = response.ok();
                 return route.fulfill({ response });
             }
-            if (url.searchParams.get("query")?.includes("CREATE")) visibleNames.add(graph);
+            if (getQueryRequestParam(request, "query")?.includes("CREATE")) visibleNames.add(graph);
             if (graph === name && deleted) {
                 staleQueries.push(request.url());
                 return route.fulfill({ status: 400, json: { message: "Reclaimed sample must not be queried" } });
@@ -1732,32 +1739,6 @@ test.describe("Tutorial", () => {
                 const { message } = await apiCall.removeGraph(name, "admin");
                 expect(message).toMatch(/deleted|empty key/);
             }
-        }
-    });
-
-    test("@admin the app download popup waits until the tutorial is closed", async () => {
-        const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        const page = await browser.getPage();
-        const app = new AppDownloadComponent(page);
-        // What's New would also wait for the tutorial and then go first; leave it out.
-        await page.route("**/api/releases", (route) => route.fulfill({ json: { releases: [] } }));
-        try {
-            // The suite keeps the popup away with "false"; any other value lets
-            // it open, and the init script only fills in a missing one.
-            await app.evaluate(() => localStorage.setItem("appDownloadPrompt", "true"));
-            await tutorial.changeLocalStorage("true");
-            await browser.navigateTo(urls.graphUrl);
-            await tutorial.waitForStep("Welcome to FalkorDB Browser");
-
-            // Both are first-visit popups: the tour goes first, alone.
-            await tutorial.waitForTimeout(4000);
-            await expect(app.prompt).toBeHidden();
-
-            await tutorial.skip();
-            await expect(app.prompt).toBeVisible({ timeout: 10_000 });
-        } finally {
-            await tutorial.changeLocalStorage("false");
         }
     });
 

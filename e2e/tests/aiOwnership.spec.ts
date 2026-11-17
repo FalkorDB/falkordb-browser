@@ -43,7 +43,9 @@ test.beforeEach(async ({ page }) => {
 
 test.afterEach(async ({ page }) => {
   for (const graphName of createdGraphs.splice(0)) {
-    expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    expect((await page.request.delete(`${baseUrl}/api/graph/${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
   }
 });
 
@@ -52,7 +54,9 @@ for (const dismissal of ["cancel", "edit", "tab-switch", "navigate"] as const) {
     const graphName = getRandomString("fixOwner");
     const pending = Promise.withResolvers<Route>();
     await page.route("**/api/chat/fix", route => { pending.resolve(route); });
-    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
     createdGraphs.push(graphName);
     await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const ai = new AiAssistComponent(page);
@@ -115,7 +119,9 @@ test("@admin an edit made while the failing query runs gets no Fix with AI", asy
 for (const invalidation of ["edit", "tab-switch"] as const) {
   test(`@admin stale Fix with AI action clears on ${invalidation}`, async ({ page }) => {
     const graphName = getRandomString("fixFailureOwner");
-    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
     createdGraphs.push(graphName);
     await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const ai = new AiAssistComponent(page);
@@ -124,9 +130,7 @@ for (const invalidation of ["edit", "tab-switch"] as const) {
     await expect(ai.fixWithAiButton).toBeVisible();
 
     if (invalidation === "edit") {
-      // insertQuery's default focus presses Escape, which dismisses the toast under test.
-      await ai.editorContainer.click();
-      await ai.insertQuery("RETURN 99", { focus: false });
+      await ai.editQueryKeepingToast("RETURN 99");
       await expect(ai.editorContainer).toHaveAttribute("data-value", "RETURN 99");
     } else {
       await ai.addTabButton.click();
@@ -153,7 +157,9 @@ for (const staleStatus of [200, 422, 401]) {
     const second = Promise.withResolvers<Route>();
     let requests = 0;
     await page.route("**/api/chat/fix", route => { (requests++ === 0 ? first : second).resolve(route); });
-    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
     createdGraphs.push(graphName);
     await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const ai = new AiAssistComponent(page);
@@ -193,7 +199,9 @@ for (const scenario of ["edited-clear", "new-draft-success", "switch-failure", "
     }
     const pending = Promise.withResolvers<Route>();
     await page.route("**/api/chat", route => { pending.resolve(route); });
-    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+    expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+      headers: { Origin: new URL(baseUrl).origin },
+    })).ok()).toBe(true);
     createdGraphs.push(graphName);
     await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
     const chat = new ChatComponent(page);
@@ -245,7 +253,9 @@ test("@admin old Chat success cannot clear a resubmitted draft after reopening",
     requests += 1;
     (requests === 1 ? first : second).resolve(route);
   });
-  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+    headers: { Origin: new URL(baseUrl).origin },
+  })).ok()).toBe(true);
   createdGraphs.push(graphName);
   await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
   const chat = new ChatComponent(page);
@@ -278,7 +288,9 @@ test(`@admin optimize cancels on ${dismissal} and allows a fresh request`, async
   const graphName = getRandomString("optimizeOwner");
   const pending = Promise.withResolvers<Route>();
   await page.route("**/api/chat/optimize", route => { pending.resolve(route); });
-  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+    headers: { Origin: new URL(baseUrl).origin },
+  })).ok()).toBe(true);
   createdGraphs.push(graphName);
   await page.goto(`${baseUrl}/graph?graph=${encodeURIComponent(graphName)}&query=RETURN%201`);
   const ai = new AiAssistComponent(page);
@@ -323,7 +335,9 @@ test("@admin optimize result closes when same-connection readiness is lost", asy
   await page.route("**/api/chat/optimize", route => route.fulfill({ json: {
     explanation: "Result before readiness loss", suggestions: [], optimizedQuery: "RETURN 2", executionPlan: ["Results"],
   } }));
-  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`)).ok()).toBe(true);
+  expect((await page.request.post(`${baseUrl}/api/graph/${graphName}`, {
+    headers: { Origin: new URL(baseUrl).origin },
+  })).ok()).toBe(true);
   createdGraphs.push(graphName);
   let releaseConfig!: () => void;
   const configGate = new Promise<void>(resolve => { releaseConfig = resolve; });

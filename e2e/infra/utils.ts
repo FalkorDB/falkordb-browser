@@ -1,10 +1,28 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable no-await-in-loop */
-import { Locator, Page } from "playwright";
+import { Locator, Page, type Request } from "playwright";
 import { readFileSync } from "fs";
 import crypto from "crypto";
 
 const adminAuthFile = "playwright/.auth/admin.json";
+
+export function getQueryRequestParam(request: Request, name: "query" | "timeout"): string | null {
+  if (request.method() !== "POST" || !request.postData()) {
+    return new URL(request.url()).searchParams.get(name);
+  }
+  let body: unknown;
+  try {
+    body = request.postDataJSON();
+  } catch {
+    return null;
+  }
+  if (!body || typeof body !== "object" || !(name in body)) return null;
+  const value = body[name as keyof typeof body];
+  if (typeof value !== "string" && typeof value !== "number") {
+    throw new Error(`Unexpected query request parameter: ${name}`);
+  }
+  return String(value);
+}
 
 export const DEFAULT_CREATE_QUERY =
   "UNWIND range(1, 10) as x CREATE (n:n)-[e:e]->(m:m) RETURN *";
@@ -59,7 +77,6 @@ export const initializeLocalStorage = (host = "localhost", port = 6379, username
         if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
         // A release far in the future counts as seen, so the What's New popup never covers a test.
         if (!localStorage.getItem("whatsNewSeen")) localStorage.setItem("whatsNewSeen", "v999.0.0");
-        if (!localStorage.getItem("appDownloadPrompt")) localStorage.setItem("appDownloadPrompt", "false");
     `;
 };
 

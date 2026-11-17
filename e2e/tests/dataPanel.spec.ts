@@ -240,24 +240,25 @@ test.describe("Data panel Tests", () => {
       const result = await apicalls.runQuery(graphName, `CREATE (n {legacy: 1, \`${protectedKeys[0]}\`: 2, \`${protectedKeys[1]}\`: 3}) RETURN ID(n) AS id`);
       const id = Number(result.data[0].id);
       const legacyUrl = `${urls.api.graphUrl}${encodeURIComponent(graphName)}/${id}/legacy`;
+      const headers = { Origin: new URL(urls.localHost).origin };
       const readProperties = async () => (await apicalls.runQuery(graphName, "MATCH (n) RETURN n")).data[0].n.properties;
-      const updated = await request.post(legacyUrl, { data: { type: true, value: 7, valueType: "integer" } });
+      const updated = await request.post(legacyUrl, { headers, data: { type: true, value: 7, valueType: "integer" } });
       expect(updated.ok(), await updated.text()).toBe(true);
       expect(await readProperties()).toEqual({ legacy: 7, ...initial });
-      const removed = await request.delete(legacyUrl, { data: { type: true } });
+      const removed = await request.delete(legacyUrl, { headers, data: { type: true } });
       expect(removed.ok(), await removed.text()).toBe(true);
       expect(await readProperties()).toEqual(initial);
       // A "?" in the key used to cut off the readOnly flag before keys were encoded (#2205).
       for (const key of protectedKeys) {
         const protectedUrl = new URL(getPropertyUrl(graphName, id, key, true), urls.localHost).toString();
-        const blockedUpdate = await request.post(protectedUrl, { data: { type: true, value: 9, valueType: "integer" } });
-        const blockedDelete = await request.delete(protectedUrl, { data: { type: true } });
+        const blockedUpdate = await request.post(protectedUrl, { headers, data: { type: true, value: 9, valueType: "integer" } });
+        const blockedDelete = await request.delete(protectedUrl, { headers, data: { type: true } });
         expect(blockedUpdate.status()).toBe(403);
         expect(blockedDelete.status()).toBe(403);
       }
       const emptyKeyUrl = new URL(getPropertyUrl(graphName, id, ""), urls.localHost).toString();
-      const emptyUpdate = await request.post(emptyKeyUrl, { data: { type: true, value: 9, valueType: "integer" } });
-      const emptyDelete = await request.delete(emptyKeyUrl, { data: { type: true } });
+      const emptyUpdate = await request.post(emptyKeyUrl, { headers, data: { type: true, value: 9, valueType: "integer" } });
+      const emptyDelete = await request.delete(emptyKeyUrl, { headers, data: { type: true } });
       expect(emptyUpdate.status()).toBe(400);
       expect(await emptyUpdate.json()).toEqual({ message: "Property key must not be empty" });
       expect(emptyDelete.status()).toBe(400);

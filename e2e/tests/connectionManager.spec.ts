@@ -16,6 +16,63 @@ const PRIMARY_PORT = 6379;
 const SECONDARY_SERVER = { host: "localhost", port: 6380 };
 const READ_WRITE_USERNAME = userRoles.find(({ role }) => role === "readwrite")!.name;
 
+test("@admin Removed connections cannot be recovered from session fields", async ({ playwright }) => {
+  const origin = new URL(urls.loginUrl).origin;
+  const request = await playwright.request.newContext({
+    baseURL: origin,
+    storageState: { cookies: [], origins: [] },
+    extraHTTPHeaders: { Origin: origin },
+  });
+  try {
+    const csrf = await (await request.get("/api/auth/csrf")).json();
+    const login = await request.post("/api/auth/callback/credentials", {
+      headers: { "X-Auth-Return-Redirect": "1" },
+      form: {
+        csrfToken: csrf.csrfToken, callbackUrl: `${origin}/graph`,
+        host: "localhost", port: "6379", username: "", password: "", tls: "false",
+      },
+    });
+    expect(login.ok()).toBe(true);
+    expect(new URL((await login.json()).url).searchParams.has("error")).toBe(false);
+    expect((await request.get("/api/info")).ok()).toBe(true);
+    const { connections }: { connections: { id: string }[] } =
+      await (await request.get("/api/connections")).json();
+    expect(connections).toHaveLength(1);
+    const connectionId = connections[0].id;
+    const existing = await request.post("/api/auth/migrate-session");
+    expect(existing.status()).toBe(200);
+    expect((await existing.json()).connection.id).toBe(connectionId);
+    expect(existing.headers()["x-session-invalid"]).toBeUndefined();
+    expect((await (await request.get("/api/connections")).json()).connections).toHaveLength(1);
+    expect((await request.delete(`/api/connections/${connectionId}`)).ok()).toBe(true);
+    const migration = await request.post("/api/auth/migrate-session");
+    expect(migration.status()).toBe(401);
+    expect((await migration.json()).code).toBe("SESSION_INVALID");
+    expect(migration.headers()["x-session-invalid"]).toBe("1");
+
+    const requestHeaders: Record<string, string>[] = [{}, { "X-Connection-Id": connectionId }];
+    for (const headers of requestHeaders) {
+      const response = await request.get("/api/info", { headers });
+      expect(response.status()).toBe(401);
+      expect((await response.json()).code).toBe("SESSION_INVALID");
+    }
+    await request.get("/api/auth/session");
+    const remaining = await (await request.get("/api/connections")).json();
+    expect(remaining.connections).toEqual([]);
+    expect((await request.get("/api/info")).status()).toBe(401);
+  } finally {
+    try {
+      const csrf = await (await request.get("/api/auth/csrf")).json();
+      const signout = await request.post("/api/auth/signout", { form: { csrfToken: csrf.csrfToken } });
+      if (!signout.ok()) console.warn(`Connection-test sign-out cleanup returned HTTP ${signout.status()}`);
+    } catch (error) {
+      console.warn("Connection-test sign-out cleanup failed:", error);
+    } finally {
+      await request.dispose();
+    }
+  }
+});
+
 test.describe("Connection Manager Tests", () => {
   let browser: BrowserWrapper;
 
@@ -107,9 +164,12 @@ test.describe("Connection Manager Tests: own session", () => {
     await manager.submitAdditionalConnection(READ_WRITE_USERNAME, "first-attempt");
     const response = await rejectedResponse;
     expect(response.status()).toBe(400);
-    expect((await response.json()).message).toMatch(/^Authentication failed/);
+    expect(await response.json()).toMatchObject({
+      code: "invalid_credentials",
+      message: "Invalid credentials. Please check your username and password.",
+    });
     await expect(manager.addConnectionSubmit).toBeDisabled();
-    await expect(manager.addDialog).toContainText("Failed to add connection");
+    await expect(manager.addDialog).toContainText("Invalid credentials. Please check your username and password.");
     await manager.fillAdditionalPassword(user.password);
     await expect(manager.addConnectionSubmit).toBeEnabled();
     await manager.submitConnectionForm();

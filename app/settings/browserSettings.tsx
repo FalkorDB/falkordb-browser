@@ -109,6 +109,7 @@ export default function BrowserSettings() {
     const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
     const [editingKeyValue, setEditingKeyValue] = useState("");
     const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
+    const [isEditInputRevealed, setIsEditInputRevealed] = useState(true);
     const [activeSelectedChatApiKeyId, setActiveSelectedChatApiKeyId] = useState("");
     const [modelLoadNonce, setModelLoadNonce] = useState(0);
     const [loadingChatApiKeyId, setLoadingChatApiKeyId] = useState("");
@@ -624,7 +625,7 @@ export default function BrowserSettings() {
         if (!keyToEdit) return;
         setEditingKeyId(id);
         setEditingKeyValue(keyToEdit.key);
-        setVisibleKeyIds(prev => new Set(prev).add(id));
+        setIsEditInputRevealed(true);
     };
 
     const handleSaveEditedKey = async (id: string) => {
@@ -692,13 +693,18 @@ export default function BrowserSettings() {
         }
     };
 
+    // An edit opens in plain text without touching the saved choice, so ending it restores
+    // what the user picked. Toggling during the edit masks or reveals the input and becomes that choice.
     const toggleKeyVisibility = (id: string) => {
+        const isEditingKey = editingKeyId === id;
+        const reveal = isEditingKey ? !isEditInputRevealed : !visibleKeyIds.has(id);
+        if (isEditingKey) setIsEditInputRevealed(reveal);
         setVisibleKeyIds(prev => {
             const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
+            if (reveal) {
                 next.add(id);
+            } else {
+                next.delete(id);
             }
             return next;
         });
@@ -926,6 +932,7 @@ export default function BrowserSettings() {
                                                             const isVisible = visibleKeyIds.has(apiKey.id);
                                                             const providerName = apiKey.provider === "unknown" ? "Unknown provider" : getProviderDisplayName(apiKey.provider);
                                                             const isEditing = editingKeyId === apiKey.id;
+                                                            const isKeyShown = isEditing ? isEditInputRevealed : isVisible;
                                                             const isLoadingKey = loadingChatApiKeyId === apiKey.id;
 
                                                             return (
@@ -966,8 +973,8 @@ export default function BrowserSettings() {
                                                                                                 toggleKeyVisibility(apiKey.id);
                                                                                             }}
                                                                                         >
-                                                                                            {isVisible ? <EyeOff className="mr-1 inline h-3.5 w-3.5" /> : <Eye className="mr-1 inline h-3.5 w-3.5" />}
-                                                                                            {isVisible ? "Hide" : "Show"}
+                                                                                            {isKeyShown ? <EyeOff className="mr-1 inline h-3.5 w-3.5" /> : <Eye className="mr-1 inline h-3.5 w-3.5" />}
+                                                                                            {isKeyShown ? "Hide" : "Show"}
                                                                                         </button>
                                                                                         <button
                                                                                             type="button"
@@ -1018,7 +1025,9 @@ export default function BrowserSettings() {
                                                                                         <Input
                                                                                             data-testid="chatApiKeyEditInput"
                                                                                             className="flex-1 font-mono text-xs"
-                                                                                            type={isVisible ? "text" : "password"}
+                                                                                            type={isEditInputRevealed ? "text" : "password"}
+                                                                                            spellCheck={false}
+                                                                                            autoComplete="off"
                                                                                             value={editingKeyValue}
                                                                                             onChange={(e) => setEditingKeyValue(e.target.value)}
                                                                                         />

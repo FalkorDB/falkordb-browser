@@ -1016,10 +1016,10 @@ test.describe("@Tokens Token API Tests", () => {
 
       const view = await apiCall.getTokenDetailsRaw(adminRow.token_id, userBearer);
       expect(view.status).toBe(403);
-      expect(view.body.message).toBe("Forbidden: You can only view your own tokens");
+      expect(view.body.message).toBe("Forbidden: You can only view tokens for your connection");
       const revoke = await apiCall.revokeTokenRaw(adminRow.token_id, userBearer);
       expect(revoke.status).toBe(403);
-      expect(revoke.body.message).toBe("Forbidden: You can only revoke your own tokens");
+      expect(revoke.body.message).toBe("Forbidden: You can only revoke tokens for your connection");
       expect((await apiCall.getTokenDetailsRaw(adminRow.token_id)).body.token.is_active).toBe(true);
 
       const userRow = (await findToken(userTokenName))!;

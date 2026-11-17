@@ -85,8 +85,9 @@ No AWS or HTTPS needed: a debug APK opens a browser running on your machine.
    AUTH_URL=http://192.168.1.52:3000 npm run dev -- -H 0.0.0.0   # from the repo root
    ```
 
-   To let the browser's "Get the app" popup offer the dev APK as well, add
+   To have `/api/app-links` point at the dev APK as well, add
    `ANDROID_APP_URL=http://192.168.1.52:8000/FalkorDB-Browser-android-dev.apk APP_LINKS_ALLOW_HTTP=1`.
+   (The browser's "Get the app" popup that used these links is hidden for now.)
 
 2. Build the APK. It needs the Android SDK and a JDK 21 (`ANDROID_HOME`, `JAVA_HOME`):
 

@@ -53,34 +53,20 @@ test.describe("Chat Feature Tests", () => {
   });
 
   test(`@readwrite Verify chat button is disabled when no graph is selected`, async () => {
-    // The graph page auto-selects the only graph when exactly one exists, and
-    // parallel tests on the shared FalkorDB often create exactly one. Two of our
-    // own keep the count above one so nothing gets auto-selected.
-    const graphNames = [getRandomString("chat"), getRandomString("chat")];
+    await browser.createNewPage(ChatComponent);
+    const page = await browser.getPage();
+    await page.addInitScript(() => {
+      for (const key of Object.keys(localStorage)) {
+        if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
+      }
+    });
+    await page.route("**/api/graph", route => route.fulfill({ json: { opts: [] } }));
+    await page.goto(urls.graphUrl);
+    await browser.setPageToFullScreen();
 
-    try {
-      // Let both creations settle before failing, so `finally` also removes a
-      // graph whose sibling failed instead of leaking it into the shared DB.
-      const created = await Promise.allSettled(graphNames.map((name) => apiCall.addGraph(name)));
-      const failure = created.find((result): result is PromiseRejectedResult => result.status === "rejected");
-      if (failure) throw failure.reason;
-
-      await browser.createNewPage(ChatComponent);
-      const page = await browser.getPage();
-      await page.addInitScript(() => {
-        for (const key of Object.keys(localStorage)) {
-          if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
-        }
-      });
-      await page.goto(urls.graphUrl);
-      await browser.setPageToFullScreen();
-
-      await expect(page.getByTestId("chatToggleButton")).toBeVisible();
-      await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
-    } finally {
-      // allSettled: removing a graph that was never created must not mask the real error.
-      await Promise.allSettled(graphNames.map((name) => apiCall.removeGraph(name)));
-    }
+    await expect(page.getByTestId("selectGraph")).toHaveText("Select Graph");
+    await expect(page.getByTestId("chatToggleButton")).toBeVisible();
+    await expect(page.getByTestId("chatToggleButton")).toBeDisabled();
   });
 
   test(`@readwrite Verify chat button is displayed when a graph is selected`, async () => {
@@ -98,6 +84,30 @@ test.describe("Chat Feature Tests", () => {
     expect(isChatButtonVisible).toBe(true);
     
     await apiCall.removeGraph(graphName);
+  });
+
+  test("@readwrite A single available graph is auto-selected and enables chat", async () => {
+    const graphName = getRandomString("chat-auto-select");
+    await apiCall.addGraph(graphName);
+    try {
+      await browser.createNewPage(ChatComponent);
+      const page = await browser.getPage();
+      await page.addInitScript(() => {
+        for (const key of Object.keys(localStorage)) {
+          if (key.endsWith(":graph-tabs")) localStorage.removeItem(key);
+        }
+      });
+      await page.route("**/api/graph", route => route.fulfill({ json: { opts: [graphName] } }));
+      await page.goto(urls.graphUrl);
+      await browser.setPageToFullScreen();
+
+      await expect(page.getByTestId("selectGraph")).toHaveText(graphName);
+      await expect(page.getByTestId("chatToggleButton")).toBeEnabled();
+      await page.getByTestId("chatToggleButton").click();
+      await expect(page.getByTestId("chatPanel")).toBeVisible();
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
   });
 
   test(`@readwrite Verify attempting to send a question without API key shows error`, async () => {
@@ -641,11 +651,28 @@ test.describe("Chat Feature Tests", () => {
       const displayedQuery = await chat.getLastAssistantMessageContent("CypherQuery");
       expect(displayedQuery?.trim().startsWith("CYPHER sourceCode='TLV'")).toBe(true);
 
+      const queryMessage = page.getByTestId("chatAssistantMessage-CypherQuery").last();
+      const queryText = queryMessage.getByTestId("chatSuggestedQuery");
+      await expect(queryText).toHaveText(cypherQuery);
+      await expect(queryText).toHaveCSS("white-space", "pre-wrap");
+      await expect(queryMessage.getByTestId("chatCopyQueryButton")).toBeVisible();
+      await expect(queryMessage.getByTestId("chatInsertQueryButton")).toBeVisible();
+      // The long query wraps past the collapse threshold, so the collapse toggle joins copy and insert.
+      await expect(queryMessage.getByRole("button", { name: "Collapse query" })).toBeVisible();
+      await expect(queryMessage.getByRole("button")).toHaveCount(3);
+      expect(await queryText.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+      let queryRequests = 0;
+      page.on("request", request => {
+        const url = new URL(request.url());
+        if (url.pathname === `/api/graph/${graphName}` && url.searchParams.has("query")) queryRequests++;
+      });
       await chat.clickChatInsertQueryButton();
 
       await expect.poll(() => chat.getEditorInput(), { timeout: 10000 })
         .toMatch(/^CYPHER sourceCode='TLV'/);
       await chat.clickRunQuery();
+      await expect.poll(() => queryRequests).toBeGreaterThan(0);
       await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
       expect(await chat.getNotificationErrorToast()).toBe(false);
     } finally {
@@ -705,9 +732,13 @@ test.describe("Chat Feature Tests", () => {
     
     for (let i = 0; i < messages.length; i += 1) {
       const message = messages[i];
+      // eslint-disable-next-line no-await-in-loop
       await chat.fillChatInput(message);
+      // eslint-disable-next-line no-await-in-loop
       await chat.waitForChatSendButtonEnabled();
+      // eslint-disable-next-line no-await-in-loop
       await chat.clickChatSendButton();
+      // eslint-disable-next-line no-await-in-loop
       await chat.waitForUserMessageCount(i + 1);
     }
 

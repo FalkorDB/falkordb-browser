@@ -24,6 +24,7 @@ import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { CanvasDimension, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { QueryStatistics } from "falkordb";
+import { ownsCanvasSession, renewMountedCanvasSessions } from "@/lib/canvasSession";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
@@ -32,7 +33,6 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
-import AppDownloadPrompt from "./components/AppDownloadPrompt";
 import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDimension, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
@@ -641,6 +641,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // are rejected while > 0); `switchTicket` is monotonic so a completing switch
   // can tell whether it is still the latest (out-of-order completions are ignored).
   const pendingSwitchesRef = useRef(0);
+  const switchOriginRef = useRef<string | null | undefined>(undefined);
   const switchTicketRef = useRef(0);
   // Rendered mirror of `pendingSwitchesRef`, for effects that must hold off
   // until a switch settles. The ref alone cannot wake them.
@@ -661,6 +662,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // end (on success via the reset effect, on failure/supersession by the caller),
   // so the counter can never get stuck above 0.
   const beginConnectionSwitch = useCallback(() => {
+    if (pendingSwitchesRef.current === 0) switchOriginRef.current = getActiveConnectionIdGlobal();
     pendingSwitchesRef.current += 1;
     switchTicketRef.current += 1;
     setSwitchPending(true);
@@ -1372,7 +1374,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         `/api/graph/${prepareArg(name)}?query=${prepareArg(query)}${readOnlyParam}`,
         gToast,
         gInd,
-        { connectionId: cid },
+        { connectionId: cid, method: "POST" },
       ) as { data?: Array<{ info?: unknown }> };
 
       if (superseded() || !sse || !Array.isArray(sse.data)) return [];
@@ -1492,6 +1494,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
         query: q,
         connectionId: cid,
+        method: "POST",
         allowTutorialCreation: options?.allowTutorialCreation ?? !options?.silent,
       }) as { data: Data; stats: QueryStatistics };
 
@@ -1732,6 +1735,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // into the tab — seeded from the tab on activation so a capture taken before
   // the view mounts does not carry the previous tab's state over.
   const schemaMetaRef = useRef<SchemaViewMeta>({});
+  const activeCanvasTabRef = useRef("");
   // The schema view's layout and direction are also mirrored in state, so the
   // address bar follows them. The rest of its metadata changes on every pan
   // and stays in the ref; bailing out on equal values keeps this quiet.
@@ -1751,7 +1755,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // zoom; capturing them is what lets a return skip the layout entirely.
     // Off /graph the canvas is unmounted and ForceGraph's own unmount handler
     // has already pushed the last snapshot into state, so fall back to that.
-    const layout = canvas ? captureCanvasLayout(canvas) : undefined;
+    const ownsCanvas = canvas && ownsCanvasSession(canvas, {
+      graph: state.graph, data: state.data, tabId: activeCanvasTabRef.current,
+      epoch: getConnectionEpoch(), restore: state.graphData,
+    });
+    const layout = ownsCanvas ? captureCanvasLayout(canvas) : undefined;
 
     return {
       ...state,
@@ -1767,7 +1775,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const canvas = canvasRef.current;
     // An empty canvas reports whatever zoom it happens to sit at, which would
     // overwrite a good viewport with a meaningless one.
-    const hasNodes = (canvas?.getGraphData().nodes.length ?? 0) > 0;
+    const hasNodes = canvas && ownsCanvasSession(canvas, {
+      graph: state.graph, data: state.data, tabId: activeCanvasTabRef.current,
+      epoch: getConnectionEpoch(), restore: state.graphData,
+    }) && canvas.getGraphData().nodes.length > 0;
     const panelView = state.view === "Schema" ? "schema" : "graph";
     if (panelRef.current) panelOpenRef.current[panelView] = !panelRef.current.isCollapsed();
 
@@ -1809,11 +1820,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     graphInfoSyncRef.current.bumpVersion();
     graphInfoSyncRef.current.setNodesCount(session.nodesCount);
     graphInfoSyncRef.current.setEdgesCount(session.edgesCount);
-    setData(session.data);
+    setData({ ...session.graph.Elements });
     setGraphData(session.graphData);
     setViewport(session.viewport);
-    setLabels(session.labels);
-    setRelationships(session.relationships);
+    setLabels([...session.graph.Labels]);
+    setRelationships([...session.graph.Relationships]);
     setCurrentTab(session.view);
     setSelectedParam(session.selectedParam);
     setSearch(session.search);
@@ -1945,7 +1956,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // for tutorial recovery, which may still be removing old samples.
   const tabsReady = (tutorialOpen || graphNamesLoaded) && timeoutLoaded && tutorialRecoveryReady;
   const graphTabs = useGraphTabs({
-    prefixReady,
+    prefixReady: prefixReady && (activeConnectionId ?? prefixConnectionId) !== null
+      && (activeConnectionId === null || activeConnectionId === prefixConnectionId),
     canRestore: tabsReady,
     connectionKey: activeConnectionId ?? prefixConnectionId,
     // The tutorial gets a strip of its own; the user's tabs come back with it.
@@ -1961,6 +1973,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     captureMeta: captureTabMeta,
     onActivate: handleActivateTab,
   });
+
+  useLayoutEffect(() => {
+    activeCanvasTabRef.current = graphTabs.activeTabId;
+  }, [graphTabs.activeTabId]);
 
   markTabRanRef.current = graphTabs.markRan;
 
@@ -1999,6 +2015,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (activeConnectionId === null && bootstrap?.id === getActiveConnectionIdGlobal()
       && bootstrap.epoch === getConnectionEpoch()) return;
     setActiveConnectionIdGlobal(activeConnectionId);
+    if (switchOriginRef.current === undefined) return;
+    const rolledBack = switchOriginRef.current === activeConnectionId;
+    switchOriginRef.current = undefined;
+    if (rolledBack && activeConnectionId) renewMountedCanvasSessions(getConnectionEpoch());
   });
 
   // Keep "Did you mean…?" function suggestions aware of the loaded UDFs.
@@ -2183,6 +2203,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const pinAndSync = async (id: string) => {
       const sameConnection = getActiveConnectionIdGlobal() === null
         && sessionConnectionIdRef.current === id;
+      // null → B bumps no epoch, so a tab query or graph list read under the
+      // session's connection could otherwise commit into B's state once the prefix moves.
+      if (!sameConnection) {
+        bumpContextGen();
+        supersedeGraphLists();
+      }
       setActiveConnectionId(id);
       setActiveConnectionIdGlobal(id);
       const pinnedEpoch = getConnectionEpoch();
@@ -2235,39 +2261,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             }
 
           } else {
-            // Token DB returned no connections — the session is out of sync.
-            // This happens after a server restart (FileTokenStorage wiped),
-            // a deploy that changed the storage backend, or any time the
-            // connection entry was never written (old pre-feature sessions).
-            //
-            // Fix: call the migration endpoint which:
-            //   1. Deletes stale Token DB entries for this user
-            //   2. Reconnects to FalkorDB using session.user credentials
-            //   3. Creates a fresh entry in Token DB
-            //   4. Returns the new connection
-            // Then sync the JWT and local state with the result.
-            //
-            // Also clean up stale localStorage keys so we don't restore
-            // a lastActiveConnectionId that no longer exists.
+            // Missing connection records require fresh authentication, not
+            // reconstruction from potentially revoked cookie fields.
             localStorage.removeItem("lastActiveConnectionId");
-
-            const migrateResult = await securedFetch("/api/auth/migrate-session", {
-              method: "POST",
-            }, toast, setIndicator);
-
-            if (cancelled) return;
-
-            if (migrateResult.ok) {
-              const migrateJson = await migrateResult.json();
-              if (migrateJson?.connection) {
-                const migratedConn: SessionConnection = migrateJson.connection;
-                const migratedConns = [migratedConn];
-                setAdditionalConnections(migratedConns);
-                if (!cancelled) {
-                  await pinAndSync(migratedConn.id);
-                }
-              }
-            }
+            setIndicator("offline");
+            const { signOut } = await import("next-auth/react");
+            if (!cancelled) await signOut({ callbackUrl: "/login" });
           }
         }
         sessionSyncedRef.current = true;
@@ -2277,7 +2276,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     })();
 
     return () => { cancelled = true; };
-  }, [status, toast]);
+  }, [status, toast, bumpContextGen]);
 
   useEffect(() => {
     if (timeoutInitKey === null) {
@@ -3398,8 +3397,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // The demo queries are internal setup, so silence the SSE parse detail and
       // report the failure once below.
       const loads = await Promise.allSettled([
-        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[0])}?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid, allowTutorialCreation: true }),
-        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[1])}?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid, allowTutorialCreation: true })
+        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[0])}?query=${prepareArg(socialQuery)}`, silentToast, setIndicator, { connectionId: cid, method: "POST", allowTutorialCreation: true }),
+        getSSEGraphResult(`/api/graph/${prepareArg(demoGraphNames[1])}?query=${prepareArg(socialTestQuery)}`, silentToast, setIndicator, { connectionId: cid, method: "POST", allowTutorialCreation: true })
       ]);
 
       const failedLoad = loads.find((load): load is PromiseRejectedResult => load.status === "rejected");
@@ -3645,11 +3644,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                       }
                                     </GraphTabsContext.Provider>
                                     <AiFixDialogs />
-                                    {/* At the root, not on /graph or /login: a saved session skips the
-                                        login page, and the graph page is not where everyone lands.
-                                        It waits until the session and the tutorial have both been decided,
-                                        and until What's New, if there is one, has been read. */}
-                                    <AppDownloadPrompt blocked={tutorialOpen || status === "loading" || (status === "authenticated" && !tutorialDecided)} />
                                   </AiFixContext.Provider>
                                 </CsvLoadContext.Provider>
                               </CypherLanguageContext.Provider>
