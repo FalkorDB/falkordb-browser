@@ -353,3 +353,76 @@ test("read URL endpoint overrides are signed locally without sending S3 requests
     }
     assert.equal(sends.length, 0);
 });
+
+test("read URLs apply Docker gateway and explicit endpoint overrides", async (t) => {
+    t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-01-01T00:00:00Z") });
+    const keys = [
+        "S3_READ_ENDPOINT",
+        "S3_ENDPOINT",
+        "S3_READ_URL_AUTO_DOCKER_GATEWAY",
+        "S3_READ_URL_DOCKER_GATEWAY",
+        "S3_READ_URL_HOST",
+        "S3_READ_URL_PORT",
+        "S3_READ_URL_PROTOCOL",
+    ] as const;
+    const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+    const ignoreConfiguredEndpoints = process.env.AWS_IGNORE_CONFIGURED_ENDPOINT_URLS;
+    process.env.AWS_IGNORE_CONFIGURED_ENDPOINT_URLS = "true";
+    t.after(() => {
+        for (const key of keys) {
+            if (original[key] === undefined) delete process.env[key];
+            else process.env[key] = original[key];
+        }
+        if (ignoreConfiguredEndpoints === undefined) delete process.env.AWS_IGNORE_CONFIGURED_ENDPOINT_URLS;
+        else process.env.AWS_IGNORE_CONFIGURED_ENDPOINT_URLS = ignoreConfiguredEndpoints;
+    });
+
+    const sends: unknown[] = [];
+    t.mock.method(S3Client.prototype, "send", async (command: unknown) => {
+        sends.push(command);
+        return {};
+    });
+    const cases = [
+        {
+            env: { S3_ENDPOINT: "http://localhost:9000", S3_READ_URL_AUTO_DOCKER_GATEWAY: "true" },
+            origin: "https://172.17.0.1:444",
+        },
+        {
+            env: { S3_ENDPOINT: "https://127.0.0.1:9443", S3_READ_URL_AUTO_DOCKER_GATEWAY: "true", S3_READ_URL_DOCKER_GATEWAY: "10.0.0.1" },
+            origin: "https://10.0.0.1:444",
+        },
+        {
+            env: { S3_ENDPOINT: "http://localhost:9000", S3_READ_URL_AUTO_DOCKER_GATEWAY: "true", S3_READ_URL_HOST: "reader.test", S3_READ_URL_PORT: "8443", S3_READ_URL_PROTOCOL: "https" },
+            origin: "https://reader.test:8443",
+        },
+        {
+            env: { S3_ENDPOINT: "http://localhost:9000", S3_READ_URL_AUTO_DOCKER_GATEWAY: "true", S3_READ_URL_PORT: "8080" },
+            origin: "http://172.17.0.1:8080",
+        },
+        {
+            env: { S3_ENDPOINT: "http://localhost:9000", S3_READ_URL_AUTO_DOCKER_GATEWAY: "true", S3_READ_URL_PROTOCOL: "https:" },
+            origin: "https://172.17.0.1:9000",
+        },
+        {
+            env: { S3_ENDPOINT: "http://remote.test:9000", S3_READ_URL_AUTO_DOCKER_GATEWAY: "true" },
+            origin: "http://remote.test:9000",
+        },
+        {
+            env: {},
+            origin: "https://s3.us-east-1.amazonaws.com",
+        },
+    ];
+
+    for (const { env, origin } of cases) {
+        for (const key of keys) delete process.env[key];
+        Object.assign(process.env, env);
+        const url = new URL(await new S3CsvStorage().resolveReadUrl(OWNER, KEY));
+        assert.equal(url.origin, origin);
+        assert.equal(decodeURIComponent(url.pathname), `/${BUCKET}/${objectPath(OWNER, KEY)}`);
+        assert.equal(url.searchParams.get("X-Amz-Expires"), "1234");
+    }
+    for (const key of keys) delete process.env[key];
+    process.env.S3_ENDPOINT = "not-a-url";
+    await assert.rejects(() => new S3CsvStorage().resolveReadUrl(OWNER, KEY), /Invalid URL/);
+    assert.equal(sends.length, 0);
+});

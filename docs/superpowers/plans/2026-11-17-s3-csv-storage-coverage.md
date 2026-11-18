@@ -72,7 +72,9 @@
     type does not expose content length; do not assert a nonexistent response
     field or use a brittle signature assertion to infer it.
   - Read endpoint overrides and configured signing expiration are reflected in
-    the generated URL without making a network request.
+    the generated URL without making a network request. Exercise Docker gateway
+    rewrites, individual read overrides, the default AWS endpoint, and an
+    invalid endpoint.
 
 - [ ] **Step 2: Run the focused test file.**
 
