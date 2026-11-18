@@ -24,7 +24,10 @@
 1. Invalid owners or keys must fail before an AWS command is sent.
 2. Missing `S3_BUCKET` must fail explicitly rather than issue a request.
 3. Optional object-existence verification must map 404 responses to the stable not-found error and rethrow other failures.
-4. Cleanup filters old objects by an owner/UUID CSV suffix, including across paginated listings. Exact paths relative to the prefix are not enforced by the current implementation.
+4. Cleanup must delete only old, exact owner/UUID CSV objects directly under
+   the configured prefix, including across paginated listings. The current
+   suffix-only filter also accepts extra nested directories; fix and regression
+   coverage are tracked separately in #2339, outside this test-only PR.
 5. Delete remains best-effort: an AWS delete failure is logged and does not reject the call.
 
 ---

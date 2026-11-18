@@ -282,6 +282,7 @@ test("createDirectUploadTarget signs PUT URLs with the owner-scoped key and requ
     t.mock.timers.enable({ apis: ["Date"], now: signingDate });
     const storage = new S3CsvStorage();
     const suppliedContentType = "text/csv";
+    const resolveMiddleware = t.mock.method(PutObjectCommand.prototype, "resolveMiddleware");
 
     const supplied = await storage.createDirectUploadTarget(OWNER, KEY, {
         filename: "data.csv",
@@ -293,6 +294,12 @@ test("createDirectUploadTarget signs PUT URLs with the owner-scoped key and requ
         contentType: "",
         sizeBytes: 456,
     });
+
+    assert.equal(resolveMiddleware.mock.callCount(), 2);
+    const fallbackCommand = resolveMiddleware.mock.calls[1].this;
+    assert.ok(fallbackCommand instanceof PutObjectCommand);
+    assert.equal(fallbackCommand.input.ContentType, CONTENT_TYPE);
+    assert.equal(fallbackCommand.input.ContentLength, 456);
 
     assert.ok(supplied);
     assert.equal(supplied.type, "s3-presigned-put");
