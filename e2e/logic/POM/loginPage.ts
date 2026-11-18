@@ -1,4 +1,4 @@
-import { Locator } from "@playwright/test";
+import { Locator, Page } from "@playwright/test";
 import {
   interactWhenVisible,
   waitForElementToBeVisible,
@@ -14,6 +14,13 @@ import HeaderComponent from "./headerComponent";
 type CertificateFile = string | { name: string; contents: string };
 
 export default class LoginPage extends HeaderComponent {
+  constructor(page: Page) {
+    super(page);
+    // Keep file-chooser interception on for the page's lifetime: `waitForEvent("filechooser")` re-arms it
+    // without awaiting, so a back-to-back upload's click can open an unobserved native picker (Firefox).
+    page.on("filechooser", () => {});
+  }
+
   private get connectBtn(): Locator {
     return this.page.getByRole("button", { name: "Log in" });
   }
@@ -367,7 +374,7 @@ export default class LoginPage extends HeaderComponent {
     if (credentials.host) params.set("host", credentials.host);
     if (credentials.port) params.set("port", credentials.port);
     if (credentials.username) params.set("username", credentials.username);
-    if (credentials.tls) params.set("tls", "true");
+    if (credentials.tls !== undefined) params.set("tls", String(credentials.tls));
 
     const loginUrlWithParams = `${urls.loginUrl}?${params.toString()}`;
     await this.page.goto(loginUrlWithParams);
@@ -376,7 +383,8 @@ export default class LoginPage extends HeaderComponent {
     if (credentials.password) {
       await this.fillPassword(credentials.password);
     }
-    await this.clickConnect();
+    // Wait for the redirect: connecting only works if the URL prefilled the form.
+    await this.clickOnConnect();
   }
 
   async uploadCertificate(file: CertificateFile): Promise<void> {

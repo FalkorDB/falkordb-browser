@@ -145,7 +145,6 @@ test.describe("Tutorial", () => {
         test.setTimeout(60_000);
         await page.addInitScript(() => {
             localStorage.removeItem("tutorial");
-            localStorage.setItem("appDownloadPrompt", "false");
             localStorage.setItem("whatsNewSeen", "v9999.0.0");
         });
         await page.route("**/api/auth/session", async route => {
@@ -881,7 +880,6 @@ test.describe("Tutorial", () => {
         await page.addInitScript(({ tab, key }) => {
             localStorage.removeItem("timeout");
             localStorage.setItem("tutorial", "false");
-            localStorage.setItem("appDownloadPrompt", "false");
             localStorage.setItem(`localhost:6379:default:${key}`, JSON.stringify({ tabs: [tab], activeTabId: tab.id }));
         }, { tab, key: TABS_STORAGE_KEY });
         let configRequests = 0;

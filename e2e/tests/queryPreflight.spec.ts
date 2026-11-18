@@ -144,7 +144,7 @@ test.describe("Query pre-flight and FalkorDB grammar extensions", () => {
             expect(await graph.hasEditorErrorMarker()).toBe(true);
 
             await graph.insertQuery(query);
-            expect(await graph.hasEditorErrorMarker()).toBe(false);
+            await graph.expectNoEditorErrorMarker();
             expect(await graph.isEnabledEditorRun()).toBe(true);
         });
     });
@@ -191,7 +191,7 @@ test.describe("Query pre-flight and FalkorDB grammar extensions", () => {
         await graph.insertQuery(query);
 
         // The query is well-formed, so it must not be marked or have Run disabled.
-        expect(await graph.hasEditorErrorMarker()).toBe(false);
+        await graph.expectNoEditorErrorMarker();
         expect(await graph.isEnabledEditorRun()).toBe(true);
 
         await graph.clickRunQuery(false);

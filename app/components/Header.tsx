@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn, getConnectionEpoch, securedFetch } from "@/lib/utils";
 import useIsMobile from "@/lib/useIsMobile";
 import ConnectionManager from "./ConnectionManager";
+import { graphCounts } from "./graphCounts";
 
 /**
  * Format version number to include dots (e.g., "11111" -> "1.11.11")
@@ -55,18 +56,10 @@ export default function Header({ mobileLeading = null }: Props) {
     const [usedMemory, setUsedMemory] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
 
-    // GRAPH.LIST covers both loaded and offloaded graphs, and GRAPH.STUBS reports
-    // only the offloaded ones — so the loaded count is the difference.
-    const { totalCount, loadedCount, offloadedCount } = useMemo(() => {
-        const total = graphNames?.length ?? 0;
-        const offloaded = supportsOffload ? offloadedGraphs.length : 0;
-
-        return {
-            totalCount: total,
-            loadedCount: Math.max(total - offloaded, 0),
-            offloadedCount: offloaded,
-        };
-    }, [graphNames, offloadedGraphs, supportsOffload]);
+    const { totalCount, loadedCount, offloadedCount } = useMemo(
+        () => graphCounts(graphNames ?? [], offloadedGraphs, supportsOffload),
+        [graphNames, offloadedGraphs, supportsOffload],
+    );
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -177,7 +170,7 @@ export default function Header({ mobileLeading = null }: Props) {
                     <span>[</span>
                     <Tooltip>
                         <TooltipTrigger>
-                            <span className="text-green" data-testid="graphsOnLoadCountValue">{loadedCount}</span>
+                            <span className="text-green-700 dark:text-green" data-testid="graphsOnLoadCountValue">{loadedCount}</span>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>Loaded</p>
@@ -186,7 +179,7 @@ export default function Header({ mobileLeading = null }: Props) {
                     <span>,</span>
                     <Tooltip>
                         <TooltipTrigger>
-                            <span className="text-yellow" data-testid="graphsOffLoadCountValue">{offloadedCount}</span>
+                            <span className="text-yellow-700 dark:text-yellow" data-testid="graphsOffLoadCountValue">{offloadedCount}</span>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>Offloaded</p>

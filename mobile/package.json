@@ -2,7 +2,7 @@
   "name": "falkordb-browser-mobile",
   "author": "FalkorDB",
   "description": "FalkorDB Browser iOS and Android app",
-  "version": "2.7.4",
+  "version": "2.8.0",
   "private": true,
   "type": "module",
   "scripts": {

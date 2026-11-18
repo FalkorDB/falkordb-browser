@@ -15,7 +15,7 @@ export function GraphLoadDot({ offloaded, dataTestId }: Props) {
 
     return (
         <span
-            className="flex items-center shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground"
+            className="flex items-center shrink-0"
             role="img"
             aria-label={label}
             data-testid={dataTestId}
@@ -40,7 +40,7 @@ export default function GraphLoadIndicator({ offloaded, dataTestId }: Props) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <span tabIndex={0} className="flex items-center shrink-0">
+                <span tabIndex={0} className="flex items-center shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground">
                     <GraphLoadDot offloaded={offloaded} dataTestId={dataTestId} />
                 </span>
             </TooltipTrigger>

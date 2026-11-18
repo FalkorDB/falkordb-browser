@@ -865,6 +865,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // --- "Fix with AI" (Idea #3) -----------------------------------------------
   const [lastFailure, setLastFailure] = useState<{ query: string; errorMessage: string } | null>(null);
+  // The editor text as of the last commit (runQuery sets it at once), so a run
+  // that fails after an edit can tell its query is no longer the one shown.
+  const editorQueryRef = useRef("");
   const [aiFixResult, setAiFixResult] = useState<AiFixResult>({ status: "idle" });
   const [pendingConsent, setPendingConsent] = useState<{ query: string; errorMessage: string; provider: ReturnType<typeof detectProviderFromModel> } | null>(null);
   const aiFixAbortRef = useRef<AbortController | null>(null);
@@ -1275,8 +1278,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     updateSession,
     beginConnectionSwitch,
     endConnectionSwitch,
+    switchPending,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, pruneOffloadedGraphs, renameOffloadedGraph, supersedeGraphRefreshes, usesLdap, additionalConnections, activeConnectionId, prefixConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, switchPending, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -1477,6 +1481,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     dismissAiFix();
     setLastFailure(null);
 
+    editorQueryRef.current = q;
     setHistoryQuery(prev => ({
       ...prev,
       query: q,
@@ -1593,8 +1598,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       } else {
         // Errors from getSSEGraphResult are already surfaced via toast
         const errorMessage = (err as Error).message || "";
-        setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
-        setLastFailure({ query: newQuery.text, errorMessage });
+        // Edited while it ran: its markers and fix would land on the new text.
+        if (editorQueryRef.current === q) {
+          setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
+          setLastFailure({ query: newQuery.text, errorMessage });
+        }
 
         // Save failed query to history with the error message
         newQuery = { ...newQuery, errorMessage };
@@ -1976,6 +1984,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Also forget the failure so a retained toast can't start a fix for the old query, whose
   // Insert would then overwrite the edited query or another tab's draft.
   useLayoutEffect(() => {
+    editorQueryRef.current = historyQuery.query;
     dismissAiFix();
     setLastFailure(null);
     return dismissAiFix;
@@ -2540,6 +2549,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             // The value belongs to another connection. Keep it: switching back
             // to that connection restores access.
             console.warn('Stored API keys belong to a different connection, leaving them untouched');
+            return;
           } else if (error instanceof ServerDecryptError && error.status === 400) {
             // The only permanent refusal: the value predates owner binding and
             // can never be read again.
@@ -2550,6 +2560,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             // A 5xx or a dropped request says nothing about the value itself;
             // deleting on one would destroy a perfectly good key.
             console.error('Failed to decrypt API keys, keeping them for a later attempt:', error);
+            // Runtime credentials were cleared before loading. Do not let a
+            // failed load wipe the stored selection or run the legacy migration.
+            return;
           }
         }
       }

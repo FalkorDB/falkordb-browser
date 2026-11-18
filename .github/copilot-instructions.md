@@ -61,9 +61,11 @@ Rules for every change:
 2. **Put logic where it is testable.** Extract decisions out of `.tsx` components and
    `providers.tsx` into framework-free modules in `lib/` (or `app/**/<name>.ts`) and unit-test
    them with `node:test` + `node:assert/strict`. Components themselves are covered by Playwright.
-3. **New pure module → add it to the 100% gate**: append a
-   `--test-coverage-include="<path>"` to `test:coverage` in `package.json` (as the existing
-   modules do) once it reaches 100% lines/branches/functions.
+3. **New pure module → add it to the 100% gate**: add a
+   `--test-coverage-include="<path>"` to `test:coverage` in `package.json` next to the existing
+   ones, **before the test globs** (Node stops reading options at the first glob, so a trailing
+   one is silently treated as a test pattern), once it reaches 100% lines/branches/functions.
+   Check that the file shows up in the coverage table.
 4. **Unit tests** live next to the source as `<name>.test.ts`; relative imports of TS files
    include the `.ts` extension (`import { x } from "./graphTabs.ts"`) because `node --test`
    runs the TS directly. Use `describe/it` or `test`, `mock` from `node:test`; no extra test
@@ -159,9 +161,9 @@ A change is not done until the docs that describe it are updated **in the same P
 
 | If you change… | Update… |
 | --- | --- |
-| User-visible behavior or a feature | `README.md` and, for features, `readme-browser.md` (the feature overview) |
+| User-visible behavior or a feature | `README.md` or the matching `docs/` page (`docs/user-guide.md`, `docs/large-graphs-3d.md`, `docs/upgrading.md`) and, for features, `readme-browser.md` (the feature overview) |
 | An API route's request/response | `app/api/swagger/swagger-spec.ts` (`.github/workflows/swagger-check.yml` fails a `route.ts(x)` change without it, unless labeled `no-api-docs` for an unchanged contract; contract changes made only in helpers such as `validate-body.ts` are not caught) |
-| Env vars / config | `.env.local.template`, `README.md`, `helm/falkordb-browser/values.yaml` + its `README.md`, and the Helm templates if the value must reach the pod |
+| Env vars / config | `.env.local.template`, `docs/configuration.md`, `README.md` (Quick start and source setup), `helm/falkordb-browser/values.yaml` + its `README.md`, and the Helm templates if the value must reach the pod |
 | The Cypher grammar | `lib/falkordb-cypher/generated/.grammar-src/Cypher.g4`, run `npm run generate:grammar`, commit the artifacts |
 | Desktop / mobile shell | `desktop/README.md` / `mobile/README.md` |
 | Test/coverage tooling or the gate | `README.md` "Testing", this file, `codecov.yml` comments |

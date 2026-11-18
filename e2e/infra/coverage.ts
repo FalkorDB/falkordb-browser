@@ -50,6 +50,11 @@ async function save(page: Page) {
     if (!started || page.isClosed()) return;
     recording.delete(page);
     await started;
+    // A popup can close while its recording is still starting: nothing to stop or save.
+    if (page.isClosed()) {
+        sources.delete(page);
+        return;
+    }
     const entries = (await page.coverage.stopJSCoverage())
         .filter(({ url }) => url.includes('/_next/static/'));
     const capturedSources = sources.get(page);
@@ -62,17 +67,16 @@ async function save(page: Page) {
     for (const entry of entries) {
         const { url } = entry;
         if (savedSources.has(url)) continue;
+        const file = path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
         let source = entry.source;
         if (source === undefined) {
             const captured = await capturedSources?.get(url);
-            if (!captured || 'error' in captured) {
-                throw new Error(`No source available for browser chunk ${url}`, {
-                    cause: captured && 'error' in captured ? captured.error : undefined,
-                });
-            }
+            // Another worker may save this chunk any moment now, so a missing
+            // source is not judged here: the report rejects the run if it is
+            // still missing once every worker is done (validateBrowserCoverage).
+            if (!captured || 'error' in captured) continue;
             source = captured.source;
         }
-        const file = path.join(dir, `browser-source-${createHash('sha1').update(url).digest('hex')}.js`);
         const tmp = `${file}.${randomUUID()}.tmp`;
         writeFileSync(tmp, source);
         try {
