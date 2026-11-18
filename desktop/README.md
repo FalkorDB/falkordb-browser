@@ -56,7 +56,10 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   signed, accepted by Gatekeeper and stapled, rather than silently publishing
   an unsigned macOS app. Installers from the platforms that passed their checks
   are still attached to the release. Windows and Linux installers remain unsigned.
-  Pull-request, push, and local builds for every platform also remain unsigned.
+  CI builds for pull requests, pushes, and manual runs remain unsigned. Local
+  macOS builds may be signed when a matching Developer ID identity is available
+  in the keychain; set `CSC_IDENTITY_AUTO_DISCOVERY=false` to force an unsigned
+  build.
 
   **Merge/release prerequisite:** a repository administrator must configure and
   verify all five secrets below before merging this release workflow or publishing
