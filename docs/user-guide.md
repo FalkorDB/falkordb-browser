@@ -54,6 +54,11 @@ set `LOAD_CSV_FILE_URI=false`.
 
 The editor's **Optimize** action uses the model and provider configuration selected
 in Settings, with an API key only for hosted providers.
+
+The Browser keeps saved chat API keys and their selection across reloads, even
+when it cannot infer a provider from the key format. These keys appear as
+**Unknown provider** in Settings.
+
 Before each analysis, optionally describe what to optimize, such as reducing scans
 or improving a specific join. This guidance is included only in that request's
 prompt and is not saved or reused. Leave it blank for a general review.
