@@ -1588,7 +1588,21 @@ const swaggerSpec = {
             description: "Property set successfully"
           },
           "409": {
-            description: "Add-only request rejected because the property already exists"
+            description: "Add-only request rejected because the property already exists",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["message"],
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "An attribute with this key already exists"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },

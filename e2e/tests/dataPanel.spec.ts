@@ -174,14 +174,14 @@ test.describe("Data panel Tests", () => {
     await graph.fillDataPanelAddAttributeValue("blue");
     await graph.clickDataPanelAddAttributeConfirm();
 
+    await expect(graph.errorDescription).toHaveText("An attribute with this key already exists");
+
     const response = await apicalls.runQuery(
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
     );
     const person = response.data.find((item) => item.n.properties.name === "Alice");
     expect(person?.n.properties.color).toBe("red");
-
-    await expect(graph.errorDescription).toHaveText("An attribute with this key already exists");
   });
 
   test(`@readwrite Validate adding new boolean attribute for node via ui and validation via API`, async () => {
