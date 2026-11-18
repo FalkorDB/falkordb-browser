@@ -6,16 +6,6 @@ import { fixRequest, optimizeRequest } from "../validate-body.ts";
 
 type JsonSchema = { required?: string[]; properties?: Record<string, Record<string, unknown>> };
 
-it("documents the JSON body for a duplicate graph property conflict", () => {
-  const conflict = swaggerSpec.paths["/api/graph/{graph}/{element}/{key}"].post.responses["409"];
-  const { schema } = conflict.content["application/json"];
-
-  assert.equal(schema.type, "object");
-  assert.deepEqual(schema.required, ["message"]);
-  assert.equal(schema.properties.message.type, "string");
-  assert.equal(schema.properties.message.example, "An attribute with this key already exists");
-});
-
 // Compares documented request constraints and defaults with the zod schema the route validates.
 function assertMatchesZod(documented: JsonSchema, schema: z.ZodType) {
   const expected = z.toJSONSchema(schema, { io: "input" }) as JsonSchema;

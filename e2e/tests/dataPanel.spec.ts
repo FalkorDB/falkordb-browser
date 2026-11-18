@@ -135,6 +135,15 @@ test.describe("Data panel Tests", () => {
     await graph.clickDataPanelAddAttribute();
     await graph.fillDataPanelAddAttributeKey("name");
     await graph.fillDataPanelAddAttributeValue("Bob");
+    const page = await browser.getPage();
+    const propertyWrites: string[] = [];
+    const matchesProperty = isPropertyWrite(graphName, "name");
+    page.on("request", (request) => {
+      if (request.method() === "POST" && matchesProperty(new URL(request.url()))) {
+        propertyWrites.push(request.url());
+      }
+    });
+
     await graph.clickDataPanelAddAttributeConfirm();
 
     await expect(graph.errorDescription).toHaveText("An attribute with this key already exists");
@@ -143,45 +152,8 @@ test.describe("Data panel Tests", () => {
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
     );
-    const person = response.data.find(
-      (item) => item.n.properties.name === "Alice" || item.n.properties.name === "Bob"
-    );
-    expect(person?.n.properties.name).toBe("Alice");
-  });
-
-  test(`@readwrite Rejects stale snapshot duplicate without overwriting the server value`, async () => {
-    const graphName = getRandomString("staleattribute");
-    await apicalls.addGraph(graphName);
-    graphToRemove = graphName;
-    await apicalls.runQuery(
-      graphName,
-      'CREATE (:Person {name: "Alice"})'
-    );
-    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    await graph.selectGraphByName(graphName);
-    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-    await graph.clickRunQuery();
-    await graph.searchElementInCanvas("Alice");
-
-    await apicalls.runQuery(
-      graphName,
-      'MATCH (n:Person {name: "Alice"}) SET n.color = "red"'
-    );
-
-    await graph.clickDataPanelAddAttribute();
-    await graph.fillDataPanelAddAttributeKey("color");
-    await graph.fillDataPanelAddAttributeValue("blue");
-    await graph.clickDataPanelAddAttributeConfirm();
-
-    await expect(graph.errorDescription).toHaveText("An attribute with this key already exists");
-
-    const response = await apicalls.runQuery(
-      graphName,
-      FETCH_FIRST_TEN_NODES ?? ""
-    );
-    const person = response.data.find((item) => item.n.properties.name === "Alice");
-    expect(person?.n.properties.color).toBe("red");
+    expect(response.data[0]?.n.properties.name).toBe("Alice");
+    expect(propertyWrites).toEqual([]);
   });
 
   test(`@readwrite Validate adding new boolean attribute for node via ui and validation via API`, async () => {

@@ -51,7 +51,7 @@ export async function POST(
         );
       }
 
-      const { value, type, valueType, addOnly = false } = validation.data;
+      const { value, type, valueType } = validation.data;
       const graph = client.selectGraph(graphId);
 
       if (isReadOnly) {
@@ -67,34 +67,12 @@ export async function POST(
       // The key comes from the URL and names a property, so it cannot be bound
       // as a parameter: it is quoted instead.
       const quotedKey = quoteCypherIdentifier(key);
-      const entity = type ? "n" : "e";
-      const match = type
-        ? `MATCH (n) WHERE ID(n) = $id`
-        : `MATCH ()-[e]->() WHERE ID(e) = $id`;
 
-      if (addOnly) {
-        const query = `${match}
-          WITH ${entity}, ${entity}.${quotedKey} IS NOT NULL AS propertyExists
-          SET ${entity}.${quotedKey} = CASE
-            WHEN propertyExists THEN ${entity}.${quotedKey}
-            ELSE ${valueExpression}
-          END
-          RETURN propertyExists AS propertyExists`;
-        const result = await graph.query(query, { params: { id: elementId, value } });
-        const row = result.data?.[0];
+      const query = type
+        ? `MATCH (n) WHERE ID(n) = $id SET n.${quotedKey} = ${valueExpression}`
+        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${quotedKey} = ${valueExpression}`;
 
-        if (typeof row === "object" && row !== null
-          && "propertyExists" in row && row.propertyExists === true) {
-          return NextResponse.json(
-            { message: "An attribute with this key already exists" },
-            { status: 409, headers: getCorsHeaders(request) }
-          );
-        }
-      } else {
-        await graph.query(`${match} SET ${entity}.${quotedKey} = ${valueExpression}`, {
-          params: { id: elementId, value },
-        });
-      }
+      await graph.query(query, { params: { id: elementId, value } });
 
       return NextResponse.json(
         { message: "Attribute updated successfully" },

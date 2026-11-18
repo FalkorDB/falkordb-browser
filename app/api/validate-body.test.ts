@@ -6,24 +6,6 @@ import { CALENDAR_DATE_ERROR } from "../../lib/graphValues.ts";
 const parse = (body: unknown) => updateGraphElementAttribute.safeParse(body);
 
 describe("updateGraphElementAttribute", () => {
-  it("preserves the optional addOnly flag and rejects non-boolean values", () => {
-    const body = { type: true, value: "hello" };
-    const withAddOnly = parse({ ...body, addOnly: true });
-
-    assert.equal(withAddOnly.success, true);
-    if (withAddOnly.success) {
-      assert.equal(withAddOnly.data.addOnly, true);
-    }
-
-    const withoutAddOnly = parse(body);
-    assert.equal(withoutAddOnly.success, true);
-    if (withoutAddOnly.success) {
-      assert.equal(withoutAddOnly.data.addOnly, undefined);
-    }
-
-    assert.equal(parse({ ...body, addOnly: "true" }).success, false);
-  });
-
   it("takes each type in the shape its Cypher constructor is built from", () => {
     const accepted: unknown[] = [
       { type: true, valueType: "string", value: "hello" },

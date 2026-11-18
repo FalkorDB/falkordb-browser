@@ -99,6 +99,13 @@ Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
 
+## Adding and editing attributes
+
+In the Data panel, **Add Attribute** rejects keys already present on the selected
+node or relationship. To change an existing value, edit its row instead. The
+check uses the currently loaded data, so rerun the query if another client may
+have changed the element.
+
 ## Graph operation ownership
 
 Expansion, collapse and mutation repaints are tied to the graph, query result,
