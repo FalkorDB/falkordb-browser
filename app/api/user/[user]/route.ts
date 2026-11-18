@@ -5,6 +5,7 @@ import {
   getRoleWithKeys,
   requiresPasswordReauthentication,
   persistAclAfterPasswordChange,
+  type UpdateUserResponse,
 } from "../model";
 import { updateUser, validateBody } from "../../validate-body";
 import { getCorsHeaders, corsPreflight } from "../../utils";
@@ -67,11 +68,14 @@ export async function PATCH(
         error => console.error("Failed to persist ACL after changing the current user's password:", error),
       );
 
-      return NextResponse.json({
-        message: "User role updated",
-        requiresReauthentication,
-        ...(requiresReauthentication ? { aclSaved } : {}),
-      }, { status: 200, headers: getCorsHeaders(request) });
+      const message = "User role updated";
+      const response: UpdateUserResponse = requiresReauthentication ? {
+        message,
+        requiresReauthentication: true,
+        aclSaved: aclSaved === true,
+        reauthenticationConnection: { host: user.host, port: user.port, username, tls: user.tls },
+      } : { message, requiresReauthentication: false };
+      return NextResponse.json(response, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(

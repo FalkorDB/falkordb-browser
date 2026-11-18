@@ -72,6 +72,15 @@ export function requiresPasswordReauthentication(
   return Boolean(password) && currentUsername === targetUsername;
 }
 
+export type UpdateUserResponse = { message: string } & (
+  | { requiresReauthentication: false }
+  | {
+    requiresReauthentication: true;
+    aclSaved: boolean;
+    reauthenticationConnection: { host: string; port: number; username: string; tls: boolean };
+  }
+);
+
 export async function persistAclAfterPasswordChange(
   shouldPersist: boolean,
   saveAcl: () => Promise<unknown>,
