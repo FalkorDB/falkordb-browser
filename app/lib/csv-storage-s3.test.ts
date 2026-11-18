@@ -21,6 +21,7 @@ process.env.S3_ENDPOINT = "http://write.s3.test:9000";
 process.env.S3_READ_ENDPOINT = "https://read.s3.test:9443";
 process.env.S3_FORCE_PATH_STYLE = "true";
 process.env.S3_VERIFY_OBJECT_EXISTS = "false";
+process.env.AWS_DEFAULTS_MODE = "legacy";
 process.env.AWS_USE_FIPS_ENDPOINT = "false";
 process.env.AWS_USE_DUALSTACK_ENDPOINT = "false";
 process.env.S3_KEY_PREFIX = "coverage/csv/";
@@ -394,6 +395,10 @@ test("read URLs apply Docker gateway and explicit endpoint overrides", async (t)
         {
             env: { S3_ENDPOINT: "http://localhost:9000", S3_READ_URL_AUTO_DOCKER_GATEWAY: "true", S3_READ_URL_HOST: "reader.test", S3_READ_URL_PORT: "8443", S3_READ_URL_PROTOCOL: "https" },
             origin: "https://reader.test:8443",
+        },
+        {
+            env: { S3_ENDPOINT: "http://localhost:9000", S3_READ_URL_AUTO_DOCKER_GATEWAY: "true", S3_READ_URL_HOST: "reader.test" },
+            origin: "http://reader.test:9000",
         },
         {
             env: { S3_ENDPOINT: "http://localhost:9000", S3_READ_URL_AUTO_DOCKER_GATEWAY: "true", S3_READ_URL_PORT: "8080" },
