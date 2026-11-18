@@ -21,6 +21,8 @@ process.env.S3_ENDPOINT = "http://write.s3.test:9000";
 process.env.S3_READ_ENDPOINT = "https://read.s3.test:9443";
 process.env.S3_FORCE_PATH_STYLE = "true";
 process.env.S3_VERIFY_OBJECT_EXISTS = "false";
+process.env.AWS_USE_FIPS_ENDPOINT = "false";
+process.env.AWS_USE_DUALSTACK_ENDPOINT = "false";
 process.env.S3_KEY_PREFIX = "coverage/csv/";
 process.env.S3_URL_EXPIRES_IN = "1234";
 process.env.S3_UPLOAD_URL_EXPIRES_IN = "321";
@@ -178,14 +180,14 @@ test("delete sends a DeleteObjectCommand for the owner-scoped key", async (t) =>
     const sends: unknown[] = [];
     t.mock.method(S3Client.prototype, "send", async (command: unknown) => {
         sends.push(command);
-        assert.ok(command instanceof DeleteObjectCommand);
-        assert.deepEqual(command.input, { Bucket: BUCKET, Key: objectPath(OWNER, KEY) });
         return {};
     });
 
     await storage.delete(OWNER, KEY);
 
     assert.equal(sends.length, 1);
+    assert.ok(sends[0] instanceof DeleteObjectCommand);
+    assert.deepEqual(sends[0].input, { Bucket: BUCKET, Key: objectPath(OWNER, KEY) });
 });
 
 test("delete logs an AWS failure and resolves", async (t) => {
@@ -218,7 +220,9 @@ test("cleanupExpired paginates and deletes only expired, well-formed owner-scope
         objectPath(OWNER, "22222222-2222-4222-8222-222222222222"),
         "coverage/csv/notes.csv",
         "coverage/csv/not-an-owner/11111111-1111-4111-8111-111111111111.csv",
-        "coverage/csv/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/11111111-1111-4111-8111-111111111111.csv",
+        objectPath(OWNER, "44444444-4444-4444-8444-444444444444"),
+        objectPath(OWNER, "55555555-5555-1555-8555-555555555555"),
+        objectPath(OWNER, "66666666-6666-4666-8666-666666666666"),
     ];
     const secondPageKey = objectPath(OWNER, "33333333-3333-4333-8333-333333333333");
     const listCommands: ListObjectsV2Command[] = [];
@@ -239,6 +243,8 @@ test("cleanupExpired paginates and deletes only expired, well-formed owner-scope
                         { Key: firstPageKeys[2], LastModified: old },
                         { Key: firstPageKeys[3], LastModified: old },
                         { Key: firstPageKeys[4], LastModified: fresh },
+                        { Key: firstPageKeys[5], LastModified: old },
+                        { Key: firstPageKeys[6], LastModified: new Date(cutoff) },
                     ],
                 };
             }
@@ -247,7 +253,7 @@ test("cleanupExpired paginates and deletes only expired, well-formed owner-scope
                 IsTruncated: false,
                 Contents: [
                     { Key: secondPageKey, LastModified: old },
-                    { Key: objectPath(OWNER, KEY), LastModified: fresh },
+                    { Key: objectPath(OWNER, "77777777-7777-4777-8777-777777777777"), LastModified: fresh },
                 ],
             };
         }
@@ -266,12 +272,14 @@ test("cleanupExpired paginates and deletes only expired, well-formed owner-scope
     assert.equal(listCommands[0].input.ContinuationToken, undefined);
     assert.deepEqual(
         deleteCommands.map((command) => command.input.Delete?.Objects?.map((object) => object.Key)),
-        [[firstPageKeys[0], firstPageKeys[1]], [secondPageKey]]
+        [[firstPageKeys[0], firstPageKeys[1], firstPageKeys[6]], [secondPageKey]]
     );
     assert.equal(deleted, 1);
 });
 
-test("createDirectUploadTarget signs PUT URLs with the owner-scoped key and requested or default content type", async () => {
+test("createDirectUploadTarget signs PUT URLs with the owner-scoped key and requested or default content type", async (t) => {
+    const signingDate = new Date("2026-01-01T00:00:00Z");
+    t.mock.timers.enable({ apis: ["Date"], now: signingDate });
     const storage = new S3CsvStorage();
     const suppliedContentType = "text/csv";
 
@@ -294,6 +302,23 @@ test("createDirectUploadTarget signs PUT URLs with the owner-scoped key and requ
     assert.equal(suppliedUrl.origin, "http://write.s3.test:9000");
     assert.equal(decodeURIComponent(suppliedUrl.pathname), `/${BUCKET}/${objectPath(OWNER, KEY)}`);
     assert.equal(suppliedUrl.searchParams.get("X-Amz-Expires"), "321");
+    const expectedPutUrl = new URL(await getSignedUrl(
+        new S3Client({
+            region: "us-east-1",
+            endpoint: "http://write.s3.test:9000",
+            forcePathStyle: true,
+            requestChecksumCalculation: "WHEN_REQUIRED",
+            credentials: { accessKeyId: "test-access-key", secretAccessKey: "test-secret-key" },
+        }),
+        new PutObjectCommand({
+            Bucket: BUCKET,
+            Key: objectPath(OWNER, KEY),
+            ContentType: suppliedContentType,
+            ContentLength: 123,
+        }),
+        { expiresIn: 321, signingDate }
+    ));
+    assert.equal(suppliedUrl.searchParams.get("X-Amz-Signature"), expectedPutUrl.searchParams.get("X-Amz-Signature"));
 
     assert.ok(fallback);
     assert.equal(fallback.type, "s3-presigned-put");
@@ -302,6 +327,7 @@ test("createDirectUploadTarget signs PUT URLs with the owner-scoped key and requ
 });
 
 test("read URL endpoint overrides are signed locally without sending S3 requests", async (t) => {
+    t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-01-01T00:00:00Z") });
     const previous = process.env.S3_READ_ENDPOINT;
     process.env.S3_READ_ENDPOINT = "https://override.read.test:7443";
     const sends: unknown[] = [];

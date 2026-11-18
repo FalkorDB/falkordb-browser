@@ -14,7 +14,7 @@
 
 - The project coverage goal is at least 95%.
 - Preserve the configured 80% required project and patch checks.
-- Add one component per PR; this PR covers only `S3CsvStorage`.
+- Add one component, page, or isolated module per PR; this PR covers only `S3CsvStorage`.
 - Do not duplicate the merged upload and CSV API scenarios in #2309 and #2311.
 - Do not change production behavior, coverage source selection, or thresholds.
 - Use deterministic tests with no real cloud calls.
@@ -24,7 +24,7 @@
 1. Invalid owners or keys must fail before an AWS command is sent.
 2. Missing `S3_BUCKET` must fail explicitly rather than issue a request.
 3. Optional object-existence verification must map 404 responses to the stable not-found error and rethrow other failures.
-4. Cleanup must delete only old, exact owner/UUID CSV objects, including across paginated listings.
+4. Cleanup filters old objects by an owner/UUID CSV suffix, including across paginated listings. Exact paths relative to the prefix are not enforced by the current implementation.
 5. Delete remains best-effort: an AWS delete failure is logged and does not reject the call.
 
 ---
@@ -60,9 +60,9 @@
     `CSV temp object not found.`; a non-404 error propagates unchanged.
   - `delete` sends a `DeleteObjectCommand`; when that command fails, the method
     logs the failure and resolves.
-  - `cleanupExpired` follows a continuation token, deletes only expired exact
-    owner/UUID CSV keys, ignores fresh and malformed objects, and returns the
-    number reported as deleted.
+  - `cleanupExpired` follows a continuation token, deletes expired objects
+    with an owner/UUID CSV suffix, ignores fresh and malformed objects, and
+    returns the number reported as deleted.
   - `createDirectUploadTarget` returns a `PUT` target with the signed URL,
     configured owner-scoped key in the URL path, and either the supplied
     content type or the default `text/csv; charset=utf-8`. The existing target
@@ -73,10 +73,10 @@
 
 - [ ] **Step 2: Run the focused test file.**
 
-  Run under Node 24:
+  Check `node --version` is at least 24 before running:
 
   ```bash
-  PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" node --test app/lib/csv-storage-s3.test.ts
+  node --test app/lib/csv-storage-s3.test.ts
   ```
 
   Expected: every new test passes; no real S3 request occurs. These tests cover
@@ -86,8 +86,10 @@
 - [ ] **Step 3: Run the complete unit coverage suite and generate its report.**
 
   ```bash
-  PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" NODE_V8_COVERAGE=coverage/raw/unit npm run test:coverage
-  PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" node .github/scripts/coverage-report.mjs unit coverage/raw/unit
+  mkdir -p coverage/raw
+  RAW_COVERAGE="$(mktemp -d coverage/raw/unit-XXXXXXXX)"
+  NODE_V8_COVERAGE="$RAW_COVERAGE" npm run test:coverage &&
+    node .github/scripts/coverage-report.mjs unit "$RAW_COVERAGE"
   ```
 
   Expected: the existing 100% pure-module gates remain green and
@@ -98,8 +100,8 @@
 - [ ] **Step 4: Run type and lint checks.**
 
   ```bash
-  PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npx eslint app/lib/csv-storage-s3.test.ts
-  PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npx tsc --noEmit
+  npx eslint app/lib/csv-storage-s3.test.ts
+  npx tsc --noEmit
   ```
 
   Expected: both commands exit successfully.

@@ -8,7 +8,7 @@ suite harder to maintain.
 
 ## Goals and non-goals
 
-- Add focused tests for one component or page per PR, then re-rank the remaining
+- Add focused tests for one component, page, or isolated module per PR, then re-rank the remaining
   uncovered code from fresh reports until the project reaches 95%.
 - Preserve the current Codecov and branch-protection configuration. The required
   project and patch checks currently target 80%; 95% is the requested coverage
@@ -22,7 +22,7 @@ suite harder to maintain.
 ## Current evidence
 
 - Staging commit `2a3028f23b54631fd61e1ee3f91b4936007382f7` has finalized
-  Codecov statuses of 82.78% project and 90.00% patch, both above the configured
+  repository coverage statuses of 82.78% project and 90.00% patch, both above the configured
   80% required floor.
 - The current source report ranks `app/lib/csv-storage-s3.ts` at 0/191 lines and
   `app/lib/csv-storage-vercel-blob.ts` at 0/121 lines. The existing
@@ -46,7 +46,7 @@ suite harder to maintain.
 2. **Only add pure-module unit tests.** These are deterministic, but do not
    address gaps in active browser flows and are not sufficient for the project
    goal. Rejected as the sole strategy.
-3. **Add one coverage-ranked component per PR.** Use the current report to find
+3. **Add one coverage-ranked component, page, or module per PR.** Use the current report to find
    uncovered behavior, confirm it is not already owned, add its tests using the
    closest existing test convention, and refresh reports before choosing the
    next slice. Selected because it matches the requested PR organization and
@@ -59,16 +59,17 @@ suite harder to maintain.
    implementation and use the repository's Node test runner.
 2. Test the Vercel Blob adapter in its own PR, separate from the S3 adapter.
 3. After each slice, inspect the new Codecov report and re-rank uncovered files.
-   Pick only one component/page per PR and verify its gaps against existing
+   Pick only one component, page, or module per PR and verify its gaps against existing
    merged PRs before writing tests. Use E2E/POM coverage for active user flows
    and unit/API tests for isolated server-side behavior.
 4. Do not target private or otherwise unreachable components as live pages.
    If such code remains in the coverage denominator, document the obstacle and
    prefer an existing direct component or module test seam over inventing a
    production route.
-5. Continue until the finalized Codecov project status on the accumulated
-   staging changes is at least 95%. The project's official Codecov status is the
-   acceptance measure; local report aggregation is only for ranking files.
+5. Continue until the finalized Codecov project percentage on the accumulated
+   staging changes is at least 95%. The repository's `coverage/project` status
+   reports that percentage, but its 80% pass threshold alone does not establish
+   that 95% was reached; local report aggregation is only for ranking files.
 
 ## Validation
 
@@ -76,7 +77,8 @@ suite harder to maintain.
   verify the relevant coverage report.
 - For UI changes, use the existing Playwright `coverage` fixture and POM
   conventions, unique test data, and condition-based waits; run the focused
-  browser tests in the configured Chromium and Firefox coverage projects.
+  browser tests in Chromium for browser coverage and in Firefox as a separate
+  cross-browser check (Firefox browser coverage is not recorded).
 - Do not claim the 95% goal is met until Codecov reports at least 95% project
   coverage on the resulting staging commit. Keep the existing 80% required
   statuses intact throughout.
