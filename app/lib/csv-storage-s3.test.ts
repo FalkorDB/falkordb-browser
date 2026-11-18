@@ -20,6 +20,7 @@ process.env.S3_REGION = "us-east-1";
 process.env.S3_ENDPOINT = "http://write.s3.test:9000";
 process.env.S3_READ_ENDPOINT = "https://read.s3.test:9443";
 process.env.S3_FORCE_PATH_STYLE = "true";
+process.env.S3_VERIFY_OBJECT_EXISTS = "false";
 process.env.S3_KEY_PREFIX = "coverage/csv/";
 process.env.S3_URL_EXPIRES_IN = "1234";
 process.env.S3_UPLOAD_URL_EXPIRES_IN = "321";
