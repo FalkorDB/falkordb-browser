@@ -3,6 +3,7 @@ import type { Session } from "next-auth";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
+import SettingsBrowserPage from "../logic/POM/settingsBrowserPage";
 import { user } from '../config/user.json';
 import { buildConnectionPrefix } from '../../lib/connection-storage';
 import { SELECTED_CHAT_API_KEY_ID_STORAGE_KEY } from '../../lib/chat-api-key-storage';
@@ -115,16 +116,35 @@ test.describe(`@admin Encryption migration tests`, () => {
         const selectionKey = `${scope}${SELECTED_CHAT_API_KEY_ID_STORAGE_KEY}`;
         expect(await page.evaluate(key => localStorage.getItem(key), selectionKey)).toBeNull();
 
-        await page.evaluate(() => localStorage.setItem("secretKey", "test-later-legacy-key"));
+        const legacyKey = "test-later-legacy-key";
+        await page.evaluate(key => localStorage.setItem("secretKey", key), legacyKey);
         await page.reload({ waitUntil: "networkidle" });
         const migrated = await waitForMigratedChatApiKeys(page, `${scope}${CHAT_API_KEYS_STORAGE_KEY}`);
         const keys = JSON.parse(migrated?.decryptedKeys ?? "[]") as Array<{ id: string; key: string }>;
         expect(keys).toHaveLength(1);
-        expect(keys[0].key).toBe("test-later-legacy-key");
+        expect(keys[0].key).toBe(legacyKey);
         await expect.poll(() => page.evaluate(key => localStorage.getItem(key), selectionKey)).toBe(keys[0].id);
 
-        await page.reload({ waitUntil: "networkidle" });
-        await expect.poll(() => page.evaluate(key => localStorage.getItem(key), selectionKey)).toBe(keys[0].id);
+        await page.route("**/api/chat/models", route => route.fulfill({ json: { models: [] } }));
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settings.expandChatSection();
+        await settings.selectApiKeyModelSource();
+        await expect(settings.chatApiKeySelection(legacyKey)).toHaveAttribute("aria-pressed", "true");
+
+        const secondKey = "sk-e2e-reload-selection-5678";
+        // Adding a key appends and selects it, making it distinct from the first-key fallback.
+        await settings.addChatApiKey(secondKey);
+        const secondSelection = settings.chatApiKeySelection(secondKey);
+        await expect(secondSelection).toHaveAttribute("aria-pressed", "true");
+        const secondId = await page.evaluate(key => localStorage.getItem(key), selectionKey);
+        expect(secondId).toBeTruthy();
+        expect(secondId).not.toBe(keys[0].id);
+
+        await page.reload();
+        await settings.expandChatSection();
+        await expect(settings.chatApiKeySelection(legacyKey)).toHaveAttribute("aria-pressed", "false");
+        await expect(secondSelection).toHaveAttribute("aria-pressed", "true");
+        await expect.poll(() => page.evaluate(key => localStorage.getItem(key), selectionKey)).toBe(secondId);
     });
 
     test(`plain text secretKey is migrated to server-side encryption on page load`, async () => {
