@@ -52,5 +52,8 @@ describe("User password update OpenAPI documentation", () => {
     assert.equal(reauthentication?.type, "boolean");
     assert.match(String(reauthentication?.description ?? ""), /current user's own password/);
     assert.equal(response.properties?.aclSaved?.type, "boolean");
+    const connection = response.properties?.reauthenticationConnection;
+    assert.equal(connection?.type, "object");
+    assert.deepEqual(Object.keys(connection?.properties ?? {}).sort(), ["host", "port", "tls", "username"]);
   });
 });

@@ -52,7 +52,7 @@ behind a mobile shell.
   OpenAI, Groq, xAI, Ollama or LM Studio models.
 - **Administration.** Users and roles, database configuration, personal access tokens, and an
   OpenAPI reference served at `/docs`.
-  Changing your own database user's password signs you out; sign in again with the new password.
+  Changing your own database user's password signs you out and prefills the database connection for sign-in with the new password.
 
 See the [feature overview](readme-browser.md) for every page, panel and workflow.
 

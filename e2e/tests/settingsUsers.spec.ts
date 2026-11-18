@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../infra/coverage";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
+import LoginPage from "../logic/POM/loginPage";
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
 import { user } from '../config/user.json';
 import ApiCalls from "../logic/api/apiCalls";
@@ -107,44 +108,74 @@ test.describe('@Config Settings users tests', () => {
         expect(mock.requests).toEqual([{ method: "PATCH", body }, { method: "PATCH", body }]);
     });
 
-    test("@admin Changing your own password requires signing in again with the new password", async () => {
-        const username = getRandomString("selfPassword");
-        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
-        const page = await browser.getPage();
-        let updateRequests = 0;
-        let saveRequests = 0;
-        let signOutRequests = 0;
-        await page.route(/\/api\/user(?:\/.*)?$/, async route => {
-            const request = route.request();
-            const path = new URL(request.url()).pathname.replace(/\/$/, "");
-            if (request.method() === "GET" && path === "/api/user") {
-                await route.fulfill({ json: { result: [{ username, role: "Admin", keys: ["*"] }] } });
-            } else if (path.endsWith("/save")) {
-                saveRequests += 1;
-                await route.fulfill({ json: { message: "Users saved" } });
-            } else if (request.method() === "PATCH") {
-                updateRequests += 1;
-                await route.fulfill({ json: { message: "User role updated", requiresReauthentication: true, aclSaved: false } });
-            } else {
-                await route.fallback();
-            }
-        });
-        await page.route("**/api/auth/signout*", async route => {
-            signOutRequests += 1;
-            const url = new URL("/login?signedOut=true&passwordChanged=true&aclSaveFailed=true", route.request().url());
-            await route.fulfill({ json: { url: url.toString() } });
-        });
+    for (const signOutFails of [false, true]) {
+        test(`@admin Settings ${signOutFails ? "warns when automatic sign-out fails" : "uses the returned connection for password reauthentication"}`, async () => {
+            const username = getRandomString("selfPassword");
+            const password = "NewPassword1!";
+            const connection = { host: "remote.example.test", port: 6380, username, tls: true };
+            const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
+            const page = await browser.getPage();
+            const updates: unknown[] = [];
+            let saveRequests = 0;
+            let signOutRequests = 0;
+            await page.route(/\/api\/user(?:\/.*)?$/, async route => {
+                const request = route.request();
+                const path = new URL(request.url()).pathname.replace(/\/$/, "");
+                if (request.method() === "GET" && path === "/api/user") {
+                    await route.fulfill({ json: { result: [{ username, role: "Admin", keys: ["*"] }] } });
+                } else if (path.endsWith("/save")) {
+                    saveRequests += 1;
+                    await route.fulfill({ json: { message: "Users saved" } });
+                } else if (request.method() === "PATCH") {
+                    updates.push(request.postDataJSON());
+                    await route.fulfill({ json: {
+                        message: "User role updated", requiresReauthentication: true, aclSaved: false, reauthenticationConnection: connection,
+                    } });
+                } else {
+                    await route.fallback();
+                }
+            });
+            await page.route("**/api/auth/signout*", async route => {
+                signOutRequests += 1;
+                if (signOutFails) {
+                    await route.abort("failed");
+                    return;
+                }
+                const callbackUrl = new URLSearchParams(route.request().postData() ?? "").get("callbackUrl");
+                if (!callbackUrl) {
+                    await route.fulfill({ status: 400, json: { message: "Missing callback URL" } });
+                    return;
+                }
+                const url = new URL(callbackUrl, route.request().url());
+                await page.context().clearCookies();
+                await route.fulfill({ json: { url: url.toString() } });
+            });
 
-        await browser.navigateTo(urls.settingsUrl);
-        await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.editUser(username, { password: "NewPassword1!" });
-        await expect(page).toHaveURL(/\/login\?signedOut=true&passwordChanged=true&aclSaveFailed=true/);
-        await expect(page.getByTestId("passwordChangedMessage")).toHaveText("Your password was changed. Sign in again with your new password.");
-        await expect(page.getByTestId("aclSaveWarning")).toBeVisible();
-        expect(updateRequests).toBe(1);
-        expect(saveRequests).toBe(0);
-        expect(signOutRequests).toBe(1);
-    });
+            await browser.navigateTo(urls.settingsUrl);
+            await settingsUsersPage.navigateToUserTab();
+            await settingsUsersPage.editUser(username, { password });
+            if (signOutFails) {
+                await expect(page.getByTestId("toast-description").filter({ hasText: /automatic sign-out failed\. Sign out manually/ })).toBeVisible();
+            } else {
+                await expect(page).toHaveURL(url => url.pathname === "/login"
+                    && url.searchParams.get("signedOut") === "true"
+                    && url.searchParams.get("passwordChanged") === "true"
+                    && url.searchParams.get("aclSaveFailed") === "true"
+                    && !url.searchParams.has("password"));
+                const login = new LoginPage(page);
+                await expect(login.hostField).toHaveValue(connection.host);
+                await expect(login.portField).toHaveValue("6380");
+                await expect(login.usernameField).toHaveValue(username);
+                await expect(login.tlsToggle).toBeChecked();
+                await expect(login.passwordField).toHaveValue("");
+                await expect(page.getByTestId("passwordChangedMessage")).toHaveText("Your password was changed. Sign in again with your new password.");
+                await expect(page.getByTestId("aclSaveWarning")).toBeVisible();
+            }
+            expect(updates).toEqual([{ role: "Admin", keys: ["*"], password }]);
+            expect(saveRequests).toBe(0);
+            expect(signOutRequests).toBe(1);
+        });
+    }
 
     test("@admin Search before the users load -> select the match -> Validate only that user is selected", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
@@ -535,6 +566,69 @@ test.describe('@Config Settings users tests', () => {
         } else {
             expect(response.status).toBe(400);
             expect(response.body.message).toMatch(/not configured to use an ACL file/);
+        }
+    });
+
+    test("@admin API Test: PATCH requires reauthentication only for the temporary admin's own password", async ({ playwright }) => {
+        const username = getRandomString("passwordAdmin");
+        const otherUser = getRandomString("passwordOther");
+        const oldPassword = `Old!${crypto.randomUUID()}`;
+        const newPassword = `New!${crypto.randomUUID()}`;
+        const origin = new URL(urls.loginUrl).origin;
+        const endpoint = { host: "localhost", port: 6379, username, tls: false };
+        const request = await playwright.request.newContext({
+            baseURL: origin,
+            storageState: { cookies: [], origins: [] },
+            extraHTTPHeaders: { Origin: origin },
+        });
+        const getCsrfToken = async () => (await (await request.get("/api/auth/csrf")).json()).csrfToken;
+        const signIn = async (password: string) => {
+            const result = await request.post("/api/auth/callback/credentials", {
+                headers: { "X-Auth-Return-Redirect": "1" },
+                form: { ...endpoint, csrfToken: await getCsrfToken(), callbackUrl: origin, password },
+            });
+            expect(result.ok()).toBe(true);
+            return (await request.get("/api/auth/session")).json();
+        };
+        const signOut = async () => request.post("/api/auth/signout", {
+            form: { csrfToken: await getCsrfToken() },
+        });
+
+        try {
+            expect((await apiCall.createUserWithStatus({ username, role: "Admin", password: oldPassword }, "admin")).status).toBe(201);
+            expect((await apiCall.createUserWithStatus({ username: otherUser, role: user.ReadWrite, password: oldPassword }, "admin")).status).toBe(201);
+            expect(await signIn(oldPassword)).toMatchObject({ user: { username } });
+
+            const otherEdit = await request.patch(`/api/user/${encodeURIComponent(otherUser)}`, {
+                data: { role: user.ReadWrite, password: newPassword },
+            });
+            expect(otherEdit.status()).toBe(200);
+            expect(await otherEdit.json()).toEqual({ message: "User role updated", requiresReauthentication: false });
+
+            const selfEdit = await request.patch(`/api/user/${encodeURIComponent(username)}`, {
+                data: { role: "Admin", password: newPassword },
+            });
+            expect(selfEdit.status()).toBe(200);
+            // The standard settings test database has no ACL file.
+            expect(await selfEdit.json()).toEqual({
+                message: "User role updated",
+                requiresReauthentication: true,
+                aclSaved: false,
+                reauthenticationConnection: endpoint,
+            });
+            expect((await signOut()).ok()).toBe(true);
+            expect((await signIn(oldPassword))?.user).toBeUndefined();
+            expect(await signIn(newPassword)).toMatchObject({ user: { username } });
+        } finally {
+            try {
+                const result = await signOut();
+                if (!result.ok()) console.warn(`Temporary password test sign-out returned HTTP ${result.status()}`);
+            } catch (error) {
+                console.warn("Temporary password test sign-out failed:", error);
+            } finally {
+                await request.dispose();
+                await removeUsers(apiCall, username, otherUser);
+            }
         }
     });
 

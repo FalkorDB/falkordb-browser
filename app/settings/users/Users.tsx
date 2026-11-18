@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { signOut } from "next-auth/react";
-import { CreateUser, User } from "@/app/api/user/model";
+import { CreateUser, User, type UpdateUserResponse } from "@/app/api/user/model";
 import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
@@ -115,10 +115,24 @@ export default function Users() {
         }, toast, setIndicator);
 
         if (result.ok) {
-            const response = await result.json() as { requiresReauthentication?: boolean; aclSaved?: boolean };
+            const response = await result.json() as UpdateUserResponse;
             if (response.requiresReauthentication) {
-                const aclSaveFailed = response.aclSaved !== true ? "&aclSaveFailed=true" : "";
-                await signOut({ callbackUrl: `/login?signedOut=true&passwordChanged=true${aclSaveFailed}` });
+                const { host, port, username: loginUsername, tls } = response.reauthenticationConnection;
+                const params = new URLSearchParams({
+                    host, port: String(port), username: loginUsername, tls: String(tls),
+                    signedOut: "true", passwordChanged: "true",
+                });
+                if (!response.aclSaved) params.set("aclSaveFailed", "true");
+                try {
+                    await signOut({ callbackUrl: `/login?${params}` });
+                } catch {
+                    const persistenceWarning = response.aclSaved ? "" : " FalkorDB could not save the ACL changes to disk.";
+                    toast({
+                        title: "Password changed",
+                        description: `Your password changed, but automatic sign-out failed. Sign out manually, then sign in with your new password.${persistenceWarning}`,
+                        variant: "warning",
+                    });
+                }
                 return true;
             }
 
