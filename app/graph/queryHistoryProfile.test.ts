@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { HistoryQuery, Query } from "../../lib/utils.ts";
-import { updateQueryHistoryProfile } from "./queryHistoryProfile.ts";
+import { applyQueryHistoryProfileUpdates, updateQueryHistoryProfile } from "./queryHistoryProfile.ts";
 
 const query = (text: string, timestamp: number, profile: string[] = []): Query => ({
     text,
@@ -70,5 +70,23 @@ describe("updateQueryHistoryProfile", () => {
 
         assert.equal(updateQueryHistoryProfile(previous, selected, ["profile"], 4, 5), undefined);
         assert.deepEqual(previous.queries, [selected]);
+    });
+
+    it("applies queued profile results only to live entries from the active connection", () => {
+        const draft = query("MATCH (n) RETURN n", 13);
+        const selected = query("RETURN 3", 14);
+        const previous = history([draft, selected], draft, 2);
+
+        const updated = applyQueryHistoryProfileUpdates(previous, [
+            { target: selected, profile: ["selected profile"], connectionEpoch: 4 },
+            { target: query("RETURN 5", 15), profile: ["deleted profile"], connectionEpoch: 4 },
+            { target: draft, profile: ["stale profile"], connectionEpoch: 3 },
+        ], 4);
+
+        assert.deepEqual(updated.queries, [
+            draft,
+            { ...selected, profile: ["selected profile"] }
+        ]);
+        assert.equal(updated.currentQuery, draft);
     });
 });

@@ -26,7 +26,6 @@ import PaginationList from "../components/PaginationList";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext, AiFixContext } from "../components/provider";
 import useQueryPreflight from "../components/useQueryPreflight";
 import { Explain, Metadata, Profile } from "./MetadataView";
-import { updateQueryHistoryProfile } from "./queryHistoryProfile";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
 
@@ -51,7 +50,7 @@ interface Props {
 }
 
 export default function QueryHistoryPanel({ onClose, graphName, languageConfig: sharedLanguageConfig }: Props) {
-    const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext);
+    const { historyQuery, setHistoryQuery, applyQueryHistoryProfile } = useContext(HistoryQueryContext);
     const { graph, graphNames, runQuery, fetchCount } = useContext(GraphContext);
     const { udfList } = useContext(UDFContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
@@ -91,11 +90,6 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     // selection makes delete/export/un-fav hit every repeat. `timestamp` is already the
     // entry identity used by handleToggleFav and is present on every stored record.
     const [selectedQueries, setSelectedQueries] = useState<number[]>([]);
-    const [profilePersistence, setProfilePersistence] = useState<{
-        target: Pick<Query, "text" | "timestamp">;
-        profile: string[];
-        connectionEpoch: number;
-    } | null>(null);
     // Touch has no Ctrl-click, so a press and hold opens multi-select and every tap
     // toggles until the selection empties — the same gesture the canvas uses.
     const [multiSelect, setMultiSelect] = useState(false);
@@ -121,24 +115,6 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     useEffect(() => { currentQueryRef.current = currentQuery; }, [currentQuery]);
     useEffect(() => { graphRef.current = graph; }, [graph]);
     useEffect(() => { graphNameRef.current = graphName; }, [graphName]);
-    useEffect(() => {
-        if (!profilePersistence) return;
-
-        if (historyQuery) {
-            const updated = updateQueryHistoryProfile(
-                historyQuery,
-                profilePersistence.target,
-                profilePersistence.profile,
-                profilePersistence.connectionEpoch,
-                getConnectionEpoch()
-            );
-            if (updated && updated.queries !== historyQuery.queries) {
-                setConnectionItem("query history", JSON.stringify(updated.queries));
-            }
-        }
-        setProfilePersistence(null);
-    }, [historyQuery, profilePersistence]);
-
     // Keep the engine schema in sync so completion (once the grammar is generated)
     // sees this graph's labels, relationship types, property keys, and UDFs.
     useEffect(() => {
@@ -823,20 +799,10 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     background={background}
                                     query={currentQuery}
                                     setQuery={({ profile }) => {
-                                        const target = currentQuery;
-                                        const connectionEpoch = getConnectionEpoch();
-                                        const nextProfile = profile || [];
-
-                                        setProfilePersistence({ target, profile: nextProfile, connectionEpoch });
-                                        setHistoryQuery(prev => {
-                                            const updated = updateQueryHistoryProfile(
-                                                prev,
-                                                target,
-                                                nextProfile,
-                                                connectionEpoch,
-                                                getConnectionEpoch()
-                                            );
-                                            return updated ?? prev;
+                                        applyQueryHistoryProfile({
+                                            target: currentQuery,
+                                            profile: profile || [],
+                                            connectionEpoch: getConnectionEpoch(),
                                         });
                                     }}
                                     fetchCount={fetchCount}

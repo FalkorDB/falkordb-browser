@@ -37,6 +37,7 @@ import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDimension, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
 import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
+import { applyQueryHistoryProfileUpdates, updateQueryHistoryProfile, type QueryHistoryProfileUpdate } from "./graph/queryHistoryProfile";
 import { TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX, completeTutorialDemoGraphSetup, getTutorialDemoReclaimableNames, isTutorialDemoGraphName, isTutorialDemoOwnerId, isTutorialDemoOwnershipExpired, parseTutorialDemoOwnership, pickTutorialDemoGraphNames, queueTutorialDemoRecovery, runTutorialDemoLoadOnce, waitForTutorialDemoLoad, TutorialDemoLoadPendingError, tutorialDemoOwnershipKey, type TutorialDemoOwnership } from "@/lib/tutorialDemoGraphs";
 
 /**
@@ -412,6 +413,30 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const setHistoryQuery = useCallback<Dispatch<SetStateAction<HistoryQuery>>>((update) => {
     setHistoryQueryState(prev => settleQueryUpdate(prev, typeof update === "function" ? update(prev) : update));
   }, []);
+  const [pendingQueryProfiles, setPendingQueryProfiles] = useState<QueryHistoryProfileUpdate[]>([]);
+  const applyQueryHistoryProfile = useCallback((update: QueryHistoryProfileUpdate) => {
+    setPendingQueryProfiles(prev => [...prev, update]);
+    setHistoryQuery(prev => updateQueryHistoryProfile(
+      prev,
+      update.target,
+      update.profile,
+      update.connectionEpoch,
+      getConnectionEpoch()
+    ) ?? prev);
+  }, [setHistoryQuery]);
+  useEffect(() => {
+    if (pendingQueryProfiles.length === 0) return;
+
+    const updated = applyQueryHistoryProfileUpdates(
+      historyQuery,
+      pendingQueryProfiles,
+      getConnectionEpoch()
+    );
+    if (updated.queries !== historyQuery.queries) {
+      setConnectionItem("query history", JSON.stringify(updated.queries));
+    }
+    setPendingQueryProfiles(pending => pending.slice(pendingQueryProfiles.length));
+  }, [historyQuery, pendingQueryProfiles]);
   const [selectedParam, setSelectedParam] = useState<string>("");
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [graphNames, setGraphNames] = useState<string[] | undefined>(undefined);
@@ -847,7 +872,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
     setHistoryQuery,
-  }), [historyQuery]);
+    applyQueryHistoryProfile,
+  }), [historyQuery, applyQueryHistoryProfile]);
 
   const indicatorContext = useMemo(() => ({
     indicator,

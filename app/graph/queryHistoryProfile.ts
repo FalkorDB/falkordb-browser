@@ -2,6 +2,12 @@ import type { HistoryQuery, Query } from "../../lib/utils.ts";
 
 type QueryIdentity = Pick<Query, "text" | "timestamp">;
 
+export type QueryHistoryProfileUpdate = {
+    target: QueryIdentity;
+    profile: string[];
+    connectionEpoch: number;
+};
+
 export function updateQueryHistoryProfile(
     history: HistoryQuery,
     target: QueryIdentity,
@@ -33,4 +39,20 @@ export function updateQueryHistoryProfile(
             : history.currentQuery,
         queries
     };
+}
+
+export function applyQueryHistoryProfileUpdates(
+    history: HistoryQuery,
+    updates: QueryHistoryProfileUpdate[],
+    connectionEpoch: number
+): HistoryQuery {
+    return updates.reduce((current, update) => (
+        updateQueryHistoryProfile(
+            current,
+            update.target,
+            update.profile,
+            update.connectionEpoch,
+            connectionEpoch
+        ) ?? current
+    ), history);
 }
