@@ -46,37 +46,67 @@ test.describe('Query history Tests', () => {
         const query = "MATCH (n) RETURN n";
         const historyQuery = "RETURN 3";
         const profile = ["Results | Records produced: 3"];
+        const timestamp = Date.now();
+        const history = [query, historyQuery].map((text, index) => ({
+            text,
+            explain: [],
+            profile: [],
+            graphName,
+            timestamp: timestamp + index,
+            status: "Success" as const,
+            elementsCount: 0,
+            fav: false
+        }));
 
         await withGraphCleanup(apicalls, [graphName], async () => {
+            let releaseProfileResponse = () => {};
             try {
                 await apicalls.addGraph(graphName);
-                const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+                const graph = await browser.createNewPage(QueryHistory);
+                const page = await browser.getPage();
+                await page.addInitScript((queries) => {
+                    localStorage.setItem("localhost:6379:default:query history", JSON.stringify(queries));
+                }, history);
+                await browser.navigateTo(urls.graphUrl);
                 await browser.setPageToFullScreen();
                 await graph.selectGraphByName(graphName);
-                await graph.insertQuery(query);
-                await graph.clickRunQuery();
-                await graph.insertQuery(historyQuery);
-                await graph.clickRunQuery();
-
                 await graph.insertQuery(query);
                 await graph.clickQueryHistoryButton();
                 await graph.selectQueryInHistory(historyQuery);
 
-                const page = await browser.getPage();
                 let profiledRequest: unknown;
+                let notifyProfileRequest = () => {};
+                const profileRequestStarted = new Promise<void>((resolve) => {
+                    notifyProfileRequest = resolve;
+                });
+                const profileResponseGate = new Promise<void>((resolve) => {
+                    releaseProfileResponse = resolve;
+                });
                 await page.route("**/api/graph/*/profile", async (route) => {
                     profiledRequest = route.request().postDataJSON();
+                    notifyProfileRequest();
+                    await profileResponseGate;
                     await route.fulfill({ json: { result: profile } });
                 });
                 await graph.clickHistoryTab("Profile");
-                await graph.historyPanel.getByRole("button", { name: "Profile", exact: true }).click();
-                await expect(graph.historyPanel.getByTestId("profileTree")).toContainText("Records produced: 3");
+                await graph.clickHistoryProfileButton();
+                await profileRequestStarted;
                 expect(profiledRequest).toEqual({ query: historyQuery });
 
-                await graph.selectQueryInHistory(query);
+                await graph.closeHistoryPanel();
+                releaseProfileResponse();
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                        text: string;
+                        profile: string[];
+                    }>;
+                    return stored.find((entry) => entry.text === historyQuery)?.profile;
+                }).toEqual(profile);
+
+                await graph.clickQueryHistoryButton();
                 await graph.selectQueryInHistory(historyQuery);
                 await graph.clickHistoryTab("Profile");
-                await expect(graph.historyPanel.getByTestId("profileTree")).toContainText("Records produced: 3");
+                await expect(graph.profileTree).toContainText("Records produced: 3");
 
                 const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
                     text: string;
@@ -92,6 +122,7 @@ test.describe('Query history Tests', () => {
                     graphName
                 });
             } finally {
+                releaseProfileResponse();
                 await browser.closeBrowser();
                 browserClosed = true;
             }
