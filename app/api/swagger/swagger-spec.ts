@@ -3032,6 +3032,25 @@ const swaggerSpec = {
                     message: {
                       type: "string",
                       example: "User role updated"
+                    },
+                    requiresReauthentication: {
+                      type: "boolean",
+                      description: "True when the current user's own password was changed"
+                    },
+                    aclSaved: {
+                      type: "boolean",
+                      description: "When reauthentication is required, indicates whether the ACL changes were saved to disk"
+                    },
+                    reauthenticationConnection: {
+                      type: "object",
+                      description: "When reauthentication is required, the database connection to use for the next sign-in, without credentials or TLS material",
+                      required: ["host", "port", "username", "tls"],
+                      properties: {
+                        host: { type: "string" },
+                        port: { type: "integer" },
+                        username: { type: "string" },
+                        tls: { type: "boolean" }
+                      }
                     }
                   }
                 }

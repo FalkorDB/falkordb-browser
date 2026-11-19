@@ -63,3 +63,36 @@ export function extractKeysFromACL(userDetails: string[]): string[] {
     .map((part) => part.slice(1));
   return keyPatterns.length > 0 ? keyPatterns : ["*"];
 }
+
+export function requiresPasswordReauthentication(
+  currentUsername: string | undefined,
+  targetUsername: string,
+  password?: string,
+): boolean {
+  return Boolean(password) && currentUsername === targetUsername;
+}
+
+export type UpdateUserResponse = { message: string } & (
+  | { requiresReauthentication: false }
+  | {
+    requiresReauthentication: true;
+    aclSaved: boolean;
+    reauthenticationConnection: { host: string; port: number; username: string; tls: boolean };
+  }
+);
+
+export async function persistAclAfterPasswordChange(
+  shouldPersist: boolean,
+  saveAcl: () => Promise<unknown>,
+  onError: (error: unknown) => void,
+): Promise<boolean | undefined> {
+  if (!shouldPersist) return undefined;
+
+  try {
+    await saveAcl();
+    return true;
+  } catch (error) {
+    onError(error);
+    return false;
+  }
+}

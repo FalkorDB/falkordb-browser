@@ -49,6 +49,8 @@ export default function LoginPage() {
 
   // An explicit logout must not be undone by the next automatic login.
   const signedOut = searchParams.get("signedOut") === "true";
+  const passwordChanged = searchParams.get("passwordChanged") === "true";
+  const aclSaveFailed = searchParams.get("aclSaveFailed") === "true";
   // Connection params in the URL are a deliberate request for a different
   // instance, so they outrank the preconfigured connection.
   const hasConnectionParams =
@@ -224,6 +226,16 @@ export default function LoginPage() {
                 {lookupError && (
                   <p className="text-sm text-center text-red-500" data-testid="loginPreconfiguredError">
                     {lookupError}
+                  </p>
+                )}
+                {passwordChanged && (
+                  <p className="text-sm text-center text-green-600" data-testid="passwordChangedMessage">
+                    Your password was changed. Sign in again with your new password.
+                  </p>
+                )}
+                {aclSaveFailed && (
+                  <p className="text-sm text-center text-amber-600" data-testid="aclSaveWarning">
+                    Your password was changed, but FalkorDB could not save the ACL changes to disk. The change is active only in memory.
                   </p>
                 )}
                 <LoginForm
