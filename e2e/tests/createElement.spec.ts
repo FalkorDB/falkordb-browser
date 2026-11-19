@@ -170,6 +170,7 @@ test.describe("Create element panel Tests", () => {
     await graph.clickCreate();
     await expect(graph.errorDescription).toHaveText("Edge must have a label (relationship type)");
     await expect(graph.panel).toBeVisible();
+    await graph.dismissErrorToast();
     const empty = await apicalls.runQuery(graphName, "MATCH ()-[e]->() RETURN count(e) AS c");
     expect(Number(empty.data[0].c)).toBe(0);
 

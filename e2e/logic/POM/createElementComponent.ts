@@ -93,7 +93,7 @@ export default class CreateElementPanel extends GraphPage {
     const [first, second] = await this.getNodesScreenPositions();
     await this.elementClick(first.screenX, first.screenY);
     // Selecting pans the canvas onto the selection, so the second node has moved.
-    const secondNow = (await this.getNodesScreenPositions()).find(
+    const secondNow = (await this.readNodesScreenPositions()).find(
       (node) => node.id === second.id
     );
     expect(secondNow, `node ${second.id} missing after selecting the first`).toBeDefined();
