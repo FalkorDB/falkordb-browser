@@ -216,6 +216,7 @@ export default function CreateElementPanel(props: Props) {
     const handleSetKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, key: string) => {
         if (e.key === "Escape") {
             e.preventDefault();
+            e.stopPropagation();
             setEditable("");
             setEditVal("");
             setEditType("string");
@@ -258,6 +259,7 @@ export default function CreateElementPanel(props: Props) {
     const handleAddKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.code === "Escape") {
             e.preventDefault();
+            e.stopPropagation();
             setNewKey("");
             setNewVal("");
             setNewType("string");

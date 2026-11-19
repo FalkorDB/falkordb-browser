@@ -108,6 +108,56 @@ test.describe("Create element panel Tests", () => {
     await expect(graph.attributesCount).toHaveText("2");
   });
 
+  test(`@readwrite Escape cancels an attribute edit without closing or clearing the draft`, async () => {
+    const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
+    await graph.openNodePanel();
+
+    await graph.addLabel("Person");
+    await graph.addAttribute("name", "Alice");
+    await graph.editAttributeWithPencil("name");
+    await graph.fillEditValue("Bob");
+    await graph.editValue.press("Escape");
+
+    await expect(graph.panel).toBeVisible();
+    await expect(graph.editValue).toBeHidden();
+    await expect(graph.label("Person")).toBeVisible();
+    await expect(graph.attributesCount).toHaveText("1");
+    await expect(graph.attributeValue("name")).toHaveText("Alice");
+
+    await graph.clickCreate();
+    await expect(graph.panel).toBeHidden();
+
+    const { data } = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n");
+    expect(data).toHaveLength(1);
+    expect(data[0].n.labels).toEqual(["Person"]);
+    expect(data[0].n.properties).toEqual({ name: "Alice" });
+  });
+
+  test(`@readwrite Escape cancels a new attribute row without closing or clearing the draft`, async () => {
+    const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
+    await graph.openNodePanel();
+
+    await graph.addLabel("Person");
+    await graph.addAttribute("name", "Alice");
+    await graph.fillNewAttribute("pending", "discard");
+    await graph.newKey.press("Escape");
+
+    await expect(graph.panel).toBeVisible();
+    await expect(graph.label("Person")).toBeVisible();
+    await expect(graph.attributesCount).toHaveText("1");
+    await expect(graph.attributeValue("name")).toHaveText("Alice");
+    await expect(graph.newKey).toHaveValue("");
+    await expect(graph.newValue).toHaveValue("");
+
+    await graph.clickCreate();
+    await expect(graph.panel).toBeHidden();
+
+    const { data } = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n");
+    expect(data).toHaveLength(1);
+    expect(data[0].n.labels).toEqual(["Person"]);
+    expect(data[0].n.properties).toEqual({ name: "Alice" });
+  });
+
   test(`@readwrite create an edge between two selected nodes; type is required; swap reverses direction`, async () => {
     const graph = await openGraph("CREATE (:Seed {name: 'a'}), (:Seed {name: 'b'})");
     const [firstId, secondId] = await graph.openEdgePanel();
@@ -242,7 +292,15 @@ test.describe("Create element panel Tests", () => {
   test(`@readwrite closing the panel discards the draft`, async () => {
     const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
 
-    for (const close of [() => graph.closePanel(), () => graph.closeWithEscape()]) {
+    const closeActions = [
+      () => graph.closePanel(),
+      async () => {
+        await graph.title.click();
+        await graph.closeWithEscape();
+      },
+    ];
+
+    for (const close of closeActions) {
       await graph.openNodePanel();
       await graph.addLabel("Draft");
       await graph.addAttribute("name", "Draft");
