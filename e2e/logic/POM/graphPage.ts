@@ -34,6 +34,13 @@ export interface RelationshipStyle {
   arrowSize: number;
 }
 
+type NodeScreenPosition = {
+  id: number;
+  screenX: number;
+  screenY: number;
+  isVisible: boolean;
+};
+
 export default class GraphPage extends BasePage {
   // CREATE
   public get create(): Locator {
@@ -491,7 +498,7 @@ export default class GraphPage extends BasePage {
     return this.snapshotNodesScreenPositions();
   }
 
-  protected async snapshotNodesScreenPositions(): Promise<any[]> {
+  protected async snapshotNodesScreenPositions(): Promise<NodeScreenPosition[]> {
     const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
       if (!canvasElement) return null;
       const rect = canvasElement.getBoundingClientRect();

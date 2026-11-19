@@ -165,6 +165,9 @@ test.describe("Create element panel Tests", () => {
     await graph.addAttribute("name", "Alice");
     await graph.fillNewAttribute("pending", "discard");
     await graph.cancelNewAttributeWithEscape();
+    await expect(graph.panel).toBeVisible();
+    await expect(graph.newKey).toHaveValue("");
+    await expect(graph.newValue).toHaveValue("");
 
     await graph.fillNewAttribute("pendingBoolean", true);
     await graph.cancelNewAttributeWithEscape("value");

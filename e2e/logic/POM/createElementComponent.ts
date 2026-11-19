@@ -108,6 +108,30 @@ export default class CreateElementPanel extends GraphPage {
       return samples.stable;
     }, { intervals: [100], message: `node ${second.id} must settle on screen after selecting node ${first.id}` })
       .toBe(2);
+    const caption = await this.page.evaluate((id) => {
+      const canvas = document.querySelector("falkordb-canvas");
+      const node = canvas?.getGraphData().nodes.find((entry) => entry.id === id);
+      const label = canvas?.getGraph()?.nodeLabel();
+      if (!node || typeof label !== "function") {
+        throw new Error(`Cannot read the canvas tooltip for node ${id}`);
+      }
+      return String(label(node));
+    }, second.id);
+
+    // The projected position can settle before the renderer's hit-test canvas catches up.
+    await expect.poll(async () => {
+      const current = (await this.snapshotNodesScreenPositions())
+        .find((node) => node.id === second.id && node.isVisible);
+      samples.last = current;
+      if (!current) return "node is outside the canvas";
+      const receivesPointer = await this.canvasElement.evaluate((canvas, { screenX, screenY }) =>
+        document.elementFromPoint(screenX, screenY) === canvas, current);
+      if (!receivesPointer) return "canvas is covered at the node position";
+
+      await this.page.mouse.move(current.screenX, current.screenY);
+      return (await this.nodeCanvasToolTip.filter({ visible: true }).allTextContents())[0] ?? "";
+    }, { message: `the canvas must resolve the pointer to node ${second.id} before Shift-click` }).toBe(caption);
+
     const secondNow = samples.last;
     if (!secondNow) throw new Error(`Node ${second.id} is no longer visible`);
 
