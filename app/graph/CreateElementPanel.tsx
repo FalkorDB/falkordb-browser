@@ -295,6 +295,20 @@ export default function CreateElementPanel(props: Props) {
                     className="data-[state=unchecked]:bg-border"
                     checked={value as boolean}
                     onCheckedChange={(checked) => setValue(checked)}
+                    onKeyDown={(e) => {
+                        if (e.key !== "Escape") return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (actionType === "set") {
+                            setEditable("");
+                            setEditVal("");
+                            setEditType("string");
+                        } else {
+                            setNewKey("");
+                            setNewVal("");
+                            setNewType("string");
+                        }
+                    }}
                 />;
             case "number":
                 return <Input

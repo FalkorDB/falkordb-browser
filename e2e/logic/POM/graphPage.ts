@@ -488,6 +488,10 @@ export default class GraphPage extends BasePage {
       { timeout: 20000 }
     );
 
+    return this.snapshotNodesScreenPositions();
+  }
+
+  protected async snapshotNodesScreenPositions(): Promise<any[]> {
     const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
       if (!canvasElement) return null;
       const rect = canvasElement.getBoundingClientRect();

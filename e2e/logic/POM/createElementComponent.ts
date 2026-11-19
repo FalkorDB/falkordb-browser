@@ -90,14 +90,29 @@ export default class CreateElementPanel extends GraphPage {
 
   /** Clicks two canvas nodes in order and opens the edge panel; the first is the source. */
   async openEdgePanel(): Promise<[number, number]> {
-    const [first, second] = await this.getNodesScreenPositions();
+    const [first, second] = await this.snapshotNodesScreenPositions();
+    expect(first?.isVisible && second?.isVisible, "both endpoints must be visible").toBe(true);
     await this.elementClick(first.screenX, first.screenY);
-    // Selecting pans the canvas onto the selection, so the second node has moved.
-    const secondNow = (await this.readNodesScreenPositions()).find(
-      (node) => node.id === second.id
-    );
-    expect(secondNow, `node ${second.id} missing after selecting the first`).toBeDefined();
+    await expect.poll(() => this.getDataPanelNodeId()).toBe(first.id);
+
+    // Selection can pan and resize the canvas even after the force engine stops.
+    const samples: { last?: { screenX: number; screenY: number }; stable: number } = { stable: 0 };
+    await expect.poll(async () => {
+      const current = (await this.snapshotNodesScreenPositions())
+        .find((node) => node.id === second.id && node.isVisible);
+      const previous = samples.last;
+      const stable = previous && current
+        && Math.hypot(previous.screenX - current.screenX, previous.screenY - current.screenY) < 1;
+      samples.last = current;
+      samples.stable = stable ? samples.stable + 1 : 0;
+      return samples.stable;
+    }, { intervals: [100], message: `node ${second.id} must settle on screen after selecting node ${first.id}` })
+      .toBe(2);
+    const secondNow = samples.last;
+    if (!secondNow) throw new Error(`Node ${second.id} is no longer visible`);
+
     await this.elementClick(secondNow.screenX, secondNow.screenY, true);
+    await expect.poll(() => this.getSelectionCount()).toBe(2);
     await this.clickElementCanvasAddEdge();
     await expect(this.title).toHaveText("Create Edge");
     return [first.id, second.id];
@@ -113,8 +128,27 @@ export default class CreateElementPanel extends GraphPage {
   }
 
   async closeWithEscape(): Promise<void> {
+    await this.title.click();
     await this.page.keyboard.press("Escape");
     await expect(this.panel).toBeHidden();
+  }
+
+  async cancelEditWithEscape(): Promise<void> {
+    await interactWhenVisible(
+      this.editValue,
+      (el) => el.press("Escape"),
+      "Create Element Edit Value"
+    );
+    await expect(this.editValue).toBeHidden();
+  }
+
+  async cancelNewAttributeWithEscape(focus: "key" | "value" = "key"): Promise<void> {
+    const activeField = focus === "key" ? this.newKey : this.newValue;
+    await interactWhenVisible(
+      activeField,
+      (el) => el.press("Escape"),
+      "Create Element New Attribute"
+    );
   }
 
   async clickCreate(): Promise<void> {
@@ -304,8 +338,10 @@ export default class CreateElementPanel extends GraphPage {
   }
 
   private async selectType(typeCell: Locator, type: ValueType): Promise<void> {
+    const trigger = typeCell.getByTestId("selectType");
+    if ((await trigger.textContent())?.trim() === type) return;
     await interactWhenVisible(
-      typeCell.getByTestId("selectType"),
+      trigger,
       (el) => el.click(),
       "Create Element Type Select"
     );
@@ -314,7 +350,7 @@ export default class CreateElementPanel extends GraphPage {
       (el) => el.click(),
       "Create Element Type Option"
     );
-    await expect(typeCell.getByTestId("selectType")).toContainText(type);
+    await expect(trigger).toContainText(type);
   }
 
   private async setValue(typeCell: Locator, input: Locator, value: AttributeValue): Promise<void> {
