@@ -84,6 +84,11 @@ Open [http://localhost:3000](http://localhost:3000) and connect to `localhost:63
 | [Mobile app](mobile/README.md) | iOS and Android shell over an AWS-hosted browser |
 | [From source](#build-and-run-from-source) | Contributing |
 
+Desktop installers are available from GitHub release notes; the browser does not
+provide direct installer downloads. macOS releases require configured signing and
+notarization credentials. For legacy unsigned releases and their security caveat,
+see the [desktop app notes](./desktop/README.md#legacy-macos-gatekeeper).
+
 ### Deploy to Kubernetes with Helm
 
 Deploy the FalkorDB Browser to your Kubernetes cluster using Helm:
@@ -176,7 +181,7 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   Each CI job records raw V8 coverage and turns it into a report with
   `.github/scripts/coverage-report.mjs`, and Codecov merges the reports per commit. The
   **Coverage status** workflow is the gate: once every coverage workflow a commit triggers
-  has finished, and Codecov has processed their uploads, it requires **80%** of the whole
+  has finished, and Codecov has processed their uploads, it requires **95%** of the whole
   codebase (`coverage/project` on PRs, `coverage/project (push)` on commits pushed to `main`
   and `staging`) and of the lines a PR changes (`coverage/patch`). A coverage job whose
   tests or report fail, are skipped or are cancelled fails the gate, since its coverage is

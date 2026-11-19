@@ -34,10 +34,9 @@ async function prepare(page: Page): Promise<void> {
 }
 
 test.describe("@admin App download hidden", () => {
-    test("the phone app link endpoints still answer with nothing configured", async ({ request }) => {
+    test("the removed app download endpoints return 404", async ({ request }) => {
         const links = await request.get(`${urls.localHost}/api/app-links`);
-        expect(links.ok()).toBeTruthy();
-        expect(await links.json()).toEqual({});
+        expect(links.status()).toBe(404);
         const android = await request.get(`${urls.localHost}/api/app-download/android`, { maxRedirects: 0 });
         expect(android.status()).toBe(404);
     });
