@@ -56,7 +56,9 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   signed, accepted by Gatekeeper and stapled, rather than silently publishing
   an unsigned macOS app. Installers from the platforms that passed their checks
   are still attached to the release. Windows and Linux installers remain unsigned.
-  CI builds for pull requests, pushes, and manual runs remain unsigned. Local
+  Manual (`workflow_dispatch`) runs are signed and notarized the same way, so a
+  signed DMG can be downloaded from the run's artifacts and tested before a
+  release. CI builds for pull requests and pushes remain unsigned. Local
   macOS builds may be signed when a matching Developer ID identity is available
   in the keychain; set `CSC_IDENTITY_AUTO_DISCOVERY=false` to force an unsigned
   build.
@@ -66,20 +68,20 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   the next release. Otherwise macOS release packaging fails and the latest-release
   macOS download links have no asset to serve. Do not publish an unsigned fallback.
 
-  Configure these repository Actions secrets:
+  Configure these Actions secrets (repository or organization level):
 
   - `MACOS_CERTIFICATE_P12`: base64-encoded Developer ID Application
     certificate (`.p12`) including its private key.
   - `MACOS_CERTIFICATE_PASSWORD`: password used when exporting the `.p12`.
-  - `APPLE_ID`: Apple ID used for notarization.
+  - `APPLE_ID`: Apple ID used for notarization (may be an Actions variable).
   - `APPLE_APP_SPECIFIC_PASSWORD`: app-specific password for that Apple ID.
-  - `APPLE_TEAM_ID`: Apple Developer team ID.
+  - `APPLE_TEAM_ID`: Apple Developer team ID (may be an Actions variable).
 
   The workflow passes the certificate as electron-builder's `CSC_LINK` and
   `CSC_KEY_PASSWORD`, and the Apple credentials as `APPLE_ID`,
   `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
   The web build and server preparation run without these credentials; only the
-  release credential check and macOS electron-builder packaging receive them.
+  release/manual-run credential check and macOS electron-builder packaging receive them.
 - **App icon:** electron-builder's default icon is used. Add `build/icon.png`
   (512×512 or larger) and set `directories.buildResources: build`.
 

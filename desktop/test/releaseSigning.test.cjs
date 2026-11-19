@@ -8,7 +8,11 @@ const path = require("node:path");
 const workflow = fs.readFileSync(path.join(__dirname, "../../.github/workflows/desktop.yml"), "utf8");
 const builderConfig = fs.readFileSync(path.join(__dirname, "../electron-builder.yml"), "utf8");
 
-const RELEASE_ON_MAC = "runner.os == 'macOS' && github.event_name == 'release'";
+const RELEASE_ON_MAC = "runner.os == 'macOS' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')";
+// Apple ID and team ID are not sensitive, so an org may store them as variables.
+const FALLS_BACK_TO_VARS = new Set(["APPLE_ID", "APPLE_TEAM_ID"]);
+const credential = (name) =>
+    FALLS_BACK_TO_VARS.has(name) ? `\${{ secrets.${name} || vars.${name} }}` : `\${{ secrets.${name} }}`;
 
 function step(name) {
     const start = workflow.indexOf(`- name: ${name}`);
@@ -23,7 +27,7 @@ test("macOS release builds fail without signing and notarization secrets", () =>
     const check = step("Verify macOS signing credentials");
     assert.match(check, new RegExp(`if: ${RELEASE_ON_MAC.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
     for (const secret of ["MACOS_CERTIFICATE_P12", "MACOS_CERTIFICATE_PASSWORD", "APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_TEAM_ID"]) {
-        assert.match(check, new RegExp(`${secret}: \\$\\{\\{ secrets\\.${secret} \\}\\}`), secret);
+        assert.ok(check.includes(`${secret}: ${credential(secret)}`), secret);
         assert.match(check, new RegExp(`-z "\\$${secret}"`), secret);
     }
     assert.match(check, /exit 1/);
@@ -39,7 +43,7 @@ test("macOS release builds pass the certificate and Apple credentials to electro
         ["APPLE_APP_SPECIFIC_PASSWORD", "APPLE_APP_SPECIFIC_PASSWORD"],
         ["APPLE_TEAM_ID", "APPLE_TEAM_ID"],
     ]) {
-        assert.ok(build.includes(`${env}: \${{ secrets.${secret} }}`), env);
+        assert.ok(build.includes(`${env}: ${credential(secret)}`), env);
     }
     assert.ok(build.includes('CSC_IDENTITY_AUTO_DISCOVERY: "true"'));
 });
@@ -51,10 +55,10 @@ test("macOS release builds force code signing; notarization is enforced by ticke
     assert.match(build, /run: npx --no-install electron-builder --publish never/);
 });
 
-test("non-release packaging leaves signing secrets absent rather than empty", () => {
+test("pull request and push packaging leaves signing secrets absent rather than empty", () => {
     const build = step("Build unsigned installers");
-    assert.ok(build.includes("if: runner.os != 'macOS' || github.event_name != 'release'"));
-    assert.doesNotMatch(build, /(?:CSC_LINK|CSC_KEY_PASSWORD|APPLE_\w+|secrets\.)/);
+    assert.ok(build.includes("if: runner.os != 'macOS' || (github.event_name != 'release' && github.event_name != 'workflow_dispatch')"));
+    assert.doesNotMatch(build, /(?:CSC_LINK|CSC_KEY_PASSWORD|APPLE_\w+|secrets\.|vars\.)/);
     assert.match(build, /run: npx --no-install electron-builder --publish never/);
     // Job-level env must not accidentally reintroduce empty credentials.
     const jobHeader = workflow.slice(workflow.indexOf("\n  build:"), workflow.indexOf("\n    steps:"));

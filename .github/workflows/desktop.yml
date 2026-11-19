@@ -116,20 +116,20 @@ jobs:
         run: npm version "${TAG#v}" --no-git-tag-version --allow-same-version
 
       - name: Verify macOS signing credentials
-        if: runner.os == 'macOS' && github.event_name == 'release'
+        if: runner.os == 'macOS' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID || vars.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
         run: |
           if [ -z "$MACOS_CERTIFICATE_P12" ] ||
              [ -z "$MACOS_CERTIFICATE_PASSWORD" ] ||
              [ -z "$APPLE_ID" ] ||
              [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ||
              [ -z "$APPLE_TEAM_ID" ]; then
-            echo "::error::Configure all documented macOS signing and notarization secrets before publishing a desktop release."
+            echo "::error::Configure all documented macOS signing and notarization secrets before building a signed desktop release."
             exit 1
           fi
 
@@ -140,26 +140,26 @@ jobs:
         run: npm run build:web && npm run prepare:server
 
       - name: Build unsigned installers
-        if: runner.os != 'macOS' || github.event_name != 'release'
+        if: runner.os != 'macOS' || (github.event_name != 'release' && github.event_name != 'workflow_dispatch')
         working-directory: desktop
         run: npx --no-install electron-builder --publish never
 
       - name: Build signed macOS installers
-        if: runner.os == 'macOS' && github.event_name == 'release'
+        if: runner.os == 'macOS' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
         working-directory: desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "true"
           CSC_LINK: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID || vars.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
         # Apple credentials trigger notarization; stapler validation below
         # enforces that notarization actually completed.
         run: npx --no-install electron-builder --publish never -c.mac.forceCodeSigning=true
 
       - name: Verify macOS signature and notarization
-        if: runner.os == 'macOS' && github.event_name == 'release'
+        if: runner.os == 'macOS' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
         working-directory: desktop/dist
         shell: bash
         run: |
