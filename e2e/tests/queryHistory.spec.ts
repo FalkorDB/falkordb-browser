@@ -29,14 +29,73 @@ async function withGraphCleanup(apicalls: ApiCalls, graphs: string[], body: () =
 test.describe('Query history Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
+    let browserClosed: boolean;
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
+        browserClosed = false;
     });
 
     test.afterEach(async () => {
-        await browser.closeBrowser();
+        if (!browserClosed) await browser.closeBrowser();
+    });
+
+    test(`@admin profiling a selected history entry saves its profile to that entry`, async () => {
+        const graphName = getRandomString('queryhistory-profile');
+        const query = "MATCH (n) RETURN n";
+        const historyQuery = "RETURN 3";
+        const profile = ["Results | Records produced: 3"];
+
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            try {
+                await apicalls.addGraph(graphName);
+                const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+                await browser.setPageToFullScreen();
+                await graph.selectGraphByName(graphName);
+                await graph.insertQuery(query);
+                await graph.clickRunQuery();
+                await graph.insertQuery(historyQuery);
+                await graph.clickRunQuery();
+
+                await graph.insertQuery(query);
+                await graph.clickQueryHistoryButton();
+                await graph.selectQueryInHistory(historyQuery);
+
+                const page = await browser.getPage();
+                let profiledRequest: unknown;
+                await page.route("**/api/graph/*/profile", async (route) => {
+                    profiledRequest = route.request().postDataJSON();
+                    await route.fulfill({ json: { result: profile } });
+                });
+                await graph.clickHistoryTab("Profile");
+                await graph.historyPanel.getByRole("button", { name: "Profile", exact: true }).click();
+                await expect(graph.historyPanel.getByTestId("profileTree")).toContainText("Records produced: 3");
+                expect(profiledRequest).toEqual({ query: historyQuery });
+
+                await graph.selectQueryInHistory(query);
+                await graph.selectQueryInHistory(historyQuery);
+                await graph.clickHistoryTab("Profile");
+                await expect(graph.historyPanel.getByTestId("profileTree")).toContainText("Records produced: 3");
+
+                const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                    text: string;
+                    profile: string[];
+                    graphName: string;
+                }>;
+                expect(stored.find((entry) => entry.text === historyQuery)).toMatchObject({
+                    profile,
+                    graphName
+                });
+                expect(stored.find((entry) => entry.text === query)).toMatchObject({
+                    profile: [],
+                    graphName
+                });
+            } finally {
+                await browser.closeBrowser();
+                browserClosed = true;
+            }
+        });
     });
 
     test(`@admin The history Metadata tab stays open and shows the query statistics`, async () => {
