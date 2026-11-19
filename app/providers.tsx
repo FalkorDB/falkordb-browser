@@ -277,7 +277,8 @@ const createChatApiKey = (key: string): ChatApiKey => {
 };
 
 const parseChatApiKeys = (value: string): ChatApiKey[] => {
-  const validProviders = new Set(["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"]);
+  // Migration and settings both save "unknown" when a key's provider cannot be inferred.
+  const validProviders = new Set(["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai", "unknown"]);
   const parsed = JSON.parse(value) as unknown;
   if (!Array.isArray(parsed)) return [];
 

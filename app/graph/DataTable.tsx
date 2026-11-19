@@ -400,6 +400,14 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
             });
             return;
         }
+        if (Object.hasOwn(object.data, key)) {
+            toast({
+                title: "Error",
+                description: "An attribute with this key already exists",
+                variant: "destructive"
+            });
+            return;
+        }
         try {
             setIsAddLoading(true);
             const success = await commitValue(key, value, newType, false, "added");
