@@ -6,7 +6,7 @@ import * as monaco from "monaco-editor";
 import { Monaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import { Download, History, Info, ListChecks, ListX, Star, StarX, Trash2, X } from "lucide-react";
-import { cn, getTheme, Query } from "@/lib/utils";
+import { cn, getConnectionEpoch, getTheme, Query } from "@/lib/utils";
 import { getStatsLines } from "@/lib/queryStats";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -50,7 +50,7 @@ interface Props {
 }
 
 export default function QueryHistoryPanel({ onClose, graphName, languageConfig: sharedLanguageConfig }: Props) {
-    const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext);
+    const { historyQuery, setHistoryQuery, applyQueryHistoryProfile } = useContext(HistoryQueryContext);
     const { graph, graphNames, runQuery, fetchCount } = useContext(GraphContext);
     const { udfList } = useContext(UDFContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
@@ -115,7 +115,6 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     useEffect(() => { currentQueryRef.current = currentQuery; }, [currentQuery]);
     useEffect(() => { graphRef.current = graph; }, [graph]);
     useEffect(() => { graphNameRef.current = graphName; }, [graphName]);
-
     // Keep the engine schema in sync so completion (once the grammar is generated)
     // sees this graph's labels, relationship types, property keys, and UDFs.
     useEffect(() => {
@@ -800,19 +799,10 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     background={background}
                                     query={currentQuery}
                                     setQuery={({ profile }) => {
-                                        setHistoryQuery(prev => {
-                                            const newQuery = {
-                                                ...prev.currentQuery,
-                                                profile: profile || []
-                                            };
-
-                                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
-
-                                            return {
-                                                ...prev,
-                                                currentQuery: newQuery,
-                                                queries: newQueries
-                                            };
+                                        applyQueryHistoryProfile({
+                                            target: currentQuery,
+                                            profile: profile || [],
+                                            connectionEpoch: getConnectionEpoch(),
                                         });
                                     }}
                                     fetchCount={fetchCount}
