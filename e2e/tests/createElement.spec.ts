@@ -40,22 +40,19 @@ test.describe("Create element panel Tests", () => {
     return graph;
   }
 
-  test(`@readwrite create a node with a label and string, number and boolean properties`, async () => {
+  test(`@readwrite create a labeled node with string and number properties`, async () => {
     const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
     await graph.openNodePanel();
 
     await graph.addLabel("Person");
     await graph.addAttribute("name", "Alice");
     await graph.addAttribute("age", 42);
-    await graph.addAttribute("active", true);
 
-    await expect(graph.attributesCount).toHaveText("3");
+    await expect(graph.attributesCount).toHaveText("2");
     await expect(graph.attributeValue("name")).toHaveText("Alice");
     await expect(graph.attributeType("name")).toHaveText("string");
     await expect(graph.attributeValue("age")).toHaveText("42");
     await expect(graph.attributeType("age")).toHaveText("number");
-    await expect(graph.attributeValue("active")).toHaveText("true");
-    await expect(graph.attributeType("active")).toHaveText("boolean");
 
     await graph.clickCreate();
     await expect(graph.panel).toBeHidden();
@@ -63,7 +60,24 @@ test.describe("Create element panel Tests", () => {
     const { data } = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n");
     expect(data).toHaveLength(1);
     expect(data[0].n.labels).toEqual(["Person"]);
-    expect(data[0].n.properties).toEqual({ name: "Alice", age: 42, active: true });
+    expect(data[0].n.properties).toEqual({ name: "Alice", age: 42 });
+  });
+
+  test(`@readwrite create a node with a boolean property`, async () => {
+    const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
+    await graph.openNodePanel();
+
+    await graph.addAttribute("active", true);
+    await expect(graph.attributesCount).toHaveText("1");
+    await expect(graph.attributeValue("active")).toHaveText("true");
+    await expect(graph.attributeType("active")).toHaveText("boolean");
+
+    await graph.clickCreate();
+    await expect(graph.panel).toBeHidden();
+
+    const { data } = await apicalls.runQuery(graphName, "MATCH (n) WHERE n.active IS NOT NULL RETURN n");
+    expect(data).toHaveLength(1);
+    expect(data[0].n.properties).toEqual({ active: true });
   });
 
   test(`@readwrite empty or duplicate attribute keys are rejected`, async () => {
@@ -108,20 +122,90 @@ test.describe("Create element panel Tests", () => {
     await expect(graph.attributesCount).toHaveText("2");
   });
 
-  test(`@readwrite create an edge between two selected nodes; type is required; swap reverses direction`, async () => {
+  test(`@readwrite Escape cancels an attribute edit without closing or clearing the draft`, async () => {
+    const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
+    await graph.openNodePanel();
+
+    await graph.addLabel("Person");
+    await graph.addAttribute("name", "Alice");
+    await graph.addAttribute("active", true);
+    await graph.editAttributeWithPencil("name");
+    await graph.fillEditValue("Bob");
+    await graph.cancelEditWithEscape();
+
+    await expect(graph.panel).toBeVisible();
+    await expect(graph.editValue).toBeHidden();
+    await expect(graph.label("Person")).toBeVisible();
+    await expect(graph.attributesCount).toHaveText("2");
+    await expect(graph.attributeValue("name")).toHaveText("Alice");
+
+    await graph.editAttributeByValue("active");
+    await expect(graph.editValue).toHaveAttribute("data-state", "checked");
+    await graph.toggleEditValue();
+    await graph.cancelEditWithEscape();
+
+    await expect(graph.panel).toBeVisible();
+    await expect(graph.editValue).toBeHidden();
+    await expect(graph.attributeValue("active")).toHaveText("true");
+
+    await graph.clickCreate();
+    await expect(graph.panel).toBeHidden();
+
+    const { data } = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n");
+    expect(data).toHaveLength(1);
+    expect(data[0].n.labels).toEqual(["Person"]);
+    expect(data[0].n.properties).toEqual({ name: "Alice", active: true });
+  });
+
+  test(`@readwrite Escape cancels a new attribute row without closing or clearing the draft`, async () => {
+    const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
+    await graph.openNodePanel();
+
+    await graph.addLabel("Person");
+    await graph.addAttribute("name", "Alice");
+    await graph.fillNewAttribute("pending", "discard");
+    await graph.cancelNewAttributeWithEscape();
+    await expect(graph.panel).toBeVisible();
+    await expect(graph.newKey).toHaveValue("");
+    await expect(graph.newValue).toHaveValue("");
+
+    await graph.fillNewAttribute("pendingBoolean", true);
+    await graph.cancelNewAttributeWithEscape("value");
+
+    await expect(graph.panel).toBeVisible();
+    await expect(graph.label("Person")).toBeVisible();
+    await expect(graph.attributesCount).toHaveText("1");
+    await expect(graph.attributeValue("name")).toHaveText("Alice");
+    await expect(graph.newKey).toHaveValue("");
+    await expect(graph.newValue).toHaveValue("");
+
+    await graph.clickCreate();
+    await expect(graph.panel).toBeHidden();
+
+    const { data } = await apicalls.runQuery(graphName, "MATCH (n:Person) RETURN n");
+    expect(data).toHaveLength(1);
+    expect(data[0].n.labels).toEqual(["Person"]);
+    expect(data[0].n.properties).toEqual({ name: "Alice" });
+  });
+
+  test(`@readwrite an edge cannot be created without a relationship type`, async () => {
+    const graph = await openGraph("CREATE (:Seed {name: 'a'}), (:Seed {name: 'b'})");
+    await graph.openEdgePanel();
+
+    await graph.clickCreate();
+    await expect(graph.errorDescription).toHaveText("Edge must have a label (relationship type)");
+    await expect(graph.panel).toBeVisible();
+    const empty = await apicalls.runQuery(graphName, "MATCH ()-[e]->() RETURN count(e) AS c");
+    expect(Number(empty.data[0].c)).toBe(0);
+  });
+
+  test(`@readwrite swapping selected nodes reverses the created edge direction`, async () => {
     const graph = await openGraph("CREATE (:Seed {name: 'a'}), (:Seed {name: 'b'})");
     const [firstId, secondId] = await graph.openEdgePanel();
 
     const source = await graph.sourceNode.innerText();
     const target = await graph.targetNode.innerText();
     expect(source).not.toBe(target);
-
-    // No type yet.
-    await graph.clickCreate();
-    await expect(graph.errorDescription).toHaveText("Edge must have a label (relationship type)");
-    await expect(graph.panel).toBeVisible();
-    const empty = await apicalls.runQuery(graphName, "MATCH ()-[e]->() RETURN count(e) AS c");
-    expect(Number(empty.data[0].c)).toBe(0);
 
     await graph.swapNodes();
     await expect(graph.sourceNode).toHaveText(target);
@@ -147,7 +231,7 @@ test.describe("Create element panel Tests", () => {
     expect(data[0].e.properties).toEqual({ since: 2020 });
   });
 
-  test(`@readwrite edit, cancel, save and delete an attribute; remove a label`, async () => {
+  test(`@readwrite edit, cancel and reject empty attribute values; remove a label`, async () => {
     const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
     await graph.openNodePanel();
 
@@ -156,10 +240,6 @@ test.describe("Create element panel Tests", () => {
     await expect(graph.addLabelTrigger).toBeVisible();
 
     await graph.addAttribute("name", "Alice");
-    await graph.addAttribute("age", 30);
-    await graph.addAttribute("active", false);
-    await graph.addAttribute("zero", 0);
-    await expect(graph.attributesCount).toHaveText("4");
 
     // Cancel discards the edit.
     await graph.editAttributeWithPencil("name");
@@ -181,6 +261,26 @@ test.describe("Create element panel Tests", () => {
     await expect(graph.editValue).toBeVisible();
     await graph.cancelAttributeEdit();
     await expect(graph.attributeValue("name")).toHaveText("Bob");
+    await graph.dismissErrorToast();
+
+    await graph.addLabel("Edited");
+    await graph.clickCreate();
+    await expect(graph.panel).toBeHidden();
+
+    const { data } = await apicalls.runQuery(graphName, "MATCH (n:Edited) RETURN n");
+    expect(data).toHaveLength(1);
+    expect(data[0].n.labels).toEqual(["Edited"]);
+    expect(data[0].n.properties).toEqual({ name: "Bob" });
+  });
+
+  test(`@readwrite preserve and edit numeric and boolean attribute values`, async () => {
+    const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
+    await graph.openNodePanel();
+
+    await graph.addAttribute("age", 30);
+    await graph.addAttribute("active", false);
+    await graph.addAttribute("zero", 0);
+    await expect(graph.attributesCount).toHaveText("3");
 
     // Clicking the value edits it too; the field starts from the current value.
     await graph.editAttributeByValue("age");
@@ -209,6 +309,21 @@ test.describe("Create element panel Tests", () => {
     await expect(graph.attributeValue("zero")).toHaveText("0");
     await expect(graph.attributeType("zero")).toHaveText("number");
 
+    await graph.addLabel("Edited");
+    await graph.clickCreate();
+    await expect(graph.panel).toBeHidden();
+
+    const { data } = await apicalls.runQuery(graphName, "MATCH (n:Edited) RETURN n");
+    expect(data).toHaveLength(1);
+    expect(data[0].n.properties).toEqual({ age: 31, active: true, zero: 0 });
+  });
+
+  test(`@readwrite persist an attribute type change and a confirmed deletion`, async () => {
+    const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
+    await graph.openNodePanel();
+    await graph.addAttribute("name", "Alice");
+    await graph.addAttribute("age", 30);
+
     // Changing the type resets the value to that type's default.
     await graph.editAttributeWithPencil("name");
     await graph.selectEditType("number");
@@ -219,14 +334,14 @@ test.describe("Create element panel Tests", () => {
     await expect(graph.attributeValue("name")).toHaveText("5");
 
     // Delete: cancelling keeps the row, confirming removes it.
-    await expect(graph.attributesCount).toHaveText("4");
+    await expect(graph.attributesCount).toHaveText("2");
     await graph.deleteAttribute("age", false);
     await expect(graph.attributeKey("age")).toBeVisible();
-    await expect(graph.attributesCount).toHaveText("4");
+    await expect(graph.attributesCount).toHaveText("2");
 
     await graph.deleteAttribute("age", true);
     await expect(graph.attributeKey("age")).toBeHidden();
-    await expect(graph.attributesCount).toHaveText("3");
+    await expect(graph.attributesCount).toHaveText("1");
 
     // Only the edited values, with their types, reach the database.
     await graph.addLabel("Edited");
@@ -236,13 +351,18 @@ test.describe("Create element panel Tests", () => {
     const { data } = await apicalls.runQuery(graphName, "MATCH (n:Edited) RETURN n");
     expect(data).toHaveLength(1);
     expect(data[0].n.labels).toEqual(["Edited"]);
-    expect(data[0].n.properties).toEqual({ name: 5, active: true, zero: 0 });
+    expect(data[0].n.properties).toEqual({ name: 5 });
   });
 
   test(`@readwrite closing the panel discards the draft`, async () => {
     const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
 
-    for (const close of [() => graph.closePanel(), () => graph.closeWithEscape()]) {
+    const closeActions = [
+      () => graph.closePanel(),
+      () => graph.closeWithEscape(),
+    ];
+
+    for (const close of closeActions) {
       await graph.openNodePanel();
       await graph.addLabel("Draft");
       await graph.addAttribute("name", "Draft");

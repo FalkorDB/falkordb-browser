@@ -216,6 +216,7 @@ export default function CreateElementPanel(props: Props) {
     const handleSetKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, key: string) => {
         if (e.key === "Escape") {
             e.preventDefault();
+            e.stopPropagation();
             setEditable("");
             setEditVal("");
             setEditType("string");
@@ -258,6 +259,7 @@ export default function CreateElementPanel(props: Props) {
     const handleAddKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.code === "Escape") {
             e.preventDefault();
+            e.stopPropagation();
             setNewKey("");
             setNewVal("");
             setNewType("string");
@@ -293,6 +295,20 @@ export default function CreateElementPanel(props: Props) {
                     className="data-[state=unchecked]:bg-border"
                     checked={value as boolean}
                     onCheckedChange={(checked) => setValue(checked)}
+                    onKeyDown={(e) => {
+                        if (e.key !== "Escape") return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (actionType === "set") {
+                            setEditable("");
+                            setEditVal("");
+                            setEditType("string");
+                        } else {
+                            setNewKey("");
+                            setNewVal("");
+                            setNewType("string");
+                        }
+                    }}
                 />;
             case "number":
                 return <Input
