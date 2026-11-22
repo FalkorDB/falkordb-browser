@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  consumeReauthenticationHandoff,
   createReauthenticationHandoffId,
   isUsableReauthenticationHandoff,
   matchesReauthenticationEndpoint,
@@ -87,5 +88,73 @@ describe("isUsableReauthenticationHandoff", () => {
     assert.equal(isUsableReauthenticationHandoff({ ...handoff, is_active: false }, 599), false);
     assert.equal(isUsableReauthenticationHandoff({ ...handoff, kind: "pat" }, 599), false);
     assert.equal(isUsableReauthenticationHandoff({ ...handoff, name: "connection:opaque" }, 599), false);
+  });
+});
+
+describe("consumeReauthenticationHandoff", () => {
+  it("deletes the prefixed handoff and does not clean up a successful login", async () => {
+    const deletedIds: string[] = [];
+    let cleanupCalls = 0;
+
+    const consumed = await consumeReauthenticationHandoff(
+      "opaque",
+      async tokenId => {
+        deletedIds.push(tokenId);
+        return true;
+      },
+      async () => { cleanupCalls += 1; },
+    );
+
+    assert.equal(consumed, true);
+    assert.deepEqual(deletedIds, ["reauth:opaque"]);
+    assert.equal(cleanupCalls, 0);
+  });
+
+  it("cleans up the rejected login when the handoff is already missing", async () => {
+    let cleanupCalls = 0;
+
+    const consumed = await consumeReauthenticationHandoff(
+      "opaque",
+      async () => false,
+      async () => { cleanupCalls += 1; },
+    );
+
+    assert.equal(consumed, false);
+    assert.equal(cleanupCalls, 1);
+  });
+
+  it("cleans up and propagates storage errors", async () => {
+    const storageError = new Error("storage unavailable");
+    let cleanupCalls = 0;
+
+    await assert.rejects(
+      consumeReauthenticationHandoff(
+        "opaque",
+        async () => { throw storageError; },
+        async () => { cleanupCalls += 1; },
+      ),
+      error => error === storageError,
+    );
+    assert.equal(cleanupCalls, 1);
+  });
+
+  it("allows only one concurrent callback to consume the same handoff", async () => {
+    let available = true;
+    let cleanupCalls = 0;
+    const deleteToken = async (tokenId: string) => {
+      assert.equal(tokenId, "reauth:opaque");
+      if (!available) return false;
+      available = false;
+      return true;
+    };
+    const onFailure = async () => { cleanupCalls += 1; };
+
+    const results = await Promise.all([
+      consumeReauthenticationHandoff("opaque", deleteToken, onFailure),
+      consumeReauthenticationHandoff("opaque", deleteToken, onFailure),
+    ]);
+
+    assert.deepEqual(results.sort(), [false, true]);
+    assert.equal(cleanupCalls, 1);
   });
 });

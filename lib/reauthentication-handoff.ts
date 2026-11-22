@@ -30,6 +30,22 @@ export function readReauthenticationHandoffId(cookieHeader: string | undefined):
   return reference || undefined;
 }
 
+export async function consumeReauthenticationHandoff(
+  reference: string,
+  deleteToken: (tokenId: string) => Promise<boolean>,
+  onFailure: () => Promise<void>,
+): Promise<boolean> {
+  try {
+    if (await deleteToken(`${REAUTHENTICATION_HANDOFF_PREFIX}${reference}`)) return true;
+  } catch (error) {
+    await onFailure();
+    throw error;
+  }
+
+  await onFailure();
+  return false;
+}
+
 export function matchesReauthenticationEndpoint(
   record: Pick<HandoffRecord, "host" | "port" | "username" | "tls">,
   credentials: ReauthenticationCredentials,

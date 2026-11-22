@@ -6,6 +6,7 @@ import {
   extractKeysFromACL,
   requiresPasswordReauthentication,
   persistAclAfterPasswordChange,
+  removePreviousPasswordConnectionCredential,
   ROLE,
 } from "./model.ts";
 
@@ -141,5 +142,47 @@ describe("persistAclAfterPasswordChange", () => {
     const status = await persistAclAfterPasswordChange(true, async () => { throw error; }, cause => { reported = cause; });
     assert.equal(status, "unknown");
     assert.equal(reported, error);
+  });
+});
+
+describe("removePreviousPasswordConnectionCredential", () => {
+  it("deletes the previous connection record when an id is available", async () => {
+    const deletedIds: string[] = [];
+
+    await removePreviousPasswordConnectionCredential(
+      "connection-id",
+      async id => {
+        deletedIds.push(id);
+        return true;
+      },
+      () => assert.fail("unexpected cleanup error"),
+    );
+
+    assert.deepEqual(deletedIds, ["connection-id"]);
+  });
+
+  it("does nothing when there is no previous connection id", async () => {
+    let deleteCalls = 0;
+
+    await removePreviousPasswordConnectionCredential(
+      undefined,
+      async () => { deleteCalls += 1; return true; },
+      () => assert.fail("unexpected cleanup error"),
+    );
+
+    assert.equal(deleteCalls, 0);
+  });
+
+  it("logs cleanup errors without failing the password-change operation", async () => {
+    const storageError = new Error("storage unavailable");
+    let reported: unknown;
+
+    await removePreviousPasswordConnectionCredential(
+      "connection-id",
+      async () => { throw storageError; },
+      error => { reported = error; },
+    );
+
+    assert.equal(reported, storageError);
   });
 });

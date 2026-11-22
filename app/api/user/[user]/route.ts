@@ -15,6 +15,7 @@ import {
   ROLE,
   getRoleWithKeys,
   requiresPasswordReauthentication,
+  removePreviousPasswordConnectionCredential,
   persistAclAfterPasswordChange,
   type UpdateUserResponse,
 } from "../model";
@@ -133,6 +134,14 @@ export async function PATCH(
           }
         }
         throw error;
+      }
+
+      if (tokenStorage && user.connectionId) {
+        await removePreviousPasswordConnectionCredential(
+          user.connectionId,
+          connectionId => tokenStorage.deleteToken(connectionId),
+          error => console.error("Failed to remove the previous password credential:", error),
+        );
       }
 
       const aclSaveStatus = await persistAclAfterPasswordChange(

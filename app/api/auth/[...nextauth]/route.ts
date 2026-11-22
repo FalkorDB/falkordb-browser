@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import StorageFactory from "@/lib/token-storage/StorageFactory";
 import {
   readReauthenticationHandoffId,
   REAUTHENTICATION_HANDOFF_COOKIE,
-  REAUTHENTICATION_HANDOFF_PREFIX,
 } from "@/lib/reauthentication-handoff";
 import { enableAutoNextAuthUrl, isRequestOriginTrusted, rejectUntrustedOrigin, shouldUseSecureCookies } from "../../utils";
 import { handlers } from "@/auth";
@@ -40,14 +38,6 @@ async function authHandler(request: NextRequest) {
   const response = await method(request);
   if (!handoffReference || !(await isSuccessfulCredentialsCallback(request, response))) {
     return response;
-  }
-
-  const tokenId = `${REAUTHENTICATION_HANDOFF_PREFIX}${handoffReference}`;
-  try {
-    const deleted = await StorageFactory.getStorage().deleteToken(tokenId);
-    if (!deleted) console.warn("Password reauthentication handoff was missing during successful sign-in cleanup");
-  } catch (error) {
-    console.error("Failed to delete the consumed password reauthentication handoff:", error);
   }
 
   const nextResponse = new NextResponse(response.body, {

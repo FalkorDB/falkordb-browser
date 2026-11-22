@@ -26,6 +26,7 @@ import {
   patPayloadStatus,
 } from "@/lib/connectionBinding";
 import {
+  consumeReauthenticationHandoff,
   isUsableReauthenticationHandoff,
   matchesReauthenticationEndpoint,
   readReauthenticationHandoffId,
@@ -896,6 +897,7 @@ const authOptions: NextAuthConfig = {
         const id = uuidv4();
         const connId = uuidv4();
         const key = sessionConnectionKey(id, connId);
+        let handoffReferenceToConsume: string | undefined;
 
         try {
           if (credentials.preconfigured !== "true" && !creds.url) {
@@ -925,6 +927,7 @@ const authOptions: NextAuthConfig = {
                   cert: handoff.cert || undefined,
                   key: handoff.encrypted_key ? decrypt(handoff.encrypted_key) : undefined,
                 };
+                handoffReferenceToConsume = handoffReference;
               }
             }
           }
@@ -974,6 +977,44 @@ const authOptions: NextAuthConfig = {
               try { await conn.close(); } catch { /* ignore */ }
             }
             return null;
+          }
+
+          if (handoffReferenceToConsume) {
+            const cleanupRejectedConnection = async () => {
+              try {
+                const deleted = await StorageFactory.getStorage().deleteToken(connId);
+                if (!deleted) {
+                  console.warn("Rejected password reauthentication connection credential was missing during cleanup");
+                }
+              } catch (error) {
+                console.error("Failed to remove rejected password reauthentication connection credential:", error);
+              }
+
+              const rejectedConnection = connections.get(key);
+              if (!rejectedConnection) return;
+              connections.delete(key);
+              try {
+                await rejectedConnection.close();
+              } catch (error) {
+                console.error("Failed to close rejected password reauthentication connection:", error);
+              }
+            };
+
+            let consumed: boolean;
+            try {
+              consumed = await consumeReauthenticationHandoff(
+                handoffReferenceToConsume,
+                tokenId => StorageFactory.getStorage().deleteToken(tokenId),
+                cleanupRejectedConnection,
+              );
+            } catch (error) {
+              console.error("Failed to consume the password reauthentication handoff:", error);
+              return null;
+            }
+            if (!consumed) {
+              console.warn("Password reauthentication handoff was already consumed or missing");
+              return null;
+            }
           }
 
           const res: User = {

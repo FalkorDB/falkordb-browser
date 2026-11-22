@@ -518,17 +518,46 @@ test.describe(`@tls TLS Login tests`, () => {
                 requiresReauthentication: true,
                 reauthenticationConnection: endpoint,
             });
+            const previousConnectionsResponse = await request.get("/api/connections");
+            expect(previousConnectionsResponse.ok()).toBe(true);
+            expect(await previousConnectionsResponse.json()).toMatchObject({ connections: [] });
             const handoffCookie = (await request.storageState()).cookies.find(
                 cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE,
             );
             expect(handoffCookie?.httpOnly).toBe(true);
             if (!handoffCookie) throw new Error("Password reauthentication handoff cookie was not set");
             expect((await signOut()).ok()).toBe(true);
+            expect((await signIn(`${password}-wrong`, false)).user).toBeUndefined();
+            expect((await request.storageState()).cookies.some(
+                cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookie.value,
+            )).toBe(true);
 
-            expect(await signIn(password, false)).toMatchObject({ user: { username } });
-            expect((await request.storageState()).cookies.find(
-                cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE,
-            )).toBeUndefined();
+            const concurrentRequests = await Promise.all(
+                Array.from({ length: 2 }, () => playwright.request.newContext({
+                    baseURL: origin,
+                    storageState: { cookies: [handoffCookie], origins: [] },
+                    extraHTTPHeaders: { Origin: origin },
+                })),
+            );
+            try {
+                const sessions = await Promise.all(concurrentRequests.map(async contender => {
+                    const contenderCsrfToken = (await (await contender.get("/api/auth/csrf")).json()).csrfToken;
+                    const response = await contender.post("/api/auth/callback/credentials", {
+                        headers: { "X-Auth-Return-Redirect": "1" },
+                        form: {
+                            ...endpoint,
+                            csrfToken: contenderCsrfToken,
+                            callbackUrl: origin,
+                            password,
+                        },
+                    });
+                    expect(response.ok()).toBe(true);
+                    return (await (await contender.get("/api/auth/session")).json()).user;
+                }));
+                expect(sessions.filter(session => session?.username === username)).toHaveLength(1);
+            } finally {
+                await Promise.all(concurrentRequests.map(contender => contender.dispose()));
+            }
 
             const replayRequest = await playwright.request.newContext({
                 baseURL: origin,

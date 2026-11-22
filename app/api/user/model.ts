@@ -74,6 +74,20 @@ export function requiresPasswordReauthentication(
   return Boolean(password) && currentUsername === targetUsername;
 }
 
+export async function removePreviousPasswordConnectionCredential(
+  connectionId: string | undefined,
+  deleteToken: (tokenId: string) => Promise<boolean>,
+  onError: (error: unknown) => void,
+): Promise<void> {
+  if (!connectionId) return;
+
+  try {
+    await deleteToken(connectionId);
+  } catch (error) {
+    onError(error);
+  }
+}
+
 export type AclSaveStatus = "saved" | "failed" | "unknown";
 
 export type UpdateUserResponse = { message: string } & (
