@@ -55,9 +55,11 @@ changes (`coverage/patch`). Details: README "Testing", `.github/scripts/coverage
 
 Rules for every change:
 
-1. **Every behavior change ships with tests** that fail without it. Target 100% of the
-   lines you touch; never let the patch drop below 80%. Do not game coverage (no assertion-free
-   tests, no `/* c8 ignore */`/`istanbul ignore` to dodge real logic).
+1. **Every behavior change ships with meaningful tests** that fail without it. Aim for
+   100% of touched lines and at least 95% Codecov patch coverage; the current enforced
+   floor is 80%. Check the finalized `coverage/patch` result when available, and explain
+   uncovered lines or unavailable coverage rather than claiming the target was met.
+   Do not game coverage (no assertion-free tests or coverage-ignore directives to dodge real logic).
 2. **Put logic where it is testable.** Extract decisions out of `.tsx` components and
    `providers.tsx` into framework-free modules in `lib/` (or `app/**/<name>.ts`) and unit-test
    them with `node:test` + `node:assert/strict`. Components themselves are covered by Playwright.
