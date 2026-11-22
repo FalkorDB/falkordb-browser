@@ -181,6 +181,106 @@ test("read and delete do not accept a blob with a matching prefix but different 
     assert.ok(requests.every((request) => request.startsWith("GET ")));
 });
 
+test("cleanup continues after a failed deletion and delete reports the failure", async (t) => {
+    const secondPath = `coverage/csv/${OWNER}-22222222-2222-4222-8222-222222222222.csv`;
+    const blob = (pathname: string) => ({
+        pathname,
+        url: `https://teststore.public.blob.vercel-storage.com/${pathname}`,
+        downloadUrl: `https://teststore.public.blob.vercel-storage.com/${pathname}`,
+        uploadedAt: "2026-01-01T00:00:00.000Z",
+        size: 12,
+        etag: "etag",
+    });
+    const deleted: string[] = [];
+    const server = createServer(async (req, res) => {
+        res.setHeader("content-type", "application/json");
+        if (req.method === "GET") {
+            res.end(JSON.stringify({ blobs: [blob(PATHNAME), blob(secondPath)], hasMore: false }));
+            return;
+        }
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(Buffer.from(chunk));
+        const { urls } = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        deleted.push(urls[0]);
+        if (urls[0] === blob(PATHNAME).url) {
+            res.statusCode = 403;
+            res.end(JSON.stringify({ error: { code: "forbidden" } }));
+            return;
+        }
+        res.end(JSON.stringify({}));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    const previousUrl = process.env.VERCEL_BLOB_API_URL;
+    process.env.VERCEL_BLOB_API_URL = `http://127.0.0.1:${address.port}`;
+    t.after(async () => {
+        if (previousUrl === undefined) delete process.env.VERCEL_BLOB_API_URL;
+        else process.env.VERCEL_BLOB_API_URL = previousUrl;
+        await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    });
+    const errors: unknown[][] = [];
+    t.mock.method(console, "error", (...args: unknown[]) => { errors.push(args); });
+
+    const storage = new VercelBlobCsvStorage();
+    assert.equal(await storage.cleanupExpired(Date.parse("2026-01-02T00:00:00.000Z")), 1);
+    await storage.delete(OWNER, KEY);
+    assert.deepEqual(deleted, [blob(PATHNAME).url, blob(secondPath).url, blob(PATHNAME).url]);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0][0], "[VercelBlobCsvStorage] delete failed:");
+    assert.ok(errors[0][1] instanceof Error);
+});
+
+test("private read signs an owner-scoped GET with the configured or default lifetime", async (t) => {
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    t.mock.timers.enable({ apis: ["Date"], now });
+    const tokenRequests: unknown[] = [];
+    const blobUrl = `https://teststore.private.blob.vercel-storage.com/${PATHNAME}`;
+    const server = createServer(async (req, res) => {
+        res.setHeader("content-type", "application/json");
+        if (req.method === "GET") {
+            res.end(JSON.stringify({
+                blobs: [{ pathname: PATHNAME, url: blobUrl, downloadUrl: blobUrl, uploadedAt: now.toISOString(), size: 12, etag: "etag" }],
+                hasMore: false,
+            }));
+            return;
+        }
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(Buffer.from(chunk));
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        tokenRequests.push(body);
+        const delegation = Buffer.from(JSON.stringify({ ...body, storeId: "teststore" })).toString("base64url");
+        res.end(JSON.stringify({ delegationToken: `${delegation}.test-signature`, clientSigningToken: "test-signing-key" }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    const previousUrl = process.env.VERCEL_BLOB_API_URL;
+    const previousTtl = process.env.BLOB_PRIVATE_URL_TTL_MS;
+    process.env.VERCEL_BLOB_API_URL = `http://127.0.0.1:${address.port}`;
+    t.after(async () => {
+        if (previousUrl === undefined) delete process.env.VERCEL_BLOB_API_URL;
+        else process.env.VERCEL_BLOB_API_URL = previousUrl;
+        if (previousTtl === undefined) delete process.env.BLOB_PRIVATE_URL_TTL_MS;
+        else process.env.BLOB_PRIVATE_URL_TTL_MS = previousTtl;
+        await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    });
+
+    const storage = new VercelBlobCsvStorage();
+    for (const [ttl, expected] of [["123000", 123000], ["invalid", 900000]] as const) {
+        process.env.BLOB_PRIVATE_URL_TTL_MS = ttl;
+        const url = new URL(await storage.resolveReadUrl(OWNER, KEY));
+        assert.equal(`${url.origin}${url.pathname}`, blobUrl);
+        assert.ok(url.searchParams.get("vercel-blob-signature"));
+        assert.ok(url.searchParams.get("vercel-blob-delegation"));
+        assert.deepEqual(tokenRequests.at(-1), {
+            pathname: PATHNAME,
+            operations: ["get"],
+            validUntil: now.getTime() + expected,
+        });
+    }
+});
+
 test("direct upload tokens restrict uploads to the owner, size, and allowed CSV types", async (t) => {
     const now = new Date("2026-01-01T00:00:00Z");
     t.mock.timers.enable({ apis: ["Date"], now });
