@@ -93,6 +93,10 @@ export default class SettingsTokensPage extends HeaderComponent {
     return this.page.getByTestId("toast-description").filter({ hasText: "An unexpected error occurred. Please try again." });
   }
 
+  public get copyFailureToast(): Locator {
+    return this.page.getByTestId("toast-destructive").filter({ hasText: "Select and copy it manually" });
+  }
+
   public get revokeDialog(): Locator {
     return this.page.getByRole("dialog");
   }

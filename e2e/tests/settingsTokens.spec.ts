@@ -281,6 +281,42 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       await settingsTokensPage.revokeToken(tokenName);
     });
 
+    for (const clipboardMode of ["rejected", "unavailable"] as const) {
+      test(`@readonly Failed clipboard copy (${clipboardMode}) keeps the token visible`, async () => {
+        const settingsTokensPage = await browser.createNewPage(SettingsTokensPage);
+        const page = await browser.getPage();
+        const token = "mock-generated-token";
+
+        await page.addInitScript((mode) => {
+          Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: mode === "unavailable"
+              ? undefined
+              : {
+                writeText: async () => {
+                  throw new DOMException("Write permission denied", "NotAllowedError");
+                },
+              },
+          });
+        }, clipboardMode);
+        await page.route("**/api/auth/tokens", async route => {
+          if (route.request().method() === "GET") {
+            await route.fulfill({ json: { tokens: [], role: "Read-Only" } });
+          } else {
+            await route.fulfill({ json: { token } });
+          }
+        });
+
+        await browser.navigateTo(urls.settingsUrl);
+        await settingsTokensPage.navigateToTokensTab();
+        await settingsTokensPage.generateToken("clipboard-failure");
+        await settingsTokensPage.copyToken();
+
+        await expect(settingsTokensPage.copyFailureToast).toContainText("Failed to copy token");
+        await expect(settingsTokensPage.generatedTokenInput).toHaveValue(token);
+      });
+    }
+
     test("@readonly Cancel token revocation", async () => {
       // Generate token via API for setup
       const readonlyUser = userConfig.userRoles.find((u) => u.role === "readonly")!;
