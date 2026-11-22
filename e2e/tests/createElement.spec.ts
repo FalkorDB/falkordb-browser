@@ -164,7 +164,7 @@ test.describe("Create element panel Tests", () => {
     await graph.addLabel("Person");
     await graph.addAttribute("name", "Alice");
     await graph.fillNewAttribute("pending", "discard");
-    await graph.cancelNewAttributeWithEscape();
+    await graph.cancelNewAttributeWithEscape("key", "");
     await expect(graph.panel).toBeVisible();
     await expect(graph.newKey).toHaveValue("");
     await expect(graph.newValue).toHaveValue("");
@@ -186,6 +186,27 @@ test.describe("Create element panel Tests", () => {
     expect(data).toHaveLength(1);
     expect(data[0].n.labels).toEqual(["Person"]);
     expect(data[0].n.properties).toEqual({ name: "Alice" });
+  });
+
+  test(`@readwrite Escape in the new attribute type dropdown keeps the panel and draft`, async () => {
+    const graph = await openGraph("CREATE (:Seed {name: 'seed'})");
+    await graph.openNodePanel();
+    await graph.addAttribute("name", "Alice");
+    await graph.fillNewAttribute("pending", "draft");
+
+    await graph.escapeFromNewAttributeType(false);
+    await expect(graph.panel).toBeVisible();
+    await expect(graph.newKey).toHaveValue("pending");
+    await expect(graph.newValue).toHaveValue("draft");
+    await graph.escapeFromNewAttributeType(true);
+
+    await expect(graph.newTypeSearch).toBeHidden();
+    await expect(graph.panel).toBeVisible();
+    await expect(graph.attributesCount).toHaveText("1");
+    await expect(graph.attributeValue("name")).toHaveText("Alice");
+    await expect(graph.newKey).toHaveValue("pending");
+    await expect(graph.newValue).toHaveValue("draft");
+    await graph.closePanel();
   });
 
   test(`@readwrite an edge cannot be created without a relationship type`, async () => {

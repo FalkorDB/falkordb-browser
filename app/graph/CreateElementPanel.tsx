@@ -132,6 +132,7 @@ export default function CreateElementPanel(props: Props) {
 
     const handleClose = useCallback((e?: KeyboardEvent) => {
         if (e && e.key !== "Escape") return;
+        if (e?.defaultPrevented) return;
         setAttributes([]);
         setLabels([]);
         setNewKey("");
@@ -257,7 +258,7 @@ export default function CreateElementPanel(props: Props) {
     };
 
     const handleAddKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.code === "Escape") {
+        if (e.key === "Escape") {
             e.preventDefault();
             e.stopPropagation();
             setNewKey("");
@@ -351,6 +352,11 @@ export default function CreateElementPanel(props: Props) {
                 inTable
                 options={["string", "number", "boolean"]}
                 selectedValue={valueType}
+                onKeyDown={(e) => {
+                    if (e.key !== "Escape") return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                }}
                 setSelectedValue={(val) => {
                     const t = val as ValueType;
                     setType(t);
