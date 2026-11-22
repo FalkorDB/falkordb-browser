@@ -155,3 +155,5 @@ preceding value, including zero. Load-time configuration values remain read-only
 
 Custom expiration dates use the selected local calendar day, ending at
 23:59:59.999 in the browser's timezone, including daylight-saving transitions.
+If copying a newly generated token fails, the token remains visible so you can
+select and copy it manually.
