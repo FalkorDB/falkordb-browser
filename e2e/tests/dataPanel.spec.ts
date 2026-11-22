@@ -25,8 +25,7 @@ test.describe("Data panel Tests", () => {
   let browser: BrowserWrapper;
   let apicalls: ApiCalls;
 
-  // Set by tests that rely on afterEach to drop their graph strictly; the
-  // older tests in this file still remove theirs inline.
+  // Tests using afterEach for graph cleanup set this; others remove their graphs inline.
   let graphToRemove: string | undefined;
 
   test.beforeEach(async () => {
@@ -116,6 +115,45 @@ test.describe("Data panel Tests", () => {
     );
     expect(person?.n.properties.age).toBe(30);
     await apicalls.removeGraph(graphName);
+  });
+
+  test(`@readwrite Rejects duplicate attribute without overwriting existing value`, async () => {
+    const graphName = getRandomString("duplicateattribute");
+    await apicalls.addGraph(graphName);
+    graphToRemove = graphName;
+    await apicalls.runQuery(
+      graphName,
+      'CREATE (:Person {name: "Alice"})'
+    );
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+    await graph.searchElementInCanvas("Alice");
+
+    await graph.clickDataPanelAddAttribute();
+    await graph.fillDataPanelAddAttributeKey("name");
+    await graph.fillDataPanelAddAttributeValue("Bob");
+    const page = await browser.getPage();
+    const propertyWrites: string[] = [];
+    const matchesProperty = isPropertyWrite(graphName, "name");
+    page.on("request", (request) => {
+      if (request.method() === "POST" && matchesProperty(new URL(request.url()))) {
+        propertyWrites.push(request.url());
+      }
+    });
+
+    await graph.clickDataPanelAddAttributeConfirm();
+
+    await expect(graph.errorDescription).toHaveText("An attribute with this key already exists");
+
+    const response = await apicalls.runQuery(
+      graphName,
+      FETCH_FIRST_TEN_NODES ?? ""
+    );
+    expect(response.data[0]?.n.properties.name).toBe("Alice");
+    expect(propertyWrites).toEqual([]);
   });
 
   test(`@readwrite Validate adding new boolean attribute for node via ui and validation via API`, async () => {

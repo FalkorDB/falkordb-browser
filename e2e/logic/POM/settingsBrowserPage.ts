@@ -410,6 +410,10 @@ export default class SettingsBrowserPage extends BasePage {
     );
   }
 
+  chatApiKeySelection(apiKey: string): Locator {
+    return this.getChatApiKeyCard(apiKey).getByTestId("selectChatApiKeyButton");
+  }
+
   async getMaskedChatApiKeyText(apiKey: string): Promise<string> {
     const keyText = this.getMaskedChatApiKeyCard(apiKey).getByTestId("chatApiKeyValue");
     await keyText.waitFor({ state: "visible", timeout: 5000 });

@@ -1,8 +1,12 @@
 import test, { expect } from "@playwright/test";
+import type { Session } from "next-auth";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
+import SettingsBrowserPage from "../logic/POM/settingsBrowserPage";
 import { user } from '../config/user.json';
+import { buildConnectionPrefix } from '../../lib/connection-storage';
+import { SELECTED_CHAT_API_KEY_ID_STORAGE_KEY } from '../../lib/chat-api-key-storage';
 
 /**
  * Encryption migration e2e tests.
@@ -26,25 +30,30 @@ const CHAT_API_KEYS_SUFFIX = `:${CHAT_API_KEYS_STORAGE_KEY}`;
 
 /** Reads the connection-scoped chat API keys entry from inside the page. */
 async function readStoredChatApiKeys(
-    page: Awaited<ReturnType<BrowserWrapper["getPage"]>>
+    page: Awaited<ReturnType<BrowserWrapper["getPage"]>>,
+    storageKey?: string
 ): Promise<string | null> {
-    return page.evaluate((suffix) => {
+    return page.evaluate(({ key: scopedKey, suffix }) => {
+        if (scopedKey) return localStorage.getItem(scopedKey);
         for (let i = 0; i < localStorage.length; i += 1) {
             const key = localStorage.key(i);
             if (key && key.endsWith(suffix)) return localStorage.getItem(key);
         }
         return null;
-    }, CHAT_API_KEYS_SUFFIX);
+    }, { key: storageKey, suffix: CHAT_API_KEYS_SUFFIX });
 }
 
-async function waitForMigratedChatApiKeys(page: Awaited<ReturnType<BrowserWrapper["getPage"]>>) {
+async function waitForMigratedChatApiKeys(
+    page: Awaited<ReturnType<BrowserWrapper["getPage"]>>,
+    storageKey?: string
+) {
     await expect.poll(async () => {
-        const chatApiKeys = await readStoredChatApiKeys(page);
+        const chatApiKeys = await readStoredChatApiKeys(page, storageKey);
         const secretKey = await page.evaluate(() => localStorage.getItem("secretKey"));
         return secretKey === null && chatApiKeys !== null && HEX_COLON_PATTERN.test(chatApiKeys);
     }, { timeout: 15000 }).toBe(true);
 
-    const encryptedKeys = await readStoredChatApiKeys(page);
+    const encryptedKeys = await readStoredChatApiKeys(page, storageKey);
     if (!encryptedKeys) return null;
 
     return page.evaluate(async (value) => {
@@ -94,20 +103,48 @@ test.describe(`@admin Encryption migration tests`, () => {
         });
         await page.goto(urls.graphUrl);
         await page.waitForLoadState("networkidle");
-        const selectionKey = await page.evaluate(() => {
-            const marker = Object.keys(localStorage).find(key => key.endsWith(":__scopeOwner"));
-            if (!marker) throw new Error("Missing connection scope marker");
-            return marker.replace(/__scopeOwner$/, "selectedChatApiKeyId");
-        });
+        // A previous connection's marker can remain in storage after reload.
+        const previousScope = buildConnectionPrefix("previous-connection.example", 6380, "default");
+        await page.evaluate(prefix => localStorage.setItem(`${prefix}__scopeOwner`, "default"), previousScope);
+
+        const response = await page.request.get(new URL("/api/auth/session", urls.graphUrl).href);
+        expect(response.ok()).toBe(true);
+        const session = await response.json() as Session | null;
+        if (!session?.user) throw new Error("Migration test requires an authenticated connection");
+        const { host, port, username } = session.user;
+        const scope = buildConnectionPrefix(host, port, username || "default");
+        const selectionKey = `${scope}${SELECTED_CHAT_API_KEY_ID_STORAGE_KEY}`;
         expect(await page.evaluate(key => localStorage.getItem(key), selectionKey)).toBeNull();
 
-        await page.evaluate(() => localStorage.setItem("secretKey", "test-later-legacy-key"));
+        const legacyKey = "test-later-legacy-key";
+        await page.evaluate(key => localStorage.setItem("secretKey", key), legacyKey);
         await page.reload({ waitUntil: "networkidle" });
-        const migrated = await waitForMigratedChatApiKeys(page);
+        const migrated = await waitForMigratedChatApiKeys(page, `${scope}${CHAT_API_KEYS_STORAGE_KEY}`);
         const keys = JSON.parse(migrated?.decryptedKeys ?? "[]") as Array<{ id: string; key: string }>;
         expect(keys).toHaveLength(1);
-        expect(keys[0].key).toBe("test-later-legacy-key");
+        expect(keys[0].key).toBe(legacyKey);
         await expect.poll(() => page.evaluate(key => localStorage.getItem(key), selectionKey)).toBe(keys[0].id);
+
+        await page.route("**/api/chat/models", route => route.fulfill({ json: { models: [] } }));
+        const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settings.expandChatSection();
+        await settings.selectApiKeyModelSource();
+        await expect(settings.chatApiKeySelection(legacyKey)).toHaveAttribute("aria-pressed", "true");
+
+        const secondKey = "sk-e2e-reload-selection-5678";
+        // Adding a key appends and selects it, making it distinct from the first-key fallback.
+        await settings.addChatApiKey(secondKey);
+        const secondSelection = settings.chatApiKeySelection(secondKey);
+        await expect(secondSelection).toHaveAttribute("aria-pressed", "true");
+        const secondId = await page.evaluate(key => localStorage.getItem(key), selectionKey);
+        expect(secondId).toBeTruthy();
+        expect(secondId).not.toBe(keys[0].id);
+
+        await page.reload();
+        await settings.expandChatSection();
+        await expect(settings.chatApiKeySelection(legacyKey)).toHaveAttribute("aria-pressed", "false");
+        await expect(secondSelection).toHaveAttribute("aria-pressed", "true");
+        await expect.poll(() => page.evaluate(key => localStorage.getItem(key), selectionKey)).toBe(secondId);
     });
 
     test(`plain text secretKey is migrated to server-side encryption on page load`, async () => {

@@ -17,6 +17,10 @@ import GraphPage from "./graphPage";
 type TextValueType = Exclude<ValueType, "boolean">;
 
 export default class DataPanel extends GraphPage {
+  public get errorDescription(): Locator {
+    return this.errorToast.getByTestId("toast-description");
+  }
+
   private get dataPanel(): Locator {
     return this.page.getByTestId("DataPanel");
   }
