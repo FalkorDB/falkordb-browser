@@ -6,6 +6,7 @@ import { useEffect, useState, useContext, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { CreateUser, User, type UpdateUserResponse } from "@/app/api/user/model";
 import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
+import { writePasswordChangeNotice } from "@/lib/password-change-notice";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { IndicatorContext, ConnectionContext } from "@/app/components/provider";
@@ -118,15 +119,33 @@ export default function Users() {
             const response = await result.json() as UpdateUserResponse;
             if (response.requiresReauthentication) {
                 const { host, port, username: loginUsername, tls } = response.reauthenticationConnection;
+                const updatedKeys = keys.length ? keys : ["*"];
+                setUsers(prev => prev.map(u => u.username === username ? { ...u, role, keys: updatedKeys } : u));
+                setRows(prev => prev.map((row): Row => row.cells[0].value === username
+                    ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: updatedKeys.join(", ") }] }
+                    : row));
+                const persistenceWarning = response.aclSaveStatus === "failed"
+                    ? " FalkorDB could not save the ACL changes to disk. The change is active only in memory."
+                    : response.aclSaveStatus === "unknown"
+                        ? " FalkorDB could not confirm whether the ACL changes were saved to disk; they may already be saved."
+                        : "";
+                try {
+                    writePasswordChangeNotice(window.sessionStorage, response.aclSaveStatus);
+                } catch (error) {
+                    console.error("Failed to store password-change notice:", error);
+                }
                 const params = new URLSearchParams({
                     host, port: String(port), username: loginUsername, tls: String(tls),
-                    signedOut: "true", passwordChanged: "true",
+                    signedOut: "true",
                 });
-                if (!response.aclSaved) params.set("aclSaveFailed", "true");
+                const callbackUrl = `/login?${params}`;
                 try {
-                    await signOut({ callbackUrl: `/login?${params}` });
+                    const signOutResponse = await signOut({ redirect: false, redirectTo: callbackUrl });
+                    if (!signOutResponse?.url || new URL(signOutResponse.url, window.location.href).href !== new URL(callbackUrl, window.location.href).href) {
+                        throw new Error("The sign-out endpoint did not confirm the requested redirect");
+                    }
+                    window.location.assign(signOutResponse.url);
                 } catch {
-                    const persistenceWarning = response.aclSaved ? "" : " FalkorDB could not save the ACL changes to disk.";
                     toast({
                         title: "Password changed",
                         description: `Your password changed, but automatic sign-out failed. Sign out manually, then sign in with your new password.${persistenceWarning}`,

@@ -125,6 +125,10 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.getByTestId("toast-destructive");
   }
 
+  public get warningToastDescription(): Locator {
+    return this.page.getByTestId("toast").getByTestId("toast-description");
+  }
+
   private get editKeyTagRemoveBtn(): (key: string) => Locator {
     return (key: string) =>
       this.editKeysContainer.getByRole("button", { name: `Remove ${key}`, exact: true });

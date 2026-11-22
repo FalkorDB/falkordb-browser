@@ -26,6 +26,12 @@ import {
   patPayloadStatus,
 } from "@/lib/connectionBinding";
 import {
+  isUsableReauthenticationHandoff,
+  matchesReauthenticationEndpoint,
+  readReauthenticationHandoffId,
+  REAUTHENTICATION_HANDOFF_PREFIX,
+} from "@/lib/reauthentication-handoff";
+import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
   isRequestOriginTrusted,
@@ -65,6 +71,7 @@ interface CustomJWTPayload {
 
 interface AuthenticatedUser {
   id: string;
+  connectionId?: string;
   username?: string;
   role: Role;
   host: string;
@@ -798,7 +805,7 @@ const authOptions: NextAuthConfig = {
         url: { label: "url", type: "string" },
         preconfigured: { label: "preconfigured", type: "string" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials) {
           return null;
         }
@@ -891,6 +898,37 @@ const authOptions: NextAuthConfig = {
         const key = sessionConnectionKey(id, connId);
 
         try {
+          if (credentials.preconfigured !== "true" && !creds.url) {
+            const handoffReference = readReauthenticationHandoffId(request.headers.get("cookie") ?? undefined);
+            if (handoffReference) {
+              const handoffTokenId = `${REAUTHENTICATION_HANDOFF_PREFIX}${handoffReference}`;
+              let handoff;
+              try {
+                handoff = await StorageFactory.getStorage().fetchTokenById(handoffTokenId);
+              } catch (error) {
+                console.error("Failed to read the password reauthentication handoff:", error);
+                return null;
+              }
+
+              if (
+                handoff
+                && handoff.token_id === handoffTokenId
+                && handoff.name === handoffTokenId
+                && isUsableReauthenticationHandoff(handoff, Math.floor(Date.now() / 1000))
+                && matchesReauthenticationEndpoint(handoff, creds)
+              ) {
+                if (!creds.password || creds.password === "undefined") return null;
+                const { decrypt } = await import("../encryption");
+                creds = {
+                  ...creds,
+                  ca: handoff.ca || undefined,
+                  cert: handoff.cert || undefined,
+                  key: handoff.encrypted_key ? decrypt(handoff.encrypted_key) : undefined,
+                };
+              }
+            }
+          }
+
           const { role } = await newClient(creds, key);
 
           // Opportunistically clean up expired tokens from storage.
@@ -1366,6 +1404,7 @@ export async function getClient(
       if (isUsableConnectionRecord(tokenData, id)) {
         const connUser: AuthenticatedUserWithPassword = {
           id,
+          connectionId: connId,
           username: tokenData.username,
           role: tokenData.role as Role,
           host: tokenData.host,
@@ -1400,6 +1439,7 @@ export async function getClient(
     if (connResult) {
       const connUser: AuthenticatedUserWithPassword = {
         id,
+        connectionId: connId,
         username: connResult.connInfo.username,
         role: connResult.connInfo.role,
         host: connResult.connInfo.host,

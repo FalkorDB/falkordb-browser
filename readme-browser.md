@@ -111,7 +111,7 @@ The `/settings` area includes multiple sections:
 - **Users** (Admin)
   - List users and adjust roles.
   - Add and delete users.
-  - Changing your own password signs you out and prefills the database connection. Enter the new password and reattach any required TLS files. If automatic sign-out fails, sign out manually. If ACL persistence fails, the browser warns that the change is active only in memory.
+  - Changing your own password signs you out and prefills the database connection. Existing TLS material is retained server-side in a five-minute, HttpOnly handoff, so enter only the new password; TLS secrets and the handoff reference are not placed in the URL or browser-readable page state. If automatic sign-out fails, sign out manually. A confirmed ACL persistence failure warns that the change is active only in memory; a connection error reports an unknown outcome because the server may have completed the save.
 - **Personal Access Tokens**
   - Generate tokens (with optional expiration).
   - Tokens are shown once at creation (copy-to-clipboard UX).

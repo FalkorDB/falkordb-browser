@@ -1,3 +1,5 @@
+import { ErrorReply } from "@redis/client";
+
 export interface User {
   username: string;
   role: string;
@@ -72,11 +74,13 @@ export function requiresPasswordReauthentication(
   return Boolean(password) && currentUsername === targetUsername;
 }
 
+export type AclSaveStatus = "saved" | "failed" | "unknown";
+
 export type UpdateUserResponse = { message: string } & (
   | { requiresReauthentication: false }
   | {
     requiresReauthentication: true;
-    aclSaved: boolean;
+    aclSaveStatus: AclSaveStatus;
     reauthenticationConnection: { host: string; port: number; username: string; tls: boolean };
   }
 );
@@ -85,14 +89,14 @@ export async function persistAclAfterPasswordChange(
   shouldPersist: boolean,
   saveAcl: () => Promise<unknown>,
   onError: (error: unknown) => void,
-): Promise<boolean | undefined> {
+): Promise<AclSaveStatus | undefined> {
   if (!shouldPersist) return undefined;
 
   try {
     await saveAcl();
-    return true;
+    return "saved";
   } catch (error) {
     onError(error);
-    return false;
+    return error instanceof ErrorReply ? "failed" : "unknown";
   }
 }

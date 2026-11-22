@@ -4,7 +4,16 @@ import { z } from "zod";
 import swaggerSpec from "./swagger-spec.ts";
 import { fixRequest, optimizeRequest } from "../validate-body.ts";
 
-type JsonSchema = { required?: string[]; properties?: Record<string, Record<string, unknown>> };
+type JsonSchema = {
+  [key: string]: unknown;
+  type?: string;
+  description?: string;
+  enum?: unknown[];
+  required?: string[];
+  properties?: Record<string, JsonSchema>;
+  oneOf?: JsonSchema[];
+  headers?: Record<string, { schema?: Record<string, unknown>; description?: string }>;
+};
 
 // Compares documented request constraints and defaults with the zod schema the route validates.
 function assertMatchesZod(documented: JsonSchema, schema: z.ZodType) {
@@ -48,12 +57,36 @@ describe("User password update OpenAPI documentation", () => {
   it("documents when a user must sign in again after changing their own password", () => {
     const response = swaggerSpec.paths["/api/user/{user}"].patch.responses["200"]
       .content["application/json"].schema as JsonSchema;
-    const reauthentication = response.properties?.requiresReauthentication;
-    assert.equal(reauthentication?.type, "boolean");
-    assert.match(String(reauthentication?.description ?? ""), /current user's own password/);
-    assert.equal(response.properties?.aclSaved?.type, "boolean");
+    const reauthenticationProperty = response.properties?.requiresReauthentication;
+    assert.equal(reauthenticationProperty?.type, "boolean");
+    assert.match(String(reauthenticationProperty?.description ?? ""), /current user's own password/);
+    assert.deepEqual(response.properties?.aclSaveStatus?.enum, ["saved", "failed", "unknown"]);
     const connection = response.properties?.reauthenticationConnection;
     assert.equal(connection?.type, "object");
-    assert.deepEqual(Object.keys(connection?.properties ?? {}).sort(), ["host", "port", "tls", "username"]);
+    assert.match(String(connection?.description ?? ""), /TLS material is retained server-side/);
+    assert.deepEqual(connection?.required, ["host", "port", "username", "tls"]);
+    assert.deepEqual(connection?.properties, {
+      host: { type: "string" },
+      port: { type: "integer" },
+      username: { type: "string" },
+      tls: { type: "boolean" },
+    });
+    assert.equal(response.headers?.["Set-Cookie"]?.schema?.type, "string");
+    assert.match(response.headers?.["Set-Cookie"]?.description ?? "", /five-minute HttpOnly handoff cookie/);
+
+    const variants = response.oneOf ?? [];
+    assert.equal(variants.length, 2);
+    const ordinary = variants.find(variant => variant.properties?.requiresReauthentication?.enum?.[0] === false);
+    const reauthenticationVariant = variants.find(variant => variant.properties?.requiresReauthentication?.enum?.[0] === true);
+    assert.ok(ordinary);
+    assert.deepEqual(ordinary.properties?.requiresReauthentication, { type: "boolean", enum: [false] });
+    assert.deepEqual(ordinary.required, ["requiresReauthentication"]);
+    assert.ok(reauthenticationVariant);
+    assert.deepEqual(reauthenticationVariant.properties?.requiresReauthentication, { type: "boolean", enum: [true] });
+    assert.deepEqual(reauthenticationVariant.required, [
+      "requiresReauthentication",
+      "aclSaveStatus",
+      "reauthenticationConnection",
+    ]);
   });
 });

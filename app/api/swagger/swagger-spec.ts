@@ -3028,6 +3028,20 @@ const swaggerSpec = {
               "application/json": {
                 schema: {
                   type: "object",
+                  oneOf: [
+                    {
+                      properties: {
+                        requiresReauthentication: { type: "boolean", enum: [false] }
+                      },
+                      required: ["requiresReauthentication"]
+                    },
+                    {
+                      properties: {
+                        requiresReauthentication: { type: "boolean", enum: [true] }
+                      },
+                      required: ["requiresReauthentication", "aclSaveStatus", "reauthenticationConnection"]
+                    }
+                  ],
                   properties: {
                     message: {
                       type: "string",
@@ -3037,13 +3051,14 @@ const swaggerSpec = {
                       type: "boolean",
                       description: "True when the current user's own password was changed"
                     },
-                    aclSaved: {
-                      type: "boolean",
-                      description: "When reauthentication is required, indicates whether the ACL changes were saved to disk"
+                    aclSaveStatus: {
+                      type: "string",
+                      enum: ["saved", "failed", "unknown"],
+                      description: "When reauthentication is required, reports whether ACL changes were saved; unknown means the connection failed and the server may have completed the save"
                     },
                     reauthenticationConnection: {
                       type: "object",
-                      description: "When reauthentication is required, the database connection to use for the next sign-in, without credentials or TLS material",
+                      description: "When reauthentication is required, the database connection to use for the next sign-in. TLS material is retained server-side in a short-lived HttpOnly handoff; the user must enter the new password.",
                       required: ["host", "port", "username", "tls"],
                       properties: {
                         host: { type: "string" },
@@ -3051,6 +3066,12 @@ const swaggerSpec = {
                         username: { type: "string" },
                         tls: { type: "boolean" }
                       }
+                    }
+                  },
+                  headers: {
+                    "Set-Cookie": {
+                      schema: { type: "string" },
+                      description: "A five-minute HttpOnly handoff cookie is set for the current session's saved TLS material."
                     }
                   }
                 }

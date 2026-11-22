@@ -66,6 +66,14 @@ export default class LoginPage extends HeaderComponent {
     return this.page.getByTestId("loginPreconfiguredError");
   }
 
+  public get passwordChangedMessage(): Locator {
+    return this.page.getByTestId("passwordChangedMessage");
+  }
+
+  public get aclSaveWarning(): Locator {
+    return this.page.getByTestId("aclSaveWarning");
+  }
+
   private get usernameInput(): Locator {
     return this.page.locator("//input[@id='Username']");
   }

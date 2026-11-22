@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { ErrorReply } from "@redis/client";
 import {
   getRoleWithKeys,
   extractKeysFromACL,
@@ -114,23 +115,31 @@ describe("requiresPasswordReauthentication", () => {
 describe("persistAclAfterPasswordChange", () => {
   it("does not save ACL when reauthentication is not required", async () => {
     let saves = 0;
-    const saved = await persistAclAfterPasswordChange(false, async () => { saves += 1; }, () => assert.fail("unexpected error"));
-    assert.equal(saved, undefined);
+    const status = await persistAclAfterPasswordChange(false, async () => { saves += 1; }, () => assert.fail("unexpected error"));
+    assert.equal(status, undefined);
     assert.equal(saves, 0);
   });
 
   it("reports a successful ACL save", async () => {
     let saves = 0;
-    const saved = await persistAclAfterPasswordChange(true, async () => { saves += 1; }, () => assert.fail("unexpected error"));
-    assert.equal(saved, true);
+    const status = await persistAclAfterPasswordChange(true, async () => { saves += 1; }, () => assert.fail("unexpected error"));
+    assert.equal(status, "saved");
     assert.equal(saves, 1);
   });
 
-  it("reports and surfaces an ACL save failure", async () => {
-    const error = new Error("ACL file is unavailable");
+  it("reports a Redis ACL SAVE error as a confirmed failure", async () => {
+    const error = new ErrorReply("ERR ACL file is unavailable");
     let reported: unknown;
-    const saved = await persistAclAfterPasswordChange(true, async () => { throw error; }, cause => { reported = cause; });
-    assert.equal(saved, false);
+    const status = await persistAclAfterPasswordChange(true, async () => { throw error; }, cause => { reported = cause; });
+    assert.equal(status, "failed");
+    assert.equal(reported, error);
+  });
+
+  it("reports a transport error as an unknown ACL SAVE outcome", async () => {
+    const error = new Error("Connection closed");
+    let reported: unknown;
+    const status = await persistAclAfterPasswordChange(true, async () => { throw error; }, cause => { reported = cause; });
+    assert.equal(status, "unknown");
     assert.equal(reported, error);
   });
 });

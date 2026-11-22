@@ -164,6 +164,17 @@ jobs:
           echo "Waiting for FalkorDB PAT (port 6380)..."
           timeout 60s bash -c 'until echo PING | nc -w 2 localhost 6380 | grep -q PONG; do sleep 1; done'
           echo "FalkorDB PAT (port 6380) is ready"
+      - name: Start ACL persistence fixture
+        run: |
+          acl_dir="$RUNNER_TEMP/falkordb-reauth-acl"
+          mkdir -p "$acl_dir"
+          cp e2e/fixtures/acl-users.acl "$acl_dir/users.acl"
+          docker run --detach --rm --name falkordb-reauth-acl --publish 6381:6379 \
+            --volume "$acl_dir/users.acl:/var/lib/falkordb/data/users.acl" \
+            --env REDIS_ARGS="--aclfile /var/lib/falkordb/data/users.acl" \
+            falkordb/falkordb:v4.18.10
+          timeout 60s bash -c 'until echo PING | nc -w 2 localhost 6381 | grep -q PONG; do sleep 1; done'
+          echo "ACL persistence fixture (port 6381) is ready"
       - name: Run Playwright tests (shard ${{ matrix.shard }} of 6)
         env:
           OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
@@ -201,6 +212,14 @@ jobs:
             --shard=${{ matrix.shard }}/6 \
             --workers=3 \
             --reporter=dot,list,html
+      - name: Stop ACL persistence fixture
+        if: always()
+        run: |
+          if docker container inspect falkordb-reauth-acl >/dev/null 2>&1; then
+            docker rm --force falkordb-reauth-acl
+          else
+            echo "ACL persistence fixture was already removed"
+          fi
       - name: Stop the server
         if: ${{ !cancelled() }}
         run: |
@@ -471,6 +490,15 @@ jobs:
           # TLS tests and the client-certificate one.
           tls-auth-clients optional
           EOF
+          cat > redis-mtls.conf << 'EOF'
+          protected-mode no
+          tls-port 6379
+          port 0
+          tls-cert-file /var/lib/falkordb/tls/redis.crt
+          tls-key-file /var/lib/falkordb/tls/redis.key
+          tls-ca-cert-file /var/lib/falkordb/tls/ca.crt
+          tls-auth-clients yes
+          EOF
       - name: Start FalkorDB with TLS
         run: |
           echo "Starting FalkorDB with TLS configuration..."
@@ -480,6 +508,13 @@ jobs:
             -v $(pwd)/tls:/var/lib/falkordb/tls \
             falkordb/falkordb:v4.18.10
           echo "Container started with ID: $(docker ps -q -f name=falkordb-tls)"
+      - name: Start FalkorDB with mutual TLS
+        run: |
+          docker run --rm -d --name falkordb-mtls -p 6381:6379 \
+            -v $(pwd)/redis-mtls.conf:/var/lib/falkordb/data/redis.conf \
+            -e REDIS_ARGS="/var/lib/falkordb/data/redis.conf" \
+            -v $(pwd)/tls:/var/lib/falkordb/tls \
+            falkordb/falkordb:v4.18.10
       - name: Wait for FalkorDB TLS to be ready
         run: |
           echo "Waiting a moment for container to fully start..."
@@ -509,6 +544,7 @@ jobs:
             openssl x509 -in tls/redis.crt -text -noout | head -10 || echo "Invalid certificate"
             exit 1
           fi
+          timeout 60s bash -c 'until printf "PING\r\n" | openssl s_client -quiet -connect localhost:6381 -cert tls/client.crt -key tls/client.key -CAfile tls/ca.crt 2>/dev/null | grep -q "+PONG"; do sleep 1; done'
       - name: Run TLS tests
         env:
           SKIP_SERVER_IDENTITY_CHECK: "true"
@@ -521,10 +557,13 @@ jobs:
         if: always()
         run: |
           rm -rf tls/
-          rm -f redis.conf
+          rm -f redis.conf redis-mtls.conf
       - name: Stop FalkorDB TLS container
         if: always()
         run: docker stop falkordb-tls || true
+      - name: Stop FalkorDB mutual TLS container
+        if: always()
+        run: docker stop falkordb-mtls || true
       - name: Stop the server
         if: ${{ !cancelled() }}
         run: |

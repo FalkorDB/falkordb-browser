@@ -10,6 +10,8 @@ import { FileText } from "lucide-react";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 import type { PreconfiguredConnectionInfo } from "@/lib/preconfiguredConnection";
+import type { AclSaveStatus } from "@/app/api/user/model";
+import { consumePasswordChangeNotice } from "@/lib/password-change-notice";
 import Spinning from "@/app/components/ui/spinning";
 import Button from "@/app/components/ui/Button";
 import LoginForm, { LoginFormCredentials } from "./LoginForm";
@@ -45,12 +47,12 @@ export default function LoginPage() {
   // and retrying is the only way back to the preconfigured connection.
   const [autoConnectRetries, setAutoConnectRetries] = useState(0);
   const [lookupError, setLookupError] = useState("");
+  const [passwordChangeNotice, setPasswordChangeNotice] = useState<AclSaveStatus | undefined>();
+  const passwordChangeNoticeConsumed = useRef(false);
   const autoConnectAttempt = useRef<Promise<SignInResponse | undefined> | null>(null);
 
   // An explicit logout must not be undone by the next automatic login.
   const signedOut = searchParams.get("signedOut") === "true";
-  const passwordChanged = searchParams.get("passwordChanged") === "true";
-  const aclSaveFailed = searchParams.get("aclSaveFailed") === "true";
   // Connection params in the URL are a deliberate request for a different
   // instance, so they outrank the preconfigured connection.
   const hasConnectionParams =
@@ -61,6 +63,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (passwordChangeNoticeConsumed.current) return;
+    passwordChangeNoticeConsumed.current = true;
+    try {
+      setPasswordChangeNotice(consumePasswordChangeNotice(window.sessionStorage));
+    } catch (error) {
+      console.error("Failed to read password-change notice:", error);
+    }
   }, []);
 
   useEffect(() => {
@@ -228,14 +240,19 @@ export default function LoginPage() {
                     {lookupError}
                   </p>
                 )}
-                {passwordChanged && (
+                {passwordChangeNotice && (
                   <p className="text-sm text-center text-green-600" data-testid="passwordChangedMessage">
                     Your password was changed. Sign in again with your new password.
                   </p>
                 )}
-                {aclSaveFailed && (
+                {passwordChangeNotice === "failed" && (
                   <p className="text-sm text-center text-amber-600" data-testid="aclSaveWarning">
                     Your password was changed, but FalkorDB could not save the ACL changes to disk. The change is active only in memory.
+                  </p>
+                )}
+                {passwordChangeNotice === "unknown" && (
+                  <p className="text-sm text-center text-amber-600" data-testid="aclSaveWarning">
+                    Your password was changed, but FalkorDB could not confirm whether the ACL changes were saved to disk; they may already be saved.
                   </p>
                 )}
                 <LoginForm

@@ -248,6 +248,18 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   bypass this dependency when both projects share a server.
   The connection manager's server-switching test also needs a second FalkorDB on port 6380
   (CI runs one as the `falkordb-pat` service): `docker run -d -p 6380:6379 falkordb/falkordb`.
+  The self-password ACL-persistence test also needs a disposable ACL-file FalkorDB on port 6381.
+  Copy the seed ACL file to a writable location (the test changes the default user's password;
+  never point this fixture at the main test database):
+  ```bash
+  mkdir -p /tmp/falkordb-reauth-acl
+  cp e2e/fixtures/acl-users.acl /tmp/falkordb-reauth-acl/users.acl
+  docker run -d --rm --name falkordb-reauth-acl -p 6381:6379 \
+    -v /tmp/falkordb-reauth-acl/users.acl:/var/lib/falkordb/data/users.acl \
+    -e "REDIS_ARGS=--aclfile /var/lib/falkordb/data/users.acl" \
+    falkordb/falkordb:v4.18.10
+  ```
+  Remove the disposable container after the test with `docker rm -f falkordb-reauth-acl`.
 
 ## Community and support
 

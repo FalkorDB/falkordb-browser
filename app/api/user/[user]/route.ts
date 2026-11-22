@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { getClient } from "../../auth/[...nextauth]/options";
+import { decrypt } from "../../auth/encryption";
+import { storeEncryptedCredential } from "../../auth/tokenUtils";
+import StorageFactory from "@/lib/token-storage/StorageFactory";
+import { isUsableConnectionRecord } from "@/lib/connectionBinding";
+import {
+  createReauthenticationHandoffId,
+  REAUTHENTICATION_HANDOFF_COOKIE,
+  REAUTHENTICATION_HANDOFF_PREFIX,
+  REAUTHENTICATION_HANDOFF_TTL_SECONDS,
+} from "@/lib/reauthentication-handoff";
 import {
   ROLE,
   getRoleWithKeys,
@@ -8,7 +19,7 @@ import {
   type UpdateUserResponse,
 } from "../model";
 import { updateUser, validateBody } from "../../validate-body";
-import { getCorsHeaders, corsPreflight } from "../../utils";
+import { getCorsHeaders, corsPreflight, shouldUseSecureCookies } from "../../utils";
 import rejectLdapManagedUsers from "../ldap-guard";
 import rejectNonAdmin from "../admin-guard";
 
@@ -55,14 +66,76 @@ export async function PATCH(
 
       const connection = await client.connection;
       const requiresReauthentication = requiresPasswordReauthentication(user.username, username, password);
+      let handoffId: string | undefined;
+      let handoffTokenId: string | undefined;
+      const tokenStorage = requiresReauthentication && user.connectionId
+        ? StorageFactory.getStorage()
+        : undefined;
+
+      if (tokenStorage && user.connectionId) {
+        try {
+          const activeConnection = await tokenStorage.fetchTokenById(user.connectionId);
+          if (!isUsableConnectionRecord(activeConnection, user.id)) {
+            throw new Error("The active connection could not be verified for reauthentication");
+          }
+
+          const key = activeConnection.encrypted_key
+            ? decrypt(activeConnection.encrypted_key)
+            : undefined;
+          handoffId = createReauthenticationHandoffId();
+          handoffTokenId = `${REAUTHENTICATION_HANDOFF_PREFIX}${handoffId}`;
+          await storeEncryptedCredential({
+            tokenHash: crypto.createHash("sha256").update(handoffTokenId).digest("hex"),
+            tokenId: handoffTokenId,
+            userId: user.id,
+            username: activeConnection.username,
+            name: handoffTokenId,
+            role: activeConnection.role,
+            host: activeConnection.host,
+            port: activeConnection.port,
+            password: "",
+            kind: "session",
+            tls: activeConnection.tls ?? false,
+            ca: activeConnection.ca,
+            cert: activeConnection.cert,
+            key,
+            expiresAtUnix: Math.floor(Date.now() / 1000) + REAUTHENTICATION_HANDOFF_TTL_SECONDS,
+          });
+        } catch (error) {
+          console.error("Failed to prepare the password reauthentication handoff:", error);
+          if (handoffTokenId) {
+            try {
+              await tokenStorage.deleteToken(handoffTokenId);
+            } catch (cleanupError) {
+              console.error("Failed to remove an incomplete password reauthentication handoff:", cleanupError);
+            }
+          }
+          return NextResponse.json(
+            { message: "Unable to prepare secure reauthentication. The password was not changed." },
+            { status: 500, headers: getCorsHeaders(request) }
+          );
+        }
+      }
 
       const finalRole = getRoleWithKeys(role, keys);
       if (password) {
         finalRole.push("resetpass", `>${password}`);
       }
-      await connection.aclSetUser(username, finalRole);
+      try {
+        await connection.aclSetUser(username, finalRole);
+      } catch (error) {
+        if (tokenStorage && handoffTokenId) {
+          try {
+            const deleted = await tokenStorage.deleteToken(handoffTokenId);
+            if (!deleted) console.error("Password reauthentication handoff was missing during cleanup");
+          } catch (cleanupError) {
+            console.error("Failed to remove the password reauthentication handoff:", cleanupError);
+          }
+        }
+        throw error;
+      }
 
-      const aclSaved = await persistAclAfterPasswordChange(
+      const aclSaveStatus = await persistAclAfterPasswordChange(
         requiresReauthentication,
         () => connection.aclSave(),
         error => console.error("Failed to persist ACL after changing the current user's password:", error),
@@ -72,10 +145,20 @@ export async function PATCH(
       const response: UpdateUserResponse = requiresReauthentication ? {
         message,
         requiresReauthentication: true,
-        aclSaved: aclSaved === true,
+        aclSaveStatus: aclSaveStatus ?? "unknown",
         reauthenticationConnection: { host: user.host, port: user.port, username, tls: user.tls },
       } : { message, requiresReauthentication: false };
-      return NextResponse.json(response, { status: 200, headers: getCorsHeaders(request) });
+      const nextResponse = NextResponse.json(response, { status: 200, headers: getCorsHeaders(request) });
+      if (handoffId) {
+        nextResponse.cookies.set(REAUTHENTICATION_HANDOFF_COOKIE, handoffId, {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: shouldUseSecureCookies(request),
+          path: "/api/auth",
+          maxAge: REAUTHENTICATION_HANDOFF_TTL_SECONDS,
+        });
+      }
+      return nextResponse;
     } catch (error) {
       console.error(error);
       return NextResponse.json(
