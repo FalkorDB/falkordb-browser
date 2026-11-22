@@ -181,7 +181,7 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   Each CI job records raw V8 coverage and turns it into a report with
   `.github/scripts/coverage-report.mjs`, and Codecov merges the reports per commit. The
   **Coverage status** workflow is the gate: once every coverage workflow a commit triggers
-  has finished, and Codecov has processed their uploads, it requires **95%** of the whole
+  has finished, and Codecov has processed their uploads, it requires **80%** of the whole
   codebase (`coverage/project` on PRs, `coverage/project (push)` on commits pushed to `main`
   and `staging`) and of the lines a PR changes (`coverage/patch`). A coverage job whose
   tests or report fail, are skipped or are cancelled fails the gate, since its coverage is

@@ -7,9 +7,13 @@ import LoginPage from "../logic/POM/loginPage";
 import MobileGraphPage from "../logic/POM/mobileGraphPage";
 
 /**
- * The browser does not offer the desktop or phone apps until the macOS build
- * is signed and notarized (#2210): no popup, no login-page link, no menu item.
+ * The browser does not offer the desktop or phone apps directly (#2210): no
+ * popup, no login-page link, no menu item. Installers are reached only through
+ * the GitHub release linked from the release notes.
  */
+
+const RELEASE_URL = "https://github.com/FalkorDB/falkordb-browser/releases/tag/v2.7.4";
+const RELEASE = { tag: "v2.7.4", name: "v2.7.4", publishedAt: "2026-11-05T00:00:00Z", body: "Bug fixes and improvements.", url: RELEASE_URL };
 
 const UA = {
     mac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
@@ -22,7 +26,7 @@ const UA = {
 const FORMER_PROMPT_DELAY_MS = 2000;
 
 /** A returning visitor whose browser has never dismissed the app popup. */
-async function prepare(page: Page): Promise<void> {
+async function prepare(page: Page, releases: (typeof RELEASE)[] = []): Promise<void> {
     await page.clock.install();
     await page.addInitScript(() => {
         localStorage.setItem("whatsNewSeen", "v999.0.0");
@@ -30,7 +34,7 @@ async function prepare(page: Page): Promise<void> {
         localStorage.removeItem("appDownloadPrompt");
         sessionStorage.removeItem("appDownloadPromptShown");
     });
-    await page.route("**/api/releases", (route) => route.fulfill({ json: { releases: [] } }));
+    await page.route("**/api/releases", (route) => route.fulfill({ json: { releases } }));
 }
 
 test.describe("@admin App download hidden", () => {
@@ -39,6 +43,17 @@ test.describe("@admin App download hidden", () => {
         expect(links.status()).toBe(404);
         const android = await request.get(`${urls.localHost}/api/app-download/android`, { maxRedirects: 0 });
         expect(android.status()).toBe(404);
+    });
+
+    test("the release notes link to the GitHub release", async ({ page }) => {
+        await prepare(page, [RELEASE]);
+        const header = new HeaderComponent(page);
+        const downloads = new AppDownloadRemovalPage(page);
+        await page.goto(urls.graphUrl);
+        await header.clickOnHelpBtn();
+        await header.releasesButton.click();
+
+        await expect(downloads.releaseLink(RELEASE.tag, RELEASE.name)).toHaveAttribute("href", RELEASE_URL);
     });
 
     for (const [os, ua] of [["macOS", UA.mac], ["Windows", UA.windows], ["Linux", UA.linux]] as const) {
