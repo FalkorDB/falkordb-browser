@@ -116,7 +116,7 @@ jobs:
         run: npm version "${TAG#v}" --no-git-tag-version --allow-same-version
 
       - name: Verify macOS signing credentials
-        if: runner.os == 'macOS' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
+        if: runner.os == 'macOS' && github.event_name == 'release'
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -129,7 +129,7 @@ jobs:
              [ -z "$APPLE_ID" ] ||
              [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ||
              [ -z "$APPLE_TEAM_ID" ]; then
-            echo "::error::Configure all documented macOS signing and notarization secrets before building a signed desktop release."
+            echo "::error::Configure all documented macOS signing and notarization secrets before publishing a desktop release."
             exit 1
           fi
 
@@ -140,12 +140,12 @@ jobs:
         run: npm run build:web && npm run prepare:server
 
       - name: Build unsigned installers
-        if: runner.os != 'macOS' || (github.event_name != 'release' && github.event_name != 'workflow_dispatch')
+        if: runner.os != 'macOS' || github.event_name != 'release'
         working-directory: desktop
         run: npx --no-install electron-builder --publish never
 
       - name: Build signed macOS installers
-        if: runner.os == 'macOS' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
+        if: runner.os == 'macOS' && github.event_name == 'release'
         working-directory: desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "true"
@@ -159,7 +159,7 @@ jobs:
         run: npx --no-install electron-builder --publish never -c.mac.forceCodeSigning=true
 
       - name: Verify macOS signature and notarization
-        if: runner.os == 'macOS' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
+        if: runner.os == 'macOS' && github.event_name == 'release'
         working-directory: desktop/dist
         shell: bash
         run: |
