@@ -3,7 +3,7 @@
 
 import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, type KeyboardEventHandler } from "react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger } from "@/components/ui/select";
 import Button from "./Button";
 import Input from "./Input";
@@ -19,11 +19,12 @@ interface ComboboxProps<T extends string> {
   inTable?: boolean,
   defaultOpen?: boolean,
   className?: string,
+  onKeyDown?: KeyboardEventHandler<HTMLButtonElement>,
 }
 
 const STEP = 4;
 
-export default function Combobox<T extends string>({ id, disabled = false, inTable = false, label, options, selectedValue, setSelectedValue, defaultOpen = false, className }: ComboboxProps<T>) {
+export default function Combobox<T extends string>({ id, disabled = false, inTable = false, label, options, selectedValue, setSelectedValue, defaultOpen = false, className, onKeyDown }: ComboboxProps<T>) {
 
   const { indicator } = useContext(IndicatorContext);
 
@@ -75,6 +76,7 @@ export default function Combobox<T extends string>({ id, disabled = false, inTab
           data-type="select"
           title={getTitle()}
           className={cn("w-full gap-2 items-center border border-border p-2 disabled:text-gray-300 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium", className)}
+          onKeyDown={onKeyDown}
         >
           <p className="truncate">{selectedValue || `Select ${label}`}</p>
         </SelectTrigger>
