@@ -37,7 +37,7 @@ import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDimension, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
 import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
-import { applyQueryHistoryProfileUpdates, updateQueryHistoryProfile, type QueryHistoryProfileUpdate } from "./graph/queryHistoryProfile";
+import { applyQueryHistoryProfileUpdates, retainPendingQueryHistoryProfileUpdates, updateQueryHistoryProfile, type QueryHistoryProfileUpdate } from "./graph/queryHistoryProfile";
 import { TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX, completeTutorialDemoGraphSetup, getTutorialDemoReclaimableNames, isTutorialDemoGraphName, isTutorialDemoOwnerId, isTutorialDemoOwnershipExpired, parseTutorialDemoOwnership, pickTutorialDemoGraphNames, queueTutorialDemoRecovery, runTutorialDemoLoadOnce, waitForTutorialDemoLoad, TutorialDemoLoadPendingError, tutorialDemoOwnershipKey, type TutorialDemoOwnership } from "@/lib/tutorialDemoGraphs";
 
 /**
@@ -427,15 +427,28 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   useEffect(() => {
     if (pendingQueryProfiles.length === 0) return;
 
-    const updated = applyQueryHistoryProfileUpdates(
+    const connectionEpoch = getConnectionEpoch();
+    const retained = retainPendingQueryHistoryProfileUpdates(
       historyQuery,
       pendingQueryProfiles,
-      getConnectionEpoch()
+      connectionEpoch,
+      loadingOwnerRef.current !== null
+    );
+    const ready = pendingQueryProfiles.filter(update => !retained.includes(update));
+    const updated = applyQueryHistoryProfileUpdates(
+      historyQuery,
+      ready,
+      connectionEpoch
     );
     if (updated.queries !== historyQuery.queries) {
       setConnectionItem("query history", JSON.stringify(updated.queries));
     }
-    setPendingQueryProfiles(pending => pending.slice(pendingQueryProfiles.length));
+    setPendingQueryProfiles(pending => {
+      const remaining = [...retained, ...pending.slice(pendingQueryProfiles.length)];
+      return remaining.length === pending.length && remaining.every((update, index) => update === pending[index])
+        ? pending
+        : remaining;
+    });
   }, [historyQuery, pendingQueryProfiles]);
   const [selectedParam, setSelectedParam] = useState<string>("");
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
@@ -873,7 +886,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     historyQuery,
     setHistoryQuery,
     applyQueryHistoryProfile,
-  }), [historyQuery, applyQueryHistoryProfile]);
+  }), [historyQuery, setHistoryQuery, applyQueryHistoryProfile]);
 
   const indicatorContext = useMemo(() => ({
     indicator,

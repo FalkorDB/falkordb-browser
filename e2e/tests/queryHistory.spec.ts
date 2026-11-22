@@ -72,7 +72,13 @@ test.describe('Query history Tests', () => {
                 await graph.selectGraphByName(graphName);
                 await graph.insertQuery(query);
                 await graph.clickQueryHistoryButton();
+                await expect(graph.historyTab("Edit Query")).toBeEnabled();
+                await expect(graph.historyPanelEditor).toBeVisible();
+                await expect(graph.historyTab("Profile")).toBeDisabled();
+                await expect(graph.historyTab("Metadata")).toBeDisabled();
+                await expect(graph.historyTab("Explain")).toBeDisabled();
                 await graph.selectQueryInHistory(historyQuery);
+                await expect(graph.historyTab("Profile")).toBeEnabled();
 
                 let profiledRequest: unknown;
                 let notifyProfileRequest = () => {};
@@ -93,7 +99,10 @@ test.describe('Query history Tests', () => {
                 await profileRequestStarted;
                 expect(profiledRequest).toEqual({ query: historyQuery });
 
-                await graph.closeHistoryPanel();
+                await graph.selectQueryInHistory(query);
+                await expect(graph.historyTab("Profile")).toBeEnabled();
+                await graph.clickHistoryTab("Profile");
+                await expect(graph.historyTab("Profile")).toHaveAttribute("data-state", "active");
                 releaseProfileResponse();
                 await expect.poll(async () => {
                     const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
@@ -102,9 +111,12 @@ test.describe('Query history Tests', () => {
                     }>;
                     return stored.find((entry) => entry.text === historyQuery)?.profile;
                 }).toEqual(profile);
+                await expect(graph.profileTree).not.toBeVisible();
 
-                await graph.clickQueryHistoryButton();
                 await graph.selectQueryInHistory(historyQuery);
+                await graph.closeHistoryPanel();
+                await graph.clickQueryHistoryButton();
+                await expect(graph.historyTab("Profile")).toBeEnabled();
                 await graph.clickHistoryTab("Profile");
                 await expect(graph.profileTree).toContainText("Records produced: 3");
 
@@ -221,28 +233,26 @@ test.describe('Query history Tests', () => {
 
     test(`@admin history panel editor shows autocomplete suggestions`, async () => {
         const graphName = getRandomString('queryhistory');
-        await apicalls.addGraph(graphName);
-        const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraphByName(graphName);
-        const query = "MATCH (n) RETURN n";
-        await graph.insertQuery(query);
-        await graph.clickRunQuery(false);
-        await graph.clickQueryHistoryButton();
-        await graph.clickSelectQueryInHistory(query);
-        // Click inside the history panel editor and trigger completions
-        await graph.clickHistoryPanelEditor();
-        // Monaco's suggest widget can be slow/racy under load; retry the trigger.
-        let suggestVisible = false;
-        for (let attempt = 0; attempt < 3 && !suggestVisible; attempt += 1) {
-            await graph.triggerSuggestions();
-            suggestVisible = await graph.waitForSuggestWidget(5000);
-        }
-        expect(suggestVisible).toBe(true);
-        // At minimum, Cypher keywords (MATCH, RETURN, etc.) should be present
-        const count = await graph.getSuggestionCount();
-        expect(count).toBeGreaterThan(0);
-        await apicalls.removeGraph(graphName);
+        const propertyKey = "historyAutocompleteProperty";
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            await apicalls.addGraph(graphName);
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            const query = `CREATE (n:HistoryAutocomplete { ${propertyKey}: 1 }) RETURN n`;
+            await graph.insertQuery(query);
+            await graph.clickRunQuery(false);
+            await graph.clickQueryHistoryButton();
+            await expect(graph.historyTab("Profile")).toBeDisabled();
+            await graph.clickHistoryPanelEditor();
+            const page = await browser.getPage();
+            await page.keyboard.press("Control+a");
+            await page.keyboard.type("MATCH (n) RETURN n.");
+
+            const suggestVisible = await graph.waitForSuggestWidget(5000);
+            expect(suggestVisible).toBe(true);
+            await expect(graph.monacoSuggestRows.filter({ hasText: propertyKey })).toHaveCount(1);
+        });
     });
 
     test(`@admin Ctrl+F opens the find widget in the fullscreen dialog editor`, async () => {

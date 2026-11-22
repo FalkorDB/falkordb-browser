@@ -26,6 +26,7 @@ import PaginationList from "../components/PaginationList";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext, AiFixContext } from "../components/provider";
 import useQueryPreflight from "../components/useQueryPreflight";
 import { Explain, Metadata, Profile } from "./MetadataView";
+import { getSelectedHistoryQuery } from "./queryHistoryProfile";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
 
@@ -104,15 +105,13 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
         return Array.from(new Set(queries.map(query => query.graphName).filter(name => !!name)));
     }, [graphNames, historyQuery?.queries]);
 
-    const currentQuery = historyQuery?.counter === 0
-        ? historyQuery.currentQuery
-        : historyQuery?.queries[historyQuery.counter - 1];
+    const selectedHistoryQuery = getSelectedHistoryQuery(historyQuery);
 
     // Refs so getSuggestions closure always reads fresh values without recreating the config
-    const currentQueryRef = useRef(currentQuery);
+    const currentQueryRef = useRef(selectedHistoryQuery);
     const graphRef = useRef(graph);
     const graphNameRef = useRef(graphName);
-    useEffect(() => { currentQueryRef.current = currentQuery; }, [currentQuery]);
+    useEffect(() => { currentQueryRef.current = selectedHistoryQuery; }, [selectedHistoryQuery]);
     useEffect(() => { graphRef.current = graph; }, [graph]);
     useEffect(() => { graphNameRef.current = graphName; }, [graphName]);
     // Keep the engine schema in sync so completion (once the grammar is generated)
@@ -318,15 +317,13 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     };
 
     const isTabEnabled = useCallback((tabName: Tab) => {
-        if (tabName === "text") return !!currentQuery;
-        if (tabName === "metadata") return !!currentQuery && getStatsLines(currentQuery).length > 0;
-        if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
-        return true;
-    }, [currentQuery]);
+        if (tabName === "text") return true;
+        if (tabName === "metadata") return !!selectedHistoryQuery && getStatsLines(selectedHistoryQuery).length > 0;
+        if (tabName === "explain") return !!selectedHistoryQuery && selectedHistoryQuery.explain.length > 0;
+        return !!selectedHistoryQuery;
+    }, [selectedHistoryQuery]);
 
     useEffect(() => {
-        if (!currentQuery || tab === "profile") return;
-
         // Keep users on the text tab even when the query is empty so they can type a new query.
         if (tab === "text") {
             if (!editorRef.current?.hasTextFocus()) {
@@ -346,7 +343,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                 }
             }
         }
-    }, [currentQuery, setTab, historyQuery?.query, tab, isTabEnabled]);
+    }, [setTab, historyQuery?.query, tab, isTabEnabled]);
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e;
@@ -734,73 +731,68 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                         <TabsTrigger className={cn("px-2 py-0.5 text-sm mobile:px-1 mobile:text-xs border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                     </TabsList>
                     <TabsContent value="text" className="mt-0 h-full w-full rounded-lg relative p-1 overflow-hidden">
-                        {
-                            currentQuery &&
-                            <>
-                                <Button
-                                    ref={submitQuery}
-                                    data-testid="queryHistoryEditorRun"
-                                    className="z-10 absolute bottom-3 right-4 py-1.5 px-6 text-sm"
-                                    indicator={indicator}
-                                    variant="Primary"
-                                    label="Run"
-                                    title={isQueryValid ? "Press Enter to run the query" : "Fix the highlighted syntax errors to run"}
-                                    onClick={handleSubmit}
-                                    isLoading={isLoading}
-                                    disabled={isQueryLoading}
-                                />
-                                <label
-                                    htmlFor="queryHistoryEditorWrapLines"
-                                    className="z-10 absolute bottom-3 right-28 py-1.5 px-2 text-sm flex items-center gap-2 cursor-pointer select-none bg-background/80 rounded"
-                                >
-                                    <Checkbox
-                                        id="queryHistoryEditorWrapLines"
-                                        data-testid="queryHistoryEditorWrapLines"
-                                        checked={wrapLines}
-                                        onCheckedChange={(checked) => setWrapLines(checked as boolean)}
-                                    />
-                                    Wrap lines
-                                </label>
-                                <EditorComponent
-                                    className="SofiaSans"
-                                    height="100%"
-                                    language={CYPHER_LANGUAGE_NAME}
-                                    languageConfig={historyEditorLanguageConfig}
-                                    themeName="selector-theme"
-                                    options={{
-                                        lineHeight: 22,
-                                        fontSize: 14,
-                                        lineNumbersMinChars: 3,
-                                        quickSuggestions: true,
-                                        suggestOnTriggerCharacters: true,
-                                        scrollbar: {
-                                            horizontal: wrapLines ? "hidden" : "auto"
-                                        },
-                                        scrollBeyondLastLine: false,
-                                        wordWrap: wrapLines ? "on" : "off",
-                                        renderWhitespace: "none"
-                                    }}
-                                    value={historyQuery.query}
-                                    externalKey={historyQuery.revision}
-                                    onChange={(value) => {
-                                        setHistoryQuery(prev => ({ ...withQuery(prev, value || ""), fromEditor: true }));
-                                    }}
-                                    onMount={handleEditorDidMount}
-                                />
-                            </>
-                        }
+                        <Button
+                            ref={submitQuery}
+                            data-testid="queryHistoryEditorRun"
+                            className="z-10 absolute bottom-3 right-4 py-1.5 px-6 text-sm"
+                            indicator={indicator}
+                            variant="Primary"
+                            label="Run"
+                            title={isQueryValid ? "Press Enter to run the query" : "Fix the highlighted syntax errors to run"}
+                            onClick={handleSubmit}
+                            isLoading={isLoading}
+                            disabled={isQueryLoading}
+                        />
+                        <label
+                            htmlFor="queryHistoryEditorWrapLines"
+                            className="z-10 absolute bottom-3 right-28 py-1.5 px-2 text-sm flex items-center gap-2 cursor-pointer select-none bg-background/80 rounded"
+                        >
+                            <Checkbox
+                                id="queryHistoryEditorWrapLines"
+                                data-testid="queryHistoryEditorWrapLines"
+                                checked={wrapLines}
+                                onCheckedChange={(checked) => setWrapLines(checked as boolean)}
+                            />
+                            Wrap lines
+                        </label>
+                        <EditorComponent
+                            className="SofiaSans"
+                            height="100%"
+                            language={CYPHER_LANGUAGE_NAME}
+                            languageConfig={historyEditorLanguageConfig}
+                            themeName="selector-theme"
+                            options={{
+                                lineHeight: 22,
+                                fontSize: 14,
+                                lineNumbersMinChars: 3,
+                                quickSuggestions: true,
+                                suggestOnTriggerCharacters: true,
+                                scrollbar: {
+                                    horizontal: wrapLines ? "hidden" : "auto"
+                                },
+                                scrollBeyondLastLine: false,
+                                wordWrap: wrapLines ? "on" : "off",
+                                renderWhitespace: "none"
+                            }}
+                            value={historyQuery.query}
+                            externalKey={historyQuery.revision}
+                            onChange={(value) => {
+                                setHistoryQuery(prev => ({ ...withQuery(prev, value || ""), fromEditor: true }));
+                            }}
+                            onMount={handleEditorDidMount}
+                        />
                     </TabsContent>
                     <TabsContent className="h-full w-full rounded-lg overflow-auto" value="profile">
                         <div className="h-full w-full overflow-auto flex flex-col gap-4">
                             {
-                                currentQuery &&
+                                selectedHistoryQuery &&
                                 <Profile
                                     hideTitle
                                     background={background}
-                                    query={currentQuery}
+                                    query={selectedHistoryQuery}
                                     setQuery={({ profile }) => {
                                         applyQueryHistoryProfile({
-                                            target: currentQuery,
+                                            target: selectedHistoryQuery,
                                             profile: profile || [],
                                             connectionEpoch: getConnectionEpoch(),
                                         });
@@ -813,10 +805,10 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                     <TabsContent className="h-full w-full rounded-lg overflow-auto" value="metadata">
                         <div className="h-full w-full overflow-auto flex flex-col gap-4">
                             {
-                                currentQuery &&
+                                selectedHistoryQuery &&
                                 <Metadata
                                     hideTitle
-                                    query={currentQuery}
+                                    query={selectedHistoryQuery}
                                 />
                             }
                         </div>
@@ -824,11 +816,11 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                     <TabsContent className="h-full w-full rounded-lg overflow-auto" value="explain">
                         <div className="h-full w-full overflow-auto flex flex-col gap-4">
                             {
-                                currentQuery &&
+                                selectedHistoryQuery &&
                                 <Explain
                                     hideTitle
                                     background={background}
-                                    query={currentQuery}
+                                    query={selectedHistoryQuery}
                                 />
                             }
                         </div>

@@ -1,7 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { HistoryQuery, Query } from "../../lib/utils.ts";
-import { applyQueryHistoryProfileUpdates, updateQueryHistoryProfile } from "./queryHistoryProfile.ts";
+import {
+    applyQueryHistoryProfileUpdates,
+    getSelectedHistoryQuery,
+    isQueryHistoryTabEnabled,
+    retainPendingQueryHistoryProfileUpdates,
+    updateQueryHistoryProfile
+} from "./queryHistoryProfile.ts";
 
 const query = (text: string, timestamp: number, profile: string[] = []): Query => ({
     text,
@@ -22,6 +28,83 @@ const history = (queries: Query[], currentQuery: Query, counter = 0): HistoryQue
 });
 
 describe("updateQueryHistoryProfile", () => {
+    it("does not treat the latest executed query as selected history when no row is selected", () => {
+        const latest = query("RETURN 3", 1);
+        const previous = history([latest], latest, 0);
+
+        assert.equal(getSelectedHistoryQuery(previous), undefined);
+    });
+
+    it("returns the history row selected by the history counter", () => {
+        const latest = query("RETURN 3", 1);
+        const selected = query("RETURN 1", 2);
+        const previous = history([latest, selected], latest, 2);
+
+        assert.equal(getSelectedHistoryQuery(previous), selected);
+    });
+
+    it("keeps the draft editor available but disables result tabs without a selected row", () => {
+        const latest = query("RETURN 3", 1);
+        const previous = history([latest], latest, 0);
+
+        assert.equal(isQueryHistoryTabEnabled(previous, "text"), true);
+        assert.equal(isQueryHistoryTabEnabled(previous, "profile"), false);
+        assert.equal(isQueryHistoryTabEnabled(previous, "metadata"), false);
+        assert.equal(isQueryHistoryTabEnabled(previous, "explain"), false);
+    });
+
+    it("enables result tabs according to the selected history row's data", () => {
+        const latest = query("RETURN 3", 1);
+        const selected = {
+            ...query("CREATE (n) RETURN n", 2),
+            metadata: ["Nodes created: 1"],
+            explain: ["Results"]
+        };
+        const previous = history([latest, selected], latest, 2);
+
+        assert.equal(isQueryHistoryTabEnabled(previous, "text"), true);
+        assert.equal(isQueryHistoryTabEnabled(previous, "profile"), true);
+        assert.equal(isQueryHistoryTabEnabled(previous, "metadata"), true);
+        assert.equal(isQueryHistoryTabEnabled(previous, "explain"), true);
+    });
+
+    it("retains a profile update when the matching current query is still running", () => {
+        const inFlight = query("RETURN 3", 1);
+        const previous = history([], inFlight);
+        const update = { target: inFlight, profile: ["profile"], connectionEpoch: 4 };
+
+        assert.deepEqual(
+            retainPendingQueryHistoryProfileUpdates(previous, [update], 4, true),
+            [update]
+        );
+    });
+
+    it("does not retain a profile update when its history row is already committed", () => {
+        const completed = query("RETURN 3", 1);
+        const current = query("RETURN 5", 2);
+        const previous = history([completed], current);
+        const update = { target: completed, profile: ["profile"], connectionEpoch: 4 };
+
+        assert.deepEqual(
+            retainPendingQueryHistoryProfileUpdates(previous, [update], 4, true),
+            []
+        );
+    });
+
+    it("discards pending profiles when their run is done, superseded, deleted, or stale", () => {
+        const completed = query("RETURN 3", 1);
+        const unrelated = query("RETURN 5", 2);
+        const previous = history([completed], unrelated);
+        const update = { target: completed, profile: ["profile"], connectionEpoch: 4 };
+        const staleUpdate = { ...update, connectionEpoch: 3 };
+        const deletedUpdate = { ...update, target: query("RETURN 1", 3) };
+
+        assert.deepEqual(
+            retainPendingQueryHistoryProfileUpdates(previous, [update, staleUpdate, deletedUpdate], 4, false),
+            []
+        );
+    });
+
     it("updates the matching selected row without overwriting the editor draft", () => {
         const draft = query("MATCH (n) RETURN n", 7);
         const selected = query("RETURN 3", 7);

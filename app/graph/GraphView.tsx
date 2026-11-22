@@ -2,12 +2,11 @@
 
 import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
 import { GitGraph, ScrollText, SlidersHorizontal, Table, Waypoints } from "lucide-react";
-import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
+import { cn, getConnectionEpoch, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { getExecutionTime, getStatsLines } from "@/lib/queryStats";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraphContext, ForceGraphContext, ConnectionContext } from "@/app/components/provider";
+import { GraphContext, ForceGraphContext, ConnectionContext, HistoryQueryContext } from "@/app/components/provider";
 import ForceGraph from "@/app/components/ForceGraph";
-import { setConnectionItem } from "@/lib/connection-storage";
 import BottomSheet from "@/components/ui/BottomSheet";
 import useIsMobile from "@/lib/useIsMobile";
 import Button from "../components/ui/Button";
@@ -33,7 +32,6 @@ interface Props {
     relationships: Relationship[]
     fetchCount: () => Promise<void>
     historyQuery: HistoryQuery
-    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
     setIsAddNode: (isAddNode: boolean) => void
     setIsAddEdge: (isAddEdge: boolean) => void
     isAddNode: boolean
@@ -55,7 +53,6 @@ function GraphView({
     relationships,
     fetchCount,
     historyQuery,
-    setHistoryQuery,
     setIsAddEdge,
     setIsAddNode,
     isAddEdge,
@@ -64,6 +61,7 @@ function GraphView({
 
     const { graph, graphName, currentTab, setCurrentTab, isLoading, expand, setExpand } = useContext(GraphContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { applyQueryHistoryProfile } = useContext(HistoryQueryContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport, dimmed, setDimmed } = useContext(ForceGraphContext);
     const isMobile = useIsMobile();
     const [toolsOpen, setToolsOpen] = useState(false);
@@ -398,22 +396,11 @@ function GraphView({
                             </TabsContent>
                             <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">
                                 <MetadataView
-                                    setQuery={({ profile }) => {
-                                        setHistoryQuery(prev => {
-                                            const newQuery = {
-                                                ...prev.currentQuery,
-                                                profile: profile || []
-                                            };
-
-                                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
-
-                                            setConnectionItem("query history", JSON.stringify(newQueries));
-
-                                            return {
-                                                ...prev,
-                                                currentQuery: newQuery,
-                                                queries: newQueries
-                                            };
+                                    setQuery={(updatedQuery) => {
+                                        applyQueryHistoryProfile({
+                                            target: updatedQuery,
+                                            profile: updatedQuery.profile || [],
+                                            connectionEpoch: getConnectionEpoch(),
                                         });
                                     }}
                                     query={historyQuery.currentQuery}

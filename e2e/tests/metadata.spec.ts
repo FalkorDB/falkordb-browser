@@ -65,6 +65,43 @@ test.describe('Metadata Tests', () => {
         expect(isMetadataViewTabEnabled).toBe(true);
     });
 
+    test('@admin profiling is disabled while a new query is running in the Metadata tab', async () => {
+        const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
+        const page = await browser.getPage();
+        await metadataView.selectGraphByName(GRAPH_NAME);
+        await metadataView.insertQuery("RETURN 1");
+        await metadataView.clickRunQuery(false);
+        await metadataView.clickMetadataViewTab();
+
+        let releaseQueryResponse = () => {};
+        try {
+            let notifyQueryStarted = () => {};
+            const queryStarted = new Promise<void>((resolve) => {
+                notifyQueryStarted = resolve;
+            });
+            const queryResponseGate = new Promise<void>((resolve) => {
+                releaseQueryResponse = resolve;
+            });
+            await page.route((url) => url.pathname === `/api/graph/${encodeURIComponent(GRAPH_NAME)}`, async (route) => {
+                const request = route.request();
+                if (request.method() === "POST" && request.postData()?.includes("RETURN 2")) {
+                    notifyQueryStarted();
+                    await queryResponseGate;
+                }
+                await route.continue();
+            });
+
+            await metadataView.insertQuery("RETURN 2");
+            const runningQuery = metadataView.clickRunQuery(false);
+            await queryStarted;
+            expect(await metadataView.profileButton.isDisabled()).toBe(true);
+            releaseQueryResponse();
+            await runningQuery;
+        } finally {
+            releaseQueryResponse();
+        }
+    });
+
     test('@readonly profiling is disabled for read-only connections', async () => {
         const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
         await metadataView.selectGraphByName(GRAPH_NAME);

@@ -1,6 +1,20 @@
 import type { HistoryQuery, Query } from "../../lib/utils.ts";
+import { getStatsLines } from "../../lib/queryStats.ts";
 
 type QueryIdentity = Pick<Query, "text" | "timestamp">;
+export type QueryHistoryTab = "text" | "metadata" | "explain" | "profile";
+
+export function getSelectedHistoryQuery(history: HistoryQuery): Query | undefined {
+    return history.counter > 0 ? history.queries[history.counter - 1] : undefined;
+}
+
+export function isQueryHistoryTabEnabled(history: HistoryQuery, tab: QueryHistoryTab): boolean {
+    const selectedQuery = getSelectedHistoryQuery(history);
+    if (tab === "text") return true;
+    if (tab === "metadata") return !!selectedQuery && getStatsLines(selectedQuery).length > 0;
+    if (tab === "explain") return !!selectedQuery && selectedQuery.explain.length > 0;
+    return !!selectedQuery;
+}
 
 export type QueryHistoryProfileUpdate = {
     target: QueryIdentity;
@@ -55,4 +69,22 @@ export function applyQueryHistoryProfileUpdates(
             connectionEpoch
         ) ?? current
     ), history);
+}
+
+export function retainPendingQueryHistoryProfileUpdates(
+    history: HistoryQuery,
+    updates: QueryHistoryProfileUpdate[],
+    connectionEpoch: number,
+    isQueryLoading: boolean
+): QueryHistoryProfileUpdate[] {
+    if (!isQueryLoading) return [];
+
+    return updates.filter(update => (
+        update.connectionEpoch === connectionEpoch
+        && !history.queries.some(query => (
+            query.timestamp === update.target.timestamp && query.text === update.target.text
+        ))
+        && history.currentQuery.timestamp === update.target.timestamp
+        && history.currentQuery.text === update.target.text
+    ));
 }
