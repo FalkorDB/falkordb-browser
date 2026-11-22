@@ -1,4 +1,4 @@
-import { Locator, expect } from "@playwright/test";
+import { Locator, expect, test } from "@playwright/test";
 import { interactWhenVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
@@ -118,25 +118,89 @@ export default class CreateElementPanel extends GraphPage {
       return String(label(node));
     }, second.id);
 
-    // The projected position can settle before the renderer's hit-test canvas catches up.
-    await expect.poll(async () => {
-      const current = (await this.snapshotNodesScreenPositions())
-        .find((node) => node.id === second.id && node.isVisible);
-      samples.last = current;
-      if (!current) return "node is outside the canvas";
-      const receivesPointer = await this.canvasElement.evaluate((canvas, { screenX, screenY }) =>
-        document.elementFromPoint(screenX, screenY) === canvas, current);
-      if (!receivesPointer) return "canvas is covered at the node position";
+    type Point = { x: number; y: number };
+    const diagnostics: {
+      pointer?: Point;
+      targets?: { document: string | null; shadow: string | null };
+      projectedCenter?: Point;
+      tooltip?: string;
+      pointerUp?: unknown;
+    } = {};
+    try {
+      // The projected position can settle before the renderer's hit-test canvas catches up.
+      await expect.poll(async () => {
+        const current = (await this.snapshotNodesScreenPositions())
+          .find((node) => node.id === second.id && node.isVisible);
+        diagnostics.projectedCenter = current && { x: current.screenX, y: current.screenY };
+        diagnostics.targets = undefined;
+        if (!current) return null;
+        const hit = await this.canvasElement.evaluate((canvas, { screenX, screenY }) => {
+          const root = canvas.getRootNode();
+          if (!(root instanceof ShadowRoot)) {
+            throw new Error("Expected the 2D graph canvas to be inside a shadow root");
+          }
+          const outer = document.elementFromPoint(screenX, screenY);
+          const inner = root.elementFromPoint(screenX, screenY);
+          const describe = (element: Element | null) =>
+            element && (element.getAttribute("data-testid") ?? element.localName);
+          return {
+            // Document hit testing stops at the shadow host; check both layers.
+            receivesPointer: outer === root.host && inner === canvas,
+            targets: { document: describe(outer), shadow: describe(inner) },
+          };
+        }, current);
+        diagnostics.targets = hit.targets;
+        if (!hit.receivesPointer) return null;
 
-      await this.page.mouse.move(current.screenX, current.screenY);
-      return (await this.nodeCanvasToolTip.filter({ visible: true }).allTextContents())[0] ?? "";
-    }, { message: `the canvas must resolve the pointer to node ${second.id} before Shift-click` }).toBe(caption);
+        await this.page.mouse.move(current.screenX, current.screenY);
+        diagnostics.pointer = { x: current.screenX, y: current.screenY };
+        diagnostics.tooltip = (await this.nodeCanvasToolTip.filter({ visible: true }).allTextContents())[0] ?? "";
+        return diagnostics.tooltip;
+      }, { message: `the pointer must hit the inner canvas and resolve to node ${second.id} before Shift-click` }).toBe(caption);
 
-    const secondNow = samples.last;
-    if (!secondNow) throw new Error(`Node ${second.id} is no longer visible`);
-
-    await this.elementClick(secondNow.screenX, secondNow.screenY, true);
-    await expect.poll(() => this.getSelectionCount()).toBe(2);
+      const pointer = diagnostics.pointer;
+      if (!pointer) throw new Error(`No pointer position confirmed for node ${second.id}`);
+      const capture = await this.page.evaluateHandle((id) => {
+        const samples: Array<{
+          target: string | null;
+          coordinates: Point;
+          projectedCenter: Point | null;
+          tooltip: string | null;
+        }> = [];
+        document.addEventListener("pointerup", (event) => {
+          const target = event.composedPath()[0];
+          const canvas = document.querySelector("falkordb-canvas");
+          const inner = canvas?.shadowRoot?.querySelector("canvas");
+          const node = canvas?.getGraphData().nodes.find((entry) => entry.id === id);
+          const rect = inner?.getBoundingClientRect();
+          const center = node?.x !== undefined && node.y !== undefined
+            ? canvas?.getGraph()?.graph2ScreenCoords(node.x, node.y)
+            : undefined;
+          samples.push({
+            target: target instanceof Element ? target.getAttribute("data-testid") ?? target.localName : null,
+            coordinates: { x: event.clientX, y: event.clientY },
+            projectedCenter: center && rect ? { x: rect.left + center.x, y: rect.top + center.y } : null,
+            tooltip: canvas?.shadowRoot?.querySelector(".float-tooltip-kap")?.textContent ?? null,
+          });
+        }, { capture: true, once: true });
+        return samples;
+      }, second.id);
+      try {
+        await this.elementClick(pointer.x, pointer.y, true);
+        await expect.poll(() => this.getSelectionCount()).toBe(2);
+      } catch (error) {
+        diagnostics.pointerUp = await capture.jsonValue();
+        throw error;
+      } finally {
+        await capture.dispose();
+      }
+    } catch (error) {
+      await test.info().attach("edge-pointer-diagnostics", {
+        body: JSON.stringify({ nodeId: second.id, expectedTooltip: caption, ...diagnostics }, null, 2),
+        contentType: "application/json",
+      });
+      throw error;
+    }
     await this.clickElementCanvasAddEdge();
     await expect(this.title).toHaveText("Create Edge");
     return [first.id, second.id];
