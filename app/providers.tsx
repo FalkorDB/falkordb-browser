@@ -440,7 +440,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       ready,
       connectionEpoch
     );
-    if (updated.queries !== historyQuery.queries) {
+    if (updated.queries !== historyQuery.queries || retained.length > 0) {
       setConnectionItem("query history", JSON.stringify(updated.queries));
     }
     setPendingQueryProfiles(pending => {

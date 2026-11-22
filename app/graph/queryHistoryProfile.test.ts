@@ -79,28 +79,35 @@ describe("updateQueryHistoryProfile", () => {
         );
     });
 
-    it("does not retain a profile update when its history row is already committed", () => {
-        const completed = query("RETURN 3", 1);
-        const current = query("RETURN 5", 2);
-        const previous = history([completed], current);
-        const update = { target: completed, profile: ["profile"], connectionEpoch: 4 };
+    it("retains a stored-row profile update until a running query commits", () => {
+        const stored = query("RETURN 3", 1);
+        const running = query("RETURN 5", 2);
+        const whileRunning = history([stored], running);
+        const update = { target: stored, profile: ["profile"], connectionEpoch: 4 };
 
+        const retained = retainPendingQueryHistoryProfileUpdates(whileRunning, [update], 4, true);
+        assert.deepEqual(retained, [update]);
+
+        const afterCommit = history([stored], running);
         assert.deepEqual(
-            retainPendingQueryHistoryProfileUpdates(previous, [update], 4, true),
+            retainPendingQueryHistoryProfileUpdates(afterCommit, retained, 4, false),
             []
+        );
+        assert.deepEqual(
+            applyQueryHistoryProfileUpdates(afterCommit, retained, 4).queries,
+            [{ ...stored, profile: ["profile"] }]
         );
     });
 
-    it("discards pending profiles when their run is done, superseded, deleted, or stale", () => {
-        const completed = query("RETURN 3", 1);
+    it("does not retain deleted or stale profile updates during a query", () => {
+        const deleted = query("RETURN 3", 1);
         const unrelated = query("RETURN 5", 2);
-        const previous = history([completed], unrelated);
-        const update = { target: completed, profile: ["profile"], connectionEpoch: 4 };
+        const previous = history([unrelated], unrelated);
+        const update = { target: deleted, profile: ["profile"], connectionEpoch: 4 };
         const staleUpdate = { ...update, connectionEpoch: 3 };
-        const deletedUpdate = { ...update, target: query("RETURN 1", 3) };
 
         assert.deepEqual(
-            retainPendingQueryHistoryProfileUpdates(previous, [update, staleUpdate, deletedUpdate], 4, false),
+            retainPendingQueryHistoryProfileUpdates(previous, [update, staleUpdate], 4, true),
             []
         );
     });

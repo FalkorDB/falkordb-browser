@@ -94,7 +94,7 @@ test.describe('Metadata Tests', () => {
             await metadataView.insertQuery("RETURN 2");
             const runningQuery = metadataView.clickRunQuery(false);
             await queryStarted;
-            expect(await metadataView.profileButton.isDisabled()).toBe(true);
+            await expect(metadataView.profileButton).toBeDisabled();
             releaseQueryResponse();
             await runningQuery;
         } finally {

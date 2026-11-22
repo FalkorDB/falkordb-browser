@@ -46,6 +46,7 @@ test.describe('Query history Tests', () => {
         const query = "MATCH (n) RETURN n";
         const historyQuery = "RETURN 3";
         const profile = ["Results | Records produced: 3"];
+        const draftProfile = ["Results | Records produced: 0"];
         const timestamp = Date.now();
         const history = [query, historyQuery].map((text, index) => ({
             text,
@@ -60,6 +61,7 @@ test.describe('Query history Tests', () => {
 
         await withGraphCleanup(apicalls, [graphName], async () => {
             let releaseProfileResponse = () => {};
+            let releaseDraftProfileResponse = () => {};
             try {
                 await apicalls.addGraph(graphName);
                 const graph = await browser.createNewPage(QueryHistory);
@@ -88,11 +90,29 @@ test.describe('Query history Tests', () => {
                 const profileResponseGate = new Promise<void>((resolve) => {
                     releaseProfileResponse = resolve;
                 });
+                let pendingProfiledRequest: unknown;
+                let notifyPendingProfileRequest = () => {};
+                const pendingProfileRequestStarted = new Promise<void>((resolve) => {
+                    notifyPendingProfileRequest = resolve;
+                });
+                const draftProfileResponseGate = new Promise<void>((resolve) => {
+                    releaseDraftProfileResponse = resolve;
+                });
                 await page.route("**/api/graph/*/profile", async (route) => {
-                    profiledRequest = route.request().postDataJSON();
-                    notifyProfileRequest();
-                    await profileResponseGate;
-                    await route.fulfill({ json: { result: profile } });
+                    const request = route.request().postDataJSON();
+                    if (request.query === historyQuery) {
+                        profiledRequest = request;
+                        notifyProfileRequest();
+                        await profileResponseGate;
+                        await route.fulfill({ json: { result: profile } });
+                    } else if (request.query === query) {
+                        pendingProfiledRequest = request;
+                        notifyPendingProfileRequest();
+                        await draftProfileResponseGate;
+                        await route.fulfill({ json: { result: draftProfile } });
+                    } else {
+                        await route.continue();
+                    }
                 });
                 await graph.clickHistoryTab("Profile");
                 await graph.clickHistoryProfileButton();
@@ -113,12 +133,23 @@ test.describe('Query history Tests', () => {
                 }).toEqual(profile);
                 await expect(graph.profileTree).not.toBeVisible();
 
-                await graph.selectQueryInHistory(historyQuery);
+                await graph.clickHistoryProfileButton();
+                await pendingProfileRequestStarted;
+                expect(pendingProfiledRequest).toEqual({ query });
                 await graph.closeHistoryPanel();
+                releaseDraftProfileResponse();
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                        text: string;
+                        profile: string[];
+                    }>;
+                    return stored.find((entry) => entry.text === query)?.profile;
+                }).toEqual(draftProfile);
+
                 await graph.clickQueryHistoryButton();
                 await expect(graph.historyTab("Profile")).toBeEnabled();
                 await graph.clickHistoryTab("Profile");
-                await expect(graph.profileTree).toContainText("Records produced: 3");
+                await expect(graph.profileTree).toContainText("Records produced: 0");
 
                 const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
                     text: string;
@@ -130,11 +161,12 @@ test.describe('Query history Tests', () => {
                     graphName
                 });
                 expect(stored.find((entry) => entry.text === query)).toMatchObject({
-                    profile: [],
+                    profile: draftProfile,
                     graphName
                 });
             } finally {
                 releaseProfileResponse();
+                releaseDraftProfileResponse();
                 await browser.closeBrowser();
                 browserClosed = true;
             }

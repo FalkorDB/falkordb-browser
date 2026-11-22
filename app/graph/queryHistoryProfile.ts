@@ -79,12 +79,12 @@ export function retainPendingQueryHistoryProfileUpdates(
 ): QueryHistoryProfileUpdate[] {
     if (!isQueryLoading) return [];
 
-    return updates.filter(update => (
-        update.connectionEpoch === connectionEpoch
-        && !history.queries.some(query => (
+    return updates.filter(update => {
+        if (update.connectionEpoch !== connectionEpoch) return false;
+
+        const matchesTarget = (query: Query) => (
             query.timestamp === update.target.timestamp && query.text === update.target.text
-        ))
-        && history.currentQuery.timestamp === update.target.timestamp
-        && history.currentQuery.text === update.target.text
-    ));
+        );
+        return history.queries.some(matchesTarget) || matchesTarget(history.currentQuery);
+    });
 }
