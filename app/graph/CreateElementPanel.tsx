@@ -132,6 +132,7 @@ export default function CreateElementPanel(props: Props) {
 
     const handleClose = useCallback((e?: KeyboardEvent) => {
         if (e && e.key !== "Escape") return;
+        if (e?.defaultPrevented) return;
         setAttributes([]);
         setLabels([]);
         setNewKey("");
@@ -216,6 +217,7 @@ export default function CreateElementPanel(props: Props) {
     const handleSetKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, key: string) => {
         if (e.key === "Escape") {
             e.preventDefault();
+            e.stopPropagation();
             setEditable("");
             setEditVal("");
             setEditType("string");
@@ -256,8 +258,9 @@ export default function CreateElementPanel(props: Props) {
     };
 
     const handleAddKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.code === "Escape") {
+        if (e.key === "Escape") {
             e.preventDefault();
+            e.stopPropagation();
             setNewKey("");
             setNewVal("");
             setNewType("string");
@@ -293,6 +296,20 @@ export default function CreateElementPanel(props: Props) {
                     className="data-[state=unchecked]:bg-border"
                     checked={value as boolean}
                     onCheckedChange={(checked) => setValue(checked)}
+                    onKeyDown={(e) => {
+                        if (e.key !== "Escape") return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (actionType === "set") {
+                            setEditable("");
+                            setEditVal("");
+                            setEditType("string");
+                        } else {
+                            setNewKey("");
+                            setNewVal("");
+                            setNewType("string");
+                        }
+                    }}
                 />;
             case "number":
                 return <Input
@@ -335,6 +352,11 @@ export default function CreateElementPanel(props: Props) {
                 inTable
                 options={["string", "number", "boolean"]}
                 selectedValue={valueType}
+                onKeyDown={(e) => {
+                    if (e.key !== "Escape") return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                }}
                 setSelectedValue={(val) => {
                     const t = val as ValueType;
                     setType(t);

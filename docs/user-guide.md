@@ -54,6 +54,11 @@ set `LOAD_CSV_FILE_URI=false`.
 
 The editor's **Optimize** action uses the model and provider configuration selected
 in Settings, with an API key only for hosted providers.
+
+The Browser keeps saved chat API keys and their selection across reloads, even
+when it cannot infer a provider from the key format. These keys appear as
+**Unknown provider** in Settings.
+
 Before each analysis, optionally describe what to optimize, such as reducing scans
 or improving a specific join. This guidance is included only in that request's
 prompt and is not saved or reused. Leave it blank for a general review.
@@ -93,6 +98,13 @@ discarded when the destination's path, search, or hash differs from their source
 Submitted Chat input remains saved until the request succeeds; newer edits or an
 intentional clear take precedence over restoring a failed submission.
 Optimize failures close the dialog and show only a toast with the Settings action.
+
+## Adding and editing attributes
+
+In the Data panel, **Add Attribute** rejects keys already present on the selected
+node or relationship. To change an existing value, edit its row instead. The
+check uses the currently loaded data, so rerun the query if another client may
+have changed the element.
 
 ## Graph operation ownership
 
@@ -143,3 +155,5 @@ preceding value, including zero. Load-time configuration values remain read-only
 
 Custom expiration dates use the selected local calendar day, ending at
 23:59:59.999 in the browser's timezone, including daylight-saving transitions.
+If copying a newly generated token fails, the token remains visible so you can
+select and copy it manually.

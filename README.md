@@ -84,6 +84,11 @@ Open [http://localhost:3000](http://localhost:3000) and connect to `localhost:63
 | [Mobile app](mobile/README.md) | iOS and Android shell over an AWS-hosted browser |
 | [From source](#build-and-run-from-source) | Contributing |
 
+Desktop installers are available from GitHub release notes; the browser does not
+provide direct installer downloads. macOS releases require configured signing and
+notarization credentials. For legacy unsigned releases and their security caveat,
+see the [desktop app notes](./desktop/README.md#legacy-macos-gatekeeper).
+
 ### Deploy to Kubernetes with Helm
 
 Deploy the FalkorDB Browser to your Kubernetes cluster using Helm:
