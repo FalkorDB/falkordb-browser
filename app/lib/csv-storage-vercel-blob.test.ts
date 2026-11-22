@@ -83,6 +83,104 @@ test("store, public read, and delete use the exact owner-scoped blob", async (t)
     assert.deepEqual(JSON.parse(calls[3].body), { urls: [blobUrl] });
 });
 
+test("cleanup paginates and deletes only expired, valid CSV objects", async (t) => {
+    const calls: { method: string | undefined; url: string; body: string }[] = [];
+    const cutoff = Date.parse("2026-01-02T00:00:00.000Z");
+    const otherOwner = "b".repeat(32);
+    const legacyPath = `coverage/csv/${otherOwner}/${KEY}.csv`;
+    const urlFor = (pathname: string) => `https://teststore.public.blob.vercel-storage.com/${pathname}`;
+    const blob = (pathname: string, uploadedAt: string) => ({
+        pathname,
+        url: urlFor(pathname),
+        downloadUrl: urlFor(pathname),
+        uploadedAt,
+        size: 12,
+        etag: "etag",
+    });
+    const server = createServer(async (req, res) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(Buffer.from(chunk));
+        const url = req.url ?? "";
+        calls.push({ method: req.method, url, body: Buffer.concat(chunks).toString("utf8") });
+        res.setHeader("content-type", "application/json");
+        if (req.method === "GET") {
+            const cursor = new URL(url, "http://localhost").searchParams.get("cursor");
+            res.end(JSON.stringify(cursor
+                ? { blobs: [blob(legacyPath, "2026-01-01T00:00:00.000Z")], hasMore: false }
+                : {
+                    blobs: [
+                        blob(PATHNAME, "2026-01-02T00:00:00.000Z"),
+                        blob(`coverage/csv/${OWNER}-22222222-2222-4222-8222-222222222222.csv`, "2026-01-03T00:00:00.000Z"),
+                        blob(`coverage/csv/${OWNER}-not-a-uuid.csv`, "2026-01-01T00:00:00.000Z"),
+                        blob(`coverage/csv/${OWNER}-33333333-3333-4333-8333-333333333333.csv`, "invalid"),
+                    ],
+                    cursor: "page-two",
+                    hasMore: true,
+                }));
+        } else {
+            res.end(JSON.stringify({}));
+        }
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    const previousUrl = process.env.VERCEL_BLOB_API_URL;
+    process.env.VERCEL_BLOB_API_URL = `http://127.0.0.1:${address.port}`;
+    t.after(async () => {
+        if (previousUrl === undefined) delete process.env.VERCEL_BLOB_API_URL;
+        else process.env.VERCEL_BLOB_API_URL = previousUrl;
+        await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    });
+
+    assert.equal(await new VercelBlobCsvStorage().cleanupExpired(cutoff), 2);
+    const listCalls = calls.filter((call) => call.method === "GET");
+    assert.equal(listCalls.length, 2);
+    assert.deepEqual(listCalls.map((call) => {
+        const params = new URL(call.url, "http://localhost").searchParams;
+        return [params.get("prefix"), params.get("limit"), params.get("cursor")];
+    }), [["coverage/csv/", "1000", null], ["coverage/csv/", "1000", "page-two"]]);
+    assert.deepEqual(
+        calls.filter((call) => call.method === "POST").map((call) => JSON.parse(call.body)),
+        [{ urls: [urlFor(PATHNAME)] }, { urls: [urlFor(legacyPath)] }]
+    );
+});
+
+test("read and delete do not accept a blob with a matching prefix but different pathname", async (t) => {
+    const requests: string[] = [];
+    const otherPath = `${PATHNAME}.backup`;
+    const server = createServer((req, res) => {
+        requests.push(`${req.method} ${req.url}`);
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({
+            blobs: [{
+                pathname: otherPath,
+                url: `https://teststore.public.blob.vercel-storage.com/${otherPath}`,
+                downloadUrl: `https://teststore.public.blob.vercel-storage.com/${otherPath}`,
+                uploadedAt: "2026-01-01T00:00:00.000Z",
+                size: 12,
+                etag: "etag",
+            }],
+            hasMore: false,
+        }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    const previousUrl = process.env.VERCEL_BLOB_API_URL;
+    process.env.VERCEL_BLOB_API_URL = `http://127.0.0.1:${address.port}`;
+    t.after(async () => {
+        if (previousUrl === undefined) delete process.env.VERCEL_BLOB_API_URL;
+        else process.env.VERCEL_BLOB_API_URL = previousUrl;
+        await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    });
+
+    const storage = new VercelBlobCsvStorage();
+    await assert.rejects(() => storage.resolveReadUrl(OWNER, KEY), /CSV temp object not found/);
+    await storage.delete(OWNER, KEY);
+    assert.equal(requests.length, 2);
+    assert.ok(requests.every((request) => request.startsWith("GET ")));
+});
+
 test("direct upload tokens restrict uploads to the owner, size, and allowed CSV types", async (t) => {
     const now = new Date("2026-01-01T00:00:00Z");
     t.mock.timers.enable({ apis: ["Date"], now });
