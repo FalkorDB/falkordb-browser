@@ -88,3 +88,26 @@ export function retainPendingQueryHistoryProfileUpdates(
         return history.queries.some(matchesTarget) || matchesTarget(history.currentQuery);
     });
 }
+
+export function reconcilePendingQueryHistoryProfileUpdates(
+    history: HistoryQuery,
+    updates: QueryHistoryProfileUpdate[],
+    connectionEpoch: number,
+    isQueryLoading: boolean,
+    setHistoryQuery: (update: (previous: HistoryQuery) => HistoryQuery) => void
+): { updated: HistoryQuery; retained: QueryHistoryProfileUpdate[] } {
+    const retained = retainPendingQueryHistoryProfileUpdates(
+        history,
+        updates,
+        connectionEpoch,
+        isQueryLoading
+    );
+    const ready = updates.filter(update => !retained.includes(update));
+    const updated = applyQueryHistoryProfileUpdates(history, ready, connectionEpoch);
+
+    if (ready.length > 0) {
+        setHistoryQuery(previous => applyQueryHistoryProfileUpdates(previous, ready, connectionEpoch));
+    }
+
+    return { updated, retained };
+}

@@ -5,6 +5,7 @@ import {
     applyQueryHistoryProfileUpdates,
     getSelectedHistoryQuery,
     isQueryHistoryTabEnabled,
+    reconcilePendingQueryHistoryProfileUpdates,
     retainPendingQueryHistoryProfileUpdates,
     updateQueryHistoryProfile
 } from "./queryHistoryProfile.ts";
@@ -97,6 +98,39 @@ describe("updateQueryHistoryProfile", () => {
             applyQueryHistoryProfileUpdates(afterCommit, retained, 4).queries,
             [{ ...stored, profile: ["profile"] }]
         );
+    });
+
+    it("reconciles a retained profile into history state after a query commits its captured snapshot", () => {
+        const stored = query("RETURN 3", 1);
+        const running = query("RETURN 5", 2);
+        const update = { target: stored, profile: ["profile"], connectionEpoch: 4 };
+        const profiledStored = { ...stored, profile: ["profile"] };
+        let currentHistory = history([profiledStored], running);
+        const updateState = (updater: (previous: HistoryQuery) => HistoryQuery) => {
+            currentHistory = updater(currentHistory);
+        };
+
+        const retained = reconcilePendingQueryHistoryProfileUpdates(
+            currentHistory,
+            [update],
+            4,
+            true,
+            updateState
+        ).retained;
+        assert.deepEqual(retained, [update]);
+        assert.deepEqual(currentHistory.queries, [profiledStored]);
+
+        currentHistory = history([stored], running);
+        const { updated } = reconcilePendingQueryHistoryProfileUpdates(
+            currentHistory,
+            retained,
+            4,
+            false,
+            updateState
+        );
+
+        assert.deepEqual(currentHistory.queries, [{ ...stored, profile: ["profile"] }]);
+        assert.deepEqual(updated.queries, currentHistory.queries);
     });
 
     it("does not retain deleted or stale profile updates during a query", () => {
