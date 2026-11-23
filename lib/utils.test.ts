@@ -958,6 +958,47 @@ describe("securedFetch session invalidation deferral", () => {
     }
   });
 
+  it("uses the default login callback when session storage cannot be read", async (t) => {
+    const origin = "http://localhost";
+    let callbackUrl: string | null = null;
+    let signOutAttempts = 0;
+    t.mock.method(console, "error", () => {});
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        location: { origin, href: `${origin}/graph` },
+        get sessionStorage() {
+          throw new DOMException("Storage access is blocked", "SecurityError");
+        },
+      },
+    });
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input), origin);
+      if (url.pathname === "/api/status") {
+        return new Response('{"message":"Expired","code":"SESSION_INVALID"}', {
+          status: 401,
+          headers: { "X-Session-Invalid": "1" },
+        });
+      }
+      if (url.pathname.endsWith("/csrf")) return Response.json({ csrfToken: "csrf" });
+      if (url.pathname.endsWith("/signout")) {
+        signOutAttempts += 1;
+        callbackUrl = new URLSearchParams(String(init?.body)).get("callbackUrl");
+        throw new Error("sign-out unavailable");
+      }
+      throw new Error(`Unexpected request: ${url.pathname}`);
+    };
+
+    const response = await securedFetch("/api/status", { method: "GET" }, noopToast, noopIndicator);
+    assert.equal(response.status, 401);
+    for (let i = 0; i < 100 && signOutAttempts === 0; i += 1) {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.equal(signOutAttempts, 1);
+    assert.equal(callbackUrl, "/login");
+    await new Promise(resolve => setImmediate(resolve));
+  });
+
   it("keeps the manual logout target when deferred sign-out returns an auth error and allows retry", async (t) => {
     const target = "/login?host=db.example.test&port=6380&username=alice&tls=true&signedOut=true";
     const origin = "http://localhost";
@@ -1038,6 +1079,7 @@ describe("securedFetch session invalidation deferral", () => {
       release(true);
     }
   });
+
 });
 
 type MockEventSourceInstance = {

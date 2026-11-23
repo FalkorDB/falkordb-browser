@@ -4,6 +4,7 @@ import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
+import HeaderComponent from "../logic/POM/headerComponent";
 import { user } from '../config/user.json';
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
@@ -109,6 +110,53 @@ test.describe('@Config Settings users tests', () => {
         await expect.poll(mock.saves).toBe(1);
         const body = { role: user.ReadOnly, keys: ["analytics:*"] };
         expect(mock.requests).toEqual([{ method: "PATCH", body }, { method: "PATCH", body }]);
+    });
+
+    test("@admin Escape outside a dialog on the Users tab navigates back", async () => {
+        const header = await browser.createNewPage(HeaderComponent);
+        const page = await browser.getPage();
+        await browser.navigateTo(urls.graphUrl);
+        await header.clickOnSettingsBtn();
+        await new SettingsUsersPage(page).navigateToUserTab();
+
+        await page.locator("body").press("Escape");
+
+        await expect(page).toHaveURL(urls.graphUrl);
+    });
+
+    test("@admin Manual sign out falls back when session storage is blocked", async () => {
+        const header = await browser.createNewPage(HeaderComponent);
+        const page = await browser.getPage();
+        const callbackUrls: string[] = [];
+        const consoleErrors: string[] = [];
+        page.on("console", message => {
+            if (message.type() === "error") consoleErrors.push(message.text());
+        });
+        await browser.navigateTo(urls.graphUrl);
+        await page.route("**/api/auth/signout*", async route => {
+            const callbackUrl = new URLSearchParams(route.request().postData() ?? "").get("callbackUrl");
+            if (!callbackUrl) throw new Error("Sign-out request did not include a callback URL");
+            callbackUrls.push(callbackUrl);
+            await page.context().clearCookies();
+            await route.fulfill({ json: { url: new URL(callbackUrl, route.request().url()).toString() } });
+        });
+        await page.evaluate(() => {
+            Object.defineProperty(window, "sessionStorage", {
+                configurable: true,
+                get() {
+                    throw new DOMException("Storage access is blocked", "SecurityError");
+                },
+            });
+        });
+
+        await header.Logout();
+
+        const currentUrl = new URL(page.url());
+        expect(currentUrl.pathname).toBe("/login");
+        expect(currentUrl.searchParams.get("signedOut")).toBe("true");
+        expect(callbackUrls).toEqual(["/login?signedOut=true"]);
+        expect(consoleErrors.some(message => message.includes("Failed to read the password reauthentication redirect"))).toBe(true);
+        expect(consoleErrors.some(message => message.includes("Failed to clear the password reauthentication redirect"))).toBe(true);
     });
 
     for (const { aclSaveStatus, signOutFails, signOutFailure, sessionStorageUnavailable, manualLogoutAfterFailure, manualLogoutFailsOnce, signOutResponseOriginMismatch } of [
