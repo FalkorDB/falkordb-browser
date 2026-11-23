@@ -520,15 +520,27 @@ test.describe(`@tls TLS Login tests`, () => {
         let testError: unknown;
         try {
             await test.step("establish the temporary user's mTLS connection", async () => {
-                await inspector.connect();
-                expect(await signIn("", true, defaultEndpoint)).toMatchObject({ user: { username: "default" } });
-                const createUser = await request.post("/api/user", {
-                    data: { username, role: "Admin", password: initialPassword, keys: ["*"] },
+                await test.step("connect the mTLS inspector", async () => {
+                    await inspector.connect();
                 });
-                expect(createUser.status()).toBe(201);
-                expect((await signOut()).ok()).toBe(true);
-                expect(await signIn(initialPassword, true)).toMatchObject({ user: { username } });
-                await expect.poll(countUserConnections).toBeGreaterThan(0);
+                await test.step("sign in as the default user", async () => {
+                    expect(await signIn("", true, defaultEndpoint)).toMatchObject({ user: { username: "default" } });
+                });
+                await test.step("create the temporary mTLS user", async () => {
+                    const createUser = await request.post("/api/user", {
+                        data: { username, role: "Admin", password: initialPassword, keys: ["*"] },
+                    });
+                    expect(createUser.status()).toBe(201);
+                });
+                await test.step("sign out the default user", async () => {
+                    expect((await signOut()).ok()).toBe(true);
+                });
+                await test.step("sign in as the temporary mTLS user", async () => {
+                    expect(await signIn(initialPassword, true)).toMatchObject({ user: { username } });
+                });
+                await test.step("confirm the temporary user's connection", async () => {
+                    await expect.poll(countUserConnections).toBeGreaterThan(0);
+                });
             });
 
             const handoffCookieValue = await test.step("change the password and preserve the handoff after a failed login", async () => {
