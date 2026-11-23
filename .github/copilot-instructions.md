@@ -45,19 +45,20 @@ npm run generate:grammar  # regenerate the parser from lib/falkordb-cypher/gener
 Desktop / mobile: `cd desktop && npm test` / `cd mobile && npm test` (also `npm run lint`).
 Before opening a PR run at least `npm run lint`, `npx tsc --noEmit` and `npm run test:coverage`.
 
-## Testing and coverage — the bar is ≥ 80%
+## Testing and coverage — the bar is ≥ 95% (CI enforces 85%)
 
 CI measures coverage over **every source file** (`app/`, `lib/`, `components/`, `auth.ts`,
 `proxy.ts`, desktop and mobile shells; not tests, `.d.ts` or `lib/falkordb-cypher/generated/`)
 across unit, smoke, e2e, desktop and mobile tests, merged by Codecov. Branch protection
-requires **80%** for the whole codebase (`coverage/project`) **and** for the lines a PR
+requires **85%** for the whole codebase (`coverage/project`) **and** for the lines a PR
 changes (`coverage/patch`). Details: README "Testing", `.github/scripts/coverage-gate.mjs`.
+That is the floor; your own bar is **95%** for the lines you change.
 
 Rules for every change:
 
 1. **Every behavior change ships with meaningful tests** that fail without it. Aim for
    100% of touched lines and at least 95% Codecov patch coverage; the current enforced
-   floor is 80%. Check the finalized `coverage/patch` result when available, and explain
+   floor is 85%. Check the finalized `coverage/patch` result when available, and explain
    uncovered lines or unavailable coverage rather than claiming the target was met.
    Do not game coverage (no assertion-free tests or coverage-ignore directives to dodge real logic).
 2. **Put logic where it is testable.** Extract decisions out of `.tsx` components and
@@ -188,8 +189,9 @@ workflows pin actions by commit SHA — keep that when editing `.github/workflow
 
 ### A PR is ready only when
 
-1. CI is green, including `coverage/project` and `coverage/patch` (≥ 80%) and build, with
+1. CI is green, including `coverage/project` and `coverage/patch` (≥ 85%) and build, with
    **no dangling tests**: none failing, flaky or newly skipped, and none passing only on retry (rule 8 above).
+   Patch coverage must also reach **95%**, above what CI enforces.
 2. **Every AI review comment is resolved and answered** (CodeRabbit, Copilot code review,
    Codecov, etc. — see `.coderabbit.yaml`). For each thread either fix it and reply with what
    changed (commit SHA), or reply with a concrete reason it does not apply; then resolve the

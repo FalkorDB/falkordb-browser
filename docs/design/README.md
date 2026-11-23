@@ -11,7 +11,7 @@ top when the work has shipped.
 Goal — one paragraph: what outcome, for whom.
 Problem today — what a user or developer experiences now.
 Mechanism — the design, naming real files/symbols (prefer symbols over line numbers).
-Tests — unit / smoke / e2e plan, and how the ≥ 80% coverage bar is met.
+Tests — unit / smoke / e2e plan, and how the ≥ 95% patch coverage bar is met.
 Risks and deferred — what is intentionally left out and why.
 ```
 
