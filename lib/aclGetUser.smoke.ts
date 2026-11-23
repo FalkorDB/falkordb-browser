@@ -16,6 +16,16 @@ import aclGetUser from "./aclGetUser.ts";
 
 const ENABLED = process.env.FALKORDB_SMOKE === "1";
 const URL = process.env.FALKORDB_URL ?? "redis://localhost:6379";
+const REDACTED_URL = (() => {
+    try {
+        const parsed = new globalThis.URL(URL);
+        if (parsed.username) parsed.username = "***";
+        if (parsed.password) parsed.password = "***";
+        return parsed.toString();
+    } catch {
+        return URL.replace(/\/\/[^@]+@/, "//***:***@");
+    }
+})();
 
 test(
     "aclGetUser detects admin, unknown and non-admin users on a live server",
@@ -25,7 +35,7 @@ test(
         try {
             db = await FalkorDB.connect({ url: URL });
         } catch (error) {
-            assert.fail(`FALKORDB_SMOKE=1 but could not connect to ${URL}: ${(error as Error).message}`);
+            assert.fail(`FALKORDB_SMOKE=1 but could not connect to ${REDACTED_URL}: ${(error as Error).message}`);
         }
 
         const connection = await db.connection;
