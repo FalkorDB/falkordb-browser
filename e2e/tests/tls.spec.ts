@@ -527,7 +527,7 @@ test.describe(`@tls TLS Login tests`, () => {
             expect(handoffCookie?.httpOnly).toBe(true);
             if (!handoffCookie) throw new Error("Password reauthentication handoff cookie was not set");
             expect((await signOut()).ok()).toBe(true);
-            expect((await signIn(`${password}-wrong`, false)).user).toBeUndefined();
+            expect((await signIn(`${password}-wrong`, false))?.user).toBeUndefined();
             expect((await request.storageState()).cookies.some(
                 cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookie.value,
             )).toBe(true);
@@ -552,7 +552,7 @@ test.describe(`@tls TLS Login tests`, () => {
                         },
                     });
                     expect(response.ok()).toBe(true);
-                    return (await (await contender.get("/api/auth/session")).json()).user;
+                    return (await (await contender.get("/api/auth/session")).json())?.user;
                 }));
                 expect(sessions.filter(session => session?.username === username)).toHaveLength(1);
             } finally {
@@ -576,7 +576,7 @@ test.describe(`@tls TLS Login tests`, () => {
                     },
                 });
                 expect(replay.ok()).toBe(true);
-                expect((await (await replayRequest.get("/api/auth/session")).json()).user).toBeUndefined();
+                expect((await (await replayRequest.get("/api/auth/session")).json())?.user).toBeUndefined();
             } finally {
                 await replayRequest.dispose();
             }
