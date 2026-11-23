@@ -4,7 +4,7 @@
 
 ## Checklist
 
-- [ ] Tests added/updated; `npm run lint`, `npx tsc --noEmit`, `npm run test:coverage` pass; patch coverage ≥ 85%
+- [ ] Tests added/updated; `npm run lint`, `npx tsc --noEmit`, `npm run test:coverage` pass; patch coverage ≥ 95% (CI enforces 85%)
 - [ ] Docs updated (README / swagger spec (enforced for API routes) / `.env.local.template` / Helm) — or not needed
 - [ ] Design doc in `docs/design/` created/updated — or not needed
 - [ ] Code is concise, efficient and clear (no dead code, duplication or speculative options)
