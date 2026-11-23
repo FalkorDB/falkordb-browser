@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { NextResponse } from "next/server.js";
 
 const routeUrl = new URL("./route.ts", import.meta.url).href;
 const authModule = "data:text/javascript,export async function getSessionFromRequest(request) { return globalThis.__connectionsRouteTest.getSession(request); } export async function listSessionConnections(id) { return globalThis.__connectionsRouteTest.list(id); } export async function addSessionConnection(id, connection) { return globalThis.__connectionsRouteTest.add(id, connection); }";

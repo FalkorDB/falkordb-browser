@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server.js";
 
 const rootRoute = new URL("./route.ts", import.meta.url).href;
 const userRoute = import.meta.resolve("./[user]/route.ts");
+const saveRoute = new URL("./save/route.ts", import.meta.url).href;
 const authModule = "data:text/javascript,export async function getClient(request) { return globalThis.__userRouteTestSession(request); }";
 
 declare global {
@@ -24,7 +25,7 @@ registerHooks({
         return nextResolve(specifier, context);
     },
     load(url, context, nextLoad) {
-        if ([rootRoute, userRoute].includes(url)) {
+        if ([rootRoute, userRoute, saveRoute].includes(url)) {
             const source = ts.transpileModule(readFileSync(new URL(url), "utf8"), {
                 fileName: fileURLToPath(url),
                 compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, inlineSourceMap: true, inlineSources: true },
@@ -37,6 +38,7 @@ registerHooks({
 
 const root = await import("./route.ts");
 const single = await import("./[user]/route.ts");
+const save = await import("./save/route.ts");
 const params = { params: Promise.resolve({ user: "alice" }) };
 const request = (method: string, body?: string) => new NextRequest("http://localhost/api/user", {
     method,
@@ -57,6 +59,7 @@ function session(overrides: object = {}, role = "Admin") {
             aclGetUser: async (name: string) => { calls.push(["aclGetUser", name]); return null; },
             aclSetUser: async (name: string, rules: string[]) => { calls.push(["aclSetUser", name, rules]); },
             aclDelUser: async (name: string) => { calls.push(["aclDelUser", name]); },
+            aclSave: async () => { calls.push(["aclSave"]); },
             ...overrides,
         }) },
     });
@@ -67,6 +70,7 @@ const mutations = [
     () => root.POST(request("POST", json({ username: "alice", password: "pass", role: "Admin" }))),
     () => root.DELETE(request("DELETE", json({ users: [{ username: "alice" }] }))),
     () => single.PATCH(request("PATCH", json({ role: "Admin" })), params),
+    () => save.POST(request("POST")),
 ];
 
 test("lists users, recognized roles, key patterns and unknown roles", async () => {
@@ -169,6 +173,14 @@ test("deletes all requested users", async () => {
     ]);
 });
 
+test("saves ACL changes to disk for an admin", async () => {
+    const calls = session();
+    const response = await save.POST(request("POST"));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { message: "ACL saved to disk" });
+    assert.deepEqual(calls, [["configGet", "falkordbe.ldap_servers"], ["aclSave"]]);
+});
+
 test("rejects invalid bodies and unknown roles without ACL mutations", async (t) => {
     t.mock.method(console, "error", () => {});
     const cases = [
@@ -198,6 +210,7 @@ test("reports database failures from listing, writing and deleting", async (t) =
         [{ aclSetUser: fail }, mutations[0]],
         [{ aclDelUser: fail }, mutations[1]],
         [{ aclSetUser: fail }, mutations[2]],
+        [{ aclSave: fail }, mutations[3]],
     ] as const;
     for (const [overrides, operation] of cases) {
         session(overrides);
