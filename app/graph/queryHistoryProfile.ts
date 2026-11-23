@@ -107,8 +107,14 @@ export function reconcilePendingQueryHistoryProfileUpdates(
     updates: QueryHistoryProfileUpdate[],
     connectionEpoch: number,
     isQueryLoading: boolean,
-    setHistoryQuery: (update: (previous: HistoryQuery) => HistoryQuery) => void
-): { updated: HistoryQuery; retained: QueryHistoryProfileUpdate[] } {
+    setHistoryQuery: (update: (previous: HistoryQuery) => HistoryQuery) => void,
+    storedQueryHistory: string | null
+): {
+    updated: HistoryQuery;
+    retained: QueryHistoryProfileUpdate[];
+    persistedQueries?: Query[];
+    storageError?: unknown;
+} {
     const retained = retainPendingQueryHistoryProfileUpdates(
         history,
         updates,
@@ -122,5 +128,29 @@ export function reconcilePendingQueryHistoryProfileUpdates(
         setHistoryQuery(previous => applyQueryHistoryProfileUpdates(previous, ready, connectionEpoch));
     }
 
-    return { updated, retained };
+    let storedQueries: unknown;
+    try {
+        storedQueries = storedQueryHistory ? JSON.parse(storedQueryHistory) : [];
+    } catch (storageError) {
+        return { updated, retained, storageError };
+    }
+
+    if (!Array.isArray(storedQueries)) {
+        return {
+            updated,
+            retained,
+            storageError: new TypeError("Stored query history must be an array")
+        };
+    }
+
+    return {
+        updated,
+        retained,
+        persistedQueries: applyQueryHistoryProfileUpdatesToStoredQueries(
+            history,
+            storedQueries as Query[],
+            updates,
+            connectionEpoch
+        )
+    };
 }

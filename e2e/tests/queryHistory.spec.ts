@@ -173,6 +173,115 @@ test.describe('Query history Tests', () => {
         });
     });
 
+    test(`@admin a profile result persists when another query commits while it is in flight`, async () => {
+        const graphName = getRandomString('queryhistory-profile-race');
+        const queryA = "RETURN 3";
+        const queryB = "RETURN 5";
+        const profile = ["Results | Records produced: 3"];
+        const history = [{
+            text: queryA,
+            explain: [],
+            profile: [],
+            graphName,
+            timestamp: Date.now(),
+            status: "Success" as const,
+            elementsCount: 0,
+            fav: false
+        }];
+
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            let releaseProfileResponse = () => {};
+            let releaseQueryResponse = () => {};
+            try {
+                await apicalls.addGraph(graphName);
+                const graph = await browser.createNewPage(QueryHistory);
+                const page = await browser.getPage();
+                await page.addInitScript((queries) => {
+                    localStorage.setItem("localhost:6379:default:query history", JSON.stringify(queries));
+                }, history);
+                await browser.navigateTo(urls.graphUrl);
+                await browser.setPageToFullScreen();
+                await graph.selectGraphByName(graphName);
+                await graph.insertQuery(queryB);
+                await graph.clickQueryHistoryButton();
+                await graph.selectQueryInHistory(queryA);
+                await graph.clickHistoryTab("Profile");
+
+                let notifyProfileRequest = () => {};
+                const profileRequestStarted = new Promise<void>((resolve) => {
+                    notifyProfileRequest = resolve;
+                });
+                const profileResponseGate = new Promise<void>((resolve) => {
+                    releaseProfileResponse = resolve;
+                });
+                await page.route("**/api/graph/*/profile", async (route) => {
+                    if (route.request().postDataJSON().query === queryA) {
+                        notifyProfileRequest();
+                        await profileResponseGate;
+                        await route.fulfill({ json: { result: profile } });
+                    } else {
+                        await route.continue();
+                    }
+                });
+                await graph.clickHistoryProfileButton();
+                await profileRequestStarted;
+
+                await graph.closeHistoryPanel();
+                let notifyQueryRequest = () => {};
+                const queryRequestStarted = new Promise<void>((resolve) => {
+                    notifyQueryRequest = resolve;
+                });
+                const queryResponseGate = new Promise<void>((resolve) => {
+                    releaseQueryResponse = resolve;
+                });
+                await page.route(
+                    (url) => url.pathname === `/api/graph/${encodeURIComponent(graphName)}`,
+                    async (route) => {
+                        if (route.request().method() === "POST" && route.request().postData()?.includes(queryB)) {
+                            notifyQueryRequest();
+                            await queryResponseGate;
+                        }
+                        await route.continue();
+                    }
+                );
+                const runningQuery = graph.clickRunQuery(false);
+                await queryRequestStarted;
+                releaseProfileResponse();
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                        text: string;
+                        profile: string[];
+                    }>;
+                    return stored.find((entry) => entry.text === queryA)?.profile;
+                }).toEqual(profile);
+                await graph.clickQueryHistoryButton();
+                await graph.selectQueryInHistory(queryA);
+                await graph.clickHistoryTab("Profile");
+                await expect(graph.profileTree).toContainText("Records produced: 3");
+                await graph.closeHistoryPanel();
+
+                releaseQueryResponse();
+                await runningQuery;
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{ text: string }>;
+                    return stored.some((entry) => entry.text === queryB);
+                }).toBe(true);
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                        text: string;
+                        profile: string[];
+                    }>;
+                    return stored.find((entry) => entry.text === queryA)?.profile;
+                }).toEqual(profile);
+            } finally {
+                releaseProfileResponse();
+                releaseQueryResponse();
+                await browser.closeBrowser();
+                browserClosed = true;
+            }
+        });
+    });
+
     test(`@admin The history Metadata tab stays open and shows the query statistics`, async () => {
         const graphName = getRandomString('queryhistory');
         await apicalls.addGraph(graphName);

@@ -7,7 +7,6 @@ import { Monaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import { Download, History, Info, ListChecks, ListX, Star, StarX, Trash2, X } from "lucide-react";
 import { cn, getConnectionEpoch, getTheme, Query } from "@/lib/utils";
-import { getStatsLines } from "@/lib/queryStats";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,7 +25,7 @@ import PaginationList from "../components/PaginationList";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext, AiFixContext } from "../components/provider";
 import useQueryPreflight from "../components/useQueryPreflight";
 import { Explain, Metadata, Profile } from "./MetadataView";
-import { getSelectedHistoryQuery } from "./queryHistoryProfile";
+import { getSelectedHistoryQuery, isQueryHistoryTabEnabled } from "./queryHistoryProfile";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
 
@@ -316,12 +315,10 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
         }
     };
 
-    const isTabEnabled = useCallback((tabName: Tab) => {
-        if (tabName === "text") return true;
-        if (tabName === "metadata") return !!selectedHistoryQuery && getStatsLines(selectedHistoryQuery).length > 0;
-        if (tabName === "explain") return !!selectedHistoryQuery && selectedHistoryQuery.explain.length > 0;
-        return !!selectedHistoryQuery;
-    }, [selectedHistoryQuery]);
+    const isTabEnabled = useCallback(
+        (tabName: Tab) => isQueryHistoryTabEnabled(historyQuery, tabName),
+        [historyQuery]
+    );
 
     useEffect(() => {
         // Keep users on the text tab even when the query is empty so they can type a new query.

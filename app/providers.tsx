@@ -37,7 +37,7 @@ import { DemoLoadOutcome } from "./components/Tutorial";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDimension, normalizeDirection, normalizeLayout, parseSharedTab } from "@/lib/useGraphTabs";
 import useIsMobile, { MOBILE_BREAKPOINT, useViewportResolved } from "@/lib/useIsMobile";
 import { DEFAULT_GRAPH_SORT_ORDER, normalizeGraphSortOrder, type GraphSortOrder } from "@/lib/graphSortOrder";
-import { applyQueryHistoryProfileUpdatesToStoredQueries, reconcilePendingQueryHistoryProfileUpdates, updateQueryHistoryProfile, type QueryHistoryProfileUpdate } from "./graph/queryHistoryProfile";
+import { reconcilePendingQueryHistoryProfileUpdates, updateQueryHistoryProfile, type QueryHistoryProfileUpdate } from "./graph/queryHistoryProfile";
 import { TUTORIAL_DEMO_OWNERSHIP_KEY_PREFIX, completeTutorialDemoGraphSetup, getTutorialDemoReclaimableNames, isTutorialDemoGraphName, isTutorialDemoOwnerId, isTutorialDemoOwnershipExpired, parseTutorialDemoOwnership, pickTutorialDemoGraphNames, queueTutorialDemoRecovery, runTutorialDemoLoadOnce, waitForTutorialDemoLoad, TutorialDemoLoadPendingError, tutorialDemoOwnershipKey, type TutorialDemoOwnership } from "@/lib/tutorialDemoGraphs";
 
 /**
@@ -428,36 +428,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (pendingQueryProfiles.length === 0) return;
 
     const connectionEpoch = getConnectionEpoch();
-    let storedQueryHistory: string | null;
-    let storedQueries: Query[];
-    try {
-      storedQueryHistory = getConnectionItem("query history");
-      const parsedQueries: unknown = storedQueryHistory ? JSON.parse(storedQueryHistory) : [];
-      if (!Array.isArray(parsedQueries)) {
-        throw new TypeError("Stored query history must be an array");
-      }
-      storedQueries = parsedQueries as Query[];
-    } catch (error) {
-      console.error("Failed to parse query history before reconciling profiles", error);
-      return;
-    }
+    const storedQueryHistory = getConnectionItem("query history");
 
-    const { retained } = reconcilePendingQueryHistoryProfileUpdates(
+    const { retained, persistedQueries, storageError } = reconcilePendingQueryHistoryProfileUpdates(
       historyQuery,
       pendingQueryProfiles,
       connectionEpoch,
       loadingOwnerRef.current !== null,
-      setHistoryQuery
+      setHistoryQuery,
+      storedQueryHistory
     );
-    const persistedQueries = applyQueryHistoryProfileUpdatesToStoredQueries(
-      historyQuery,
-      storedQueries,
-      pendingQueryProfiles,
-      connectionEpoch
-    );
-    const serializedQueries = JSON.stringify(persistedQueries);
-    if ((storedQueryHistory !== null || retained.length > 0) && serializedQueries !== storedQueryHistory) {
-      setConnectionItem("query history", serializedQueries);
+    if (storageError !== undefined) {
+      console.error("Failed to parse query history while reconciling profiles", storageError);
+    } else if (persistedQueries && storedQueryHistory !== null) {
+      const serializedQueries = JSON.stringify(persistedQueries);
+      if (serializedQueries !== storedQueryHistory) {
+        setConnectionItem("query history", serializedQueries);
+      }
     }
     setPendingQueryProfiles(pending => {
       const remaining = [...retained, ...pending.slice(pendingQueryProfiles.length)];

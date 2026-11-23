@@ -116,7 +116,8 @@ describe("updateQueryHistoryProfile", () => {
             [update],
             4,
             true,
-            updateState
+            updateState,
+            JSON.stringify([profiledStored])
         ).retained;
         assert.deepEqual(retained, [update]);
         assert.deepEqual(currentHistory.queries, [profiledStored]);
@@ -127,11 +128,82 @@ describe("updateQueryHistoryProfile", () => {
             retained,
             4,
             false,
-            updateState
+            updateState,
+            JSON.stringify([stored])
         );
 
         assert.deepEqual(currentHistory.queries, [{ ...stored, profile: ["profile"] }]);
         assert.deepEqual(updated.queries, currentHistory.queries);
+    });
+
+    it("reconciles pending profiles even when stored history is malformed", () => {
+        const stored = query("RETURN 3", 1);
+        const current = query("RETURN 5", 2);
+        const update = { target: stored, profile: ["profile"], connectionEpoch: 4 };
+        let currentHistory = history([stored], current);
+        const updateState = (updater: (previous: HistoryQuery) => HistoryQuery) => {
+            currentHistory = updater(currentHistory);
+        };
+
+        const result = reconcilePendingQueryHistoryProfileUpdates(
+            currentHistory,
+            [update],
+            4,
+            false,
+            updateState,
+            "{not json"
+        );
+
+        assert.deepEqual(currentHistory.queries, [{ ...stored, profile: ["profile"] }]);
+        assert.deepEqual(result.retained, []);
+        assert.equal(result.persistedQueries, undefined);
+        assert.ok(result.storageError instanceof SyntaxError);
+    });
+
+    it("applies pending profiles without persisting malformed non-array storage", () => {
+        const stored = query("RETURN 3", 1);
+        const current = query("RETURN 5", 2);
+        const update = { target: stored, profile: ["profile"], connectionEpoch: 4 };
+        let currentHistory = history([stored], current);
+        const updateState = (updater: (previous: HistoryQuery) => HistoryQuery) => {
+            currentHistory = updater(currentHistory);
+        };
+
+        const result = reconcilePendingQueryHistoryProfileUpdates(
+            currentHistory,
+            [update],
+            4,
+            false,
+            updateState,
+            JSON.stringify({ text: stored.text })
+        );
+
+        assert.deepEqual(currentHistory.queries, [{ ...stored, profile: ["profile"] }]);
+        assert.deepEqual(result.retained, []);
+        assert.equal(result.persistedQueries, undefined);
+        assert.ok(result.storageError instanceof TypeError);
+    });
+
+    it("does not restore a missing history list while applying a current-query profile", () => {
+        const current = query("RETURN 5", 2);
+        const update = { target: current, profile: ["profile"], connectionEpoch: 4 };
+        let currentHistory = history([], current);
+        const updateState = (updater: (previous: HistoryQuery) => HistoryQuery) => {
+            currentHistory = updater(currentHistory);
+        };
+
+        const result = reconcilePendingQueryHistoryProfileUpdates(
+            currentHistory,
+            [update],
+            4,
+            false,
+            updateState,
+            null
+        );
+
+        assert.deepEqual(currentHistory.currentQuery.profile, ["profile"]);
+        assert.deepEqual(result.persistedQueries, []);
+        assert.equal(result.storageError, undefined);
     });
 
     it("does not restore a deleted row when reconciling profiles into the latest stored history", () => {
