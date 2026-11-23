@@ -121,6 +121,10 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.getByRole("dialog");
   }
 
+  private get editUserForm(): Locator {
+    return this.page.getByRole("dialog", { name: "Edit User" });
+  }
+
   private get errorToast(): Locator {
     return this.page.getByTestId("toast-destructive");
   }
@@ -319,8 +323,8 @@ export default class SettingsUsersPage extends BasePage {
   }
 
   async closeUserForm(): Promise<void> {
-    await this.userForm.press("Escape");
-    await waitForElementToNotBeVisible(this.userForm);
+    await this.editUserForm.press("Escape");
+    await waitForElementToNotBeVisible(this.editUserForm);
   }
 
   async isEditUserButtonEnabled(): Promise<boolean> {
@@ -432,6 +436,10 @@ export default class SettingsUsersPage extends BasePage {
 
   async isUserFormNotVisible(): Promise<boolean> {
     return waitForElementToNotBeVisible(this.userForm);
+  }
+
+  async isEditUserFormNotVisible(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.editUserForm);
   }
 
   async getErrorToastText(): Promise<string> {

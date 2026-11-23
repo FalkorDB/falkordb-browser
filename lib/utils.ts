@@ -14,7 +14,11 @@ import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMe
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 import { quoteCypherIdentifier } from "./cypher.ts";
 import { getActiveConnectionIdGlobal } from "./active-connection.ts";
-import { getPasswordChangeLogoutTarget } from "./password-change-notice.ts";
+import {
+  getPasswordChangeLogoutTarget,
+  getPasswordChangeSignOutTarget,
+  PASSWORD_CHANGE_LOGOUT_TARGET_KEY,
+} from "./password-change-notice.ts";
 import type { QueryStatistics } from "falkordb";
 import type { PropertyValue } from "./graphValues.ts";
 
@@ -864,14 +868,48 @@ function triggerSessionInvalidationSignOut(): void {
   if (sessionInvalidationInFlight) return;
   sessionInvalidationInFlight = true;
   let callbackUrl = "/login";
-  if (typeof window !== "undefined") {
+  let passwordChangeLogoutTarget: string | undefined;
+  const browserWindow = typeof window !== "undefined" ? window : undefined;
+  if (browserWindow) {
     try {
-      callbackUrl = getPasswordChangeLogoutTarget(window.sessionStorage, window.location.origin) ?? callbackUrl;
+      passwordChangeLogoutTarget = getPasswordChangeLogoutTarget(
+        browserWindow.sessionStorage,
+        browserWindow.location.origin,
+      );
+      callbackUrl = passwordChangeLogoutTarget ?? callbackUrl;
     } catch (error) {
       console.error("Failed to read the password reauthentication redirect:", error);
     }
   }
-  signOut({ callbackUrl }).catch(() => {
+
+  if (!browserWindow || !passwordChangeLogoutTarget) {
+    signOut({ callbackUrl }).catch(error => {
+      console.error("Failed to sign out after session invalidation:", error);
+      sessionInvalidationInFlight = false;
+    });
+    return;
+  }
+
+  signOut({ redirect: false, redirectTo: callbackUrl }).then(response => {
+    const signOutTarget = getPasswordChangeSignOutTarget(
+      response?.url,
+      passwordChangeLogoutTarget,
+      browserWindow.location.href,
+    );
+    if (!signOutTarget) {
+      console.error("Session invalidation sign-out did not confirm the password-change redirect");
+      sessionInvalidationInFlight = false;
+      return;
+    }
+
+    try {
+      browserWindow.sessionStorage.removeItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY);
+    } catch (error) {
+      console.error("Failed to clear the password reauthentication redirect:", error);
+    }
+    browserWindow.location.assign(signOutTarget);
+  }).catch(error => {
+    console.error("Failed to complete password reauthentication sign-out:", error);
     sessionInvalidationInFlight = false;
   });
 }

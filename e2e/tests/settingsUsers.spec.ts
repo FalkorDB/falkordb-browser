@@ -219,7 +219,7 @@ test.describe('@Config Settings users tests', () => {
                 expect(await settingsUsersPage.isEditKeyTagVisible("reports:*")).toBe(true);
                 if (manualLogoutAfterFailure) {
                     await settingsUsersPage.closeUserForm();
-                    expect(await settingsUsersPage.isUserFormNotVisible()).toBe(true);
+                    expect(await settingsUsersPage.isEditUserFormNotVisible()).toBe(true);
                     await page.getByTestId("logoutButton").click();
                     await page.getByTestId("logoutConfirm").click();
                     if (manualLogoutFailsOnce) {
@@ -280,7 +280,7 @@ test.describe('@Config Settings users tests', () => {
             }
             expect(updates).toEqual([{ role: user.ReadOnly, keys: ["reports:*"], password }]);
             expect(saveRequests).toBe(0);
-            expect(signOutRequests).toBe(1 + Number(manualLogoutAfterFailure) + Number(manualLogoutFailsOnce));
+            expect(signOutRequests).toBe(1 + Number(Boolean(manualLogoutAfterFailure)) + Number(Boolean(manualLogoutFailsOnce)));
         });
     }
 

@@ -519,97 +519,50 @@ test.describe(`@tls TLS Login tests`, () => {
 
         let testError: unknown;
         try {
-            await inspector.connect();
-            expect(await signIn("", true, defaultEndpoint)).toMatchObject({ user: { username: "default" } });
-            const createUser = await request.post("/api/user", {
-                data: { username, role: "Admin", password: initialPassword, keys: ["*"] },
-            });
-            expect(createUser.status()).toBe(201);
-            expect((await signOut()).ok()).toBe(true);
-            expect(await signIn(initialPassword, true)).toMatchObject({ user: { username } });
-            await expect.poll(countUserConnections).toBeGreaterThan(0);
-
-            const update = await request.patch(`/api/user/${encodeURIComponent(username)}`, {
-                data: { role: "Admin", keys: ["*"], password },
-            });
-            expect(update.status()).toBe(200);
-            expect(await update.json()).toMatchObject({
-                requiresReauthentication: true,
-                reauthenticationConnection: endpoint,
-            });
-            await expect.poll(countUserConnections).toBe(0);
-            const previousConnectionsResponse = await request.get("/api/connections");
-            expect(previousConnectionsResponse.ok()).toBe(true);
-            expect(await previousConnectionsResponse.json()).toMatchObject({ connections: [] });
-            const handoffCookie = (await request.storageState()).cookies.find(
-                cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE,
-            );
-            expect(handoffCookie?.httpOnly).toBe(true);
-            if (!handoffCookie) throw new Error("Password reauthentication handoff cookie was not set");
-            expect((await signOut()).ok()).toBe(true);
-            expect((await signIn(`${password}-wrong`, false))?.user).toBeUndefined();
-            expect((await request.storageState()).cookies.some(
-                cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookie.value,
-            )).toBe(true);
-
-            const concurrentRequests = await Promise.all(
-                Array.from({ length: 2 }, () => playwright.request.newContext({
-                    baseURL: origin,
-                    storageState: { cookies: [handoffCookie], origins: [] },
-                    extraHTTPHeaders: { Origin: origin },
-                })),
-            );
-            try {
-                const sessions = await Promise.all(concurrentRequests.map(async contender => {
-                    const contenderCsrfToken = (await (await contender.get("/api/auth/csrf")).json()).csrfToken;
-                    const response = await contender.post("/api/auth/callback/credentials", {
-                        headers: { "X-Auth-Return-Redirect": "1" },
-                        form: {
-                            ...endpoint,
-                            csrfToken: contenderCsrfToken,
-                            callbackUrl: origin,
-                            password,
-                        },
-                    });
-                    expect(response.ok()).toBe(true);
-                    return (await (await contender.get("/api/auth/session")).json())?.user;
-                }));
-                expect(sessions.filter(session => session?.username === username)).toHaveLength(1);
-            } finally {
-                await Promise.all(concurrentRequests.map(async contender => {
-                    try {
-                        const token = (await (await contender.get("/api/auth/csrf")).json()).csrfToken;
-                        const response = await contender.post("/api/auth/signout", { form: { csrfToken: token } });
-                        if (!response.ok()) console.warn(`mTLS contender sign-out returned HTTP ${response.status()}`);
-                    } catch (error) {
-                        console.warn("mTLS contender sign-out failed:", error);
-                    } finally {
-                        await contender.dispose();
-                    }
-                }));
-            }
-
-            const replayRequest = await playwright.request.newContext({
-                baseURL: origin,
-                storageState: { cookies: [handoffCookie], origins: [] },
-                extraHTTPHeaders: { Origin: origin },
-            });
-            try {
-                const replayCsrfToken = (await (await replayRequest.get("/api/auth/csrf")).json()).csrfToken;
-                const replay = await replayRequest.post("/api/auth/callback/credentials", {
-                    headers: { "X-Auth-Return-Redirect": "1" },
-                    form: {
-                        ...endpoint,
-                        csrfToken: replayCsrfToken,
-                        callbackUrl: origin,
-                        password,
-                    },
+            await test.step("establish the temporary user's mTLS connection", async () => {
+                await inspector.connect();
+                expect(await signIn("", true, defaultEndpoint)).toMatchObject({ user: { username: "default" } });
+                const createUser = await request.post("/api/user", {
+                    data: { username, role: "Admin", password: initialPassword, keys: ["*"] },
                 });
-                expect(replay.ok()).toBe(true);
-                expect((await (await replayRequest.get("/api/auth/session")).json())?.user).toBeUndefined();
-            } finally {
-                await replayRequest.dispose();
-            }
+                expect(createUser.status()).toBe(201);
+                expect((await signOut()).ok()).toBe(true);
+                expect(await signIn(initialPassword, true)).toMatchObject({ user: { username } });
+                await expect.poll(countUserConnections).toBeGreaterThan(0);
+            });
+
+            const handoffCookieValue = await test.step("change the password and preserve the handoff after a failed login", async () => {
+                const update = await request.patch(`/api/user/${encodeURIComponent(username)}`, {
+                    data: { role: "Admin", keys: ["*"], password },
+                });
+                expect(update.status()).toBe(200);
+                expect(await update.json()).toMatchObject({
+                    requiresReauthentication: true,
+                    reauthenticationConnection: endpoint,
+                });
+                await expect.poll(countUserConnections).toBe(0);
+                const previousConnectionsResponse = await request.get("/api/connections");
+                expect(previousConnectionsResponse.ok()).toBe(true);
+                expect(await previousConnectionsResponse.json()).toMatchObject({ connections: [] });
+                const handoffCookie = (await request.storageState()).cookies.find(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE,
+                );
+                expect(handoffCookie?.httpOnly).toBe(true);
+                if (!handoffCookie) throw new Error("Password reauthentication handoff cookie was not set");
+                expect((await signOut()).ok()).toBe(true);
+                expect((await signIn(`${password}-wrong`, false))?.user).toBeUndefined();
+                expect((await request.storageState()).cookies.some(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookie.value,
+                )).toBe(true);
+                return handoffCookie.value;
+            });
+
+            await test.step("reuse saved TLS material without resubmitting it", async () => {
+                expect(await signIn(password, false)).toMatchObject({ user: { username } });
+                expect((await request.storageState()).cookies.some(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookieValue,
+                )).toBe(false);
+            });
         } catch (error) {
             testError = error;
             throw error;

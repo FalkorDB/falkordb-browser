@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { LoginError } from "./login-errors.ts";
 import { execFileSync } from "node:child_process";
 import { convertToCanvasData, createAbortError, deferSessionInvalidationSignOut, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, prepareArg, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
+import { PASSWORD_CHANGE_LOGOUT_TARGET_KEY } from "./password-change-notice.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
@@ -892,11 +893,14 @@ describe("getSSEGraphResult POST failures", () => {
 describe("securedFetch session invalidation deferral", () => {
   const originalFetch = globalThis.fetch;
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalBroadcastChannel = Object.getOwnPropertyDescriptor(globalThis, "BroadcastChannel");
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
     else Reflect.deleteProperty(globalThis, "window");
+    if (originalBroadcastChannel) Object.defineProperty(globalThis, "BroadcastChannel", originalBroadcastChannel);
+    else Reflect.deleteProperty(globalThis, "BroadcastChannel");
   });
 
   it("defers an invalid status poll during ACL persistence and uses the reauthentication redirect", async () => {
@@ -950,6 +954,87 @@ describe("securedFetch session invalidation deferral", () => {
     } finally {
       finishAclSave();
       await passwordChange;
+      release(true);
+    }
+  });
+
+  it("keeps the manual logout target when deferred sign-out returns an auth error and allows retry", async (t) => {
+    const target = "/login?host=db.example.test&port=6380&username=alice&tls=true&signedOut=true";
+    const origin = "http://localhost";
+    let currentHref = `${origin}/graph`;
+    const navigations: string[] = [];
+    let signOutRequests = 0;
+    const callbackUrls: string[] = [];
+    let storedTarget: string | null = target;
+    t.mock.method(console, "error", () => {});
+    Object.defineProperty(globalThis, "BroadcastChannel", { configurable: true, value: undefined });
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        location: {
+          get href() { return currentHref; },
+          set href(value: string) {
+            currentHref = value;
+            navigations.push(value);
+          },
+          origin,
+          assign(value: string) {
+            currentHref = new URL(value, origin).href;
+            navigations.push(currentHref);
+          },
+        },
+        sessionStorage: {
+          getItem: (key: string) => key === PASSWORD_CHANGE_LOGOUT_TARGET_KEY ? storedTarget : null,
+          removeItem: (key: string) => {
+            if (key === PASSWORD_CHANGE_LOGOUT_TARGET_KEY) storedTarget = null;
+          },
+        },
+      },
+    });
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input), origin);
+      if (url.pathname === "/api/status") {
+        return new Response('{"message":"Expired","code":"SESSION_INVALID"}', {
+          status: 401,
+          headers: { "X-Session-Invalid": "1" },
+        });
+      }
+      if (url.pathname.endsWith("/csrf")) return Response.json({ csrfToken: "csrf" });
+      if (url.pathname.endsWith("/signout")) {
+        signOutRequests += 1;
+        callbackUrls.push(new URLSearchParams(String(init?.body)).get("callbackUrl") ?? "");
+        const responseUrl = signOutRequests === 1
+          ? `${origin}/api/auth/error?error=Configuration`
+          : `${origin}${target}`;
+        return Response.json({ url: responseUrl });
+      }
+      throw new Error(`Unexpected request: ${url.pathname}`);
+    };
+
+    const release = deferSessionInvalidationSignOut();
+    try {
+      const response = await securedFetch("/api/status", { method: "GET" }, noopToast, noopIndicator);
+      assert.equal(response.status, 401);
+      assert.equal(signOutRequests, 0);
+
+      release();
+      for (let i = 0; i < 100 && signOutRequests === 0; i += 1) {
+        await new Promise(resolve => setImmediate(resolve));
+      }
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(signOutRequests, 1);
+      assert.deepEqual(navigations, []);
+      assert.equal(storedTarget, target);
+
+      await securedFetch("/api/status", { method: "GET" }, noopToast, noopIndicator);
+      for (let i = 0; i < 100 && signOutRequests < 2; i += 1) {
+        await new Promise(resolve => setImmediate(resolve));
+      }
+      assert.equal(signOutRequests, 2);
+      assert.deepEqual(callbackUrls, [target, target]);
+      assert.deepEqual(navigations, [`${origin}${target}`]);
+      assert.equal(storedTarget, null);
+    } finally {
       release(true);
     }
   });
