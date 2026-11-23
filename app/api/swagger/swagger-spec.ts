@@ -3013,7 +3013,7 @@ const swaggerSpec = {
                   },
                   password: {
                     type: "string",
-                    description: "New password for the user (optional, omit to keep current password). Must be at least 8 characters with uppercase, lowercase, digit, and special character."
+                    description: "New password for the user (optional, omit to keep current password). Must be at least 8 characters with uppercase, lowercase, digit, and special character. The literal \"undefined\" is rejected as a missing-credential sentinel."
                   }
                 },
                 required: ["role"]
@@ -3033,47 +3033,53 @@ const swaggerSpec = {
             content: {
               "application/json": {
                 schema: {
-                  type: "object",
                   oneOf: [
                     {
+                      type: "object",
                       properties: {
+                        message: {
+                          type: "string",
+                          example: "User role updated"
+                        },
                         requiresReauthentication: { type: "boolean", enum: [false] }
                       },
-                      required: ["requiresReauthentication"]
+                      required: ["message", "requiresReauthentication"],
+                      additionalProperties: false
                     },
                     {
-                      properties: {
-                        requiresReauthentication: { type: "boolean", enum: [true] }
-                      },
-                      required: ["requiresReauthentication", "aclSaveStatus", "reauthenticationConnection"]
-                    }
-                  ],
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "User role updated"
-                    },
-                    requiresReauthentication: {
-                      type: "boolean",
-                      description: "True when the current user's own password was changed"
-                    },
-                    aclSaveStatus: {
-                      type: "string",
-                      enum: ["saved", "failed", "unknown"],
-                      description: "When reauthentication is required, reports whether ACL changes were saved; unknown means the ACL SAVE outcome could not be confirmed and the server may have completed the save"
-                    },
-                    reauthenticationConnection: {
                       type: "object",
-                      description: "When reauthentication is required, the database connection to use for the next sign-in. TLS material is retained server-side in a short-lived HttpOnly handoff; the user must enter the new password.",
-                      required: ["host", "port", "username", "tls"],
                       properties: {
-                        host: { type: "string" },
-                        port: { type: "integer" },
-                        username: { type: "string" },
-                        tls: { type: "boolean" }
-                      }
+                        message: {
+                          type: "string",
+                          example: "User role updated"
+                        },
+                        requiresReauthentication: { type: "boolean", enum: [true] },
+                        aclSaveStatus: {
+                          type: "string",
+                          enum: ["saved", "failed", "unknown"],
+                          description: "When reauthentication is required, reports whether ACL changes were saved; unknown means the ACL SAVE outcome could not be confirmed and the server may have completed the save"
+                        },
+                        reauthenticationConnection: {
+                          type: "object",
+                          description: "When reauthentication is required, the database connection to use for the next sign-in. TLS material is retained server-side in a short-lived HttpOnly handoff; the user must enter the new password.",
+                          required: ["host", "port", "username", "tls"],
+                          properties: {
+                            host: { type: "string" },
+                            port: { type: "integer" },
+                            username: { type: "string" },
+                            tls: { type: "boolean" }
+                          }
+                        }
+                      },
+                      required: [
+                        "message",
+                        "requiresReauthentication",
+                        "aclSaveStatus",
+                        "reauthenticationConnection"
+                      ],
+                      additionalProperties: false
                     }
-                  }
+                  ]
                 }
               }
             }

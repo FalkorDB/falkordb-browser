@@ -3,6 +3,8 @@ import test from "node:test";
 import {
     consumePasswordChangeLogoutTarget,
     consumePasswordChangeNotice,
+    getPasswordChangePersistenceWarning,
+    getPasswordChangeSignOutTarget,
     PASSWORD_CHANGE_LOGOUT_TARGET_KEY,
     PASSWORD_CHANGE_NOTICE_KEY,
     writePasswordChangeLogoutTarget,
@@ -54,6 +56,27 @@ test("removes and rejects an unsupported notice", () => {
 
     assert.equal(consumePasswordChangeNotice(storage), undefined);
     assert.equal(storage.getItem(PASSWORD_CHANGE_NOTICE_KEY), null);
+});
+
+test("accepts a sign-out callback on the configured auth origin and uses the local target", () => {
+    const target = "/login?host=db.example.test&port=6380&username=alice&tls=true&signedOut=true";
+
+    assert.equal(
+        getPasswordChangeSignOutTarget(`http://localhost:3000${target}`, target, "http://127.0.0.1:3000"),
+        target
+    );
+    assert.equal(getPasswordChangeSignOutTarget("/api/auth/error", target, "http://127.0.0.1:3000"), undefined);
+    assert.equal(getPasswordChangeSignOutTarget(undefined, target, "http://127.0.0.1:3000"), undefined);
+});
+
+test("never claims an ACL SAVE error proves changes stayed only in memory", () => {
+    for (const status of ["failed", "unknown"] satisfies AclSaveStatus[]) {
+        const warning = getPasswordChangePersistenceWarning(status);
+        assert.match(warning, /could not confirm/);
+        assert.doesNotMatch(warning, /only in memory/);
+    }
+
+    assert.equal(getPasswordChangePersistenceWarning("saved"), "");
 });
 
 test("keeps the password reauthentication target for manual logout without allowing external redirects", () => {

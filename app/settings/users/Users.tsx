@@ -4,7 +4,12 @@ import { useEffect, useState, useContext, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { CreateUser, User, type UpdateUserResponse } from "@/app/api/user/model";
 import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
-import { writePasswordChangeLogoutTarget, writePasswordChangeNotice } from "@/lib/password-change-notice";
+import {
+    getPasswordChangePersistenceWarning,
+    getPasswordChangeSignOutTarget,
+    writePasswordChangeLogoutTarget,
+    writePasswordChangeNotice,
+} from "@/lib/password-change-notice";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { IndicatorContext, ConnectionContext } from "@/app/components/provider";
@@ -121,11 +126,7 @@ export default function Users() {
                 setRows(prev => prev.map((row): Row => row.cells[0].value === username
                     ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: updatedKeys.join(", ") }] }
                     : row));
-                const persistenceWarning = response.aclSaveStatus === "failed"
-                    ? " FalkorDB could not save the ACL changes to disk. The change is active only in memory."
-                    : response.aclSaveStatus === "unknown"
-                        ? " FalkorDB could not confirm whether the ACL changes were saved to disk; they may already be saved."
-                        : "";
+                const persistenceWarning = getPasswordChangePersistenceWarning(response.aclSaveStatus);
                 try {
                     writePasswordChangeNotice(window.sessionStorage, response.aclSaveStatus);
                 } catch (error) {
@@ -138,10 +139,15 @@ export default function Users() {
                 const callbackUrl = `/login?${params}`;
                 try {
                     const signOutResponse = await signOut({ redirect: false, redirectTo: callbackUrl });
-                    if (!signOutResponse?.url || new URL(signOutResponse.url, window.location.href).href !== new URL(callbackUrl, window.location.href).href) {
+                    const signOutTarget = getPasswordChangeSignOutTarget(
+                        signOutResponse?.url,
+                        callbackUrl,
+                        window.location.href,
+                    );
+                    if (!signOutTarget) {
                         throw new Error("The sign-out endpoint did not confirm the requested redirect");
                     }
-                    window.location.assign(signOutResponse.url);
+                    window.location.assign(signOutTarget);
                 } catch {
                     try {
                         writePasswordChangeLogoutTarget(window.sessionStorage, callbackUrl);
@@ -150,7 +156,7 @@ export default function Users() {
                     }
                     toast({
                         title: "Password changed",
-                        description: `Your password changed, but automatic sign-out failed. Sign out manually, then sign in with your new password.${persistenceWarning}`,
+                        description: `Your password changed, but automatic sign-out failed. Sign out manually, then sign in with your new password.${persistenceWarning ? ` ${persistenceWarning}` : ""}`,
                         variant: "warning",
                     });
                 }

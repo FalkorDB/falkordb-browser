@@ -3,6 +3,26 @@ import type { AclSaveStatus } from "../app/api/user/model.ts";
 export const PASSWORD_CHANGE_NOTICE_KEY = "passwordChangeNotice";
 export const PASSWORD_CHANGE_LOGOUT_TARGET_KEY = "passwordChangeLogoutTarget";
 
+export function getPasswordChangeSignOutTarget(
+    responseUrl: string | null | undefined,
+    callbackUrl: string,
+    currentUrl: string,
+): string | undefined {
+    if (!responseUrl) return undefined;
+
+    const response = new URL(responseUrl, currentUrl);
+    const callback = new URL(callbackUrl, currentUrl);
+    return response.pathname === callback.pathname && response.search === callback.search
+        ? callbackUrl
+        : undefined;
+}
+
+export function getPasswordChangePersistenceWarning(status: AclSaveStatus): string {
+    return status === "saved"
+        ? ""
+        : "FalkorDB could not confirm whether the ACL changes were saved to disk; they may already be saved.";
+}
+
 export function writePasswordChangeNotice(storage: Pick<Storage, "setItem">, status: AclSaveStatus): void {
     storage.setItem(PASSWORD_CHANGE_NOTICE_KEY, status);
 }

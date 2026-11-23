@@ -111,8 +111,8 @@ test.describe('@Config Settings users tests', () => {
         expect(mock.requests).toEqual([{ method: "PATCH", body }, { method: "PATCH", body }]);
     });
 
-    for (const { aclSaveStatus, signOutFails, signOutFailure, sessionStorageUnavailable, manualLogoutAfterFailure } of [
-        { aclSaveStatus: "saved", signOutFails: false, sessionStorageUnavailable: false },
+    for (const { aclSaveStatus, signOutFails, signOutFailure, sessionStorageUnavailable, manualLogoutAfterFailure, signOutResponseOriginMismatch } of [
+        { aclSaveStatus: "saved", signOutFails: false, sessionStorageUnavailable: false, signOutResponseOriginMismatch: true },
         { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", sessionStorageUnavailable: false },
         { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", manualLogoutAfterFailure: true, sessionStorageUnavailable: false },
         { aclSaveStatus: "failed", signOutFails: false, sessionStorageUnavailable: false },
@@ -121,16 +121,14 @@ test.describe('@Config Settings users tests', () => {
         { aclSaveStatus: "unknown", signOutFails: true, signOutFailure: "network", sessionStorageUnavailable: false },
         { aclSaveStatus: "failed", signOutFails: false, sessionStorageUnavailable: true },
     ] as const) {
-        test(`@admin Settings reports ${aclSaveStatus} ACL persistence when ${signOutFails ? "automatic sign-out fails" : "reauthenticating"}${manualLogoutAfterFailure ? " then manually signing out" : ""}${sessionStorageUnavailable ? " with blocked session storage" : ""}`, async () => {
+        test(`@admin Settings reports ${aclSaveStatus} ACL persistence when ${signOutFails ? "automatic sign-out fails" : "reauthenticating"}${signOutResponseOriginMismatch ? " with a different auth origin" : ""}${manualLogoutAfterFailure ? " then manually signing out" : ""}${sessionStorageUnavailable ? " with blocked session storage" : ""}`, async () => {
             const username = getRandomString("selfPassword");
             const password = "NewPassword1!";
             const connection = { host: "remote.example.test", port: 6380, username, tls: true };
             const handoffReference = `opaque-${username}`;
-            const persistenceWarning = aclSaveStatus === "failed"
-                ? "FalkorDB could not save the ACL changes to disk. The change is active only in memory."
-                : aclSaveStatus === "unknown"
-                    ? "FalkorDB could not confirm whether the ACL changes were saved to disk; they may already be saved."
-                    : "";
+            const persistenceWarning = aclSaveStatus === "saved"
+                ? ""
+                : "FalkorDB could not confirm whether the ACL changes were saved to disk; they may already be saved.";
             const settingsUsersPage = await browser.createNewPage(SettingsUsersPage);
             const page = await browser.getPage();
             const updates: unknown[] = [];
@@ -187,6 +185,9 @@ test.describe('@Config Settings users tests', () => {
                     return;
                 }
                 const url = new URL(requestedCallbackUrl, route.request().url());
+                if (signOutResponseOriginMismatch) {
+                    url.hostname = url.hostname === "localhost" ? "127.0.0.1" : "localhost";
+                }
                 const handoffCookie = (await page.context().cookies()).find(cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE);
                 await page.context().clearCookies();
                 if (handoffCookie) await page.context().addCookies([handoffCookie]);

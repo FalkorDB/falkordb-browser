@@ -11,7 +11,7 @@ import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 import type { PreconfiguredConnectionInfo } from "@/lib/preconfiguredConnection";
 import type { AclSaveStatus } from "@/app/api/user/model";
-import { consumePasswordChangeNotice } from "@/lib/password-change-notice";
+import { consumePasswordChangeNotice, getPasswordChangePersistenceWarning } from "@/lib/password-change-notice";
 import Spinning from "@/app/components/ui/spinning";
 import Button from "@/app/components/ui/Button";
 import LoginForm, { LoginFormCredentials } from "./LoginForm";
@@ -245,14 +245,9 @@ export default function LoginPage() {
                     Your password was changed. Sign in again with your new password.
                   </p>
                 )}
-                {passwordChangeNotice === "failed" && (
+                {passwordChangeNotice && passwordChangeNotice !== "saved" && (
                   <p className="text-sm text-center text-amber-600" data-testid="aclSaveWarning">
-                    Your password was changed, but FalkorDB could not save the ACL changes to disk. The change is active only in memory.
-                  </p>
-                )}
-                {passwordChangeNotice === "unknown" && (
-                  <p className="text-sm text-center text-amber-600" data-testid="aclSaveWarning">
-                    Your password was changed, but FalkorDB could not confirm whether the ACL changes were saved to disk; they may already be saved.
+                      Your password was changed, but {getPasswordChangePersistenceWarning(passwordChangeNotice)}
                   </p>
                 )}
                 <LoginForm

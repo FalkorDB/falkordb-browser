@@ -55,22 +55,11 @@ describe("AI assistance OpenAPI documentation", () => {
 
 describe("User password update OpenAPI documentation", () => {
   it("documents when a user must sign in again after changing their own password", () => {
+    const requestBody = swaggerSpec.paths["/api/user/{user}"].patch.requestBody.content["application/json"].schema;
+    assert.match(String(requestBody.properties.password.description), /literal.*undefined/);
+
     const successResponse = swaggerSpec.paths["/api/user/{user}"].patch.responses["200"];
     const response = successResponse.content["application/json"].schema as JsonSchema;
-    const reauthenticationProperty = response.properties?.requiresReauthentication;
-    assert.equal(reauthenticationProperty?.type, "boolean");
-    assert.match(String(reauthenticationProperty?.description ?? ""), /current user's own password/);
-    assert.deepEqual(response.properties?.aclSaveStatus?.enum, ["saved", "failed", "unknown"]);
-    const connection = response.properties?.reauthenticationConnection;
-    assert.equal(connection?.type, "object");
-    assert.match(String(connection?.description ?? ""), /TLS material is retained server-side/);
-    assert.deepEqual(connection?.required, ["host", "port", "username", "tls"]);
-    assert.deepEqual(connection?.properties, {
-      host: { type: "string" },
-      port: { type: "integer" },
-      username: { type: "string" },
-      tls: { type: "boolean" },
-    });
     assert.equal(successResponse.headers?.["Set-Cookie"]?.schema?.type, "string");
     assert.match(successResponse.headers?.["Set-Cookie"]?.description ?? "", /browser session with an active connection/);
     assert.match(successResponse.headers?.["Set-Cookie"]?.description ?? "", /PAT self-updates may not set/);
@@ -82,10 +71,26 @@ describe("User password update OpenAPI documentation", () => {
     const reauthenticationVariant = variants.find(variant => variant.properties?.requiresReauthentication?.enum?.[0] === true);
     assert.ok(ordinary);
     assert.deepEqual(ordinary.properties?.requiresReauthentication, { type: "boolean", enum: [false] });
-    assert.deepEqual(ordinary.required, ["requiresReauthentication"]);
+    assert.deepEqual(ordinary.required, ["message", "requiresReauthentication"]);
+    assert.equal(ordinary.properties?.aclSaveStatus, undefined);
+    assert.equal(ordinary.properties?.reauthenticationConnection, undefined);
+    assert.equal(ordinary.additionalProperties, false);
     assert.ok(reauthenticationVariant);
     assert.deepEqual(reauthenticationVariant.properties?.requiresReauthentication, { type: "boolean", enum: [true] });
+    assert.deepEqual(reauthenticationVariant.properties?.aclSaveStatus?.enum, ["saved", "failed", "unknown"]);
+    const connection = reauthenticationVariant.properties?.reauthenticationConnection;
+    assert.equal(connection?.type, "object");
+    assert.match(String(connection?.description ?? ""), /TLS material is retained server-side/);
+    assert.deepEqual(connection?.required, ["host", "port", "username", "tls"]);
+    assert.deepEqual(connection?.properties, {
+      host: { type: "string" },
+      port: { type: "integer" },
+      username: { type: "string" },
+      tls: { type: "boolean" },
+    });
+    assert.equal(reauthenticationVariant.additionalProperties, false);
     assert.deepEqual(reauthenticationVariant.required, [
+      "message",
       "requiresReauthentication",
       "aclSaveStatus",
       "reauthenticationConnection",
