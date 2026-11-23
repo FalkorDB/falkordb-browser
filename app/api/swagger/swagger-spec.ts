@@ -4,7 +4,7 @@ const swaggerSpec = {
   info: {
     title: "FalkorDB Browser API",
     version: "1.4.6",
-    description: "REST API for FalkorDB Browser - Graph Database Management Interface",
+    description: "REST API for FalkorDB Browser - Graph Database Management Interface.\n\nThe former `/api/app-links` and `/api/app-download/android` endpoints have been removed. App installers are available through GitHub release notes.",
   },
   components: {
     securitySchemes: {

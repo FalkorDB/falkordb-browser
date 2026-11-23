@@ -6,7 +6,7 @@ applyTo: "app/api/route.{ts,tsx},app/api/**/route.{ts,tsx}"
 
 - Handlers that touch FalkorDB: `const session = await getClient(request); if (session instanceof NextResponse) return session;`.
   Connection-management and auth routes use `getSessionFromRequest` instead; public routes
-  (releases, app links, swagger) need neither.
+  (releases, swagger) need neither.
 - try/catch every handler and `console.error` the cause. Return JSON errors as
   `NextResponse.json({ message }, { status, headers: getCorsHeaders(request) })` (the dominant shape
   and the one `swagger-spec.ts` documents; match the sibling routes if they differ) with an

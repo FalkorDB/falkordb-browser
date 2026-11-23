@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import Input from "@/app/components/ui/Input";
 import { IndicatorContext } from "@/app/components/provider";
 import { securedFetch } from "@/lib/utils";
+import { copyText } from "@/lib/clipboard";
 import useIsMobile from "@/lib/useIsMobile";
 import { toLocalDateInputValue } from "@/lib/localDate";
 import { Copy, Plus, Trash2 } from "lucide-react";
@@ -215,8 +216,18 @@ export default function PersonalAccessTokens() {
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string) => {
+    const clipboard = navigator.clipboard;
+    const copied = await copyText(clipboard?.writeText?.bind(clipboard), text);
+    if (!copied) {
+      toast({
+        title: "Error",
+        description: "Failed to copy token. Select and copy it manually.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     toast({
       title: "Copied",
       description: "Token copied to clipboard",
