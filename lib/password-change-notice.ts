@@ -45,12 +45,11 @@ export function writePasswordChangeLogoutTarget(storage: Pick<Storage, "setItem"
     storage.setItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY, target);
 }
 
-export function consumePasswordChangeLogoutTarget(
-    storage: Pick<Storage, "getItem" | "removeItem">,
+export function getPasswordChangeLogoutTarget(
+    storage: Pick<Storage, "getItem">,
     origin: string,
 ): string | undefined {
     const target = storage.getItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY);
-    storage.removeItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY);
     if (!target) return undefined;
 
     try {
@@ -61,4 +60,13 @@ export function consumePasswordChangeLogoutTarget(
     } catch {
         return undefined;
     }
+}
+
+export function consumePasswordChangeLogoutTarget(
+    storage: Pick<Storage, "getItem" | "removeItem">,
+    origin: string,
+): string | undefined {
+    const target = getPasswordChangeLogoutTarget(storage, origin);
+    storage.removeItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY);
+    return target;
 }

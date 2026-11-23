@@ -14,6 +14,7 @@ import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMe
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 import { quoteCypherIdentifier } from "./cypher.ts";
 import { getActiveConnectionIdGlobal } from "./active-connection.ts";
+import { getPasswordChangeLogoutTarget } from "./password-change-notice.ts";
 import type { QueryStatistics } from "falkordb";
 import type { PropertyValue } from "./graphValues.ts";
 
@@ -838,11 +839,39 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
 
 // Guards against concurrent signOut calls when multiple in-flight requests hit an invalidated session.
 let sessionInvalidationInFlight = false;
+let sessionInvalidationDeferralCount = 0;
+let deferredSessionInvalidation = false;
+
+export function deferSessionInvalidationSignOut(): (discardPending?: boolean) => void {
+  sessionInvalidationDeferralCount += 1;
+  let released = false;
+  return (discardPending = false) => {
+    if (released) return;
+    released = true;
+    sessionInvalidationDeferralCount -= 1;
+    if (sessionInvalidationDeferralCount !== 0 || !deferredSessionInvalidation) return;
+
+    deferredSessionInvalidation = false;
+    if (!discardPending) triggerSessionInvalidationSignOut();
+  };
+}
 
 function triggerSessionInvalidationSignOut(): void {
+  if (sessionInvalidationDeferralCount > 0) {
+    deferredSessionInvalidation = true;
+    return;
+  }
   if (sessionInvalidationInFlight) return;
   sessionInvalidationInFlight = true;
-  signOut({ callbackUrl: "/login" }).catch(() => {
+  let callbackUrl = "/login";
+  if (typeof window !== "undefined") {
+    try {
+      callbackUrl = getPasswordChangeLogoutTarget(window.sessionStorage, window.location.origin) ?? callbackUrl;
+    } catch (error) {
+      console.error("Failed to read the password reauthentication redirect:", error);
+    }
+  }
+  signOut({ callbackUrl }).catch(() => {
     sessionInvalidationInFlight = false;
   });
 }

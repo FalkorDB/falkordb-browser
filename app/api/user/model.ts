@@ -112,3 +112,18 @@ export async function persistAclAfterPasswordChange(
     return "unknown";
   }
 }
+
+export async function persistAclAndRemovePreviousPasswordConnectionCredential(
+  shouldPersist: boolean,
+  saveAcl: () => Promise<unknown>,
+  onSaveError: (error: unknown) => void,
+  connectionId: string | undefined,
+  deleteToken: ((tokenId: string) => Promise<boolean>) | undefined,
+  onDeleteError: (error: unknown) => void,
+): Promise<AclSaveStatus | undefined> {
+  const status = await persistAclAfterPasswordChange(shouldPersist, saveAcl, onSaveError);
+  if (shouldPersist && deleteToken) {
+    await removePreviousPasswordConnectionCredential(connectionId, deleteToken, onDeleteError);
+  }
+  return status;
+}

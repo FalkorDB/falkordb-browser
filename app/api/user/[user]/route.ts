@@ -15,8 +15,7 @@ import {
   ROLE,
   getRoleWithKeys,
   requiresPasswordReauthentication,
-  removePreviousPasswordConnectionCredential,
-  persistAclAfterPasswordChange,
+  persistAclAndRemovePreviousPasswordConnectionCredential,
   type UpdateUserResponse,
 } from "../model";
 import { updateUser, validateBody } from "../../validate-body";
@@ -135,18 +134,13 @@ export async function PATCH(
         throw error;
       }
 
-      if (tokenStorage && user.connectionId) {
-        await removePreviousPasswordConnectionCredential(
-          user.connectionId,
-          connectionId => tokenStorage.deleteToken(connectionId),
-          error => console.error("Failed to remove the previous password credential:", error),
-        );
-      }
-
-      const aclSaveStatus = await persistAclAfterPasswordChange(
+      const aclSaveStatus = await persistAclAndRemovePreviousPasswordConnectionCredential(
         requiresReauthentication,
         () => connection.aclSave(),
         error => console.error("Failed to persist ACL after changing the current user's password:", error),
+        tokenStorage ? user.connectionId : undefined,
+        tokenStorage ? connectionId => tokenStorage.deleteToken(connectionId) : undefined,
+        error => console.error("Failed to remove the previous password credential:", error),
       );
       if (requiresReauthentication && user.connectionId) {
         await closeCachedConnection(sessionConnectionKey(user.id, user.connectionId));

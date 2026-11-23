@@ -2,7 +2,7 @@ import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { LoginError } from "./login-errors.ts";
 import { execFileSync } from "node:child_process";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, prepareArg, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
+import { convertToCanvasData, createAbortError, deferSessionInvalidationSignOut, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, prepareArg, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
@@ -723,9 +723,12 @@ describe("getSSEGraphResult POST failures", () => {
     else Reflect.deleteProperty(globalThis, "window");
   });
 
-  async function runPost(fetchImpl: typeof fetch, options: { query?: string; signal?: AbortSignal } = {}) {
+  async function runPost(fetchImpl: typeof fetch, options: { query?: string; signal?: AbortSignal; sessionStorage?: Pick<Storage, "getItem"> } = {}) {
     Object.defineProperty(globalThis, "window", {
-      configurable: true, value: { location: { href: "http://localhost/graph" } },
+      configurable: true, value: {
+        location: { href: "http://localhost/graph", origin: "http://localhost" },
+        sessionStorage: options.sessionStorage ?? { getItem: () => null },
+      },
     });
     globalThis.fetch = fetchImpl;
     const toasts: Array<Record<string, unknown>> = [];
@@ -821,6 +824,134 @@ describe("getSSEGraphResult POST failures", () => {
     assert.equal(signOutAttempts, 1);
     // Let the rejected sign-out release the in-flight guard before the next test.
     await new Promise(resolve => setImmediate(resolve));
+  });
+
+  it("defers invalid-session sign-out during password reauthentication and honors its saved target", async () => {
+    const target = "/login?host=db.example.test&port=6380&username=alice&tls=true&signedOut=true";
+    let signOutAttempts = 0;
+    let callbackUrl: string | null = null;
+    const release = deferSessionInvalidationSignOut();
+    const releaseSecond = deferSessionInvalidationSignOut();
+    try {
+      const { error } = await runPost(async (input, init) => {
+        const url = String(input);
+        if (url.includes("/api/graph/")) {
+          return new Response('{"message":"Expired","code":"SESSION_INVALID"}', { status: 401 });
+        }
+        if (url.endsWith("/csrf")) return Response.json({ csrfToken: "csrf" });
+        signOutAttempts += 1;
+        callbackUrl = new URLSearchParams(String(init?.body)).get("callbackUrl");
+        throw new Error("sign-out unavailable");
+      }, {
+        sessionStorage: {
+          getItem: key => key === "passwordChangeLogoutTarget" ? target : null,
+        },
+      });
+
+      assert.equal(error.message, "Expired");
+      assert.equal(signOutAttempts, 0);
+      release();
+      assert.equal(signOutAttempts, 0);
+      releaseSecond();
+      for (let i = 0; i < 100 && signOutAttempts === 0; i += 1) {
+        await new Promise(resolve => setImmediate(resolve));
+      }
+      assert.equal(signOutAttempts, 1);
+      assert.equal(callbackUrl, target);
+      await new Promise(resolve => setImmediate(resolve));
+    } finally {
+      release(true);
+      releaseSecond(true);
+    }
+  });
+
+  it("discards a deferred invalid-session sign-out when password reauthentication handles it", async () => {
+    let signOutAttempts = 0;
+    const release = deferSessionInvalidationSignOut();
+    try {
+      await runPost(async input => {
+        const url = String(input);
+        if (url.includes("/api/graph/")) {
+          return new Response('{"message":"Expired","code":"SESSION_INVALID"}', { status: 401 });
+        }
+        if (url.endsWith("/csrf")) return Response.json({ csrfToken: "csrf" });
+        signOutAttempts += 1;
+        throw new Error("sign-out unavailable");
+      });
+
+      assert.equal(signOutAttempts, 0);
+      release(true);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(signOutAttempts, 0);
+    } finally {
+      release(true);
+    }
+  });
+});
+
+describe("securedFetch session invalidation deferral", () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  });
+
+  it("defers an invalid status poll during ACL persistence and uses the reauthentication redirect", async () => {
+    const target = "/login?host=db.example.test&port=6380&username=alice&tls=true&signedOut=true";
+    let signOutAttempts = 0;
+    let callbackUrl: string | null = null;
+    let storedTarget: string | null = null;
+    let finishAclSave!: () => void;
+    const delayedAclSave = new Promise<void>(resolve => {
+      finishAclSave = resolve;
+    });
+    const passwordChange = delayedAclSave.then(() => {
+      storedTarget = target;
+    });
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        location: { href: "http://localhost/graph", origin: "http://localhost" },
+        sessionStorage: { getItem: (key: string) => key === "passwordChangeLogoutTarget" ? storedTarget : null },
+      },
+    });
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/api/status")) {
+        return new Response('{"message":"Expired","code":"SESSION_INVALID"}', {
+          status: 401,
+          headers: { "X-Session-Invalid": "1" },
+        });
+      }
+      if (url.endsWith("/csrf")) return Response.json({ csrfToken: "csrf" });
+      signOutAttempts += 1;
+      callbackUrl = new URLSearchParams(String(init?.body)).get("callbackUrl");
+      throw new Error("sign-out unavailable");
+    };
+
+    const release = deferSessionInvalidationSignOut();
+    try {
+      const response = await securedFetch("/api/status", { method: "GET" }, noopToast, noopIndicator);
+      assert.equal(response.status, 401);
+      assert.equal(signOutAttempts, 0);
+
+      finishAclSave();
+      await passwordChange;
+      release();
+      for (let i = 0; i < 100 && signOutAttempts === 0; i += 1) {
+        await new Promise(resolve => setImmediate(resolve));
+      }
+      assert.equal(signOutAttempts, 1);
+      assert.equal(callbackUrl, target);
+      await new Promise(resolve => setImmediate(resolve));
+    } finally {
+      finishAclSave();
+      await passwordChange;
+      release(true);
+    }
   });
 });
 

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
     consumePasswordChangeLogoutTarget,
     consumePasswordChangeNotice,
+    getPasswordChangeLogoutTarget,
     getPasswordChangePersistenceWarning,
     getPasswordChangeSignOutTarget,
     PASSWORD_CHANGE_LOGOUT_TARGET_KEY,
@@ -94,4 +95,13 @@ test("keeps the password reauthentication target for manual logout without allow
     assert.equal(consumePasswordChangeLogoutTarget(storage, "https://browser.example.test"), undefined);
     writePasswordChangeLogoutTarget(storage, "/login");
     assert.equal(consumePasswordChangeLogoutTarget(storage, "invalid origin"), undefined);
+});
+
+test("reads a valid manual logout target without consuming it", () => {
+  const storage = new MemoryStorage();
+  const target = "/login?host=db.example.test&port=6380&username=alice&tls=true&signedOut=true";
+  writePasswordChangeLogoutTarget(storage, target);
+
+  assert.equal(getPasswordChangeLogoutTarget(storage, "https://browser.example.test"), target);
+  assert.equal(storage.getItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY), target);
 });

@@ -318,6 +318,11 @@ export default class SettingsUsersPage extends BasePage {
     );
   }
 
+  async closeUserForm(): Promise<void> {
+    await this.userForm.press("Escape");
+    await waitForElementToNotBeVisible(this.userForm);
+  }
+
   async isEditUserButtonEnabled(): Promise<boolean> {
     return interactWhenVisible(this.editUserButton, (el) => el.isEnabled(), "edit user button");
   }

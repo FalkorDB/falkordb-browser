@@ -15,7 +15,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import useIsMobile, { MOBILE_BREAKPOINT } from "@/lib/useIsMobile";
-import { consumePasswordChangeLogoutTarget } from "@/lib/password-change-notice";
+import {
+    consumePasswordChangeLogoutTarget,
+    getPasswordChangeLogoutTarget,
+    getPasswordChangeSignOutTarget,
+} from "@/lib/password-change-notice";
 import Button from "./ui/Button";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
@@ -55,14 +59,26 @@ export default function Navbar({ showUDF }: Props) {
     const handleConfirmLogout = async () => {
         setLoggingOut(true);
         try {
-            await signOut({ redirect: false });
-            setLogoutDialogOpen(false);
-            // The marker stops a preconfigured connection logging the user straight back in.
-            let logoutTarget = "/login?signedOut=true";
+            let callbackUrl = "/login?signedOut=true";
             try {
-                logoutTarget = consumePasswordChangeLogoutTarget(window.sessionStorage, window.location.origin) ?? logoutTarget;
+                callbackUrl = getPasswordChangeLogoutTarget(window.sessionStorage, window.location.origin) ?? callbackUrl;
             } catch (error) {
                 console.error("Failed to read the password reauthentication redirect:", error);
+            }
+            const signOutResponse = await signOut({ redirect: false, redirectTo: callbackUrl });
+            const logoutTarget = getPasswordChangeSignOutTarget(
+                signOutResponse?.url,
+                callbackUrl,
+                window.location.href,
+            );
+            if (!logoutTarget) {
+                throw new Error("The sign-out endpoint did not confirm the requested redirect");
+            }
+            setLogoutDialogOpen(false);
+            try {
+                consumePasswordChangeLogoutTarget(window.sessionStorage, window.location.origin);
+            } catch (error) {
+                console.error("Failed to clear the password reauthentication redirect:", error);
             }
             router.push(logoutTarget);
         } catch {

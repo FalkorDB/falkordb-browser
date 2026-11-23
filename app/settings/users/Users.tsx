@@ -3,7 +3,7 @@
 import { useEffect, useState, useContext, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { CreateUser, User, type UpdateUserResponse } from "@/app/api/user/model";
-import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
+import { deferSessionInvalidationSignOut, prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
 import {
     getPasswordChangePersistenceWarning,
     getPasswordChangeSignOutTarget,
@@ -112,67 +112,74 @@ export default function Users() {
     };
 
     const handleEditUser = async (username: string, role: string, keys: string[], password?: string) => {
-        const result = await securedFetch(`api/user/${prepareArg(username)}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ role, keys, password })
-        }, toast, setIndicator);
+        const releaseInvalidationDeferral = password ? deferSessionInvalidationSignOut() : undefined;
+        let discardDeferredInvalidation = false;
+        try {
+            const result = await securedFetch(`api/user/${prepareArg(username)}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ role, keys, password })
+            }, toast, setIndicator);
 
-        if (result.ok) {
-            const response = await result.json() as UpdateUserResponse;
-            if (response.requiresReauthentication) {
-                const { host, port, username: loginUsername, tls } = response.reauthenticationConnection;
-                const updatedKeys = keys.length ? keys : ["*"];
-                setUsers(prev => prev.map(u => u.username === username ? { ...u, role, keys: updatedKeys } : u));
-                setRows(prev => prev.map((row): Row => row.cells[0].value === username
-                    ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: updatedKeys.join(", ") }] }
-                    : row));
-                const persistenceWarning = getPasswordChangePersistenceWarning(response.aclSaveStatus);
-                try {
-                    writePasswordChangeNotice(window.sessionStorage, response.aclSaveStatus);
-                } catch (error) {
-                    console.error("Failed to store password-change notice:", error);
-                }
-                const params = new URLSearchParams({
-                    host, port: String(port), username: loginUsername, tls: String(tls),
-                    signedOut: "true",
-                });
-                const callbackUrl = `/login?${params}`;
-                try {
-                    const signOutResponse = await signOut({ redirect: false, redirectTo: callbackUrl });
-                    const signOutTarget = getPasswordChangeSignOutTarget(
-                        signOutResponse?.url,
-                        callbackUrl,
-                        window.location.href,
-                    );
-                    if (!signOutTarget) {
-                        throw new Error("The sign-out endpoint did not confirm the requested redirect");
-                    }
-                    window.location.assign(signOutTarget);
-                } catch {
+            if (result.ok) {
+                const response = await result.json() as UpdateUserResponse;
+                if (response.requiresReauthentication) {
+                    const { host, port, username: loginUsername, tls } = response.reauthenticationConnection;
+                    const updatedKeys = keys.length ? keys : ["*"];
+                    setUsers(prev => prev.map(u => u.username === username ? { ...u, role, keys: updatedKeys } : u));
+                    setRows(prev => prev.map((row): Row => row.cells[0].value === username
+                        ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: updatedKeys.join(", ") }] }
+                        : row));
+                    const persistenceWarning = getPasswordChangePersistenceWarning(response.aclSaveStatus);
                     try {
-                        writePasswordChangeLogoutTarget(window.sessionStorage, callbackUrl);
+                        writePasswordChangeNotice(window.sessionStorage, response.aclSaveStatus);
                     } catch (error) {
-                        console.error("Failed to preserve the password reauthentication redirect:", error);
+                        console.error("Failed to store password-change notice:", error);
                     }
-                    toast({
-                        title: "Password changed",
-                        description: `Your password changed, but automatic sign-out failed. Sign out manually, then sign in with your new password.${persistenceWarning ? ` ${persistenceWarning}` : ""}`,
-                        variant: "warning",
+                    const params = new URLSearchParams({
+                        host, port: String(port), username: loginUsername, tls: String(tls),
+                        signedOut: "true",
                     });
+                    const callbackUrl = `/login?${params}`;
+                    try {
+                        const signOutResponse = await signOut({ redirect: false, redirectTo: callbackUrl });
+                        const signOutTarget = getPasswordChangeSignOutTarget(
+                            signOutResponse?.url,
+                            callbackUrl,
+                            window.location.href,
+                        );
+                        if (!signOutTarget) {
+                            throw new Error("The sign-out endpoint did not confirm the requested redirect");
+                        }
+                        window.location.assign(signOutTarget);
+                        discardDeferredInvalidation = true;
+                    } catch {
+                        try {
+                            writePasswordChangeLogoutTarget(window.sessionStorage, callbackUrl);
+                        } catch (error) {
+                            console.error("Failed to preserve the password reauthentication redirect:", error);
+                        }
+                        toast({
+                            title: "Password changed",
+                            description: `Your password changed, but automatic sign-out failed. Sign out manually, then sign in with your new password.${persistenceWarning ? ` ${persistenceWarning}` : ""}`,
+                            variant: "warning",
+                        });
+                    }
+                    return true;
                 }
-                return true;
+
+                setUsers(prev => prev.map(u => u.username === username ? { ...u, role, keys: keys || ["*"] } : u));
+                setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: keys.join(", ") || "*" }] } : row));
+                toast({
+                    title: "Success",
+                    description: `${username} updated successfully`,
+                });
+                await handleSaveUsers();
             }
 
-            setUsers(prev => prev.map(u => u.username === username ? { ...u, role, keys: keys || ["*"] } : u));
-            setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: keys.join(", ") || "*" }] } : row));
-            toast({
-                title: "Success",
-                description: `${username} updated successfully`,
-            });
-            await handleSaveUsers();
+            return result.ok;
+        } finally {
+            releaseInvalidationDeferral?.(discardDeferredInvalidation);
         }
-
-        return result.ok;
     };
 
     const checkedRows = rows.filter(row => row.checked);

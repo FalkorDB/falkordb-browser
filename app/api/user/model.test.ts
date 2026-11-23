@@ -6,6 +6,7 @@ import {
   extractKeysFromACL,
   requiresPasswordReauthentication,
   persistAclAfterPasswordChange,
+  persistAclAndRemovePreviousPasswordConnectionCredential,
   removePreviousPasswordConnectionCredential,
   ROLE,
 } from "./model.ts";
@@ -142,6 +143,49 @@ describe("persistAclAfterPasswordChange", () => {
     const status = await persistAclAfterPasswordChange(true, async () => { throw error; }, cause => { reported = cause; });
     assert.equal(status, "unknown");
     assert.equal(reported, error);
+  });
+});
+
+describe("persistAclAndRemovePreviousPasswordConnectionCredential", () => {
+  it("keeps the active credential valid for status polls while ACL SAVE is pending", async () => {
+    const activeCredentials = new Set(["connection-id"]);
+    let finishSave!: () => void;
+    const save = new Promise<void>(resolve => { finishSave = resolve; });
+    const update = persistAclAndRemovePreviousPasswordConnectionCredential(
+      true,
+      () => save,
+      () => assert.fail("unexpected ACL SAVE error"),
+      "connection-id",
+      async connectionId => {
+        activeCredentials.delete(connectionId);
+        return true;
+      },
+      () => assert.fail("unexpected credential cleanup error"),
+    );
+
+    const statusPoll = () => activeCredentials.has("connection-id") ? 200 : 401;
+    assert.equal(statusPoll(), 200);
+
+    finishSave();
+    assert.equal(await update, "saved");
+    assert.equal(statusPoll(), 401);
+  });
+
+  it("does not save or remove credentials when reauthentication is not required", async () => {
+    let saves = 0;
+    let deletions = 0;
+    const status = await persistAclAndRemovePreviousPasswordConnectionCredential(
+      false,
+      async () => { saves += 1; },
+      () => assert.fail("unexpected ACL SAVE error"),
+      "connection-id",
+      async () => { deletions += 1; return true; },
+      () => assert.fail("unexpected credential cleanup error"),
+    );
+
+    assert.equal(status, undefined);
+    assert.equal(saves, 0);
+    assert.equal(deletions, 0);
   });
 });
 

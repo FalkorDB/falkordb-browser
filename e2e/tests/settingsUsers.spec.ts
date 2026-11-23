@@ -8,7 +8,7 @@ import { user } from '../config/user.json';
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
 import { REAUTHENTICATION_HANDOFF_COOKIE } from "../../lib/reauthentication-handoff.ts";
-import { PASSWORD_CHANGE_NOTICE_KEY } from "../../lib/password-change-notice.ts";
+import { PASSWORD_CHANGE_LOGOUT_TARGET_KEY, PASSWORD_CHANGE_NOTICE_KEY } from "../../lib/password-change-notice.ts";
 import { createClient } from "@redis/client";
 
 // Serves `users` to GET /api/user, rejects the first create/edit with `rejection` and accepts the retry.
@@ -111,17 +111,18 @@ test.describe('@Config Settings users tests', () => {
         expect(mock.requests).toEqual([{ method: "PATCH", body }, { method: "PATCH", body }]);
     });
 
-    for (const { aclSaveStatus, signOutFails, signOutFailure, sessionStorageUnavailable, manualLogoutAfterFailure, signOutResponseOriginMismatch } of [
+    for (const { aclSaveStatus, signOutFails, signOutFailure, sessionStorageUnavailable, manualLogoutAfterFailure, manualLogoutFailsOnce, signOutResponseOriginMismatch } of [
         { aclSaveStatus: "saved", signOutFails: false, sessionStorageUnavailable: false, signOutResponseOriginMismatch: true },
         { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", sessionStorageUnavailable: false },
         { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", manualLogoutAfterFailure: true, sessionStorageUnavailable: false },
+        { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", manualLogoutAfterFailure: true, manualLogoutFailsOnce: true, sessionStorageUnavailable: false },
         { aclSaveStatus: "failed", signOutFails: false, sessionStorageUnavailable: false },
         { aclSaveStatus: "unknown", signOutFails: false, sessionStorageUnavailable: false },
         { aclSaveStatus: "failed", signOutFails: true, signOutFailure: "error-response", sessionStorageUnavailable: false },
         { aclSaveStatus: "unknown", signOutFails: true, signOutFailure: "network", sessionStorageUnavailable: false },
         { aclSaveStatus: "failed", signOutFails: false, sessionStorageUnavailable: true },
     ] as const) {
-        test(`@admin Settings reports ${aclSaveStatus} ACL persistence when ${signOutFails ? "automatic sign-out fails" : "reauthenticating"}${signOutResponseOriginMismatch ? " with a different auth origin" : ""}${manualLogoutAfterFailure ? " then manually signing out" : ""}${sessionStorageUnavailable ? " with blocked session storage" : ""}`, async () => {
+        test(`@admin Settings reports ${aclSaveStatus} ACL persistence when ${signOutFails ? "automatic sign-out fails" : "reauthenticating"}${signOutResponseOriginMismatch ? " with a different auth origin" : ""}${manualLogoutAfterFailure ? " then manually signing out" : ""}${manualLogoutFailsOnce ? " after a manual sign-out error" : ""}${sessionStorageUnavailable ? " with blocked session storage" : ""}`, async () => {
             const username = getRandomString("selfPassword");
             const password = "NewPassword1!";
             const connection = { host: "remote.example.test", port: 6380, username, tls: true };
@@ -170,7 +171,7 @@ test.describe('@Config Settings users tests', () => {
             });
             await page.route("**/api/auth/signout*", async route => {
                 signOutRequests += 1;
-                if (signOutFails && (!manualLogoutAfterFailure || signOutRequests === 1)) {
+                if (signOutFails && signOutRequests === 1) {
                     if (signOutFailure === "network") {
                         await route.abort("failed");
                     } else {
@@ -180,6 +181,11 @@ test.describe('@Config Settings users tests', () => {
                     return;
                 }
                 requestedCallbackUrl = new URLSearchParams(route.request().postData() ?? "").get("callbackUrl");
+                if (manualLogoutFailsOnce && signOutRequests === 2) {
+                    const origin = new URL(route.request().url()).origin;
+                    await route.fulfill({ json: { url: `${origin}/api/auth/error?error=Configuration` } });
+                    return;
+                }
                 if (!requestedCallbackUrl) {
                     await route.fulfill({ status: 400, json: { message: "Missing callback URL" } });
                     return;
@@ -212,8 +218,17 @@ test.describe('@Config Settings users tests', () => {
                 await expect.poll(() => settingsUsersPage.getEditSelectedRole()).toContain(user.ReadOnly);
                 expect(await settingsUsersPage.isEditKeyTagVisible("reports:*")).toBe(true);
                 if (manualLogoutAfterFailure) {
+                    await settingsUsersPage.closeUserForm();
+                    expect(await settingsUsersPage.isUserFormNotVisible()).toBe(true);
                     await page.getByTestId("logoutButton").click();
                     await page.getByTestId("logoutConfirm").click();
+                    if (manualLogoutFailsOnce) {
+                        await expect(page).toHaveURL(url => url.pathname === new URL(urls.settingsUrl).pathname);
+                        expect(await page.evaluate(key => window.sessionStorage.getItem(key), PASSWORD_CHANGE_LOGOUT_TARGET_KEY))
+                            .toBe(`/login?host=${connection.host}&port=${connection.port}&username=${username}&tls=true&signedOut=true`);
+                        await expect(page.getByTestId("logoutConfirm")).toBeVisible();
+                        await page.getByTestId("logoutConfirm").click();
+                    }
                     await expect(page).toHaveURL(url => url.pathname === "/login"
                         && url.searchParams.get("host") === connection.host
                         && url.searchParams.get("port") === String(connection.port)
@@ -265,7 +280,7 @@ test.describe('@Config Settings users tests', () => {
             }
             expect(updates).toEqual([{ role: user.ReadOnly, keys: ["reports:*"], password }]);
             expect(saveRequests).toBe(0);
-            expect(signOutRequests).toBe(1);
+            expect(signOutRequests).toBe(1 + Number(manualLogoutAfterFailure) + Number(manualLogoutFailsOnce));
         });
     }
 
