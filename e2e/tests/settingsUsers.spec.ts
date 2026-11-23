@@ -220,6 +220,7 @@ test.describe('@Config Settings users tests', () => {
                 if (manualLogoutAfterFailure) {
                     await settingsUsersPage.closeUserForm();
                     expect(await settingsUsersPage.isEditUserFormNotVisible()).toBe(true);
+                    await expect(page).toHaveURL(url => url.pathname === new URL(urls.settingsUrl).pathname);
                     await page.getByTestId("logoutButton").click();
                     await page.getByTestId("logoutConfirm").click();
                     if (manualLogoutFailsOnce) {

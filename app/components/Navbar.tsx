@@ -80,7 +80,7 @@ export default function Navbar({ showUDF }: Props) {
             } catch (error) {
                 console.error("Failed to clear the password reauthentication redirect:", error);
             }
-            router.push(logoutTarget);
+            window.location.assign(logoutTarget);
         } catch {
             toast({ title: "Failed to sign out", description: "Please try again.", variant: "destructive" });
         } finally {
