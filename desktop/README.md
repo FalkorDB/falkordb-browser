@@ -80,8 +80,9 @@ for the build machine. CI builds all three: `.github/workflows/desktop.yml`.
   `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
   The web build and server preparation run without these credentials; only the
   release credential check and macOS electron-builder packaging receive them.
-- **App icon:** electron-builder's default icon is used. Add `build/icon.png`
-  (512×512 or larger) and set `directories.buildResources: build`.
+- **App icon:** `build/icon.png` (1024×1024, from the falkordb.com favicon) is
+  the source electron-builder converts into the macOS, Windows and Linux icons.
+  Replace that file to change the icon.
 
 ## Legacy macOS Gatekeeper
 
