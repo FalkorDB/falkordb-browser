@@ -700,6 +700,60 @@ const swaggerSpec = {
         }
       }
     },
+    "/api/upload": {
+      post: {
+        tags: ["Graph"],
+        summary: "Stage a file for upload",
+        description: "Stages one file for the authenticated user. Non-dump files are limited to 5 MiB; dump restore is currently disabled.",
+        security: [{ bearerAuth: [] }, { sessionCookie: [] }, { sessionCookieSecure: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                required: ["file"],
+                properties: { file: { type: "string", format: "binary" } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "File staged successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["id", "path", "status"],
+                  properties: {
+                    id: { type: "string" },
+                    path: { type: "string" },
+                    status: { type: "integer", example: 200 },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Invalid multipart request or file" },
+          "401": { description: "Authentication failed" },
+          "403": { description: "Read-only access or dump restore disabled" },
+          "413": {
+            description: "File exceeds the upload size limit",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["error"],
+                  properties: { error: { type: "string", example: "File is too large." } },
+                },
+              },
+            },
+          },
+          "500": { description: "Failed to store or validate the upload" },
+        },
+      },
+    },
     "/api/graph": {
       get: {
         tags: ["Graph"],
