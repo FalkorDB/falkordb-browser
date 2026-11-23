@@ -850,11 +850,15 @@ test.describe('@Config Settings users tests', () => {
                 data: { role: "Admin", password: secondPassword },
             });
             expect(secondSelfEdit.status()).toBe(200);
-            expect(await getHandoffCookie()).toBeDefined();
+            const secondHandoffCookie = await getHandoffCookie();
+            if (!secondHandoffCookie) throw new Error("Second password reauthentication handoff cookie was not set");
             expect((await signOut()).ok()).toBe(true);
             expect(await signIn(newPassword, { ...endpoint, username: otherUser })).toMatchObject({
                 user: { username: otherUser },
             });
+            expect(await getHandoffCookie()).toMatchObject({ value: secondHandoffCookie.value });
+            expect((await signOut()).ok()).toBe(true);
+            expect(await signIn(secondPassword)).toMatchObject({ user: { username } });
             expect(await getHandoffCookie()).toBeUndefined();
         } finally {
             try {

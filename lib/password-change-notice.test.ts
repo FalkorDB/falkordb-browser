@@ -70,6 +70,12 @@ test("accepts a sign-out callback on the configured auth origin and uses the loc
     assert.equal(getPasswordChangeSignOutTarget(undefined, target, "http://127.0.0.1:3000"), undefined);
 });
 
+test("rejects an external callback target even when the response has the same path and query", () => {
+    const target = "https://attacker.example.test/login?host=db.example.test&port=6380&username=alice";
+
+    assert.equal(getPasswordChangeSignOutTarget(target, target, "https://browser.example.test"), undefined);
+});
+
 test("never claims an ACL SAVE error proves changes stayed only in memory", () => {
     for (const status of ["failed", "unknown"] satisfies AclSaveStatus[]) {
         const warning = getPasswordChangePersistenceWarning(status);

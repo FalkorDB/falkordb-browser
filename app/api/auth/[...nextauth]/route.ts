@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   readReauthenticationHandoffId,
   REAUTHENTICATION_HANDOFF_COOKIE,
+  REAUTHENTICATION_HANDOFF_PREFIX,
 } from "@/lib/reauthentication-handoff";
+import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { enableAutoNextAuthUrl, isRequestOriginTrusted, rejectUntrustedOrigin, shouldUseSecureCookies } from "../../utils";
 import { handlers } from "@/auth";
 
@@ -37,6 +39,16 @@ async function authHandler(request: NextRequest) {
   const method = request.method === "POST" ? handlers.POST : handlers.GET;
   const response = await method(request);
   if (!handoffReference || !(await isSuccessfulCredentialsCallback(request, response))) {
+    return response;
+  }
+
+  try {
+    const handoff = await StorageFactory.getStorage().fetchTokenById(
+      `${REAUTHENTICATION_HANDOFF_PREFIX}${handoffReference}`,
+    );
+    if (handoff) return response;
+  } catch (error) {
+    console.error("Failed to verify password reauthentication handoff consumption:", error);
     return response;
   }
 

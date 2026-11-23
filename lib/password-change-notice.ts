@@ -12,7 +12,10 @@ export function getPasswordChangeSignOutTarget(
 
     const response = new URL(responseUrl, currentUrl);
     const callback = new URL(callbackUrl, currentUrl);
-    return response.pathname === callback.pathname && response.search === callback.search
+    const current = new URL(currentUrl);
+    return callback.origin === current.origin
+        && response.pathname === callback.pathname
+        && response.search === callback.search
         ? callbackUrl
         : undefined;
 }
