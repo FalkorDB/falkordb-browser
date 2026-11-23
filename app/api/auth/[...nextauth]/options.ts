@@ -40,6 +40,7 @@ import {
 } from "../tokenUtils";
 import { authCredentials } from "../../validate-body";
 import { classifyLoginError } from "@/lib/login-errors";
+import aclGetUser from "@/lib/aclGetUser";
 
 class DatabaseCredentialsSignin extends CredentialsSignin {
   constructor(error: unknown) {
@@ -245,7 +246,7 @@ export async function newClient(
   const connection = await client.connection;
 
   try {
-    await connection.aclGetUser(credentials.username || "default");
+    await aclGetUser(connection, credentials.username || "default");
     return { role: "Admin", client };
   } catch (err) {
     if ((err as Error).message.startsWith("NOPERM")) {
