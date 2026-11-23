@@ -8,7 +8,7 @@
 # Codecov merges them per commit: a line any test runs is covered.
 #
 # The gate is not Codecov's: the Coverage status workflow posts
-# coverage/project and coverage/patch (80%, required by branch protection) once
+# coverage/project and coverage/patch (85%, required by branch protection) once
 # every coverage workflow of the commit has finished and Codecov has processed
 # its uploads (.github/scripts/coverage-gate.mjs). Codecov posts its statuses
 # whenever a pull request changes, before the tests are done, so they are off.
@@ -22,7 +22,7 @@ codecov:
 coverage:
   precision: 2
   round: down
-  range: "80...100"
+  range: "85...100"
 
   status:
     project: off
