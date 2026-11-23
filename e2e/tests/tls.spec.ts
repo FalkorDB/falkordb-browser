@@ -479,6 +479,7 @@ test.describe(`@tls TLS Login tests`, () => {
                 host: "localhost",
                 port: endpoint.port,
                 tls: true,
+                ...(process.env.SKIP_SERVER_IDENTITY_CHECK === "true" ? { checkServerIdentity: () => undefined } : {}),
                 ca: await readFile(path.join(process.cwd(), "tls", "ca.crt")),
                 cert: await readFile(path.join(process.cwd(), "tls", "client.crt")),
                 key: await readFile(path.join(process.cwd(), "tls", "client.key")),
