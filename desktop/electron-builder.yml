@@ -3,6 +3,7 @@ productName: FalkorDB Browser
 copyright: Copyright © FalkorDB
 directories:
   output: dist
+  buildResources: build
 # Keep filenames stable because the GitHub release notes link to these assets.
 artifactName: FalkorDB-Browser-${os}-${arch}.${ext}
 files:

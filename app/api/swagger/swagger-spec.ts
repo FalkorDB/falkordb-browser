@@ -2826,7 +2826,20 @@ const swaggerSpec = {
             }
           },
           "400": {
-            description: "Bad request - missing parameters"
+            description: "Bad request - invalid request body, or the user could not be created",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Invalid role"
+                    }
+                  }
+                }
+              }
+            }
           },
           "403": {
             description: "Forbidden - only Admin users can manage users, or users are managed by LDAP on this connection",
@@ -2845,7 +2858,20 @@ const swaggerSpec = {
             }
           },
           "409": {
-            description: "User already exists"
+            description: "User already exists",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "User alice already exists"
+                    }
+                  }
+                }
+              }
+            }
           },
           "500": {
             description: "Internal server error"
