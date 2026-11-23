@@ -227,6 +227,7 @@ test.describe('Query history Tests', () => {
                 await profileRequestStarted;
 
                 await graph.closeHistoryPanel();
+                await graph.insertQuery(queryB);
                 let notifyQueryRequest = () => {};
                 const queryRequestStarted = new Promise<void>((resolve) => {
                     notifyQueryRequest = resolve;
@@ -255,7 +256,7 @@ test.describe('Query history Tests', () => {
                     return stored.find((entry) => entry.text === queryA)?.profile;
                 }).toEqual(profile);
                 await graph.clickQueryHistoryButton();
-                await graph.selectQueryInHistory(queryA);
+                await expect(graph.historyTab("Profile")).toBeEnabled();
                 await graph.clickHistoryTab("Profile");
                 await expect(graph.profileTree).toContainText("Records produced: 3");
                 await graph.closeHistoryPanel();
