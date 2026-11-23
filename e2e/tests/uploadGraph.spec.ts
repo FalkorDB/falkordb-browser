@@ -333,6 +333,14 @@ test.describe("Upload API – /api/upload", () => {
     });
   }
 
+  test(`@admin Reject a Cypher file larger than 5 MiB`, async ({ request }) => {
+    const { status, body } = await apiCall.uploadFile(request, {
+      file: { ...cypherPart(), buffer: Buffer.alloc(5 * 1024 * 1024 + 1, "a") },
+    });
+    expect(status).toBe(413);
+    expect(body.error).toBe("File is too large.");
+  });
+
   test(`@readonly Validate a read-only user cannot upload a file`, async ({ request }) => {
     const { status, body } = await apiCall.uploadFile(request, { file: cypherPart() });
     expect(status).toBe(403);
