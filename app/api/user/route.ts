@@ -5,6 +5,7 @@ import { createUser, deleteUsers, validateBody } from "../validate-body";
 import { getCorsHeaders, corsPreflight } from "../utils";
 import rejectLdapManagedUsers from "./ldap-guard";
 import rejectNonAdmin from "./admin-guard";
+import aclGetUser from "@/lib/aclGetUser";
 
 export const OPTIONS = corsPreflight;
 
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
         throw new Error("Invalid role");
 
       try {
-        const user = await connection.aclGetUser(username);
+        const user = await aclGetUser(connection, username);
 
         if (user) {
           return NextResponse.json(
