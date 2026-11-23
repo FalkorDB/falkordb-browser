@@ -1,12 +1,10 @@
-/* eslint-disable @typescript-eslint/no-use-before-define */
-
 "use client";
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { CreateUser, User, type UpdateUserResponse } from "@/app/api/user/model";
 import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
-import { writePasswordChangeNotice } from "@/lib/password-change-notice";
+import { writePasswordChangeLogoutTarget, writePasswordChangeNotice } from "@/lib/password-change-notice";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { IndicatorContext, ConnectionContext } from "@/app/components/provider";
@@ -53,7 +51,6 @@ export default function Users() {
                 checked: false,
             })));
         })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeConnectionId]);
 
     const handleSaveUsers = useCallback(async () => {
@@ -146,6 +143,11 @@ export default function Users() {
                     }
                     window.location.assign(signOutResponse.url);
                 } catch {
+                    try {
+                        writePasswordChangeLogoutTarget(window.sessionStorage, callbackUrl);
+                    } catch (error) {
+                        console.error("Failed to preserve the password reauthentication redirect:", error);
+                    }
                     toast({
                         title: "Password changed",
                         description: `Your password changed, but automatic sign-out failed. Sign out manually, then sign in with your new password.${persistenceWarning}`,

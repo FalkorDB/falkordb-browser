@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { getClient } from "../../auth/[...nextauth]/options";
+import { closeCachedConnection, getClient, sessionConnectionKey } from "../../auth/[...nextauth]/options";
 import { decrypt } from "../../auth/encryption";
 import { storeEncryptedCredential } from "../../auth/tokenUtils";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
@@ -26,7 +26,6 @@ import rejectNonAdmin from "../admin-guard";
 
 export const OPTIONS = corsPreflight;
 
-// eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ user: string }> }
@@ -149,6 +148,9 @@ export async function PATCH(
         () => connection.aclSave(),
         error => console.error("Failed to persist ACL after changing the current user's password:", error),
       );
+      if (requiresReauthentication && user.connectionId) {
+        await closeCachedConnection(sessionConnectionKey(user.id, user.connectionId));
+      }
 
       const message = "User role updated";
       const response: UpdateUserResponse = requiresReauthentication ? {

@@ -1,6 +1,7 @@
 import test, { expect } from "@playwright/test";
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
+import { createClient } from "@redis/client";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
@@ -472,6 +473,17 @@ test.describe(`@tls TLS Login tests`, () => {
         const cert = (await readFile(path.join(process.cwd(), "tls", "client.crt"))).toString("base64");
         const key = (await readFile(path.join(process.cwd(), "tls", "client.key"))).toString("base64");
         const password = `New!${crypto.randomUUID()}`;
+        const inspector = createClient({
+            username: "default",
+            socket: {
+                host: "localhost",
+                port: endpoint.port,
+                tls: true,
+                ca: await readFile(path.join(process.cwd(), "tls", "ca.crt")),
+                cert: await readFile(path.join(process.cwd(), "tls", "client.crt")),
+                key: await readFile(path.join(process.cwd(), "tls", "client.key")),
+            },
+        });
         const request = await playwright.request.newContext({
             baseURL: origin,
             storageState: { cookies: [], origins: [] },
@@ -500,8 +512,14 @@ test.describe(`@tls TLS Login tests`, () => {
         const signOut = async () => request.post("/api/auth/signout", {
             form: { csrfToken: await csrfToken() },
         });
+        const countUserConnections = async () => {
+            const clients = await inspector.clientList();
+            return clients.filter(client => client.user === username).length;
+        };
 
+        let testError: unknown;
         try {
+            await inspector.connect();
             expect(await signIn("", true, defaultEndpoint)).toMatchObject({ user: { username: "default" } });
             const createUser = await request.post("/api/user", {
                 data: { username, role: "Admin", password: initialPassword, keys: ["*"] },
@@ -509,6 +527,7 @@ test.describe(`@tls TLS Login tests`, () => {
             expect(createUser.status()).toBe(201);
             expect((await signOut()).ok()).toBe(true);
             expect(await signIn(initialPassword, true)).toMatchObject({ user: { username } });
+            await expect.poll(countUserConnections).toBeGreaterThan(0);
 
             const update = await request.patch(`/api/user/${encodeURIComponent(username)}`, {
                 data: { role: "Admin", keys: ["*"], password },
@@ -518,6 +537,7 @@ test.describe(`@tls TLS Login tests`, () => {
                 requiresReauthentication: true,
                 reauthenticationConnection: endpoint,
             });
+            await expect.poll(countUserConnections).toBe(0);
             const previousConnectionsResponse = await request.get("/api/connections");
             expect(previousConnectionsResponse.ok()).toBe(true);
             expect(await previousConnectionsResponse.json()).toMatchObject({ connections: [] });
@@ -556,7 +576,17 @@ test.describe(`@tls TLS Login tests`, () => {
                 }));
                 expect(sessions.filter(session => session?.username === username)).toHaveLength(1);
             } finally {
-                await Promise.all(concurrentRequests.map(contender => contender.dispose()));
+                await Promise.all(concurrentRequests.map(async contender => {
+                    try {
+                        const token = (await (await contender.get("/api/auth/csrf")).json()).csrfToken;
+                        const response = await contender.post("/api/auth/signout", { form: { csrfToken: token } });
+                        if (!response.ok()) console.warn(`mTLS contender sign-out returned HTTP ${response.status()}`);
+                    } catch (error) {
+                        console.warn("mTLS contender sign-out failed:", error);
+                    } finally {
+                        await contender.dispose();
+                    }
+                }));
             }
 
             const replayRequest = await playwright.request.newContext({
@@ -580,6 +610,9 @@ test.describe(`@tls TLS Login tests`, () => {
             } finally {
                 await replayRequest.dispose();
             }
+        } catch (error) {
+            testError = error;
+            throw error;
         } finally {
             try {
                 const response = await signOut();
@@ -587,7 +620,25 @@ test.describe(`@tls TLS Login tests`, () => {
             } catch (error) {
                 console.warn("mTLS reauthentication sign-out failed:", error);
             } finally {
-                await request.dispose();
+                try {
+                    const adminSession = await signIn("", true, defaultEndpoint);
+                    expect(adminSession).toMatchObject({ user: { username: "default" } });
+                    const deletion = await request.delete("/api/user", { data: { users: [{ username }] } });
+                    expect(deletion.status()).toBe(200);
+                    const save = await request.post("/api/user/save");
+                    if (!save.ok()) console.warn(`mTLS test-user ACL cleanup could not be persisted: HTTP ${save.status()}`);
+                    const adminSignOut = await signOut();
+                    if (!adminSignOut.ok()) console.warn(`mTLS cleanup admin sign-out returned HTTP ${adminSignOut.status()}`);
+                } catch (cleanupError) {
+                    console.error(`Failed to remove temporary mTLS test user ${username}:`, cleanupError);
+                    if (!testError) throw cleanupError;
+                } finally {
+                    try {
+                        if (inspector.isOpen) await inspector.quit();
+                    } finally {
+                        await request.dispose();
+                    }
+                }
             }
         }
     });

@@ -3024,6 +3024,12 @@ const swaggerSpec = {
         responses: {
           "200": {
             description: "User updated successfully",
+            headers: {
+              "Set-Cookie": {
+                schema: { type: "string" },
+                description: "Set for a browser session with an active connection after its own password is changed. PAT self-updates may not set this five-minute HttpOnly handoff cookie."
+              }
+            },
             content: {
               "application/json": {
                 schema: {
@@ -3054,7 +3060,7 @@ const swaggerSpec = {
                     aclSaveStatus: {
                       type: "string",
                       enum: ["saved", "failed", "unknown"],
-                      description: "When reauthentication is required, reports whether ACL changes were saved; unknown means the connection failed and the server may have completed the save"
+                      description: "When reauthentication is required, reports whether ACL changes were saved; unknown means the ACL SAVE outcome could not be confirmed and the server may have completed the save"
                     },
                     reauthenticationConnection: {
                       type: "object",
@@ -3066,12 +3072,6 @@ const swaggerSpec = {
                         username: { type: "string" },
                         tls: { type: "boolean" }
                       }
-                    }
-                  },
-                  headers: {
-                    "Set-Cookie": {
-                      schema: { type: "string" },
-                      description: "A five-minute HttpOnly handoff cookie is set for the current session's saved TLS material."
                     }
                   }
                 }

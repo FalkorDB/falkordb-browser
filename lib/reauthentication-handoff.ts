@@ -50,9 +50,13 @@ export function matchesReauthenticationEndpoint(
   record: Pick<HandoffRecord, "host" | "port" | "username" | "tls">,
   credentials: ReauthenticationCredentials,
 ): boolean {
-  const port = Number(credentials.port ?? "6379");
+  const portValue = credentials.port ?? "6379";
+  if (!/^\d+$/.test(portValue)) return false;
+
+  const port = Number(portValue);
   return Number.isSafeInteger(port)
     && port > 0
+    && port <= 65535
     && record.host === (credentials.host || "localhost")
     && record.port === port
     && record.username === (credentials.username || "default")

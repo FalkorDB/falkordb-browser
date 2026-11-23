@@ -21,7 +21,7 @@
 
 ## Review Focus
 
-- Redis may write the ACL file before its socket fails; the user must see `unknown`, not a confirmed memory-only result. Test `ErrorReply` versus transport errors.
+- Redis may write the ACL file before an error is returned; the user must see `unknown`, not a confirmed memory-only result.
 - A handoff cookie can be stale, expired, inactive, or point to another endpoint; never apply its TLS data unless every endpoint field matches.
 - A handoff record must survive session sign-out but must not be listed or accepted as a connection or personal access token.
 - The opaque reference must be HttpOnly, short-lived, Secure on HTTPS, and absent from the URL and JavaScript-visible responses.
@@ -47,13 +47,13 @@
 - A self-password PATCH response uses `aclSaveStatus` and does not use the ambiguous `aclSaved` boolean.
 - Non-self password updates continue to return `requiresReauthentication: false`.
 
-- [x] **Step 1: Write tests for ACL result classification.** Verify success returns `"saved"`, a Redis `ErrorReply` returns `"failed"`, and a transport error returns `"unknown"`, while each failure is reported.
+- [x] **Step 1: Write tests for ACL result classification.** Verify success returns `"saved"`, server and transport errors return `"unknown"` when persistence cannot be disproved, and failures are reported.
 - [x] **Step 2: Run `node --test app/api/user/model.test.ts` and confirm the new cases fail because classification does not yet exist.**
-- [x] **Step 3: Implement typed ACL status classification in `model.ts`, using the Redis client's exported `ErrorReply` class to distinguish definitive server replies from transport failures.**
+- [x] **Step 3: Implement typed ACL status classification in `model.ts`; errors that cannot prove persistence failed report `unknown`.**
 - [x] **Step 4: Run `node --test app/api/user/model.test.ts` and confirm all model tests pass.**
 - [x] **Step 5: Update the real PATCH test and mocked UI tests to assert distinct `failed` and `unknown` login messages and response values.**
 - [ ] **Step 6: Run the focused API/UI Playwright tests and confirm they fail because the route does not return the status and the UI has only the prior binary message.**
-- [x] **Step 7: Update PATCH response, login warning copy, settings UI query parameter, OpenAPI response schema, and user documentation to distinguish confirmed failure from unknown outcome.**
+- [x] **Step 7: Update PATCH response, login warning copy, settings UI query parameter, OpenAPI response schema, and user documentation to distinguish successful persistence from an unknown outcome.**
 - [ ] **Step 8: Run `node --test app/api/user/model.test.ts app/api/swagger/swagger-spec.test.ts`, focused Playwright tests, then `npx tsc --noEmit` and focused ESLint.**
 
 ### Task 2: Reuse saved TLS settings for the next sign-in

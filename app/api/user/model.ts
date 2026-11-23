@@ -1,5 +1,3 @@
-import { ErrorReply } from "@redis/client";
-
 export interface User {
   username: string;
   role: string;
@@ -111,6 +109,6 @@ export async function persistAclAfterPasswordChange(
     return "saved";
   } catch (error) {
     onError(error);
-    return error instanceof ErrorReply ? "failed" : "unknown";
+    return "unknown";
   }
 }

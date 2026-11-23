@@ -127,7 +127,7 @@ export { PAT_BINDING_VERSION };
  * initial login flow — NOT for JWT/PAT clients (which are keyed by
  * pat:<jti>).
  */
-function sessionConnectionKey(sessionId: string, connectionId: string): string {
+export function sessionConnectionKey(sessionId: string, connectionId: string): string {
   return `${sessionId}:${connectionId}`;
 }
 

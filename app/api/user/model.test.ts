@@ -128,11 +128,11 @@ describe("persistAclAfterPasswordChange", () => {
     assert.equal(saves, 1);
   });
 
-  it("reports a Redis ACL SAVE error as a confirmed failure", async () => {
+  it("reports a Redis ACL SAVE error as an unknown outcome", async () => {
     const error = new ErrorReply("ERR ACL file is unavailable");
     let reported: unknown;
     const status = await persistAclAfterPasswordChange(true, async () => { throw error; }, cause => { reported = cause; });
-    assert.equal(status, "failed");
+    assert.equal(status, "unknown");
     assert.equal(reported, error);
   });
 

@@ -60,6 +60,13 @@ describe("matchesReauthenticationEndpoint", () => {
     assert.equal(matchesReauthenticationEndpoint(handoff, { host: "db.example.test", port: "6379", username: "alice", tls: "true" }), false);
     assert.equal(matchesReauthenticationEndpoint(handoff, { host: "db.example.test", port: "not-a-port", username: "alice", tls: "true" }), false);
     assert.equal(matchesReauthenticationEndpoint(handoff, { host: "db.example.test", port: "0", username: "alice", tls: "true" }), false);
+    assert.equal(matchesReauthenticationEndpoint(handoff, { host: "db.example.test", port: "65536", username: "alice", tls: "true" }), false);
+  });
+
+  it("rejects port spellings that the Redis client would parse as a different port", () => {
+    assert.equal(matchesReauthenticationEndpoint(handoff, { host: "db.example.test", port: "6.38e3", username: "alice", tls: "true" }), false);
+    assert.equal(matchesReauthenticationEndpoint(handoff, { host: "db.example.test", port: "6380junk", username: "alice", tls: "true" }), false);
+    assert.equal(matchesReauthenticationEndpoint(handoff, { host: "db.example.test", port: " 6380", username: "alice", tls: "true" }), false);
   });
 
   it("rejects a username mismatch", () => {

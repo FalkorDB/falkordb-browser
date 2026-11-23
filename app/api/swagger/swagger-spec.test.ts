@@ -55,8 +55,8 @@ describe("AI assistance OpenAPI documentation", () => {
 
 describe("User password update OpenAPI documentation", () => {
   it("documents when a user must sign in again after changing their own password", () => {
-    const response = swaggerSpec.paths["/api/user/{user}"].patch.responses["200"]
-      .content["application/json"].schema as JsonSchema;
+    const successResponse = swaggerSpec.paths["/api/user/{user}"].patch.responses["200"];
+    const response = successResponse.content["application/json"].schema as JsonSchema;
     const reauthenticationProperty = response.properties?.requiresReauthentication;
     assert.equal(reauthenticationProperty?.type, "boolean");
     assert.match(String(reauthenticationProperty?.description ?? ""), /current user's own password/);
@@ -71,8 +71,10 @@ describe("User password update OpenAPI documentation", () => {
       username: { type: "string" },
       tls: { type: "boolean" },
     });
-    assert.equal(response.headers?.["Set-Cookie"]?.schema?.type, "string");
-    assert.match(response.headers?.["Set-Cookie"]?.description ?? "", /five-minute HttpOnly handoff cookie/);
+    assert.equal(successResponse.headers?.["Set-Cookie"]?.schema?.type, "string");
+    assert.match(successResponse.headers?.["Set-Cookie"]?.description ?? "", /browser session with an active connection/);
+    assert.match(successResponse.headers?.["Set-Cookie"]?.description ?? "", /PAT self-updates may not set/);
+    assert.equal(response.headers, undefined);
 
     const variants = response.oneOf ?? [];
     assert.equal(variants.length, 2);

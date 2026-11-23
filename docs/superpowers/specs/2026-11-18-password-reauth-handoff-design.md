@@ -22,7 +22,7 @@ After an administrator changes their own database password, require a fresh sign
 
 The password-update route returns only non-secret connection fields and a three-state ACL save result. It creates a five-minute Token DB handoff record by copying the active connection's CA and client certificate and retaining the encrypted private key. The record is not a connection record, so normal sign-out cleanup removes the active session connections but leaves this temporary handoff. A random record ID is sent in an HttpOnly, SameSite=Lax cookie scoped to `/api/auth` and marked Secure for HTTPS. The existing login form uses query parameters to prefill the host, port, username, and TLS toggle; the user enters only the new password. Credentials sign-in looks up the cookie ID server-side, checks record activity, expiry, username, host, port, and TLS mode against the submitted credentials, and uses the stored TLS material only on an exact match. Delete the record and expire the cookie after successful authentication; failed sign-in may retry until expiry. Never expose TLS material or the ID to JavaScript or put either in the URL.
 
-Treat Redis `ErrorReply` as a confirmed ACL-save failure. Other rejections are `unknown` because the command may have completed before transport failed. Use distinct login warnings for these outcomes and make the UI and API documentation match.
+Treat ACL-save errors as `unknown` because the command may have completed before the response failed. Do not claim a confirmed persistence failure unless the server can prove the file was not written. Use distinct login warnings for reported outcomes and make the UI and API documentation match.
 
 ## Non-goals
 

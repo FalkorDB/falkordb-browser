@@ -254,9 +254,14 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   ```bash
   mkdir -p /tmp/falkordb-reauth-acl
   cp e2e/fixtures/acl-users.acl /tmp/falkordb-reauth-acl/users.acl
+  chmod 777 /tmp/falkordb-reauth-acl
+  cat > /tmp/falkordb-reauth-acl/redis.conf <<'EOF'
+  protected-mode no
+  aclfile /var/lib/falkordb/data/users.acl
+  EOF
   docker run -d --rm --name falkordb-reauth-acl -p 6381:6379 \
-    -v /tmp/falkordb-reauth-acl/users.acl:/var/lib/falkordb/data/users.acl \
-    -e "REDIS_ARGS=--aclfile /var/lib/falkordb/data/users.acl" \
+    -v /tmp/falkordb-reauth-acl:/var/lib/falkordb/data \
+    -e "REDIS_ARGS=/var/lib/falkordb/data/redis.conf" \
     falkordb/falkordb:v4.18.10
   ```
   Remove the disposable container after the test with `docker rm -f falkordb-reauth-acl`.

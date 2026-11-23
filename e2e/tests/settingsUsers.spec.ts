@@ -111,16 +111,17 @@ test.describe('@Config Settings users tests', () => {
         expect(mock.requests).toEqual([{ method: "PATCH", body }, { method: "PATCH", body }]);
     });
 
-    for (const { aclSaveStatus, signOutFails, signOutFailure, sessionStorageUnavailable } of [
+    for (const { aclSaveStatus, signOutFails, signOutFailure, sessionStorageUnavailable, manualLogoutAfterFailure } of [
         { aclSaveStatus: "saved", signOutFails: false, sessionStorageUnavailable: false },
         { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", sessionStorageUnavailable: false },
+        { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", manualLogoutAfterFailure: true, sessionStorageUnavailable: false },
         { aclSaveStatus: "failed", signOutFails: false, sessionStorageUnavailable: false },
         { aclSaveStatus: "unknown", signOutFails: false, sessionStorageUnavailable: false },
         { aclSaveStatus: "failed", signOutFails: true, signOutFailure: "error-response", sessionStorageUnavailable: false },
         { aclSaveStatus: "unknown", signOutFails: true, signOutFailure: "network", sessionStorageUnavailable: false },
         { aclSaveStatus: "failed", signOutFails: false, sessionStorageUnavailable: true },
     ] as const) {
-        test(`@admin Settings reports ${aclSaveStatus} ACL persistence when ${signOutFails ? "automatic sign-out fails" : "reauthenticating"}${sessionStorageUnavailable ? " with blocked session storage" : ""}`, async () => {
+        test(`@admin Settings reports ${aclSaveStatus} ACL persistence when ${signOutFails ? "automatic sign-out fails" : "reauthenticating"}${manualLogoutAfterFailure ? " then manually signing out" : ""}${sessionStorageUnavailable ? " with blocked session storage" : ""}`, async () => {
             const username = getRandomString("selfPassword");
             const password = "NewPassword1!";
             const connection = { host: "remote.example.test", port: 6380, username, tls: true };
@@ -171,7 +172,7 @@ test.describe('@Config Settings users tests', () => {
             });
             await page.route("**/api/auth/signout*", async route => {
                 signOutRequests += 1;
-                if (signOutFails) {
+                if (signOutFails && (!manualLogoutAfterFailure || signOutRequests === 1)) {
                     if (signOutFailure === "network") {
                         await route.abort("failed");
                     } else {
@@ -209,6 +210,16 @@ test.describe('@Config Settings users tests', () => {
                 await settingsUsersPage.clickOnEditUserBtn();
                 await expect.poll(() => settingsUsersPage.getEditSelectedRole()).toContain(user.ReadOnly);
                 expect(await settingsUsersPage.isEditKeyTagVisible("reports:*")).toBe(true);
+                if (manualLogoutAfterFailure) {
+                    await page.getByTestId("logoutButton").click();
+                    await page.getByTestId("logoutConfirm").click();
+                    await expect(page).toHaveURL(url => url.pathname === "/login"
+                        && url.searchParams.get("host") === connection.host
+                        && url.searchParams.get("port") === String(connection.port)
+                        && url.searchParams.get("username") === username
+                        && url.searchParams.get("tls") === "true"
+                        && url.searchParams.get("signedOut") === "true");
+                }
             } else {
                 await expect(page).toHaveURL(url => url.pathname === "/login"
                     && url.searchParams.get("signedOut") === "true"
@@ -686,6 +697,7 @@ test.describe('@Config Settings users tests', () => {
             form: { csrfToken: await getCsrfToken() },
         });
 
+        let testError: unknown;
         try {
             expect(await signIn("")).toMatchObject({ user: { username: "default" } });
 
@@ -708,19 +720,48 @@ test.describe('@Config Settings users tests', () => {
             try {
                 await aclClient.connect();
                 expect(await aclClient.sendCommand(["ACL", "LOAD"])).toBe("OK");
+                await expect(aclClient.sendCommand(["AUTH", "default", ""])).rejects.toThrow();
             } finally {
                 if (aclClient.isOpen) await aclClient.quit();
             }
 
             expect(await signIn(newPassword)).toMatchObject({ user: { username: "default" } });
+        } catch (error) {
+            testError = error;
+            throw error;
         } finally {
             try {
-                const result = await signOut();
-                if (!result.ok()) console.warn(`ACL persistence test sign-out returned HTTP ${result.status()}`);
-            } catch (error) {
-                console.warn("ACL persistence test sign-out failed:", error);
+                const resetDefaultUser = async (password: string) => {
+                    const client = createClient({
+                        username: "default",
+                        ...(password ? { password } : {}),
+                        socket: { host: "localhost", port: endpoint.port },
+                    });
+                    try {
+                        await client.connect();
+                        await client.sendCommand(["ACL", "SETUSER", "default", "resetpass", "nopass"]);
+                        await client.sendCommand(["ACL", "SAVE"]);
+                    } finally {
+                        if (client.isOpen) await client.quit();
+                    }
+                };
+                try {
+                    await resetDefaultUser(newPassword);
+                } catch {
+                    await resetDefaultUser("");
+                }
+            } catch (cleanupError) {
+                console.error("Failed to restore the ACL fixture's passwordless default user:", cleanupError);
+                if (!testError) throw cleanupError;
             } finally {
-                await request.dispose();
+                try {
+                    const result = await signOut();
+                    if (!result.ok()) console.warn(`ACL persistence test sign-out returned HTTP ${result.status()}`);
+                } catch (error) {
+                    console.warn("ACL persistence test sign-out failed:", error);
+                } finally {
+                    await request.dispose();
+                }
             }
         }
     });

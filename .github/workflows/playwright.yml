@@ -169,7 +169,7 @@ jobs:
           acl_dir="$RUNNER_TEMP/falkordb-reauth-acl"
           mkdir -p "$acl_dir"
           cp e2e/fixtures/acl-users.acl "$acl_dir/users.acl"
-          chmod 666 "$acl_dir/users.acl"
+          chmod 777 "$acl_dir"
           cat > "$acl_dir/redis.conf" <<'EOF'
           protected-mode no
           aclfile /var/lib/falkordb/data/users.acl

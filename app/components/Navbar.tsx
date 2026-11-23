@@ -1,5 +1,3 @@
-/* eslint-disable react/require-default-props */
-
 'use client';
 
 import { ArrowUpRight, FileCode, Info, LogOut, Menu, Monitor, Moon, Sun, Settings, Sparkles, FunctionSquare, GitGraph } from "lucide-react";
@@ -17,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import useIsMobile, { MOBILE_BREAKPOINT } from "@/lib/useIsMobile";
+import { consumePasswordChangeLogoutTarget } from "@/lib/password-change-notice";
 import Button from "./ui/Button";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
@@ -59,7 +58,13 @@ export default function Navbar({ showUDF }: Props) {
             await signOut({ redirect: false });
             setLogoutDialogOpen(false);
             // The marker stops a preconfigured connection logging the user straight back in.
-            router.push("/login?signedOut=true");
+            let logoutTarget = "/login?signedOut=true";
+            try {
+                logoutTarget = consumePasswordChangeLogoutTarget(window.sessionStorage, window.location.origin) ?? logoutTarget;
+            } catch (error) {
+                console.error("Failed to read the password reauthentication redirect:", error);
+            }
+            router.push(logoutTarget);
         } catch {
             toast({ title: "Failed to sign out", description: "Please try again.", variant: "destructive" });
         } finally {
