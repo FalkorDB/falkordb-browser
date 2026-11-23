@@ -71,6 +71,19 @@ export function applyQueryHistoryProfileUpdates(
     ), history);
 }
 
+export function applyQueryHistoryProfileUpdatesToStoredQueries(
+    history: HistoryQuery,
+    storedQueries: Query[],
+    updates: QueryHistoryProfileUpdate[],
+    connectionEpoch: number
+): Query[] {
+    return applyQueryHistoryProfileUpdates(
+        { ...history, queries: storedQueries },
+        updates,
+        connectionEpoch
+    ).queries;
+}
+
 export function retainPendingQueryHistoryProfileUpdates(
     history: HistoryQuery,
     updates: QueryHistoryProfileUpdate[],

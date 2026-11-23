@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { HistoryQuery, Query } from "../../lib/utils.ts";
 import {
     applyQueryHistoryProfileUpdates,
+    applyQueryHistoryProfileUpdatesToStoredQueries,
     getSelectedHistoryQuery,
     isQueryHistoryTabEnabled,
     reconcilePendingQueryHistoryProfileUpdates,
@@ -131,6 +132,18 @@ describe("updateQueryHistoryProfile", () => {
 
         assert.deepEqual(currentHistory.queries, [{ ...stored, profile: ["profile"] }]);
         assert.deepEqual(updated.queries, currentHistory.queries);
+    });
+
+    it("does not restore a deleted row when reconciling profiles into the latest stored history", () => {
+        const deleted = query("RETURN 3", 1);
+        const current = query("RETURN 5", 2);
+        const staleSnapshot = history([deleted], current);
+        const update = { target: deleted, profile: ["profile"], connectionEpoch: 4 };
+
+        assert.deepEqual(
+            applyQueryHistoryProfileUpdatesToStoredQueries(staleSnapshot, [], [update], 4),
+            []
+        );
     });
 
     it("does not retain deleted or stale profile updates during a query", () => {
