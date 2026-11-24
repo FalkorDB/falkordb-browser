@@ -76,6 +76,18 @@ export default class QueryHistory extends GraphPage {
         return this.page.getByTestId("queryHistoryPanel");
     }
 
+    public get historyProfileButton(): Locator {
+        return this.historyPanel.getByRole("button", { name: "Profile", exact: true });
+    }
+
+    public get profileTree(): Locator {
+        return this.historyPanel.getByTestId("profileTree");
+    }
+
+    public get closeHistoryButton(): Locator {
+        return this.historyPanel.getByTestId("queryHistoryCloseButton");
+    }
+
     /** A tab of the selected query in the history panel, e.g. "Metadata". */
     public historyTab(name: string): Locator {
         return this.historyPanel.getByRole('tab', { name });
@@ -213,6 +225,14 @@ export default class QueryHistory extends GraphPage {
 
     async clickHistoryTab(name: string): Promise<void> {
         await interactWhenVisible(this.historyTab(name), (el) => el.click(), `history tab ${name}`);
+    }
+
+    async clickHistoryProfileButton(): Promise<void> {
+        await interactWhenVisible(this.historyProfileButton, (el) => el.click(), "history Profile button");
+    }
+
+    async closeHistoryPanel(): Promise<void> {
+        await interactWhenVisible(this.closeHistoryButton, (el) => el.click(), "close query history panel");
     }
 
     async clickRunInQueryHistory(): Promise<void> {   
