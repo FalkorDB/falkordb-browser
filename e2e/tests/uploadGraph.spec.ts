@@ -182,6 +182,29 @@ test.describe("Upload Graph – Cypher batch", () => {
     await expect(graph.uploadConfirm).toBeDisabled();
     await expect(graph.uploadDialog).not.toContainText(CYPHER_FILE_NAME);
   });
+
+  test(`@admin Warn when Cypher processing loses its response`, async () => {
+    graphName = getRandomString("uploadUncertain");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    let processingCalls = 0;
+    await page.route("**/api/upload", (route) => route.fulfill({ json: { id: "uncertain-file" } }));
+    await page.route(`**/api/graph/${graphName}/upload`, async (route) => {
+      processingCalls += 1;
+      await route.abort();
+    });
+    await graph.openUploadDialog(graphName);
+    await graph.setUploadFile(CYPHER_FIXTURE);
+    await graph.submitUpload();
+    await expect(graph.errorToast).toContainText("Upload state uncertain");
+    await expect(graph.errorToast).toContainText("Refresh and verify graph data before retrying.");
+    await expect(graph.uploadConfirm).toBeEnabled();
+    await expect(graph.uploadDialog).toContainText(CYPHER_FILE_NAME);
+    expect(processingCalls).toBe(1);
+    await graph.clickUploadCancel();
+    await expect(graph.uploadConfirm).toBeHidden();
+  });
 });
 
 // ---------------------------------------------------------------------------
