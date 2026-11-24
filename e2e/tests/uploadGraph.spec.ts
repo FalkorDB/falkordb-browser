@@ -77,6 +77,27 @@ test.describe("Upload Graph – Cypher batch", () => {
     expect(await graph.uploadConfirm.isDisabled()).toBe(true);
   });
 
+  test(`@admin Preview a large Cypher file and hide the truncated preview`, async () => {
+    graphName = getRandomString("uploadPreview");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.openUploadDialog(graphName);
+    await graph.setUploadFile({
+      name: "large.cypher",
+      mimeType: "text/plain",
+      buffer: Buffer.from(`RETURN 1;\n${"// preview line\n".repeat(16000)}`),
+    });
+    await expect(graph.uploadViewFile).toBeEnabled();
+    await graph.uploadViewFile.click();
+    await expect(graph.toast).toContainText("Preview truncated");
+    await expect(graph.uploadFilePreview).toBeVisible();
+    await expect.poll(async () => (await graph.getUploadPreviewContent())?.length).toBe(250_000);
+    expect(await graph.getUploadPreviewContent()).toMatch(/^RETURN 1;\n/);
+    await graph.uploadHidePreview.click();
+    await expect(graph.uploadFilePreview).toBeHidden();
+    await expect(graph.uploadConfirm).toBeEnabled();
+  });
+
   test(`@admin Validate an unsupported Cypher replacement is rejected and the valid file is the one uploaded`, async () => {
     graphName = getRandomString("uploadRejected");
     await apiCall.addGraph(graphName);
@@ -225,6 +246,28 @@ test.describe("Upload Graph – Load CSV", () => {
     await graph.setUploadFile(CSV_FIXTURE);
     await expect(graph.csvUploadTempConfirm).toBeEnabled();
     await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+  });
+
+  test(`@admin CSV preview follows a replacement file and can be hidden`, async () => {
+    graphName = getRandomString("csvPreview");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.openUploadDialog(graphName);
+    await graph.selectUploadTab("csv");
+    await graph.setUploadFile({
+      name: "first.csv", mimeType: "text/csv", buffer: Buffer.from("name\nAlice\n"),
+    });
+    await graph.uploadViewFile.click();
+    await expect.poll(() => graph.getUploadPreviewContent()).toBe("name\nAlice\n");
+
+    await graph.setUploadFile({
+      name: "second.csv", mimeType: "text/csv", buffer: Buffer.from("name\nBob\n"),
+    });
+    await expect.poll(() => graph.getUploadPreviewContent()).toBe("name\nBob\n");
+    await expect(graph.uploadDialog).toContainText("second.csv");
+    await graph.uploadHidePreview.click();
+    await expect(graph.uploadFilePreview).toBeHidden();
+    await expect(graph.csvUploadTempConfirm).toBeEnabled();
   });
 
   test(`@admin Validate cancelling after the temp upload and reopening starts clean on the first step`, async () => {

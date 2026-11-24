@@ -106,6 +106,27 @@ export default class GraphPage extends BasePage {
     return this.uploadDialog.locator('input[type="file"]');
   }
 
+  public get uploadFilePreview(): Locator {
+    return this.uploadDialog.locator(".monaco-editor");
+  }
+
+  public get uploadViewFile(): Locator {
+    return this.uploadDialog.getByRole("button", { name: /Preview selected (Cypher|CSV) file/ });
+  }
+
+  public get uploadHidePreview(): Locator {
+    return this.uploadDialog.getByRole("button", { name: "Hide preview" });
+  }
+
+  public async getUploadPreviewContent(): Promise<string | undefined> {
+    return this.uploadDialog.evaluate(dialog => {
+      const monaco = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      return monaco?.editor.getEditors()
+        .find(editor => dialog.contains(editor.getContainerDomNode()))
+        ?.getValue();
+    });
+  }
+
   public get loadCsvTabTrigger(): Locator {
     return this.page.getByRole("tab", { name: "Load CSV" });
   }
