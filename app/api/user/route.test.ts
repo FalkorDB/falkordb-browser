@@ -19,6 +19,7 @@ registerHooks({
     resolve(specifier, context, nextResolve) {
         if (context.parentURL?.includes("/app/api/user/")) {
             if (specifier.includes("auth/[...nextauth]/options")) return { url: authModule, shortCircuit: true };
+            if (specifier === "@/lib/aclGetUser") return { url: new URL("../../../lib/aclGetUser.ts", import.meta.url).href, shortCircuit: true };
             if (specifier === "next/server") return nextResolve("next/server.js", context);
             if (specifier.startsWith(".") && !/\.[a-z]+$/i.test(specifier)) return nextResolve(`${specifier}.ts`, context);
         }
@@ -56,7 +57,7 @@ function session(overrides: object = {}, role = "Admin") {
         client: { connection: Promise.resolve({
             configGet: async (key: string) => { calls.push(["configGet", key]); return {}; },
             aclList: async () => [],
-            aclGetUser: async (name: string) => { calls.push(["aclGetUser", name]); return null; },
+            sendCommand: async (args: string[]) => { calls.push(["sendCommand", args]); return null; },
             aclSetUser: async (name: string, rules: string[]) => { calls.push(["aclSetUser", name, rules]); },
             aclDelUser: async (name: string) => { calls.push(["aclDelUser", name]); },
             aclSave: async () => { calls.push(["aclSave"]); },
@@ -135,16 +136,21 @@ test("creates a user with requested ACL key patterns and password", async () => 
     assert.deepEqual(await response.json(), { message: "Success" });
     assert.deepEqual(calls, [
         ["configGet", "falkordbe.ldap_servers"],
-        ["aclGetUser", "alice"],
+        ["sendCommand", ["ACL", "GETUSER", "alice"]],
         ["aclSetUser", "alice", ["on", "resetkeys", "~app:*", "~logs:*", "clearselectors", "&*", "+@all", ">pass"]],
     ]);
 });
 
 test("refuses existing users without writing ACLs", async () => {
-    const calls = session({ aclGetUser: async () => ({ flags: ["on"] }) });
+    const commands: string[][] = [];
+    const calls = session({ sendCommand: async (args: string[]) => {
+        commands.push(args);
+        return ["flags", ["on"]];
+    } });
     const response = await root.POST(request("POST", json({ username: "alice", password: "pass", role: "Admin" })));
     assert.equal(response.status, 409);
     assert.deepEqual(await response.json(), { message: "User alice already exists" });
+    assert.deepEqual(commands, [["ACL", "GETUSER", "alice"]]);
     assert.deepEqual(calls, [["configGet", "falkordbe.ldap_servers"]]);
 });
 

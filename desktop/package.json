@@ -3,7 +3,7 @@
   "productName": "FalkorDB Browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser desktop app",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "private": true,
   "main": "main.cjs",
   "scripts": {
