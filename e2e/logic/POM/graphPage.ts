@@ -42,6 +42,18 @@ type NodeScreenPosition = {
 };
 
 export default class GraphPage extends BasePage {
+  public get graphPage(): Locator {
+    return this.page.getByTestId("graphPage");
+  }
+
+  public get memoryValue(): Locator {
+    return this.page.getByRole("button", { name: "Memory:" }).locator("..").locator("h2");
+  }
+
+  public get memoryLoadingIndicator(): Locator {
+    return this.page.getByRole("button", { name: "Memory:" }).locator("..").locator("svg.animate-spin");
+  }
+
   // CREATE
   public get create(): Locator {
     return this.page.getByTestId("createGraph");

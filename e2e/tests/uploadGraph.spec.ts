@@ -337,6 +337,60 @@ test.describe("Upload Graph – Load CSV", () => {
     expect(await countPeople(apiCall, graphName)).toBe(3);
   });
 
+  test(`@admin CSV proxy fallback failures preserve the file for a successful upload`, async () => {
+    graphName = getRandomString("csvFallback");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    let preparations = 0;
+    let uploads = 0;
+    const uploadedNames: string[] = [];
+    await page.route("**/api/csv-temp/direct", async route => {
+      preparations += 1;
+      await route.fulfill(preparations === 1
+        ? { status: 503, json: { message: "Direct storage unavailable" } }
+        : { status: 409, json: { message: "Direct upload disabled" } });
+    });
+    await page.route("**/api/csv-temp", async route => {
+      if (route.request().method() !== "POST") return route.continue();
+      uploads += 1;
+      uploadedNames.push(...multipartFileNames(route.request()));
+      if (uploads === 1) return route.fulfill({ status: 400, json: { message: "Proxy rejected upload" } });
+      if (uploads === 2) return route.fulfill({ json: {} });
+      return route.continue();
+    });
+    await graph.openUploadDialog(graphName);
+    await graph.selectUploadTab("csv");
+    await graph.setUploadFile(CSV_FIXTURE);
+    await graph.csvUploadTempConfirm.click();
+    await expect(graph.errorToast).toContainText("Direct storage unavailable");
+    await expect(graph.csvUploadTempConfirm).toBeEnabled();
+    await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+
+    await graph.csvUploadTempConfirm.click();
+    await expect(graph.errorToast).toContainText("Unexpected response from server.");
+    await expect(graph.csvUploadTempConfirm).toBeEnabled();
+    await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+
+    const [tempUpload] = await Promise.all([
+      page.waitForResponse(response => response.request().method() === "POST"
+        && new URL(response.url()).pathname === "/api/csv-temp"),
+      graph.csvUploadTempConfirm.click(),
+    ]);
+    expect(tempUpload.status()).toBe(201);
+    const { key } = await tempUpload.json() as { key: string };
+    await expect(graph.loadCsvRunConfirm).toBeVisible();
+    const [cleanup] = await Promise.all([
+      page.waitForResponse(response => response.request().method() === "DELETE"
+        && new URL(response.url()).pathname === `/api/csv-temp/${key}`),
+      graph.clickUploadCancel(),
+    ]);
+    expect(cleanup.status()).toBe(204);
+    expect(preparations).toBe(3);
+    expect(uploads).toBe(3);
+    expect(uploadedNames).toEqual([CSV_FILE_NAME, CSV_FILE_NAME, CSV_FILE_NAME]);
+  });
+
   test(`@admin A malformed direct upload target keeps the CSV available for a successful retry`, async () => {
     graphName = getRandomString("csvDirectRetry");
     await apiCall.addGraph(graphName);
