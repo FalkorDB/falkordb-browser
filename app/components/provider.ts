@@ -10,6 +10,7 @@ import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
 import { DEFAULT_GRAPH_TABS, GraphTab, SchemaViewMeta } from "@/lib/useGraphTabs";
 import { DEFAULT_GRAPH_SORT_ORDER, type GraphSortOrder } from "@/lib/graphSortOrder";
+import type { QueryHistoryProfileUpdate } from "../graph/queryHistoryProfile";
 
 export type ChatApiKey = {
   id: string;
@@ -211,6 +212,7 @@ type GraphContextType = {
 type HistoryQueryContextType = {
   historyQuery: HistoryQuery;
   setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>;
+  applyQueryHistoryProfile: (update: QueryHistoryProfileUpdate) => void;
 };
 
 type IndicatorContextType = {
@@ -594,6 +596,7 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
     counter: 0,
   },
   setHistoryQuery: () => { },
+  applyQueryHistoryProfile: () => { },
 });
 
 export const IndicatorContext = createContext<IndicatorContextType>({

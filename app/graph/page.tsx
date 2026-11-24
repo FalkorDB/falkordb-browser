@@ -861,7 +861,6 @@ export default function Page() {
             relationships={relationships}
             fetchCount={fetchCount}
             historyQuery={historyQuery}
-            setHistoryQuery={setHistoryQuery}
             setIsAddNode={handleSetIsAdd(setIsAddNode, setIsAddEdge)}
             setIsAddEdge={handleSetIsAdd(setIsAddEdge, setIsAddNode)}
             isAddEdge={isAddEdge}
