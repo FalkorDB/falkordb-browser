@@ -4,7 +4,7 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json';
 import QueryHistory from "../logic/POM/queryHistoryComponent";
-import { getRandomString } from "../infra/utils";
+import { getQueryRequestParam, getRandomString } from "../infra/utils";
 
 /**
  * Runs `body`, then removes `graphs` (read after `body`, so it may add to the list).
@@ -376,6 +376,46 @@ test.describe('Query history Tests', () => {
             await graph.clickQueryHistoryButton();
             await expect(graph.selectQueryHistory(edited)).toBeVisible();
             await expect(graph.selectQueryHistory(original)).toBeVisible();
+        });
+    });
+
+    test(`@admin history editor blocks invalid syntax and runs the corrected query`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            const tag = getRandomString('historysyntax');
+            const original = `RETURN '${tag}-original'`;
+            const corrected = `RETURN '${tag}-corrected'`;
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.runQueries([original]);
+            await graph.clickQueryHistoryButton();
+            await graph.selectQueryInHistory(original);
+
+            const page = await browser.getPage();
+            const queryRequests: string[] = [];
+            page.on("request", request => {
+                if (request.method() === "POST" && new URL(request.url()).pathname === `/api/graph/${graphName}`) {
+                    const query = getQueryRequestParam(request, "query");
+                    if (query) queryRequests.push(query);
+                }
+            });
+
+            await graph.setHistoryPanelQuery("MATCH (");
+            await expect(graph.runQueryHistoryButton).toHaveAttribute("aria-label", "Fix the highlighted syntax errors to run");
+            await graph.clickRunInQueryHistory();
+            await expect(graph.errorToast).toContainText("Syntax Error");
+            await expect(graph.historyPanel).toBeVisible();
+            expect(queryRequests.some(query => query.startsWith("MATCH ("))).toBe(false);
+
+            await graph.setHistoryPanelQuery(corrected);
+            await expect(graph.runQueryHistoryButton).toHaveAttribute("aria-label", "Press Enter to run the query");
+            await graph.clickRunInQueryHistory();
+            await expect(graph.historyPanel).toBeHidden();
+            await expect.poll(() => queryRequests.filter(query => query.startsWith(corrected)).length).toBe(1);
+            await graph.clickQueryHistoryButton();
+            await expect(graph.selectQueryHistory(corrected)).toBeVisible();
         });
     });
 
