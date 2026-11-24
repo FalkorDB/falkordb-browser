@@ -184,6 +184,30 @@ describe("updateQueryHistoryProfile", () => {
         assert.ok(result.storageError instanceof TypeError);
     });
 
+    it("skips non-object rows when reconciling profiles while a query is loading", () => {
+        const stored = query("RETURN 3", 1);
+        const current = query("RETURN 5", 2);
+        const update = { target: stored, profile: ["profile"], connectionEpoch: 4 };
+        const malformedQueries = JSON.parse(JSON.stringify([null, "invalid", stored])) as Query[];
+        let currentHistory = history(malformedQueries, current);
+        const updateState = (updater: (previous: HistoryQuery) => HistoryQuery) => {
+            currentHistory = updater(currentHistory);
+        };
+
+        const result = reconcilePendingQueryHistoryProfileUpdates(
+            currentHistory,
+            [update],
+            4,
+            true,
+            updateState,
+            JSON.stringify([null, "invalid", stored])
+        );
+
+        assert.deepEqual(result.retained, [update]);
+        assert.deepEqual(result.persistedQueries, [null, "invalid", { ...stored, profile: ["profile"] }]);
+        assert.equal(result.storageError, undefined);
+    });
+
     it("does not restore a missing history list while applying a current-query profile", () => {
         const current = query("RETURN 5", 2);
         const update = { target: current, profile: ["profile"], connectionEpoch: 4 };

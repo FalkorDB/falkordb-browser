@@ -274,6 +274,10 @@ test.describe('Query history Tests', () => {
                     }>;
                     return stored.find((entry) => entry.text === queryA)?.profile;
                 }).toEqual(profile);
+                await graph.clickQueryHistoryButton();
+                await graph.selectQueryInHistory(queryA);
+                await graph.clickHistoryTab("Profile");
+                await expect(graph.profileTree).toContainText("Records produced: 3");
             } finally {
                 releaseProfileResponse();
                 releaseQueryResponse();

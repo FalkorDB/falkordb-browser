@@ -4,6 +4,14 @@ import { getStatsLines } from "../../lib/queryStats.ts";
 type QueryIdentity = Pick<Query, "text" | "timestamp">;
 export type QueryHistoryTab = "text" | "metadata" | "explain" | "profile";
 
+function matchesQueryIdentity(query: unknown, target: QueryIdentity): boolean {
+    if (typeof query !== "object" || query === null) return false;
+    return "timestamp" in query
+        && "text" in query
+        && query.timestamp === target.timestamp
+        && query.text === target.text;
+}
+
 export function getSelectedHistoryQuery(history: HistoryQuery): Query | undefined {
     return history.counter > 0 ? history.queries[history.counter - 1] : undefined;
 }
@@ -31,9 +39,7 @@ export function updateQueryHistoryProfile(
 ): HistoryQuery | undefined {
     if (expectedConnectionEpoch !== connectionEpoch) return undefined;
 
-    const selectedIndex = history.queries.findIndex(query =>
-        query.timestamp === target.timestamp && query.text === target.text
-    );
+    const selectedIndex = history.queries.findIndex(query => matchesQueryIdentity(query, target));
     const isCurrentQuery = history.currentQuery.timestamp === target.timestamp
         && history.currentQuery.text === target.text;
 
@@ -95,9 +101,7 @@ export function retainPendingQueryHistoryProfileUpdates(
     return updates.filter(update => {
         if (update.connectionEpoch !== connectionEpoch) return false;
 
-        const matchesTarget = (query: Query) => (
-            query.timestamp === update.target.timestamp && query.text === update.target.text
-        );
+        const matchesTarget = (query: Query) => matchesQueryIdentity(query, update.target);
         return history.queries.some(matchesTarget) || matchesTarget(history.currentQuery);
     });
 }
