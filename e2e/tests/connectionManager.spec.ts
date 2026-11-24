@@ -125,14 +125,17 @@ test.describe("Connection Manager Tests: own session", () => {
     manager = new ConnectionManagerComponent(page);
     // After login the provider pins the restored connection into the session; let it finish first.
     const initialSync = manager.waitForSessionUpdate();
-    await new LoginPage(page).clickOnConnect();
+    await new LoginPage(page).clickConnect();
+    const graphUrl = new URL(urls.graphUrl);
+    await page.waitForURL(url => url.origin === graphUrl.origin && url.pathname === graphUrl.pathname);
     await initialSync;
   });
 
   test.afterEach(async ({ page }) => {
-    // Reload first: a menu, dialog or toast left open would block the header logout.
-    await manager.refreshPage();
-    await new LoginPage(page).Logout();
+    // Keep the exercised document alive until coverage is saved on page close.
+    const signOut = await manager.signOutSession();
+    expect(signOut.ok()).toBe(true);
+    await page.close();
   });
 
   test(`@admin Verify cancelling last-connection logout preserves the session`, async ({ page }) => {
@@ -233,7 +236,10 @@ test.describe("Connection Manager Tests: own session", () => {
 
   test.describe("with an added read-write connection", () => {
     test.beforeEach(async () => {
-      await manager.submitAdditionalConnection(READ_WRITE_USERNAME, user.password);
+      const session = await manager.getSession();
+      expect(session.ok()).toBe(true);
+      const { user: { host, port } }: { user: { host: string; port: number } } = await session.json();
+      await manager.submitAdditionalConnection(READ_WRITE_USERNAME, user.password, { host, port });
       await expect(manager.addDialog).toBeHidden();
     });
 
@@ -246,6 +252,65 @@ test.describe("Connection Manager Tests: own session", () => {
       const session = await manager.getSession();
       expect(session.ok()).toBe(true);
       expect(await session.json()).toMatchObject({ activeConnectionId: secondaryId, user: { role: user.ReadWrite } });
+    });
+
+    test(`@admin Selecting the active connection does not update the session`, async ({ page }) => {
+      await manager.openDropdown();
+      const activeId = await manager.getConnectionId(READ_WRITE_USERNAME);
+      expect(activeId).toBeTruthy();
+      let updates = 0;
+      page.on("request", (request) => {
+        if (request.method() === "POST" && new URL(request.url()).pathname === "/api/auth/session") updates += 1;
+      });
+      await manager.selectConnection(READ_WRITE_USERNAME);
+      await manager.openDropdown();
+      await expect(manager.activeMarkerForUser(READ_WRITE_USERNAME)).toHaveCount(1);
+      const session = await manager.getSession();
+      expect(session.ok()).toBe(true);
+      expect(await session.json()).toMatchObject({ activeConnectionId: activeId, user: { role: user.ReadWrite } });
+      expect(await manager.getLastActiveConnectionId()).toBe(activeId);
+      expect(updates).toBe(0);
+    });
+
+    test(`@admin A rejected connection switch preserves the active connection and can be retried`, async ({ page }) => {
+      await manager.openDropdown();
+      const primaryId = await manager.getConnectionId(ADMIN_USERNAME);
+      const activeId = await manager.getConnectionId(READ_WRITE_USERNAME);
+      expect(primaryId).toBeTruthy();
+      expect(activeId).toBeTruthy();
+      const currentSession = await manager.getSession();
+      expect(currentSession.ok()).toBe(true);
+      const unchangedSession = await currentSession.json();
+      expect(unchangedSession).toMatchObject({ activeConnectionId: activeId, user: { role: user.ReadWrite } });
+      let updates = 0;
+      await page.route("**/api/auth/session", async (route) => {
+        if (route.request().method() !== "POST") {
+          await route.continue();
+          return;
+        }
+        updates += 1;
+        if (updates === 1) {
+          await route.fulfill({ json: unchangedSession });
+        } else {
+          await route.continue();
+        }
+      });
+      await manager.selectConnection(ADMIN_USERNAME);
+      await expect(manager.errorToast("Failed to switch connection")).toBeVisible();
+      await manager.openDropdown();
+      await expect(manager.activeMarkerForUser(READ_WRITE_USERNAME)).toHaveCount(1);
+      await expect(manager.activeMarkerForUser(ADMIN_USERNAME)).toHaveCount(0);
+      const rejectedSession = await manager.getSession();
+      expect(rejectedSession.ok()).toBe(true);
+      expect(await rejectedSession.json()).toMatchObject({ activeConnectionId: activeId, user: { role: user.ReadWrite } });
+
+      const retriedUpdate = manager.waitForSessionUpdate();
+      await manager.selectConnection(ADMIN_USERNAME);
+      expect(await (await retriedUpdate).json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
+      await manager.openDropdown();
+      await expect(manager.activeMarkerForUser(ADMIN_USERNAME)).toHaveCount(1);
+      await expect(manager.activeMarkerForUser(READ_WRITE_USERNAME)).toHaveCount(0);
+      expect(updates).toBe(2);
     });
 
     test(`@admin Verify the selected connection persists across reload with both connections present`, async () => {

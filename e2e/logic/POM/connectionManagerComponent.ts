@@ -172,6 +172,17 @@ export default class ConnectionManagerComponent extends BasePage {
         return this.page.request.get(new URL("/api/auth/session", this.page.url()).href);
     }
 
+    async signOutSession(): Promise<APIResponse> {
+        const origin = new URL(this.page.url()).origin;
+        const csrf = await this.page.request.get(`${origin}/api/auth/csrf`);
+        if (!csrf.ok()) throw new Error(`Could not get sign-out CSRF token: HTTP ${csrf.status()}`);
+        const { csrfToken }: { csrfToken: string } = await csrf.json();
+        return this.page.request.post(`${origin}/api/auth/signout`, {
+            headers: { Origin: origin },
+            form: { csrfToken },
+        });
+    }
+
     async getLastActiveConnectionId(): Promise<string | null> {
         return (await this.evaluate(() => localStorage.getItem("lastActiveConnectionId"))) as string | null;
     }
