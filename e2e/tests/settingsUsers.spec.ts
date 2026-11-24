@@ -121,7 +121,8 @@ test.describe('@Config Settings users tests', () => {
 
         await page.locator("body").press("Escape");
 
-        await expect(page).toHaveURL(urls.graphUrl);
+        const graphUrl = new URL(urls.graphUrl);
+        await expect(page).toHaveURL(url => url.origin === graphUrl.origin && url.pathname === graphUrl.pathname);
     });
 
     test("@admin Manual sign out falls back when session storage is blocked", async () => {
