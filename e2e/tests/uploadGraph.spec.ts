@@ -2,6 +2,8 @@ import { expect, test, type Request } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import { createServer } from "http";
+import assert from "node:assert/strict";
 import { getRandomString } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
@@ -290,6 +292,99 @@ test.describe("Upload Graph – Load CSV", () => {
     await expect(graph.loadCsvRunConfirm).toBeHidden();
     expect(loadCsvCalls).toBe(2);
     expect(await countPeople(apiCall, graphName)).toBe(3);
+  });
+
+  test(`@admin A malformed direct upload target keeps the CSV available for a successful retry`, async () => {
+    graphName = getRandomString("csvDirectRetry");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    const uploaded: Array<{ body: Buffer; method: string | undefined; marker: string | string[] | undefined }> = [];
+    const imports: unknown[] = [];
+    let preparations = 0;
+    const storage = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        uploaded.push({ body: Buffer.concat(chunks), method: request.method, marker: request.headers["x-upload-marker"] });
+        response.writeHead(200);
+        response.end();
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      storage.once("error", reject);
+      storage.listen(0, "127.0.0.1", resolve);
+    });
+    try {
+      const address = storage.address();
+      assert.ok(address && typeof address !== "string");
+      await page.route("**/api/csv-temp/direct", async (route) => {
+        preparations += 1;
+        await route.fulfill({ json: preparations === 1
+          ? { key: "direct-key", upload: { type: "s3-presigned-put", method: "POST" } }
+          : { key: "direct-key", upload: {
+            type: "s3-presigned-put", method: "PUT", url: new URL("/mock-direct-csv", page.url()).href,
+            headers: { "x-upload-marker": "fixture" },
+          } } });
+      });
+      await page.route("**/mock-direct-csv", (route) =>
+        route.continue({ url: `http://127.0.0.1:${address.port}/mock-direct-csv` }));
+      await page.route(`**/api/graph/${graphName}/load-csv`, async (route) => {
+        imports.push(route.request().postDataJSON());
+        await route.fulfill({ json: { message: "Direct import accepted" } });
+      });
+      await page.route("**/api/csv-temp/direct-key", (route) => route.fulfill({ status: 204 }));
+
+      await graph.openUploadDialog(graphName);
+      await graph.selectUploadTab("csv");
+      await graph.setUploadFile(CSV_FIXTURE);
+      await graph.csvUploadTempConfirm.click();
+      await expect(graph.errorToast).toContainText("Unexpected direct-upload response.");
+      await expect(graph.csvUploadTempConfirm).toBeEnabled();
+      await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+      expect(uploaded).toEqual([]);
+
+      await graph.csvUploadTempConfirm.click();
+      await expect(graph.loadCsvRunConfirm).toBeVisible();
+      expect(uploaded).toEqual([{ body: fs.readFileSync(CSV_FIXTURE), method: "PUT", marker: "fixture" }]);
+      await graph.setLoadCsvBody(CSV_LOAD_BODY);
+      await graph.clickLoadCsvRun();
+      await expect(graph.toast).toContainText("Direct import accepted");
+      expect(preparations).toBe(2);
+      expect(imports).toEqual([{ key: "direct-key", withHeaders: true, body: CSV_LOAD_BODY }]);
+    } finally {
+      await new Promise<void>((resolve, reject) => storage.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  test(`@admin A rejected direct CSV upload reports the storage error and allows retry`, async () => {
+    graphName = getRandomString("csvDirectFailure");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    let uploads = 0;
+    await page.route("**/api/csv-temp/direct", (route) => route.fulfill({ json: {
+      key: "direct-key", upload: {
+        type: "s3-presigned-put", method: "PUT", url: new URL("/mock-direct-csv", page.url()).href, headers: {},
+      },
+    } }));
+    await page.route("**/mock-direct-csv", async (route) => {
+      uploads += 1;
+      await route.fulfill(uploads === 1 ? { status: 403, body: "Storage rejected upload" } : { status: 200 });
+    });
+    await page.route("**/api/csv-temp/direct-key", (route) => route.fulfill({ status: 204 }));
+
+    await graph.openUploadDialog(graphName);
+    await graph.selectUploadTab("csv");
+    await graph.setUploadFile(CSV_FIXTURE);
+    await graph.csvUploadTempConfirm.click();
+    await expect(graph.errorToast).toContainText("S3 upload failed (403): Storage rejected upload.");
+    await expect(graph.csvUploadTempConfirm).toBeEnabled();
+    await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+    await graph.csvUploadTempConfirm.click();
+    await expect(graph.loadCsvRunConfirm).toBeVisible();
+    expect(uploads).toBe(2);
+    await graph.clickUploadCancel();
   });
 
   test(`@admin Upload CSV button is disabled until a CSV file is selected`, async () => {
