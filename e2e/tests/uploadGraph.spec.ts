@@ -57,8 +57,13 @@ test.describe("Upload Graph – Cypher batch", () => {
     graphName = getRandomString("uploadCypher");
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.selectGraphByName(graphName);
+    await expect(graph.graphInfoLabel("City")).toHaveCount(0);
     await graph.uploadGraphData(graphName, "cypher", CYPHER_FIXTURE);
     expect(await graph.toast.textContent()).toContain("Upload completed");
+    await expect(graph.graphInfoLabel("City")).toBeVisible();
+    await expect(graph.nodesCount).toHaveText("3");
+    await expect(graph.propertyKeysCount).toHaveText("2");
 
     const result = await apiCall.runQuery(
       graphName,

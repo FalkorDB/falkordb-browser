@@ -382,6 +382,14 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("nodesCount");
   }
 
+  public get propertyKeysCount(): Locator {
+    return this.page.getByTestId("propertyKeysCount");
+  }
+
+  public graphInfoLabel(name: string): Locator {
+    return this.page.getByTestId(`graphInfo${name}Node`);
+  }
+
   public get nodesCountLoader(): Locator {
     return this.page.getByTestId("nodesCountLoader");
   }
