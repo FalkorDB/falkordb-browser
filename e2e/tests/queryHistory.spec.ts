@@ -419,4 +419,30 @@ test.describe('Query history Tests', () => {
         });
     });
 
+    test(`@admin history editor keyboard shortcuts insert a line, focus search and run`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            const original = `RETURN '${getRandomString('historykeys')}'`;
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.runQueries([original]);
+            await graph.clickQueryHistoryButton();
+            await graph.selectQueryInHistory(original);
+            await graph.setHistoryPanelQuery("RETURN 1");
+            await graph.clickHistoryPanelEditor();
+            await graph.pressEditorKey("End");
+            await graph.pressEditorKey("Shift+Enter");
+            await expect.poll(() => graph.getHistoryPanelValue()).toMatch(/^RETURN 1\r?\n[ \t]*$/);
+            await graph.pressEditorKey("Escape");
+            await expect(graph.historySearchInput).toBeFocused();
+            await graph.clickHistoryPanelEditor();
+            await graph.pressEditorKey("Control+Enter");
+            await expect(graph.historyPanel).toBeHidden();
+            await graph.clickQueryHistoryButton();
+            await expect(graph.selectQueryHistory("RETURN 1")).toBeVisible();
+        });
+    });
+
 });
