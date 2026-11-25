@@ -153,6 +153,7 @@ export default function Users() {
                         window.location.assign(signOutTarget);
                         discardDeferredInvalidation = true;
                     } catch {
+                        writePasswordChangeLogoutTarget(undefined, callbackUrl);
                         try {
                             writePasswordChangeLogoutTarget(window.sessionStorage, callbackUrl);
                         } catch (error) {

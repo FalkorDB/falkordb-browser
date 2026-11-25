@@ -64,6 +64,7 @@ export default function Navbar({ showUDF }: Props) {
                 callbackUrl = getPasswordChangeLogoutTarget(window.sessionStorage, window.location.origin) ?? callbackUrl;
             } catch (error) {
                 console.error("Failed to read the password reauthentication redirect:", error);
+                callbackUrl = getPasswordChangeLogoutTarget(undefined, window.location.origin) ?? callbackUrl;
             }
             const signOutResponse = await signOut({ redirect: false, redirectTo: callbackUrl });
             const logoutTarget = getPasswordChangeSignOutTarget(
@@ -79,6 +80,7 @@ export default function Navbar({ showUDF }: Props) {
                 consumePasswordChangeLogoutTarget(window.sessionStorage, window.location.origin);
             } catch (error) {
                 console.error("Failed to clear the password reauthentication redirect:", error);
+                consumePasswordChangeLogoutTarget(undefined, window.location.origin);
             }
             window.location.assign(logoutTarget);
         } catch {

@@ -16,7 +16,7 @@ The self-password PATCH route rejects the literal `"undefined"` password sentine
 
 For reauthentication, the route stores the active connection's TLS material in a five-minute server-side handoff record and returns only its opaque reference in an HttpOnly cookie. The login URL carries only endpoint fields. Credentials authorization applies the handoff only on an exact host, port, username, and TLS match, and consumes it only after successful authentication; failed sign-in retains it for retry.
 
-Password-change notices live in one-time `sessionStorage`, not query parameters. If automatic sign-out fails, a validated local `/login` target preserves the endpoint for manual logout. Sign-out confirmation compares the callback path and query, then navigates to the local target so a differing configured auth origin does not cause a false failure.
+Password-change notices live in one-time `sessionStorage`, not query parameters. If automatic sign-out fails, a validated local `/login` target preserves the endpoint for manual logout or deferred session invalidation. An in-memory copy retains the target when session storage is unavailable, until confirmed sign-out or a page reload. Sign-out confirmation compares the callback path and query, then navigates to the local target so a differing configured auth origin does not cause a false failure.
 
 ## Approaches
 

@@ -15,9 +15,9 @@ import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 import { quoteCypherIdentifier } from "./cypher.ts";
 import { getActiveConnectionIdGlobal } from "./active-connection.ts";
 import {
+  consumePasswordChangeLogoutTarget,
   getPasswordChangeLogoutTarget,
   getPasswordChangeSignOutTarget,
-  PASSWORD_CHANGE_LOGOUT_TARGET_KEY,
 } from "./password-change-notice.ts";
 import type { QueryStatistics } from "falkordb";
 import type { PropertyValue } from "./graphValues.ts";
@@ -879,6 +879,8 @@ function triggerSessionInvalidationSignOut(): void {
       callbackUrl = passwordChangeLogoutTarget ?? callbackUrl;
     } catch (error) {
       console.error("Failed to read the password reauthentication redirect:", error);
+      passwordChangeLogoutTarget = getPasswordChangeLogoutTarget(undefined, browserWindow.location.origin);
+      callbackUrl = passwordChangeLogoutTarget ?? callbackUrl;
     }
   }
 
@@ -903,9 +905,10 @@ function triggerSessionInvalidationSignOut(): void {
     }
 
     try {
-      browserWindow.sessionStorage.removeItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY);
+      consumePasswordChangeLogoutTarget(browserWindow.sessionStorage, browserWindow.location.origin);
     } catch (error) {
       console.error("Failed to clear the password reauthentication redirect:", error);
+      consumePasswordChangeLogoutTarget(undefined, browserWindow.location.origin);
     }
     browserWindow.location.assign(signOutTarget);
   }).catch(error => {

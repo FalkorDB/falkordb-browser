@@ -165,6 +165,7 @@ test.describe('@Config Settings users tests', () => {
         { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", sessionStorageUnavailable: false },
         { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", manualLogoutAfterFailure: true, sessionStorageUnavailable: false },
         { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", manualLogoutAfterFailure: true, manualLogoutFailsOnce: true, sessionStorageUnavailable: false },
+        { aclSaveStatus: "saved", signOutFails: true, signOutFailure: "error-response", manualLogoutAfterFailure: true, manualLogoutFailsOnce: true, sessionStorageUnavailable: true },
         { aclSaveStatus: "failed", signOutFails: false, sessionStorageUnavailable: false },
         { aclSaveStatus: "unknown", signOutFails: false, sessionStorageUnavailable: false },
         { aclSaveStatus: "failed", signOutFails: true, signOutFailure: "error-response", sessionStorageUnavailable: false },
@@ -274,8 +275,10 @@ test.describe('@Config Settings users tests', () => {
                     await page.getByTestId("logoutConfirm").click();
                     if (manualLogoutFailsOnce) {
                         await expect(page).toHaveURL(url => url.pathname === new URL(urls.settingsUrl).pathname);
-                        expect(await page.evaluate(key => window.sessionStorage.getItem(key), PASSWORD_CHANGE_LOGOUT_TARGET_KEY))
-                            .toBe(`/login?host=${connection.host}&port=${connection.port}&username=${username}&tls=true&signedOut=true`);
+                        if (!sessionStorageUnavailable) {
+                            expect(await page.evaluate(key => window.sessionStorage.getItem(key), PASSWORD_CHANGE_LOGOUT_TARGET_KEY))
+                                .toBe(`/login?host=${connection.host}&port=${connection.port}&username=${username}&tls=true&signedOut=true`);
+                        }
                         await expect(page.getByTestId("logoutConfirm")).toBeVisible();
                         await page.getByTestId("logoutConfirm").click();
                     }

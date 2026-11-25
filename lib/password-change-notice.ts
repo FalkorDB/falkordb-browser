@@ -3,6 +3,8 @@ import type { AclSaveStatus } from "../app/api/user/model.ts";
 export const PASSWORD_CHANGE_NOTICE_KEY = "passwordChangeNotice";
 export const PASSWORD_CHANGE_LOGOUT_TARGET_KEY = "passwordChangeLogoutTarget";
 
+let passwordChangeLogoutTarget: string | undefined;
+
 export function getPasswordChangeSignOutTarget(
     responseUrl: string | null | undefined,
     callbackUrl: string,
@@ -44,15 +46,16 @@ export function consumePasswordChangeNotice(storage: Pick<Storage, "getItem" | "
     }
 }
 
-export function writePasswordChangeLogoutTarget(storage: Pick<Storage, "setItem">, target: string): void {
-    storage.setItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY, target);
+export function writePasswordChangeLogoutTarget(storage: Pick<Storage, "setItem"> | undefined, target: string): void {
+    passwordChangeLogoutTarget = target;
+    storage?.setItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY, target);
 }
 
 export function getPasswordChangeLogoutTarget(
-    storage: Pick<Storage, "getItem">,
+    storage: Pick<Storage, "getItem"> | undefined,
     origin: string,
 ): string | undefined {
-    const target = storage.getItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY);
+    const target = passwordChangeLogoutTarget ?? storage?.getItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY);
     if (!target) return undefined;
 
     try {
@@ -66,10 +69,14 @@ export function getPasswordChangeLogoutTarget(
 }
 
 export function consumePasswordChangeLogoutTarget(
-    storage: Pick<Storage, "getItem" | "removeItem">,
+    storage: Pick<Storage, "getItem" | "removeItem"> | undefined,
     origin: string,
 ): string | undefined {
-    const target = getPasswordChangeLogoutTarget(storage, origin);
-    storage.removeItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY);
-    return target;
+    try {
+        const target = getPasswordChangeLogoutTarget(storage, origin);
+        storage?.removeItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY);
+        return target;
+    } finally {
+        passwordChangeLogoutTarget = undefined;
+    }
 }

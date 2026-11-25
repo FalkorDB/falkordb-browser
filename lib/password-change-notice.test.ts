@@ -110,4 +110,18 @@ test("reads a valid manual logout target without consuming it", () => {
 
   assert.equal(getPasswordChangeLogoutTarget(storage, "https://browser.example.test"), target);
   assert.equal(storage.getItem(PASSWORD_CHANGE_LOGOUT_TARGET_KEY), target);
+  consumePasswordChangeLogoutTarget(storage, "https://browser.example.test");
+});
+
+test("retains a failed storage write in memory until the target is consumed", () => {
+    const target = "/login?host=db.example.test&port=6380&username=alice&tls=true&signedOut=true";
+    const blockedStorage = {
+        setItem() { throw new Error("storage blocked"); },
+    };
+    const emptyStorage = new MemoryStorage();
+
+    assert.throws(() => writePasswordChangeLogoutTarget(blockedStorage, target), /storage blocked/);
+    assert.equal(getPasswordChangeLogoutTarget(emptyStorage, "https://browser.example.test"), target);
+    assert.equal(consumePasswordChangeLogoutTarget(emptyStorage, "https://browser.example.test"), target);
+    assert.equal(getPasswordChangeLogoutTarget(emptyStorage, "https://browser.example.test"), undefined);
 });

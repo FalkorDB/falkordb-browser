@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { LoginError } from "./login-errors.ts";
 import { execFileSync } from "node:child_process";
 import { convertToCanvasData, createAbortError, deferSessionInvalidationSignOut, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, prepareArg, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
-import { PASSWORD_CHANGE_LOGOUT_TARGET_KEY } from "./password-change-notice.ts";
+import { consumePasswordChangeLogoutTarget, PASSWORD_CHANGE_LOGOUT_TARGET_KEY, writePasswordChangeLogoutTarget } from "./password-change-notice.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
@@ -997,6 +997,54 @@ describe("securedFetch session invalidation deferral", () => {
     assert.equal(signOutAttempts, 1);
     assert.equal(callbackUrl, "/login");
     await new Promise(resolve => setImmediate(resolve));
+  });
+
+  it("uses the in-memory password target for deferred sign-out when session storage is blocked", async (t) => {
+    const target = "/login?host=db.example.test&port=6380&username=alice&tls=true&signedOut=true";
+    const origin = "http://localhost";
+    const callbackUrls: string[] = [];
+    t.mock.method(console, "error", () => {});
+    Object.defineProperty(globalThis, "BroadcastChannel", { configurable: true, value: undefined });
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        location: { origin, href: `${origin}/settings` },
+        get sessionStorage() {
+          throw new DOMException("Storage access is blocked", "SecurityError");
+        },
+      },
+    });
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input), origin);
+      if (url.pathname === "/api/status") {
+        return new Response('{"message":"Expired","code":"SESSION_INVALID"}', {
+          status: 401, headers: { "X-Session-Invalid": "1" },
+        });
+      }
+      if (url.pathname.endsWith("/csrf")) return Response.json({ csrfToken: "csrf" });
+      if (url.pathname.endsWith("/signout")) {
+        callbackUrls.push(new URLSearchParams(String(init?.body)).get("callbackUrl") ?? "");
+        return Response.json({ url: `${origin}/api/auth/error?error=Configuration` });
+      }
+      throw new Error(`Unexpected request: ${url.pathname}`);
+    };
+
+    const release = deferSessionInvalidationSignOut();
+    try {
+      await securedFetch("/api/status", { method: "GET" }, noopToast, noopIndicator);
+      assert.deepEqual(callbackUrls, []);
+      writePasswordChangeLogoutTarget(undefined, target);
+      release();
+      for (let i = 0; i < 100 && callbackUrls.length === 0; i += 1) {
+        await new Promise(resolve => setImmediate(resolve));
+      }
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(callbackUrls, [target]);
+      assert.equal(consumePasswordChangeLogoutTarget(undefined, origin), target);
+    } finally {
+      release(true);
+      consumePasswordChangeLogoutTarget(undefined, origin);
+    }
   });
 
   it("keeps the manual logout target when deferred sign-out returns an auth error and allows retry", async (t) => {
