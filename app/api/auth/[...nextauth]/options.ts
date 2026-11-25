@@ -31,6 +31,7 @@ import {
   matchesReauthenticationEndpoint,
   readReauthenticationHandoffId,
   REAUTHENTICATION_HANDOFF_PREFIX,
+  resolveReauthenticationTls,
 } from "@/lib/reauthentication-handoff";
 import {
   enableAutoNextAuthUrl,
@@ -924,9 +925,7 @@ const authOptions: NextAuthConfig = {
                 const { decrypt } = await import("../encryption");
                 creds = {
                   ...creds,
-                  ca: handoff.ca || undefined,
-                  cert: handoff.cert || undefined,
-                  key: handoff.encrypted_key ? decrypt(handoff.encrypted_key) : undefined,
+                  ...resolveReauthenticationTls(creds, handoff, decrypt),
                 };
                 handoffReferenceToConsume = handoffReference;
               }

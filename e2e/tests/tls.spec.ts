@@ -495,6 +495,7 @@ test.describe(`@tls TLS Login tests`, () => {
             passwordValue: string,
             includeTlsMaterial: boolean,
             signInEndpoint = endpoint,
+            tlsMaterial?: { ca?: string; cert?: string; key?: string },
         ) => {
             const form: Record<string, string | number | boolean> = {
                 ...signInEndpoint,
@@ -503,6 +504,7 @@ test.describe(`@tls TLS Login tests`, () => {
                 password: passwordValue,
             };
             if (includeTlsMaterial) Object.assign(form, { ca, cert, key });
+            if (tlsMaterial) Object.assign(form, tlsMaterial);
             const response = await request.post("/api/auth/callback/credentials", {
                 headers: { "X-Auth-Return-Redirect": "1" },
                 form,
@@ -570,10 +572,34 @@ test.describe(`@tls TLS Login tests`, () => {
                 return handoffCookie.value;
             });
 
+            await test.step("honor replacement TLS files and reject an incomplete client pair", async () => {
+                const invalidMaterial = Buffer.from("invalid certificate material").toString("base64");
+                expect((await signIn(password, false, endpoint, { ca: invalidMaterial }))?.user).toBeUndefined();
+                expect((await signIn(password, false, endpoint, { cert: invalidMaterial, key: invalidMaterial }))?.user).toBeUndefined();
+                expect((await signIn(password, false, endpoint, { cert }))?.user).toBeUndefined();
+                expect((await signIn(password, false, endpoint, { key }))?.user).toBeUndefined();
+                expect((await request.storageState()).cookies.some(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookieValue,
+                )).toBe(true);
+            });
+
             await test.step("reuse saved TLS material without resubmitting it", async () => {
                 expect(await signIn(password, false)).toMatchObject({ user: { username } });
                 expect((await request.storageState()).cookies.some(
                     cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookieValue,
+                )).toBe(false);
+            });
+
+            await test.step("allow a complete uploaded TLS replacement", async () => {
+                const nextPassword = `Next!${crypto.randomUUID()}`;
+                const update = await request.patch(`/api/user/${encodeURIComponent(username)}`, {
+                    data: { role: "Admin", keys: ["*"], password: nextPassword },
+                });
+                expect(update.status()).toBe(200);
+                expect((await signOut()).ok()).toBe(true);
+                expect(await signIn(nextPassword, true)).toMatchObject({ user: { username } });
+                expect((await request.storageState()).cookies.some(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE,
                 )).toBe(false);
             });
         } catch (error) {

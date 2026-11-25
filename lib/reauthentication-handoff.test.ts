@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import * as handoffHelpers from "./reauthentication-handoff.ts";
+import { authCredentials } from "../app/api/validate-body.ts";
 import {
   consumeReauthenticationHandoff,
   createReauthenticationHandoffId,
@@ -19,6 +21,48 @@ const handoff = {
   username: "alice",
   tls: true,
 };
+
+describe("resolveReauthenticationTls", () => {
+  it("uses explicit TLS material instead of the saved material", () => {
+    const resolve = handoffHelpers.resolveReauthenticationTls;
+    assert.equal(typeof resolve, "function");
+    const result = resolve(
+      { ca: "new-ca", cert: "new-cert", key: "new-key" },
+      { ca: "saved-ca", cert: "saved-cert", encrypted_key: "encrypted-key" },
+      () => { throw new Error("Unneeded key decryption"); },
+    );
+    assert.deepEqual(result, { ca: "new-ca", cert: "new-cert", key: "new-key" });
+  });
+
+  it("uses the saved pair for omitted credentials and allows a new CA", () => {
+    const saved = { ca: "saved-ca", cert: "saved-cert", encrypted_key: "encrypted-key" };
+    const decrypt = (value: string) => `decrypted-${value}`;
+    assert.deepEqual(handoffHelpers.resolveReauthenticationTls({}, saved, decrypt), {
+      ca: "saved-ca", cert: "saved-cert", key: "decrypted-encrypted-key",
+    });
+    assert.deepEqual(handoffHelpers.resolveReauthenticationTls({ ca: "new-ca", cert: "undefined", key: "undefined" }, saved, decrypt), {
+      ca: "new-ca", cert: "saved-cert", key: "decrypted-encrypted-key",
+    });
+    assert.deepEqual(handoffHelpers.resolveReauthenticationTls({ ca: "undefined" }, {}, decrypt), {
+      ca: undefined, cert: undefined, key: undefined,
+    });
+  });
+
+  it("does not fill a partially supplied pair from the saved handoff", () => {
+    const saved = { cert: "saved-cert", encrypted_key: "encrypted-key" };
+    const decrypt = () => { throw new Error("Unneeded key decryption"); };
+    assert.deepEqual(handoffHelpers.resolveReauthenticationTls({ cert: "new-cert" }, saved, decrypt), {
+      ca: undefined, cert: "new-cert", key: undefined,
+    });
+    assert.deepEqual(handoffHelpers.resolveReauthenticationTls({ key: "new-key" }, saved, decrypt), {
+      ca: undefined, cert: undefined, key: "new-key",
+    });
+    for (const partial of [{ cert: "bmV3LWNlcnQ=" }, { key: "bmV3LWtleQ==" }]) {
+      const tls = handoffHelpers.resolveReauthenticationTls(partial, saved, decrypt);
+      assert.equal(authCredentials.safeParse({ ...tls, tls: "true" }).success, false);
+    }
+  });
+});
 
 describe("createReauthenticationHandoffId", () => {
   it("creates distinct opaque UUID references", () => {

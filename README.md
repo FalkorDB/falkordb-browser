@@ -53,6 +53,7 @@ behind a mobile shell.
 - **Administration.** Users and roles, database configuration, personal access tokens, and an
   OpenAPI reference served at `/docs`.
   Changing your own database user's password signs you out and prefills the database connection for sign-in with the new password.
+  Existing TLS files are temporarily reused, but newly uploaded files take precedence; a client certificate and key must be uploaded together.
 
 See the [feature overview](readme-browser.md) for every page, panel and workflow.
 

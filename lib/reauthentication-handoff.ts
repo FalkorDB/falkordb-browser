@@ -17,6 +17,29 @@ type ReauthenticationCredentials = {
   tls?: string;
 };
 
+type ReauthenticationTls = {
+  ca?: string;
+  cert?: string;
+  key?: string;
+};
+
+export function resolveReauthenticationTls(
+  credentials: ReauthenticationTls,
+  handoff: Pick<TokenData, "ca" | "cert" | "encrypted_key">,
+  decrypt: (value: string) => string,
+): ReauthenticationTls {
+  const provided = (value: string | undefined) => value && value !== "undefined" ? value : undefined;
+  const ca = provided(credentials.ca) ?? handoff.ca;
+  const cert = provided(credentials.cert);
+  const key = provided(credentials.key);
+  if (cert || key) return { ca, cert, key };
+  return {
+    ca,
+    cert: handoff.cert,
+    key: handoff.encrypted_key ? decrypt(handoff.encrypted_key) : undefined,
+  };
+}
+
 export function createReauthenticationHandoffId(): string {
   return randomUUID();
 }
