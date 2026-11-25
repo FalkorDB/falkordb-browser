@@ -35,7 +35,7 @@ export default class ConnectionManagerComponent extends BasePage {
         return this.logoutDialog.getByTestId("connectionLogoutConfirm");
     }
 
-    private get logoutCancel(): Locator {
+    public get logoutCancel(): Locator {
         return this.logoutDialog.getByTestId("connectionLogoutCancel");
     }
 
@@ -119,6 +119,10 @@ export default class ConnectionManagerComponent extends BasePage {
 
     async cancelRemoval(): Promise<void> {
         await interactWhenVisible(this.logoutCancel, (el) => el.click(), "Cancel connection logout");
+    }
+
+    async dismissRemovalWithEscape(): Promise<void> {
+        await this.page.keyboard.press("Escape");
     }
 
     async closeAddDialog(): Promise<void> {

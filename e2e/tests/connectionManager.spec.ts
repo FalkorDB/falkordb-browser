@@ -295,6 +295,54 @@ test.describe("Connection Manager Tests: own session", () => {
       await expect(manager.addDialog).toBeHidden();
     });
 
+    test(`@admin A pending removal cannot be dismissed until the request finishes`, async ({ page }) => {
+      await manager.openDropdown();
+      const inactiveId = await manager.getConnectionId(ADMIN_USERNAME);
+      const activeId = await manager.getConnectionId(READ_WRITE_USERNAME);
+      if (!inactiveId || !activeId) throw new Error("Expected both connection IDs");
+      let releaseDelete!: () => void;
+      const deleteGate = new Promise<void>(resolve => { releaseDelete = resolve; });
+      let notifyDelete!: () => void;
+      const deleteStarted = new Promise<void>(resolve => { notifyDelete = resolve; });
+      let deleteCount = 0;
+      await page.route("**/api/connections/*", async route => {
+        if (route.request().method() !== "DELETE") {
+          await route.continue();
+          return;
+        }
+        deleteCount += 1;
+        notifyDelete();
+        await deleteGate;
+        await route.continue();
+      });
+      const deleteResponse = page.waitForResponse(response =>
+        new URL(response.url()).pathname === `/api/connections/${inactiveId}` &&
+        response.request().method() === "DELETE");
+      try {
+        await manager.requestRemoval(ADMIN_USERNAME);
+        await manager.confirmRemoval();
+        await deleteStarted;
+        await expect(manager.logoutCancel).toBeDisabled();
+        await manager.dismissRemovalWithEscape();
+        await expect(manager.logoutDialog).toBeVisible();
+        const pending = await page.request.get(new URL("/api/connections", page.url()).href);
+        expect(pending.ok()).toBe(true);
+        const { connections }: { connections: { id: string }[] } = await pending.json();
+        expect(connections.map(connection => connection.id)).toEqual(expect.arrayContaining([inactiveId, activeId]));
+        expect(connections).toHaveLength(2);
+      } finally {
+        releaseDelete();
+      }
+      expect((await deleteResponse).ok()).toBe(true);
+      await expect(manager.logoutDialog).toBeHidden();
+      await expect(manager.connectionItems).toHaveCount(1);
+      await expect(manager.activeMarkerForUser(READ_WRITE_USERNAME)).toHaveCount(1);
+      const remaining = await page.request.get(new URL("/api/connections", page.url()).href);
+      expect(remaining.ok()).toBe(true);
+      expect((await remaining.json()).connections).toEqual([expect.objectContaining({ id: activeId })]);
+      expect(deleteCount).toBe(1);
+    });
+
     test(`@admin Verify adding a connection selects it and activates its role`, async () => {
       await manager.openDropdown();
       const secondaryId = await manager.getConnectionId(READ_WRITE_USERNAME);
