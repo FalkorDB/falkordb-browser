@@ -255,6 +255,26 @@ test("count endpoints return an SSE error when a count query fails", async (t) =
     }
 });
 
+test("count endpoints use a fallback message for query errors without a message", async (t) => {
+    t.mock.method(console, "error", () => {});
+    const cases = [
+        [count, "graph-one/count"],
+        [nodes, "graph-one/count/nodes"],
+        [edges, "graph-one/count/edges"],
+    ] as const;
+
+    for (const [route, path] of cases) {
+        const state = harness({ countError: new Error("") });
+        const response = await route.GET(request(path), routeParams());
+
+        assert.deepEqual(eventPayload(await response.text(), "error"), {
+            message: "Internal server error",
+            status: 400,
+        });
+        assert.equal(state.countCalls.length, 1);
+    }
+});
+
 test("combined count reports an error when the edge query fails after the node query", async (t) => {
     t.mock.method(console, "error", () => {});
     const state = harness({
