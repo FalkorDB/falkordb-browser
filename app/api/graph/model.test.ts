@@ -520,6 +520,19 @@ test("adding a label to an unlabeled node removes its empty category", async () 
     assert.deepEqual(graph.Data, [{ item: { ...original, labels: ["Person"] } }]);
 });
 
+test("adding a label without updating query results changes only graph state", async () => {
+    const original = node(1);
+    const graph = await graphWith([{ item: original }]);
+    const selected = graph.NodesMap.get(1);
+    assert.ok(selected);
+
+    await graph.addLabel("Employee", selected, false);
+
+    assert.deepEqual(selected.labels, ["Person", "Employee"]);
+    assert.deepEqual(graph.Data, [{ item: original }]);
+    assert.equal(graph.LabelsMap.get("Employee")?.elements[0], selected);
+});
+
 test("visibleLinks follows relationship and endpoint visibility", async () => {
     const graph = await graphWith([{
         nodes: [node(1), node(2), node(3)],
@@ -589,4 +602,31 @@ test("removing a relationship element clears its results and final category", as
     assert.equal(graph.LinksMap.has(10), false);
     assert.equal(graph.RelationshipsMap.has("KNOWS"), false);
     assert.deepEqual(graph.Data, [{ nodes: [first, second], edges: undefined, scalar: "kept" }]);
+});
+
+test("removing an edge referenced only inside a path clears that result cell", async () => {
+    const first = node(1);
+    const second = node(2);
+    const link = edge(10);
+    const graph = await graphWith([{ path: { nodes: [first, second], edges: [link] }, scalar: "kept" }]);
+    const selected = graph.LinksMap.get(10);
+    assert.ok(selected);
+
+    graph.removeElements([selected]);
+
+    assert.deepEqual(graph.Data, [{ path: undefined, scalar: "kept" }]);
+    assert.deepEqual(graph.Elements.links, []);
+    assert.equal(graph.RelationshipsMap.has("KNOWS"), false);
+});
+
+test("empty graph initializes safe defaults and empty accessors", () => {
+    const graph = Graph.empty();
+
+    assert.equal(graph.Id, "");
+    assert.equal(graph.CurrentLimit, 0);
+    assert.equal(graph.ShowPropertyKeyPrefix, false);
+    assert.deepEqual(graph.Elements, { nodes: [], links: [] });
+    assert.deepEqual(graph.Data, []);
+    assert.deepEqual(graph.getElements(), []);
+    assert.equal(graph.GraphInfo.PropertyKeys, undefined);
 });
