@@ -7,7 +7,7 @@ import { Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
-import { IndicatorContext, ConnectionContext } from "../components/provider";
+import { IndicatorContext, ConnectionContext, QueryLoadingContext } from "../components/provider";
 
 const renderValue = (v: any) => (
     <span className="SofiaSans text-xs">{v}</span>
@@ -27,6 +27,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { isQueryLoading } = useContext(QueryLoadingContext);
 
     const { toast } = useToast();
     const { theme } = useTheme();
@@ -37,7 +38,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
 
 
     const handleProfile = async () => {
-        if (isReadOnly) return;
+        if (isReadOnly || isQueryLoading) return;
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
@@ -77,7 +78,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
                     label="Profile"
                     onClick={handleProfile}
                     isLoading={isLoading}
-                    disabled={isReadOnly}
+                    disabled={isReadOnly || isQueryLoading}
                 />
                 <Button
                     className="cursor-default"

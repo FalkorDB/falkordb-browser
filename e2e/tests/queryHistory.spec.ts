@@ -29,14 +29,262 @@ async function withGraphCleanup(apicalls: ApiCalls, graphs: string[], body: () =
 test.describe('Query history Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
+    let browserClosed: boolean;
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
+        browserClosed = false;
     });
 
     test.afterEach(async () => {
-        await browser.closeBrowser();
+        if (!browserClosed) await browser.closeBrowser();
+    });
+
+    test(`@admin profiling a selected history entry saves its profile to that entry`, async () => {
+        const graphName = getRandomString('queryhistory-profile');
+        const query = "MATCH (n) RETURN n";
+        const historyQuery = "RETURN 3";
+        const profile = ["Results | Records produced: 3"];
+        const draftProfile = ["Results | Records produced: 0"];
+        const timestamp = Date.now();
+        const history = [query, historyQuery].map((text, index) => ({
+            text,
+            explain: [],
+            profile: [],
+            graphName,
+            timestamp: timestamp + index,
+            status: "Success" as const,
+            elementsCount: 0,
+            fav: false
+        }));
+
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            let releaseProfileResponse = () => {};
+            let releaseDraftProfileResponse = () => {};
+            try {
+                await apicalls.addGraph(graphName);
+                const graph = await browser.createNewPage(QueryHistory);
+                const page = await browser.getPage();
+                await page.addInitScript((queries) => {
+                    localStorage.setItem("localhost:6379:default:query history", JSON.stringify(queries));
+                }, history);
+                await browser.navigateTo(urls.graphUrl);
+                await browser.setPageToFullScreen();
+                await graph.selectGraphByName(graphName);
+                await graph.insertQuery(query);
+                await graph.clickQueryHistoryButton();
+                await expect(graph.historyTab("Edit Query")).toBeEnabled();
+                await expect(graph.historyPanelEditor).toBeVisible();
+                await expect(graph.historyTab("Profile")).toBeDisabled();
+                await expect(graph.historyTab("Metadata")).toBeDisabled();
+                await expect(graph.historyTab("Explain")).toBeDisabled();
+                await graph.selectQueryInHistory(historyQuery);
+                await expect(graph.historyTab("Profile")).toBeEnabled();
+
+                let profiledRequest: unknown;
+                let notifyProfileRequest = () => {};
+                const profileRequestStarted = new Promise<void>((resolve) => {
+                    notifyProfileRequest = resolve;
+                });
+                const profileResponseGate = new Promise<void>((resolve) => {
+                    releaseProfileResponse = resolve;
+                });
+                let pendingProfiledRequest: unknown;
+                let notifyPendingProfileRequest = () => {};
+                const pendingProfileRequestStarted = new Promise<void>((resolve) => {
+                    notifyPendingProfileRequest = resolve;
+                });
+                const draftProfileResponseGate = new Promise<void>((resolve) => {
+                    releaseDraftProfileResponse = resolve;
+                });
+                await page.route("**/api/graph/*/profile", async (route) => {
+                    const request = route.request().postDataJSON();
+                    if (request.query === historyQuery) {
+                        profiledRequest = request;
+                        notifyProfileRequest();
+                        await profileResponseGate;
+                        await route.fulfill({ json: { result: profile } });
+                    } else if (request.query === query) {
+                        pendingProfiledRequest = request;
+                        notifyPendingProfileRequest();
+                        await draftProfileResponseGate;
+                        await route.fulfill({ json: { result: draftProfile } });
+                    } else {
+                        await route.continue();
+                    }
+                });
+                await graph.clickHistoryTab("Profile");
+                await graph.clickHistoryProfileButton();
+                await profileRequestStarted;
+                expect(profiledRequest).toEqual({ query: historyQuery });
+
+                await graph.selectQueryInHistory(query);
+                await expect(graph.historyTab("Profile")).toBeEnabled();
+                await graph.clickHistoryTab("Profile");
+                await expect(graph.historyTab("Profile")).toHaveAttribute("data-state", "active");
+                releaseProfileResponse();
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                        text: string;
+                        profile: string[];
+                    }>;
+                    return stored.find((entry) => entry.text === historyQuery)?.profile;
+                }).toEqual(profile);
+                await expect(graph.profileTree).not.toBeVisible();
+
+                await graph.clickHistoryProfileButton();
+                await pendingProfileRequestStarted;
+                expect(pendingProfiledRequest).toEqual({ query });
+                await graph.closeHistoryPanel();
+                releaseDraftProfileResponse();
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                        text: string;
+                        profile: string[];
+                    }>;
+                    return stored.find((entry) => entry.text === query)?.profile;
+                }).toEqual(draftProfile);
+
+                await graph.clickQueryHistoryButton();
+                await expect(graph.historyTab("Profile")).toBeEnabled();
+                await graph.clickHistoryTab("Profile");
+                await expect(graph.profileTree).toContainText("Records produced: 0");
+
+                const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                    text: string;
+                    profile: string[];
+                    graphName: string;
+                }>;
+                expect(stored.find((entry) => entry.text === historyQuery)).toMatchObject({
+                    profile,
+                    graphName
+                });
+                expect(stored.find((entry) => entry.text === query)).toMatchObject({
+                    profile: draftProfile,
+                    graphName
+                });
+            } finally {
+                releaseProfileResponse();
+                releaseDraftProfileResponse();
+                await browser.closeBrowser();
+                browserClosed = true;
+            }
+        });
+    });
+
+    test(`@admin a profile result persists when another query commits while it is in flight`, async () => {
+        const graphName = getRandomString('queryhistory-profile-race');
+        const queryA = "RETURN 3";
+        const queryB = "RETURN 5";
+        const profile = ["Results | Records produced: 3"];
+        const history = [{
+            text: queryA,
+            explain: [],
+            profile: [],
+            graphName,
+            timestamp: Date.now(),
+            status: "Success" as const,
+            elementsCount: 0,
+            fav: false
+        }];
+
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            let releaseProfileResponse = () => {};
+            let releaseQueryResponse = () => {};
+            try {
+                await apicalls.addGraph(graphName);
+                const graph = await browser.createNewPage(QueryHistory);
+                const page = await browser.getPage();
+                await page.addInitScript((queries) => {
+                    localStorage.setItem("localhost:6379:default:query history", JSON.stringify(queries));
+                }, history);
+                await browser.navigateTo(urls.graphUrl);
+                await browser.setPageToFullScreen();
+                await graph.selectGraphByName(graphName);
+                await graph.insertQuery(queryB);
+                await graph.clickQueryHistoryButton();
+                await graph.selectQueryInHistory(queryA);
+                await graph.clickHistoryTab("Profile");
+
+                let notifyProfileRequest = () => {};
+                const profileRequestStarted = new Promise<void>((resolve) => {
+                    notifyProfileRequest = resolve;
+                });
+                const profileResponseGate = new Promise<void>((resolve) => {
+                    releaseProfileResponse = resolve;
+                });
+                await page.route("**/api/graph/*/profile", async (route) => {
+                    if (route.request().postDataJSON().query === queryA) {
+                        notifyProfileRequest();
+                        await profileResponseGate;
+                        await route.fulfill({ json: { result: profile } });
+                    } else {
+                        await route.continue();
+                    }
+                });
+                await graph.clickHistoryProfileButton();
+                await profileRequestStarted;
+
+                await graph.closeHistoryPanel();
+                await graph.insertQuery(queryB);
+                let notifyQueryRequest = () => {};
+                const queryRequestStarted = new Promise<void>((resolve) => {
+                    notifyQueryRequest = resolve;
+                });
+                const queryResponseGate = new Promise<void>((resolve) => {
+                    releaseQueryResponse = resolve;
+                });
+                await page.route(
+                    (url) => url.pathname === `/api/graph/${encodeURIComponent(graphName)}`,
+                    async (route) => {
+                        if (route.request().method() === "POST" && route.request().postData()?.includes(queryB)) {
+                            notifyQueryRequest();
+                            await queryResponseGate;
+                        }
+                        await route.continue();
+                    }
+                );
+                const runningQuery = graph.clickRunQuery(false);
+                await queryRequestStarted;
+                releaseProfileResponse();
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                        text: string;
+                        profile: string[];
+                    }>;
+                    return stored.find((entry) => entry.text === queryA)?.profile;
+                }).toEqual(profile);
+                await graph.clickQueryHistoryButton();
+                await expect(graph.historyTab("Profile")).toBeEnabled();
+                await graph.clickHistoryTab("Profile");
+                await expect(graph.profileTree).toContainText("Records produced: 3");
+                await graph.closeHistoryPanel();
+
+                releaseQueryResponse();
+                await runningQuery;
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{ text: string }>;
+                    return stored.some((entry) => entry.text === queryB);
+                }).toBe(true);
+                await expect.poll(async () => {
+                    const stored = JSON.parse(await graph.getStoredQueryHistory()) as Array<{
+                        text: string;
+                        profile: string[];
+                    }>;
+                    return stored.find((entry) => entry.text === queryA)?.profile;
+                }).toEqual(profile);
+                await graph.clickQueryHistoryButton();
+                await graph.selectQueryInHistory(queryA);
+                await graph.clickHistoryTab("Profile");
+                await expect(graph.profileTree).toContainText("Records produced: 3");
+            } finally {
+                releaseProfileResponse();
+                releaseQueryResponse();
+                await browser.closeBrowser();
+                browserClosed = true;
+            }
+        });
     });
 
     test(`@admin The history Metadata tab stays open and shows the query statistics`, async () => {
@@ -131,28 +379,26 @@ test.describe('Query history Tests', () => {
 
     test(`@admin history panel editor shows autocomplete suggestions`, async () => {
         const graphName = getRandomString('queryhistory');
-        await apicalls.addGraph(graphName);
-        const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraphByName(graphName);
-        const query = "MATCH (n) RETURN n";
-        await graph.insertQuery(query);
-        await graph.clickRunQuery(false);
-        await graph.clickQueryHistoryButton();
-        await graph.clickSelectQueryInHistory(query);
-        // Click inside the history panel editor and trigger completions
-        await graph.clickHistoryPanelEditor();
-        // Monaco's suggest widget can be slow/racy under load; retry the trigger.
-        let suggestVisible = false;
-        for (let attempt = 0; attempt < 3 && !suggestVisible; attempt += 1) {
-            await graph.triggerSuggestions();
-            suggestVisible = await graph.waitForSuggestWidget(5000);
-        }
-        expect(suggestVisible).toBe(true);
-        // At minimum, Cypher keywords (MATCH, RETURN, etc.) should be present
-        const count = await graph.getSuggestionCount();
-        expect(count).toBeGreaterThan(0);
-        await apicalls.removeGraph(graphName);
+        const propertyKey = "historyAutocompleteProperty";
+        await withGraphCleanup(apicalls, [graphName], async () => {
+            await apicalls.addGraph(graphName);
+            const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            const query = `CREATE (n:HistoryAutocomplete { ${propertyKey}: 1 }) RETURN n`;
+            await graph.insertQuery(query);
+            await graph.clickRunQuery(false);
+            await graph.clickQueryHistoryButton();
+            await expect(graph.historyTab("Profile")).toBeDisabled();
+            await graph.clickHistoryPanelEditor();
+            const page = await browser.getPage();
+            await page.keyboard.press("Control+a");
+            await page.keyboard.type("MATCH (n) RETURN n.");
+
+            const suggestVisible = await graph.waitForSuggestWidget(5000);
+            expect(suggestVisible).toBe(true);
+            await expect(graph.monacoSuggestRows.filter({ hasText: propertyKey })).toHaveCount(1);
+        });
     });
 
     test(`@admin Ctrl+F opens the find widget in the fullscreen dialog editor`, async () => {
