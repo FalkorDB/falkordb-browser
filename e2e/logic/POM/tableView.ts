@@ -9,6 +9,10 @@ export default class TableView extends GraphPage {
         return this.page.getByTestId("tableTab");
     }
 
+    public get selectAllManagedGraphs(): Locator {
+        return this.manageContent.getByRole('checkbox', { name: 'Select all Graphs' });
+    }
+
     public get tableViewTabPanel(): Locator {
         return this.page.getByRole('tabpanel', { name: 'Table' });
     }

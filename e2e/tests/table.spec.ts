@@ -33,6 +33,57 @@ test.describe('Table View Tests', () => {
         expect(isTableViewEnabled).toBe(false);
     });
 
+    test('@admin select all applies only to filtered managed graph rows', async () => {
+        const prefix = getRandomString('table-select');
+        const graphNames = [`${prefix}-one`, `${prefix}-two`, `${prefix}-other`];
+        const created: string[] = [];
+        try {
+            for (const graphName of graphNames) {
+                await apiCalls.addGraph(graphName);
+                created.push(graphName);
+            }
+            const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+            await tableView.clickSelect();
+            await tableView.clickManage();
+            await tableView.searchManagedGraphs(`${prefix}-`);
+            await expect(tableView.tableCheckboxByName(graphNames[0])).toBeVisible();
+            await expect(tableView.tableCheckboxByName(graphNames[1])).toBeVisible();
+            await expect(tableView.tableCheckboxByName(graphNames[2])).toBeVisible();
+
+            await tableView.searchManagedGraphs(`${prefix}-one`);
+            await expect(tableView.tableCheckboxByName(graphNames[1])).toHaveCount(0);
+            await tableView.selectAllManagedGraphs.check();
+            await expect(tableView.tableCheckboxByName(graphNames[0])).toBeChecked();
+            await tableView.searchManagedGraphs(`${prefix}-`);
+            await expect(tableView.tableCheckboxByName(graphNames[1])).toBeVisible();
+            await expect(tableView.tableCheckboxByName(graphNames[0])).toBeChecked();
+            await expect(tableView.tableCheckboxByName(graphNames[1])).not.toBeChecked();
+            await expect(tableView.tableCheckboxByName(graphNames[2])).not.toBeChecked();
+            await expect(tableView.selectAllManagedGraphs).not.toBeChecked();
+            await tableView.selectAllManagedGraphs.check();
+            for (const graphName of graphNames) {
+                await expect(tableView.tableCheckboxByName(graphName)).toBeChecked();
+            }
+            await tableView.searchManagedGraphs(`${prefix}-one`);
+            await expect(tableView.tableCheckboxByName(graphNames[1])).toHaveCount(0);
+            await expect(tableView.selectAllManagedGraphs).toBeChecked();
+            await tableView.selectAllManagedGraphs.uncheck();
+            await tableView.searchManagedGraphs(`${prefix}-`);
+            for (const graphName of graphNames) {
+                await expect(tableView.tableCheckboxByName(graphName)).not.toBeChecked();
+            }
+        } finally {
+            try {
+                await browser.closeBrowser();
+            } finally {
+                const results = await Promise.all(created.map(graphName => apiCalls.removeGraph(graphName, 'admin')));
+                for (const result of results) {
+                    expect(result.message).toMatch(/deleted|empty key/i);
+                }
+            }
+        }
+    });
+
     test('@admin Validate that table view is enabled when there is data', async () => {
         const graphName = getRandomString('table');
         await apiCalls.addGraph(graphName);
