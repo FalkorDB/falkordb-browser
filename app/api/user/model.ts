@@ -63,3 +63,67 @@ export function extractKeysFromACL(userDetails: string[]): string[] {
     .map((part) => part.slice(1));
   return keyPatterns.length > 0 ? keyPatterns : ["*"];
 }
+
+export function requiresPasswordReauthentication(
+  currentUsername: string | undefined,
+  targetUsername: string,
+  password?: string,
+): boolean {
+  return Boolean(password) && currentUsername === targetUsername;
+}
+
+export async function removePreviousPasswordConnectionCredential(
+  connectionId: string | undefined,
+  deleteToken: (tokenId: string) => Promise<boolean>,
+  onError: (error: unknown) => void,
+): Promise<void> {
+  if (!connectionId) return;
+
+  try {
+    await deleteToken(connectionId);
+  } catch (error) {
+    onError(error);
+  }
+}
+
+export type AclSaveStatus = "saved" | "failed" | "unknown";
+
+export type UpdateUserResponse = { message: string } & (
+  | { requiresReauthentication: false }
+  | {
+    requiresReauthentication: true;
+    aclSaveStatus: AclSaveStatus;
+    reauthenticationConnection: { host: string; port: number; username: string; tls: boolean };
+  }
+);
+
+export async function persistAclAfterPasswordChange(
+  shouldPersist: boolean,
+  saveAcl: () => Promise<unknown>,
+  onError: (error: unknown) => void,
+): Promise<AclSaveStatus | undefined> {
+  if (!shouldPersist) return undefined;
+
+  try {
+    await saveAcl();
+    return "saved";
+  } catch (error) {
+    onError(error);
+    return "unknown";
+  }
+}
+
+export async function persistAclAndRemovePreviousPasswordConnectionCredential(
+  shouldPersist: boolean,
+  saveAcl: () => Promise<unknown>,
+  onSaveError: (error: unknown) => void,
+  connectionId: string | undefined,
+  deleteToken: ((tokenId: string) => Promise<boolean>) | undefined,
+  onDeleteError: (error: unknown) => void,
+): Promise<AclSaveStatus | undefined> {
+  const status = await persistAclAfterPasswordChange(shouldPersist, saveAcl, onSaveError);
+  if (shouldPersist && deleteToken) {
+    await removePreviousPasswordConnectionCredential(connectionId, deleteToken, onDeleteError);
+  }
+  return status;
+}

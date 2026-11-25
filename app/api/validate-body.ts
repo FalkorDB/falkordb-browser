@@ -54,6 +54,7 @@ export const updateUser = z.object({
     .optional(),
   password: z
     .string()
+    .refine((value) => value !== "undefined", "Password cannot be the literal undefined")
     .optional(),
 });
 

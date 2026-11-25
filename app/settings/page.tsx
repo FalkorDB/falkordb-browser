@@ -63,11 +63,14 @@ export default function Settings() {
     }, [setTab]);
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
-        if (e.key === "Escape" && current !== "Browser") {
-            e.preventDefault();
+        if (
+            e.key !== "Escape"
+            || current === "Browser"
+            || (e.target instanceof Element && e.target.closest('[role="dialog"], [role="alertdialog"]'))
+        ) return;
 
-            router.back();
-        }
+        e.preventDefault();
+        router.back();
     }, [current, router]);
 
     useEffect(() => {

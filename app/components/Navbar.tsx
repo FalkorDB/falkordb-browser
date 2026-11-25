@@ -1,5 +1,3 @@
-/* eslint-disable react/require-default-props */
-
 'use client';
 
 import { ArrowUpRight, FileCode, Info, LogOut, Menu, Monitor, Moon, Sun, Settings, Sparkles, FunctionSquare, GitGraph } from "lucide-react";
@@ -17,6 +15,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import useIsMobile, { MOBILE_BREAKPOINT } from "@/lib/useIsMobile";
+import {
+    consumePasswordChangeLogoutTarget,
+    getPasswordChangeLogoutTarget,
+    getPasswordChangeSignOutTarget,
+} from "@/lib/password-change-notice";
 import Button from "./ui/Button";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
@@ -56,10 +59,30 @@ export default function Navbar({ showUDF }: Props) {
     const handleConfirmLogout = async () => {
         setLoggingOut(true);
         try {
-            await signOut({ redirect: false });
+            let callbackUrl = "/login?signedOut=true";
+            try {
+                callbackUrl = getPasswordChangeLogoutTarget(window.sessionStorage, window.location.origin) ?? callbackUrl;
+            } catch (error) {
+                console.error("Failed to read the password reauthentication redirect:", error);
+                callbackUrl = getPasswordChangeLogoutTarget(undefined, window.location.origin) ?? callbackUrl;
+            }
+            const signOutResponse = await signOut({ redirect: false, redirectTo: callbackUrl });
+            const logoutTarget = getPasswordChangeSignOutTarget(
+                signOutResponse?.url,
+                callbackUrl,
+                window.location.href,
+            );
+            if (!logoutTarget) {
+                throw new Error("The sign-out endpoint did not confirm the requested redirect");
+            }
             setLogoutDialogOpen(false);
-            // The marker stops a preconfigured connection logging the user straight back in.
-            router.push("/login?signedOut=true");
+            try {
+                consumePasswordChangeLogoutTarget(window.sessionStorage, window.location.origin);
+            } catch (error) {
+                console.error("Failed to clear the password reauthentication redirect:", error);
+                consumePasswordChangeLogoutTarget(undefined, window.location.origin);
+            }
+            window.location.assign(logoutTarget);
         } catch {
             toast({ title: "Failed to sign out", description: "Please try again.", variant: "destructive" });
         } finally {

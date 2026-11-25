@@ -27,5 +27,6 @@ Plans predating this convention carry no shipped/status note: verify them agains
 | [idea-3-ai-fix-plan.md](idea-3-ai-fix-plan.md) | "Fix with AI" and the shared AI completion transport (also used by Optimize) |
 | [idea-5-coverage-drift-plan.md](idea-5-coverage-drift-plan.md) | More error hints + drift guard against a real FalkorDB |
 | [idea-6-connection-epoch-pinning-plan.md](idea-6-connection-epoch-pinning-plan.md) | Ownership tokens against stale connection/graph/query results |
+| [password-reauthentication-handoff-plan.md](password-reauthentication-handoff-plan.md) | Secure reauthentication after changing the current user's password |
 
 Add a row here when you add a doc.

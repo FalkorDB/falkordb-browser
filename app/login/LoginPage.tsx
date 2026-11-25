@@ -10,6 +10,8 @@ import { FileText } from "lucide-react";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 import type { PreconfiguredConnectionInfo } from "@/lib/preconfiguredConnection";
+import type { AclSaveStatus } from "@/app/api/user/model";
+import { consumePasswordChangeNotice, getPasswordChangePersistenceWarning } from "@/lib/password-change-notice";
 import Spinning from "@/app/components/ui/spinning";
 import Button from "@/app/components/ui/Button";
 import LoginForm, { LoginFormCredentials } from "./LoginForm";
@@ -45,6 +47,8 @@ export default function LoginPage() {
   // and retrying is the only way back to the preconfigured connection.
   const [autoConnectRetries, setAutoConnectRetries] = useState(0);
   const [lookupError, setLookupError] = useState("");
+  const [passwordChangeNotice, setPasswordChangeNotice] = useState<AclSaveStatus | undefined>();
+  const passwordChangeNoticeConsumed = useRef(false);
   const autoConnectAttempt = useRef<Promise<SignInResponse | undefined> | null>(null);
 
   // An explicit logout must not be undone by the next automatic login.
@@ -59,6 +63,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (passwordChangeNoticeConsumed.current) return;
+    passwordChangeNoticeConsumed.current = true;
+    try {
+      setPasswordChangeNotice(consumePasswordChangeNotice(window.sessionStorage));
+    } catch (error) {
+      console.error("Failed to read password-change notice:", error);
+    }
   }, []);
 
   useEffect(() => {
@@ -224,6 +238,16 @@ export default function LoginPage() {
                 {lookupError && (
                   <p className="text-sm text-center text-red-500" data-testid="loginPreconfiguredError">
                     {lookupError}
+                  </p>
+                )}
+                {passwordChangeNotice && (
+                  <p className="text-sm text-center text-green-600" data-testid="passwordChangedMessage">
+                    Your password was changed. Sign in again with your new password.
+                  </p>
+                )}
+                {passwordChangeNotice && passwordChangeNotice !== "saved" && (
+                  <p className="text-sm text-center text-amber-600" data-testid="aclSaveWarning">
+                      Your password was changed, but {getPasswordChangePersistenceWarning(passwordChangeNotice)}
                   </p>
                 )}
                 <LoginForm

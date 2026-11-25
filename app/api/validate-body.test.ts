@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { updateGraphElementAttribute, login, addConnection, authCredentials, optimizeRequest } from "./validate-body.ts";
+import { updateGraphElementAttribute, login, addConnection, authCredentials, optimizeRequest, updateUser } from "./validate-body.ts";
 import { CALENDAR_DATE_ERROR } from "../../lib/graphValues.ts";
 
 const parse = (body: unknown) => updateGraphElementAttribute.safeParse(body);
@@ -133,6 +133,12 @@ const KEY = Buffer.from("-----BEGIN PRIVATE KEY-----").toString("base64");
 
 const messages = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
   result.success ? [] : result.error!.issues.map((i) => i.message);
+
+describe("updateUser", () => {
+  it("rejects the literal undefined password that credentials sign-in treats as absent", () => {
+    assert.equal(updateUser.safeParse({ role: "Admin", password: "undefined" }).success, false);
+  });
+});
 
 describe("mTLS credentials", () => {
   // A half-filled pair has to be named by the schema rather than surfacing later

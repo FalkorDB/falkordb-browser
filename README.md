@@ -52,6 +52,8 @@ behind a mobile shell.
   OpenAI, Groq, xAI, Ollama or LM Studio models.
 - **Administration.** Users and roles, database configuration, personal access tokens, and an
   OpenAPI reference served at `/docs`.
+  Changing your own database user's password signs you out and prefills the database connection for sign-in with the new password.
+  Existing TLS files are temporarily reused, but newly uploaded files take precedence; a client certificate and key must be uploaded together.
 
 See the [feature overview](readme-browser.md) for every page, panel and workflow.
 
@@ -247,6 +249,23 @@ plugin (install commands in the instructions). Design plans are in [`docs/design
   bypass this dependency when both projects share a server.
   The connection manager's server-switching test also needs a second FalkorDB on port 6380
   (CI runs one as the `falkordb-pat` service): `docker run -d -p 6380:6379 falkordb/falkordb`.
+  The self-password ACL-persistence test also needs a disposable ACL-file FalkorDB on port 6381.
+  Copy the seed ACL file to a writable location (the test changes the default user's password;
+  never point this fixture at the main test database):
+  ```bash
+  mkdir -p /tmp/falkordb-reauth-acl
+  cp e2e/fixtures/acl-users.acl /tmp/falkordb-reauth-acl/users.acl
+  chmod 777 /tmp/falkordb-reauth-acl
+  cat > /tmp/falkordb-reauth-acl/redis.conf <<'EOF'
+  protected-mode no
+  aclfile /var/lib/falkordb/data/users.acl
+  EOF
+  docker run -d --rm --name falkordb-reauth-acl -p 6381:6379 \
+    -v /tmp/falkordb-reauth-acl:/var/lib/falkordb/data \
+    -e "REDIS_ARGS=/var/lib/falkordb/data/redis.conf" \
+    falkordb/falkordb:v4.18.10
+  ```
+  Remove the disposable container after the test with `docker rm -f falkordb-reauth-acl`.
 
 ## Community and support
 

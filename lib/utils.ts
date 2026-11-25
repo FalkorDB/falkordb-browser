@@ -14,6 +14,11 @@ import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMe
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 import { quoteCypherIdentifier } from "./cypher.ts";
 import { getActiveConnectionIdGlobal } from "./active-connection.ts";
+import {
+  consumePasswordChangeLogoutTarget,
+  getPasswordChangeLogoutTarget,
+  getPasswordChangeSignOutTarget,
+} from "./password-change-notice.ts";
 import type { QueryStatistics } from "falkordb";
 import type { PropertyValue } from "./graphValues.ts";
 
@@ -838,11 +843,76 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
 
 // Guards against concurrent signOut calls when multiple in-flight requests hit an invalidated session.
 let sessionInvalidationInFlight = false;
+let sessionInvalidationDeferralCount = 0;
+let deferredSessionInvalidation = false;
+
+export function deferSessionInvalidationSignOut(): (discardPending?: boolean) => void {
+  sessionInvalidationDeferralCount += 1;
+  let released = false;
+  return (discardPending = false) => {
+    if (released) return;
+    released = true;
+    sessionInvalidationDeferralCount -= 1;
+    if (sessionInvalidationDeferralCount !== 0 || !deferredSessionInvalidation) return;
+
+    deferredSessionInvalidation = false;
+    if (!discardPending) triggerSessionInvalidationSignOut();
+  };
+}
 
 function triggerSessionInvalidationSignOut(): void {
+  if (sessionInvalidationDeferralCount > 0) {
+    deferredSessionInvalidation = true;
+    return;
+  }
   if (sessionInvalidationInFlight) return;
   sessionInvalidationInFlight = true;
-  signOut({ callbackUrl: "/login" }).catch(() => {
+  let callbackUrl = "/login";
+  let passwordChangeLogoutTarget: string | undefined;
+  const browserWindow = typeof window !== "undefined" ? window : undefined;
+  if (browserWindow) {
+    try {
+      passwordChangeLogoutTarget = getPasswordChangeLogoutTarget(
+        browserWindow.sessionStorage,
+        browserWindow.location.origin,
+      );
+      callbackUrl = passwordChangeLogoutTarget ?? callbackUrl;
+    } catch (error) {
+      console.error("Failed to read the password reauthentication redirect:", error);
+      passwordChangeLogoutTarget = getPasswordChangeLogoutTarget(undefined, browserWindow.location.origin);
+      callbackUrl = passwordChangeLogoutTarget ?? callbackUrl;
+    }
+  }
+
+  if (!browserWindow || !passwordChangeLogoutTarget) {
+    signOut({ callbackUrl }).catch(error => {
+      console.error("Failed to sign out after session invalidation:", error);
+      sessionInvalidationInFlight = false;
+    });
+    return;
+  }
+
+  signOut({ redirect: false, redirectTo: callbackUrl }).then(response => {
+    const signOutTarget = getPasswordChangeSignOutTarget(
+      response?.url,
+      passwordChangeLogoutTarget,
+      browserWindow.location.href,
+    );
+    if (!signOutTarget) {
+      console.error("Session invalidation sign-out did not confirm the password-change redirect");
+      sessionInvalidationInFlight = false;
+      return;
+    }
+
+    try {
+      consumePasswordChangeLogoutTarget(browserWindow.sessionStorage, browserWindow.location.origin);
+    } catch (error) {
+      console.error("Failed to clear the password reauthentication redirect:", error);
+      consumePasswordChangeLogoutTarget(undefined, browserWindow.location.origin);
+    }
+    browserWindow.location.assign(signOutTarget);
+  }).catch(error => {
+    console.error("Failed to complete password reauthentication sign-out:", error);
     sessionInvalidationInFlight = false;
   });
 }

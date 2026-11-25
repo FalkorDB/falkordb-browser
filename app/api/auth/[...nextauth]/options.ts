@@ -26,6 +26,14 @@ import {
   patPayloadStatus,
 } from "@/lib/connectionBinding";
 import {
+  consumeReauthenticationHandoff,
+  isUsableReauthenticationHandoff,
+  matchesReauthenticationEndpoint,
+  readReauthenticationHandoffId,
+  REAUTHENTICATION_HANDOFF_PREFIX,
+  resolveReauthenticationTls,
+} from "@/lib/reauthentication-handoff";
+import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
   isRequestOriginTrusted,
@@ -66,6 +74,7 @@ interface CustomJWTPayload {
 
 interface AuthenticatedUser {
   id: string;
+  connectionId?: string;
   username?: string;
   role: Role;
   host: string;
@@ -120,7 +129,7 @@ export { PAT_BINDING_VERSION };
  * initial login flow — NOT for JWT/PAT clients (which are keyed by
  * pat:<jti>).
  */
-function sessionConnectionKey(sessionId: string, connectionId: string): string {
+export function sessionConnectionKey(sessionId: string, connectionId: string): string {
   return `${sessionId}:${connectionId}`;
 }
 
@@ -799,7 +808,7 @@ const authOptions: NextAuthConfig = {
         url: { label: "url", type: "string" },
         preconfigured: { label: "preconfigured", type: "string" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials) {
           return null;
         }
@@ -890,8 +899,39 @@ const authOptions: NextAuthConfig = {
         const id = uuidv4();
         const connId = uuidv4();
         const key = sessionConnectionKey(id, connId);
+        let handoffReferenceToConsume: string | undefined;
 
         try {
+          if (credentials.preconfigured !== "true" && !creds.url) {
+            const handoffReference = readReauthenticationHandoffId(request.headers.get("cookie") ?? undefined);
+            if (handoffReference) {
+              const handoffTokenId = `${REAUTHENTICATION_HANDOFF_PREFIX}${handoffReference}`;
+              let handoff;
+              try {
+                handoff = await StorageFactory.getStorage().fetchTokenById(handoffTokenId);
+              } catch (error) {
+                console.error("Failed to read the password reauthentication handoff:", error);
+                return null;
+              }
+
+              if (
+                handoff
+                && handoff.token_id === handoffTokenId
+                && handoff.name === handoffTokenId
+                && isUsableReauthenticationHandoff(handoff, Math.floor(Date.now() / 1000))
+                && matchesReauthenticationEndpoint(handoff, creds)
+              ) {
+                if (!creds.password || creds.password === "undefined") return null;
+                const { decrypt } = await import("../encryption");
+                creds = {
+                  ...creds,
+                  ...resolveReauthenticationTls(creds, handoff, decrypt),
+                };
+                handoffReferenceToConsume = handoffReference;
+              }
+            }
+          }
+
           const { role } = await newClient(creds, key);
 
           // Opportunistically clean up expired tokens from storage.
@@ -937,6 +977,44 @@ const authOptions: NextAuthConfig = {
               try { await conn.close(); } catch { /* ignore */ }
             }
             return null;
+          }
+
+          if (handoffReferenceToConsume) {
+            const cleanupRejectedConnection = async () => {
+              try {
+                const deleted = await StorageFactory.getStorage().deleteToken(connId);
+                if (!deleted) {
+                  console.warn("Rejected password reauthentication connection credential was missing during cleanup");
+                }
+              } catch (error) {
+                console.error("Failed to remove rejected password reauthentication connection credential:", error);
+              }
+
+              const rejectedConnection = connections.get(key);
+              if (!rejectedConnection) return;
+              connections.delete(key);
+              try {
+                await rejectedConnection.close();
+              } catch (error) {
+                console.error("Failed to close rejected password reauthentication connection:", error);
+              }
+            };
+
+            let consumed: boolean;
+            try {
+              consumed = await consumeReauthenticationHandoff(
+                handoffReferenceToConsume,
+                tokenId => StorageFactory.getStorage().deleteToken(tokenId),
+                cleanupRejectedConnection,
+              );
+            } catch (error) {
+              console.error("Failed to consume the password reauthentication handoff:", error);
+              return null;
+            }
+            if (!consumed) {
+              console.warn("Password reauthentication handoff was already consumed or missing");
+              return null;
+            }
           }
 
           const res: User = {
@@ -1367,6 +1445,7 @@ export async function getClient(
       if (isUsableConnectionRecord(tokenData, id)) {
         const connUser: AuthenticatedUserWithPassword = {
           id,
+          connectionId: connId,
           username: tokenData.username,
           role: tokenData.role as Role,
           host: tokenData.host,
@@ -1401,6 +1480,7 @@ export async function getClient(
     if (connResult) {
       const connUser: AuthenticatedUserWithPassword = {
         id,
+        connectionId: connId,
         username: connResult.connInfo.username,
         role: connResult.connInfo.role,
         host: connResult.connInfo.host,

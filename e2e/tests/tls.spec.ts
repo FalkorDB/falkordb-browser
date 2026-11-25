@@ -1,10 +1,12 @@
 import test, { expect } from "@playwright/test";
-import { writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
+import { createClient } from "@redis/client";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
 import { urlPath } from "../infra/utils";
+import { REAUTHENTICATION_HANDOFF_COOKIE } from "../../lib/reauthentication-handoff.ts";
 
 test.describe(`@tls TLS Login tests`, () => {
     let browser: BrowserWrapper;
@@ -459,5 +461,177 @@ test.describe(`@tls TLS Login tests`, () => {
 
         await login.clickConnect();
         expect(urlPath(login.getCurrentURL())).not.toBe(urlPath(urls.graphUrl));
+    });
+
+    test(`reuses saved client TLS material after a password change`, async ({ playwright }) => {
+        const origin = new URL(urls.loginUrl).origin;
+        const username = `reauth_${crypto.randomUUID().replaceAll("-", "")}`;
+        const initialPassword = `Initial!${crypto.randomUUID()}`;
+        const endpoint = { host: "localhost", port: 6381, username, tls: true };
+        const defaultEndpoint = { ...endpoint, username: "default" };
+        const ca = (await readFile(path.join(process.cwd(), "tls", "ca.crt"))).toString("base64");
+        const cert = (await readFile(path.join(process.cwd(), "tls", "client.crt"))).toString("base64");
+        const key = (await readFile(path.join(process.cwd(), "tls", "client.key"))).toString("base64");
+        const password = `New!${crypto.randomUUID()}`;
+        const inspector = createClient({
+            username: "default",
+            socket: {
+                host: "localhost",
+                port: endpoint.port,
+                tls: true,
+                ...(process.env.SKIP_SERVER_IDENTITY_CHECK === "true" ? { checkServerIdentity: () => undefined } : {}),
+                ca: await readFile(path.join(process.cwd(), "tls", "ca.crt")),
+                cert: await readFile(path.join(process.cwd(), "tls", "client.crt")),
+                key: await readFile(path.join(process.cwd(), "tls", "client.key")),
+            },
+        });
+        const request = await playwright.request.newContext({
+            baseURL: origin,
+            storageState: { cookies: [], origins: [] },
+            extraHTTPHeaders: { Origin: origin },
+        });
+        const csrfToken = async () => (await (await request.get("/api/auth/csrf")).json()).csrfToken;
+        const signIn = async (
+            passwordValue: string,
+            includeTlsMaterial: boolean,
+            signInEndpoint = endpoint,
+            tlsMaterial?: { ca?: string; cert?: string; key?: string },
+        ) => {
+            const form: Record<string, string | number | boolean> = {
+                ...signInEndpoint,
+                csrfToken: await csrfToken(),
+                callbackUrl: origin,
+                password: passwordValue,
+            };
+            if (includeTlsMaterial) Object.assign(form, { ca, cert, key });
+            if (tlsMaterial) Object.assign(form, tlsMaterial);
+            const response = await request.post("/api/auth/callback/credentials", {
+                headers: { "X-Auth-Return-Redirect": "1" },
+                form,
+            });
+            expect(response.ok()).toBe(true);
+            return (await request.get("/api/auth/session")).json();
+        };
+        const signOut = async () => request.post("/api/auth/signout", {
+            form: { csrfToken: await csrfToken() },
+        });
+        const countUserConnections = async () => {
+            const clients = await inspector.clientList();
+            return clients.filter(client => client.user === username).length;
+        };
+
+        let testError: unknown;
+        try {
+            await test.step("establish the temporary user's mTLS connection", async () => {
+                await test.step("connect the mTLS inspector", async () => {
+                    await inspector.connect();
+                });
+                await test.step("sign in as the default user", async () => {
+                    expect(await signIn("", true, defaultEndpoint)).toMatchObject({ user: { username: "default" } });
+                });
+                await test.step("create the temporary mTLS user", async () => {
+                    const createUser = await request.post("/api/user", {
+                        data: { username, role: "Admin", password: initialPassword, keys: ["*"] },
+                    });
+                    expect(createUser.status()).toBe(201);
+                });
+                await test.step("sign out the default user", async () => {
+                    expect((await signOut()).ok()).toBe(true);
+                });
+                await test.step("sign in as the temporary mTLS user", async () => {
+                    expect(await signIn(initialPassword, true)).toMatchObject({ user: { username } });
+                });
+                await test.step("confirm the temporary user's connection", async () => {
+                    await expect.poll(countUserConnections).toBeGreaterThan(0);
+                });
+            });
+
+            const handoffCookieValue = await test.step("change the password and preserve the handoff after a failed login", async () => {
+                const update = await request.patch(`/api/user/${encodeURIComponent(username)}`, {
+                    data: { role: "Admin", keys: ["*"], password },
+                });
+                expect(update.status()).toBe(200);
+                expect(await update.json()).toMatchObject({
+                    requiresReauthentication: true,
+                    reauthenticationConnection: endpoint,
+                });
+                await expect.poll(countUserConnections).toBe(0);
+                const previousConnectionsResponse = await request.get("/api/connections");
+                expect(previousConnectionsResponse.ok()).toBe(true);
+                expect(await previousConnectionsResponse.json()).toMatchObject({ connections: [] });
+                const handoffCookie = (await request.storageState()).cookies.find(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE,
+                );
+                expect(handoffCookie?.httpOnly).toBe(true);
+                if (!handoffCookie) throw new Error("Password reauthentication handoff cookie was not set");
+                expect((await signOut()).ok()).toBe(true);
+                expect((await signIn(`${password}-wrong`, false))?.user).toBeUndefined();
+                expect((await request.storageState()).cookies.some(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookie.value,
+                )).toBe(true);
+                return handoffCookie.value;
+            });
+
+            await test.step("honor replacement TLS files and reject an incomplete client pair", async () => {
+                const invalidMaterial = Buffer.from("invalid certificate material").toString("base64");
+                expect((await signIn(password, false, endpoint, { ca: invalidMaterial }))?.user).toBeUndefined();
+                expect((await signIn(password, false, endpoint, { cert: invalidMaterial, key: invalidMaterial }))?.user).toBeUndefined();
+                expect((await signIn(password, false, endpoint, { cert }))?.user).toBeUndefined();
+                expect((await signIn(password, false, endpoint, { key }))?.user).toBeUndefined();
+                expect((await request.storageState()).cookies.some(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookieValue,
+                )).toBe(true);
+            });
+
+            await test.step("reuse saved TLS material without resubmitting it", async () => {
+                expect(await signIn(password, false)).toMatchObject({ user: { username } });
+                expect((await request.storageState()).cookies.some(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE && cookie.value === handoffCookieValue,
+                )).toBe(false);
+            });
+
+            await test.step("allow a complete uploaded TLS replacement", async () => {
+                const nextPassword = `Next!${crypto.randomUUID()}`;
+                const update = await request.patch(`/api/user/${encodeURIComponent(username)}`, {
+                    data: { role: "Admin", keys: ["*"], password: nextPassword },
+                });
+                expect(update.status()).toBe(200);
+                expect((await signOut()).ok()).toBe(true);
+                expect(await signIn(nextPassword, true)).toMatchObject({ user: { username } });
+                expect((await request.storageState()).cookies.some(
+                    cookie => cookie.name === REAUTHENTICATION_HANDOFF_COOKIE,
+                )).toBe(false);
+            });
+        } catch (error) {
+            testError = error;
+            throw error;
+        } finally {
+            try {
+                const response = await signOut();
+                if (!response.ok()) console.warn(`mTLS reauthentication sign-out returned HTTP ${response.status()}`);
+            } catch (error) {
+                console.warn("mTLS reauthentication sign-out failed:", error);
+            } finally {
+                try {
+                    const adminSession = await signIn("", true, defaultEndpoint);
+                    expect(adminSession).toMatchObject({ user: { username: "default" } });
+                    const deletion = await request.delete("/api/user", { data: { users: [{ username }] } });
+                    expect(deletion.status()).toBe(200);
+                    const save = await request.post("/api/user/save");
+                    if (!save.ok()) console.warn(`mTLS test-user ACL cleanup could not be persisted: HTTP ${save.status()}`);
+                    const adminSignOut = await signOut();
+                    if (!adminSignOut.ok()) console.warn(`mTLS cleanup admin sign-out returned HTTP ${adminSignOut.status()}`);
+                } catch (cleanupError) {
+                    console.error(`Failed to remove temporary mTLS test user ${username}:`, cleanupError);
+                    if (!testError) throw cleanupError;
+                } finally {
+                    try {
+                        if (inspector.isOpen) await inspector.quit();
+                    } finally {
+                        await request.dispose();
+                    }
+                }
+            }
+        }
     });
 });

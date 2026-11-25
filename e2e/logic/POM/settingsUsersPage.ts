@@ -121,8 +121,16 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.getByRole("dialog");
   }
 
+  private get editUserForm(): Locator {
+    return this.page.getByRole("dialog", { name: "Edit User" });
+  }
+
   private get errorToast(): Locator {
     return this.page.getByTestId("toast-destructive");
+  }
+
+  public get warningToastDescription(): Locator {
+    return this.page.getByTestId("toast").getByTestId("toast-description");
   }
 
   private get editKeyTagRemoveBtn(): (key: string) => Locator {
@@ -314,6 +322,11 @@ export default class SettingsUsersPage extends BasePage {
     );
   }
 
+  async closeUserForm(): Promise<void> {
+    await this.editUserForm.press("Escape");
+    await waitForElementToNotBeVisible(this.editUserForm);
+  }
+
   async isEditUserButtonEnabled(): Promise<boolean> {
     return interactWhenVisible(this.editUserButton, (el) => el.isEnabled(), "edit user button");
   }
@@ -423,6 +436,10 @@ export default class SettingsUsersPage extends BasePage {
 
   async isUserFormNotVisible(): Promise<boolean> {
     return waitForElementToNotBeVisible(this.userForm);
+  }
+
+  async isEditUserFormNotVisible(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.editUserForm);
   }
 
   async getErrorToastText(): Promise<string> {
