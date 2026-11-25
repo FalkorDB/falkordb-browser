@@ -308,6 +308,31 @@ test("removing a collapsed node removes its connected collapsed edge but keeps o
     assert.equal(graph.LinksMap.has(10), false);
 });
 
+test("removeLinks preserves uncollapsed links connected to selected nodes", async () => {
+    const graph = await graphWith([{ nodes: [node(1), node(2)], edges: [edge(10)] }]);
+
+    graph.removeLinks([1]);
+
+    assert.deepEqual(graph.Elements.links.map((item) => item.id), [10]);
+    assert.equal(graph.LinksMap.has(10), true);
+    assert.deepEqual(graph.RelationshipsMap.get("KNOWS")?.elements.map((item) => item.id), [10]);
+});
+
+test("removeLinks without node IDs removes orphaned links only", async () => {
+    const graph = await graphWith([{
+        nodes: [node(1), node(2), node(3), node(4)],
+        edges: [edge(10, 1, 2), edge(11, 3, 4)],
+    }]);
+    graph.NodesMap.delete(2);
+
+    graph.removeLinks();
+
+    assert.deepEqual(graph.Elements.links.map((item) => item.id), [11]);
+    assert.equal(graph.LinksMap.has(10), false);
+    assert.equal(graph.LinksMap.has(11), true);
+    assert.deepEqual(graph.RelationshipsMap.get("KNOWS")?.elements.map((item) => item.id), [11]);
+});
+
 test("GraphInfo resolves missing counts with metadata for its pinned connection", async () => {
     const calls: Array<[string, string | null | undefined]> = [];
     const stats: MetaStatsResult = [[["Person", 4]], [["KNOWS", 7]]];
