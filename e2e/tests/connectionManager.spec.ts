@@ -157,6 +157,58 @@ test.describe("Connection Manager Tests: own session", () => {
     expect(await session.json()).toMatchObject({ user: { role: "Admin" } });
   });
 
+  test(`@admin Confirming last-connection logout ends the session`, async ({ page }) => {
+    await manager.openDropdown();
+    await manager.requestRemoval(ADMIN_USERNAME);
+    await expect(manager.logoutDialog).toContainText("only connection");
+    const signOut = page.waitForResponse(response =>
+      new URL(response.url()).pathname === "/api/auth/signout" && response.request().method() === "POST");
+    await manager.confirmRemoval();
+    expect((await signOut).ok()).toBe(true);
+    const loginUrl = new URL(urls.loginUrl);
+    await page.waitForURL(url => url.origin === loginUrl.origin && url.pathname === loginUrl.pathname);
+    const session = await manager.getSession();
+    expect(session.ok()).toBe(true);
+    expect(await session.json()).toBeNull();
+    const info = await page.request.get(new URL("/api/info", urls.loginUrl).href);
+    expect(info.status()).toBe(401);
+  });
+
+  test(`@admin A rejected automatic switch keeps the new connection and reports the failure`, async ({ page }) => {
+    await manager.openDropdown();
+    const primaryId = await manager.getConnectionId(ADMIN_USERNAME);
+    expect(primaryId).toBeTruthy();
+    await manager.closeDropdown();
+    const currentSession = await manager.getSession();
+    expect(currentSession.ok()).toBe(true);
+    const unchangedSession = await currentSession.json();
+    expect(unchangedSession).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
+    const { user: { host, port } }: { user: { host: string; port: number } } = unchangedSession;
+    let updates = 0;
+    await page.route("**/api/auth/session", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      updates += 1;
+      await route.fulfill({ json: unchangedSession });
+    });
+    const added = manager.waitForAddConnectionResponse();
+    await manager.submitAdditionalConnection(READ_WRITE_USERNAME, user.password, { host, port });
+    expect((await added).ok()).toBe(true);
+    await expect(manager.errorToast("Connection added but switch failed")).toBeVisible();
+    await expect(manager.addDialog).toBeVisible();
+    await manager.closeAddDialog();
+    await manager.openDropdown();
+    await expect(manager.connectionItems).toHaveCount(2);
+    await expect(manager.activeMarkerForUser(ADMIN_USERNAME)).toHaveCount(1);
+    await expect(manager.activeMarkerForUser(READ_WRITE_USERNAME)).toHaveCount(0);
+    const session = await manager.getSession();
+    expect(session.ok()).toBe(true);
+    expect(await session.json()).toMatchObject({ activeConnectionId: primaryId, user: { role: "Admin" } });
+    expect(updates).toBe(1);
+  });
+
   test(`@admin Verify a rejected additional connection keeps the form editable for retry`, async ({ page }) => {
     const submittedPasswords: unknown[] = [];
     page.on("request", (request) => {

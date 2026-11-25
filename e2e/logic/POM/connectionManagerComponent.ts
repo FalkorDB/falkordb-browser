@@ -121,6 +121,11 @@ export default class ConnectionManagerComponent extends BasePage {
         await interactWhenVisible(this.logoutCancel, (el) => el.click(), "Cancel connection logout");
     }
 
+    async closeAddDialog(): Promise<void> {
+        await interactWhenVisible(this.addDialog.getByRole("button", { name: "Close" }), (el) => el.click(), "Close add connection dialog");
+        await this.addDialog.waitFor({ state: "hidden" });
+    }
+
     async fillAdditionalPassword(password: string): Promise<void> {
         await interactWhenVisible(this.addDialogPassword, (el) => el.fill(password), "Add connection password");
     }
