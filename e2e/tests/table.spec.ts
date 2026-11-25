@@ -107,6 +107,49 @@ test.describe('Table View Tests', () => {
         }
     });
 
+    test('@admin column expansion controls are independent and survive switching tabs', async () => {
+        const graphName = getRandomString('table-expand');
+        await apiCalls.addGraph(graphName);
+        cleanupGraph = graphName;
+        const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+        await tableView.selectGraphByName(graphName);
+        await tableView.insertQuery("RETURN {outer: {leftLeaf: 'left-value'}} AS leftMap, {outer: {rightLeaf: 'right-value'}} AS rightMap");
+        await tableView.clickRunQuery(false);
+        await tableView.clickTableTab();
+        await expect(tableView.dataRows).toHaveCount(1);
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).not.toContainText('rightLeaf');
+
+        await tableView.setExpansion(/^leftMap/, 'Expand Root');
+        await expect(tableView.cell(0, 0)).toContainText('outer');
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).not.toContainText('outer');
+        await tableView.setExpansion(/^rightMap/, 'Expand All');
+        await expect(tableView.cell(0, 1)).toContainText('rightLeaf');
+        await expect(tableView.cell(0, 1)).toContainText('right-value');
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await tableView.clickSchemaTab();
+        await tableView.clickTableViewTab();
+        await expect(tableView.cell(0, 0)).toContainText('outer');
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).toContainText('rightLeaf');
+
+        await tableView.setExpansion(/^rightMap/, 'Collapse All');
+        await expect(tableView.cell(0, 1)).not.toContainText('outer');
+        await expect(tableView.cell(0, 0)).toContainText('outer');
+        await tableView.setExpansion(/^Index/, 'Expand All');
+        await expect(tableView.cell(0, 0)).toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).toContainText('rightLeaf');
+        await tableView.setExpansion(/^Index/, 'Expand Root');
+        await expect(tableView.cell(0, 0)).toContainText('outer');
+        await expect(tableView.cell(0, 1)).toContainText('outer');
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).not.toContainText('rightLeaf');
+        await tableView.setExpansion(/^Index/, 'Collapse All');
+        await expect(tableView.cell(0, 0)).not.toContainText('outer');
+        await expect(tableView.cell(0, 1)).not.toContainText('outer');
+    });
+
     test('@admin exports null, nested and quoted result values as exact CSV', async () => {
         const graphName = getRandomString('table-export');
         await apiCalls.addGraph(graphName);
