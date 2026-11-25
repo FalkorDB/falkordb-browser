@@ -39,6 +39,10 @@ export default class TableView extends GraphPage {
         return row.locator('td').first();
     }
 
+    public async cancelManagedGraphEdit(name: string): Promise<void> {
+        await this.graphNameEditor(name).press('Escape');
+    }
+
     public get searchInput(): Locator {
         return this.page.getByTestId('searchInputTableView');
     }

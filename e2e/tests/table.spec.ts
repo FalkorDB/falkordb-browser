@@ -120,6 +120,29 @@ test.describe('Table View Tests', () => {
         expect(isExportButtonVisible).toBe(true);
     });
 
+    test('@admin Escape cancels a managed graph name edit without renaming it', async () => {
+        const graphName = getRandomString('table-edit-cancel');
+        const draftName = `${graphName}-draft`;
+        await apiCalls.addGraph(graphName);
+        cleanupGraph = graphName;
+        const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+        await tableView.selectGraphByName(graphName);
+        await tableView.clickSelect();
+        await tableView.clickManage();
+        await tableView.searchManagedGraphs(graphName);
+        await expect(tableView.tableCheckboxByName(graphName)).toBeVisible();
+        await tableView.editManagedGraph(graphName);
+        await expect(tableView.graphNameEditor(graphName)).toHaveValue(graphName);
+        await tableView.graphNameEditor(graphName).fill(draftName);
+        await tableView.cancelManagedGraphEdit(graphName);
+        await expect(tableView.manageContent).toBeVisible();
+        await expect(tableView.graphNameEditor(graphName)).toHaveCount(0);
+        await expect(tableView.tableRowByName(graphName)).toContainText(graphName);
+        const graphs = (await apiCalls.getGraphs()).opts;
+        expect(graphs).toContain(graphName);
+        expect(graphs).not.toContain(draftName);
+    });
+
     test('@admin PATH query result appears as a single row in table view', async () => {
         const graphName = getRandomString('path-table');
         await apiCalls.addGraph(graphName);
