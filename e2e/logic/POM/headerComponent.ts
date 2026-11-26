@@ -123,6 +123,9 @@ export default class HeaderComponent extends BasePage {
      */
     async disconnectConnection(): Promise<void> {
         const context = this.page.context();
+        // Leave the app first: every /api/auth/session response re-sets the
+        // session cookie, so one still in flight would undo clearCookies().
+        await this.page.goto('about:blank');
         await context.clearCookies();
         await this.page.goto(urls.loginUrl);
         await this.page.waitForLoadState('networkidle');
