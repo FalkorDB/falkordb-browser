@@ -191,16 +191,30 @@ jobs:
           export E2E_COVERAGE_DIR="$PWD/coverage/raw/e2e"
           NODE_V8_COVERAGE="$E2E_COVERAGE_DIR" npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
+          status=0
           npx playwright test \
             --grep-invert "@tls|@cluster" \
             --project="[Admin] Chromium" \
             --project="[Read-Write] - Chromium" \
             --project="[Read-Only] - Chromium" \
-            --project="[Admin: Settings - Chromium]" \
             --project="[Admin: Mobile] Chromium" \
             --shard=${{ matrix.shard }}/6 \
             --workers=3 \
-            --reporter=dot,list,html
+            --reporter=dot,list,html || status=$?
+          # The settings specs set server-wide graph config (RESULTSET_SIZE 0,
+          # 1 ms timeouts) on the shared database, which empties or times out
+          # any query another project runs meanwhile. Run them only afterwards,
+          # with their own results and report folders so neither run wipes the other's.
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/settings \
+            npx playwright test \
+            --grep-invert "@tls|@cluster" \
+            --project="[Admin: Settings - Chromium]" \
+            --shard=${{ matrix.shard }}/6 \
+            --workers=3 \
+            --output=test-results/settings \
+            --pass-with-no-tests \
+            --reporter=dot,list,html || status=$?
+          exit $status
       - name: Stop the server
         if: ${{ !cancelled() }}
         run: |
