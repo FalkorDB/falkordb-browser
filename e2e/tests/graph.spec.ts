@@ -260,6 +260,22 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@admin Remove graph via API -> count it via API -> validate graph stays removed`, async () => {
+    // The Manage Graphs table counts each row lazily, so a count can reach the
+    // server just after the row's graph was deleted; it must not recreate it.
+    const graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+    try {
+      await apiCall.removeGraph(graphName, "admin");
+      await expect(apiCall.getGraphCount(graphName)).rejects.toThrow();
+      expect((await apiCall.getGraphs("admin")).opts).not.toContain(graphName);
+    } finally {
+      if ((await apiCall.getGraphs("admin")).opts.includes(graphName)) {
+        await apiCall.removeGraph(graphName, "admin");
+      }
+    }
+  });
+
   test(`@admin Add graph via UI -> remove graph via API -> Verify graph removal in UI`, async () => {
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     const graphName1 = getRandomString("graph");

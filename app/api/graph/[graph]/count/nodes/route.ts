@@ -1,5 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE, resolveGraphReadOnly } from "@/app/api/utils";
+import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
 import { endStream } from "@/app/api/sse";
 
@@ -34,16 +34,17 @@ export async function GET(
       });
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId } = await params;
-    const isReadOnly = resolveGraphReadOnly(request, user.role, graphId);
 
     try {
       const graph = client.selectGraph(graphId);
+      // Always read-only: a writable GRAPH.QUERY on a missing key creates an
+      // empty graph, so a count racing a delete would resurrect the graph.
 
       // Execute nodes count query
       const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
-      const nodesResult = await runQuery(graph, nodesQuery, isReadOnly);
+      const nodesResult = await runQuery(graph, nodesQuery, true);
 
       if (!nodesResult) throw new Error("Something went wrong");
 

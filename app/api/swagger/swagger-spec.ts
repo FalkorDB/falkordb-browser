@@ -1254,7 +1254,7 @@ const swaggerSpec = {
       get: {
         tags: ["Graph"],
         summary: "Get graph element counts",
-        description: "Get the count of nodes and relationships in a graph",
+        description: "Get the count of nodes and relationships in a graph as Server-Sent Events. The counts always run read-only, so a missing graph yields an `error` event instead of being created",
         security: [{ bearerAuth: [] }],
         parameters: [
           {

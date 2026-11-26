@@ -186,18 +186,18 @@ test("count streams node and edge totals from the selected graph", async () => {
     assert.deepEqual(eventPayload(await response.text(), "result"), { nodes: 4, edges: 2 });
     assert.deepEqual(state.selectedGraphIds, ["graph-one"]);
     assert.deepEqual(state.countCalls.map(({ query, isReadOnly }) => ({ query, isReadOnly })), [
-        { query: "MATCH (n) RETURN count(n) as nodes", isReadOnly: false },
-        { query: "MATCH ()-[e]->() RETURN count(e) as edges", isReadOnly: false },
+        { query: "MATCH (n) RETURN count(n) as nodes", isReadOnly: true },
+        { query: "MATCH ()-[e]->() RETURN count(e) as edges", isReadOnly: true },
     ]);
 });
 
-test("node and edge count endpoints default absent rows to zero and enforce read-only mode", async () => {
+// A writable GRAPH.QUERY on a missing key creates an empty graph, so a count
+// that lands after a delete would resurrect the graph; counts must be read-only
+// for every role.
+test("node and edge count endpoints default absent rows to zero and always count read-only", async () => {
     const state = harness({ countResult: () => ({ data: [] }) });
-    const nodeResponse = await nodes.GET(request("graph-one/count/nodes?readOnly=true"), routeParams());
-    const edgeResponse = await edges.GET(
-        request("tutorial-social-demo-test-1/count/edges"),
-        routeParams("tutorial-social-demo-test-1"),
-    );
+    const nodeResponse = await nodes.GET(request("graph-one/count/nodes"), routeParams());
+    const edgeResponse = await edges.GET(request("graph-one/count/edges"), routeParams());
 
     assert.deepEqual(eventPayload(await nodeResponse.text(), "result"), { nodes: 0 });
     assert.deepEqual(eventPayload(await edgeResponse.text(), "result"), { edges: 0 });
