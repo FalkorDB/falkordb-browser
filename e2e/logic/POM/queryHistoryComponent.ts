@@ -107,6 +107,10 @@ export default class QueryHistory extends GraphPage {
         return this.historyPanel.locator('.monaco-editor').first();
     }
 
+    public get historySearchInput(): Locator {
+        return this.search("Query");
+    }
+
     /** The Monaco find widget (visible after pressing Ctrl+F). */
     public get monacoFindWidget(): Locator {
         return this.page.locator('.find-widget').first();
@@ -220,6 +224,14 @@ export default class QueryHistory extends GraphPage {
             const panel = document.querySelector('[data-testid="queryHistoryPanel"]');
             const editor = m?.editor.getEditors().find((e) => panel?.contains(e.getContainerDomNode()));
             return editor?.getRawOptions().wordWrap;
+        });
+    }
+
+    async getHistoryPanelValue(): Promise<string | undefined> {
+        return this.page.evaluate(() => {
+            const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+            const panel = document.querySelector('[data-testid="queryHistoryPanel"]');
+            return m?.editor.getEditors().find((editor) => panel?.contains(editor.getContainerDomNode()))?.getValue();
         });
     }
 

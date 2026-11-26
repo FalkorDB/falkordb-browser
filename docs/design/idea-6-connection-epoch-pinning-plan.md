@@ -27,6 +27,9 @@ control when restoration may finish.
 
 The delayed-discovery and create-dialog scenarios in `e2e/tests/graphTabs.spec.ts`
 cover this bootstrap window as well as loss of readiness during restoration.
+Overlapping discovery runs that pin the already-active connection preserve the
+bootstrap marker and do not supersede its graph-list requests; session updates
+are still validated. `lib/active-connection.test.ts` covers the pin decisions.
 
 `lib/utils.ts`
 - `_activeConnectionId` — injected as `X-Connection-Id` by `securedFetch`, `uploadFileWithProgress`,

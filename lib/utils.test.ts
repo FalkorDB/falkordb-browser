@@ -2,10 +2,33 @@ import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { LoginError } from "./login-errors.ts";
 import { execFileSync } from "node:child_process";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, prepareArg, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
+import { renderToStaticMarkup } from "react-dom/server";
+import { convertToCanvasData, createAbortError, formatSyntaxError, getConnectionEpoch, getMetaStats, getQueryWithLimit, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, prepareArg, securedFetch, setActiveConnectionIdGlobal, toUserFriendlyMessage, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
+
+describe("formatSyntaxError", () => {
+  it("highlights the offending character and escapes query text", () => {
+    const markup = renderToStaticMarkup(formatSyntaxError("Invalid input", "RETURN <x", 7));
+    assert.match(markup, /<span class="font-bold text-xl underline mx-1">&lt;<\/span>x/);
+    assert.match(markup, /Invalid input/);
+  });
+
+  it("highlights the preceding word for a whitespace error", () => {
+    const markup = renderToStaticMarkup(formatSyntaxError("Invalid input ' '", "RETURN LIM 5", 10));
+    assert.match(markup, /<span class="font-bold text-xl underline mx-1">LIM<\/span> 5/);
+  });
+
+  it("clamps offsets and keeps empty context renderable", () => {
+    const start = renderToStaticMarkup(formatSyntaxError("Invalid input", "ABC", -10));
+    const end = renderToStaticMarkup(formatSyntaxError("Invalid input", "ABC", 100));
+    const empty = renderToStaticMarkup(formatSyntaxError("Invalid input", "", 0));
+    assert.match(start, /<span class="font-bold text-xl underline mx-1">A<\/span>BC/);
+    assert.match(end, /AB<span class="font-bold text-xl underline mx-1">C<\/span>/);
+    assert.match(empty, /<span class="font-bold text-xl underline mx-1"> <\/span>/);
+  });
+});
 
 it("preserves predefined login messages through the toast error sanitizer", () => {
   for (const code of ["credentials_required", "invalid_credentials", "connection_failed"]) {

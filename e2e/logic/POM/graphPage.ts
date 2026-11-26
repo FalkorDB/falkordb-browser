@@ -42,6 +42,18 @@ type NodeScreenPosition = {
 };
 
 export default class GraphPage extends BasePage {
+  public get graphPage(): Locator {
+    return this.page.getByTestId("graphPage");
+  }
+
+  public get memoryValue(): Locator {
+    return this.page.getByRole("button", { name: "Memory:" }).locator("..").locator("h2");
+  }
+
+  public get memoryLoadingIndicator(): Locator {
+    return this.page.getByRole("button", { name: "Memory:" }).locator("..").locator("svg.animate-spin");
+  }
+
   // CREATE
   public get create(): Locator {
     return this.page.getByTestId("createGraph");
@@ -104,6 +116,27 @@ export default class GraphPage extends BasePage {
 
   public get uploadFileInput(): Locator {
     return this.uploadDialog.locator('input[type="file"]');
+  }
+
+  public get uploadFilePreview(): Locator {
+    return this.uploadDialog.locator(".monaco-editor");
+  }
+
+  public get uploadViewFile(): Locator {
+    return this.uploadDialog.getByRole("button", { name: /Preview selected (Cypher|CSV) file/ });
+  }
+
+  public get uploadHidePreview(): Locator {
+    return this.uploadDialog.getByRole("button", { name: "Hide preview" });
+  }
+
+  public async getUploadPreviewContent(): Promise<string | undefined> {
+    return this.uploadDialog.evaluate(dialog => {
+      const monaco = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      return monaco?.editor.getEditors()
+        .find(editor => dialog.contains(editor.getContainerDomNode()))
+        ?.getValue();
+    });
   }
 
   public get loadCsvTabTrigger(): Locator {
@@ -347,6 +380,14 @@ export default class GraphPage extends BasePage {
   // COUNT
   public get nodesCount(): Locator {
     return this.page.getByTestId("nodesCount");
+  }
+
+  public get propertyKeysCount(): Locator {
+    return this.page.getByTestId("propertyKeysCount");
+  }
+
+  public graphInfoLabel(name: string): Locator {
+    return this.page.getByTestId(`graphInfo${name}Node`);
   }
 
   public get nodesCountLoader(): Locator {

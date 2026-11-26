@@ -50,6 +50,11 @@ with the storage and URI handled for you. Whether `file://` can resolve depends 
 deployment and nothing the browser can see settles it, so it is assumed to work unless you
 set `LOAD_CSV_FILE_URI=false`.
 
+## Cypher file uploads
+
+Cypher batch files can be up to 5 MiB. Larger files are rejected instead of being
+silently truncated; split an oversized batch into smaller files before uploading.
+
 ## AI query optimization and drafts
 
 The editor's **Optimize** action uses the model and provider configuration selected

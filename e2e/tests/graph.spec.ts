@@ -5,6 +5,7 @@ import { expect, test } from "../infra/coverage";
 import fs from "fs";
 import {
   getRandomString,
+  getQueryRequestParam,
   DEFAULT_CREATE_QUERY,
   CREATE_QUERY,
 } from "../infra/utils";
@@ -259,6 +260,22 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@admin Remove graph via API -> count it via API -> validate graph stays removed`, async () => {
+    // The Manage Graphs table counts each row lazily, so a count can reach the
+    // server just after the row's graph was deleted; it must not recreate it.
+    const graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+    try {
+      await apiCall.removeGraph(graphName, "admin");
+      await expect(apiCall.getGraphCount(graphName)).rejects.toThrow();
+      expect((await apiCall.getGraphs("admin")).opts).not.toContain(graphName);
+    } finally {
+      if ((await apiCall.getGraphs("admin")).opts.includes(graphName)) {
+        await apiCall.removeGraph(graphName, "admin");
+      }
+    }
+  });
+
   test(`@admin Add graph via UI -> remove graph via API -> Verify graph removal in UI`, async () => {
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     const graphName1 = getRandomString("graph");
@@ -343,14 +360,27 @@ test.describe("Graph Tests", () => {
   });
 
   test(`@readwrite Validate that a blank graph name is rejected without creating a graph`, async () => {
+    const backgroundGraph = getRandomString("backgroundQuery");
     try {
+      await apiCall.addGraph(backgroundGraph);
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
       const page = await browser.getPage();
       await browser.setPageToFullScreen();
       const writes: string[] = [];
       page.on("request", request => {
-        if (request.method() === "POST" && /^\/api\/graph(?:\/[^/]*)?$/.test(new URL(request.url()).pathname)) writes.push(request.url());
+        if (request.method() === "POST"
+          && /^\/api\/graph(?:\/[^/]*)?$/.test(new URL(request.url()).pathname)
+          && getQueryRequestParam(request, "query") === null) writes.push(request.url());
       });
+      const backgroundStatus = await page.evaluate(async (name) => {
+        const response = await fetch(`/api/graph/${encodeURIComponent(name)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: "RETURN 1", timeout: 0 }),
+        });
+        return response.status;
+      }, backgroundGraph);
+      expect(backgroundStatus).toBe(200);
       await graph.clickCreateGraph();
       await graph.clickConfirmCreateGraph();
       await graph.expectEmptyGraphNameError();
@@ -365,6 +395,8 @@ test.describe("Graph Tests", () => {
       expect(writes).toEqual([]);
     } finally {
       await apiCall.removeGraph(encodeURIComponent("   "));
+      await browser.closeBrowser();
+      await apiCall.removeGraph(backgroundGraph, "admin");
     }
   });
 

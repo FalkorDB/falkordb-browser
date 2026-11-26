@@ -3,15 +3,12 @@ import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import NavBarComponent from "../logic/POM/headerComponent";
 import { initializeLocalStorage, normalizeUrl, urlPath } from "../infra/utils";
-import ApiCalls from "../logic/api/apiCalls";
 
 test.describe(`Header tests`, () => {
   let browser: BrowserWrapper;
-  let apiCall: ApiCalls;
 
   test.beforeEach(async () => {
     browser = new BrowserWrapper();
-    apiCall = new ApiCalls();
   });
 
   test.afterEach(async () => {
@@ -33,11 +30,18 @@ test.describe(`Header tests`, () => {
   });
 
   test(`@admin Verify header graphs count matches API`, async () => {
-    const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
+    // Fixed responses: the real graph list is shared with parallel workers that
+    // create and delete graphs, so comparing it with a second live read races.
+    const graphNames = ["header-count-a", "header-count-b", "header-count-c"];
+    await browser.createNewPage(NavBarComponent);
+    const page = await browser.getPage();
+    await page.route("**/api/graph", (route) => route.fulfill({ json: { opts: graphNames } }));
+    await page.route("**/api/graph/stubs", (route) => route.fulfill({ json: { stubs: [] } }));
+    const navBar = new NavBarComponent(page);
+    await page.goto(urls.graphUrl);
     await navBar.waitForGraphsCountValue();
 
-    const graphs = await apiCall.getGraphs();
-    expect(await navBar.getGraphsCountValue()).toBe(graphs.opts.length);
+    expect(await navBar.getGraphsCountValue()).toBe(graphNames.length);
   });
 
   test(`@admin Verify header graphs loader is shown while graph list is fetching`, async ({ browser: pwBrowser }) => {

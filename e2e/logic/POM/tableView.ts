@@ -9,6 +9,10 @@ export default class TableView extends GraphPage {
         return this.page.getByTestId("tableTab");
     }
 
+    public get selectAllManagedGraphs(): Locator {
+        return this.manageContent.getByRole('checkbox', { name: 'Select all Graphs' });
+    }
+
     public get tableViewTabPanel(): Locator {
         return this.page.getByRole('tabpanel', { name: 'Table' });
     }
@@ -35,6 +39,10 @@ export default class TableView extends GraphPage {
         return row.locator('td').first();
     }
 
+    public async cancelManagedGraphEdit(name: string): Promise<void> {
+        await this.graphNameEditor(name).press('Escape');
+    }
+
     public get searchInput(): Locator {
         return this.page.getByTestId('searchInputTableView');
     }
@@ -59,6 +67,14 @@ export default class TableView extends GraphPage {
 
     columnHeader(name: RegExp): Locator {
         return this.tableViewTabPanel.getByRole('columnheader').filter({ hasText: name });
+    }
+
+    public cell(row: number, column: number): Locator {
+        return this.dataRow(row).locator('td').nth(column + 1);
+    }
+
+    public async setExpansion(header: RegExp, level: 'Expand Root' | 'Expand All' | 'Collapse All'): Promise<void> {
+        await this.columnHeader(header).getByRole('button', { name: level, exact: true }).click();
     }
 
     public async clickTableViewTab(): Promise<void> {

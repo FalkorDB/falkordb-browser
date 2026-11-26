@@ -2,6 +2,8 @@ import { expect, test, type Request } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import { createServer } from "http";
+import assert from "node:assert/strict";
 import { getRandomString } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
@@ -55,8 +57,13 @@ test.describe("Upload Graph – Cypher batch", () => {
     graphName = getRandomString("uploadCypher");
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.selectGraphByName(graphName);
+    await expect(graph.graphInfoLabel("City")).toHaveCount(0);
     await graph.uploadGraphData(graphName, "cypher", CYPHER_FIXTURE);
     expect(await graph.toast.textContent()).toContain("Upload completed");
+    await expect(graph.graphInfoLabel("City")).toBeVisible();
+    await expect(graph.nodesCount).toHaveText("3");
+    await expect(graph.propertyKeysCount).toHaveText("2");
 
     const result = await apiCall.runQuery(
       graphName,
@@ -73,6 +80,27 @@ test.describe("Upload Graph – Cypher batch", () => {
     await graph.openUploadDialog(graphName);
     // No file attached — confirm button should be disabled (Cypher-only dialog)
     expect(await graph.uploadConfirm.isDisabled()).toBe(true);
+  });
+
+  test(`@admin Preview a large Cypher file and hide the truncated preview`, async () => {
+    graphName = getRandomString("uploadPreview");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.openUploadDialog(graphName);
+    await graph.setUploadFile({
+      name: "large.cypher",
+      mimeType: "text/plain",
+      buffer: Buffer.from(`RETURN 1;\n${"// preview line\n".repeat(16000)}`),
+    });
+    await expect(graph.uploadViewFile).toBeEnabled();
+    await graph.uploadViewFile.click();
+    await expect(graph.toast).toContainText("Preview truncated");
+    await expect(graph.uploadFilePreview).toBeVisible();
+    await expect.poll(async () => (await graph.getUploadPreviewContent())?.length).toBe(250_000);
+    expect(await graph.getUploadPreviewContent()).toMatch(/^RETURN 1;\n/);
+    await graph.uploadHidePreview.click();
+    await expect(graph.uploadFilePreview).toBeHidden();
+    await expect(graph.uploadConfirm).toBeEnabled();
   });
 
   test(`@admin Validate an unsupported Cypher replacement is rejected and the valid file is the one uploaded`, async () => {
@@ -154,6 +182,29 @@ test.describe("Upload Graph – Cypher batch", () => {
     await expect(graph.uploadConfirm).toBeDisabled();
     await expect(graph.uploadDialog).not.toContainText(CYPHER_FILE_NAME);
   });
+
+  test(`@admin Warn when Cypher processing loses its response`, async () => {
+    graphName = getRandomString("uploadUncertain");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    let processingCalls = 0;
+    await page.route("**/api/upload", (route) => route.fulfill({ json: { id: "uncertain-file" } }));
+    await page.route(`**/api/graph/${graphName}/upload`, async (route) => {
+      processingCalls += 1;
+      await route.abort();
+    });
+    await graph.openUploadDialog(graphName);
+    await graph.setUploadFile(CYPHER_FIXTURE);
+    await graph.submitUpload();
+    await expect(graph.errorToast).toContainText("Upload state uncertain");
+    await expect(graph.errorToast).toContainText("Refresh and verify graph data before retrying.");
+    await expect(graph.uploadConfirm).toBeEnabled();
+    await expect(graph.uploadDialog).toContainText(CYPHER_FILE_NAME);
+    expect(processingCalls).toBe(1);
+    await graph.clickUploadCancel();
+    await expect(graph.uploadConfirm).toBeHidden();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -225,6 +276,28 @@ test.describe("Upload Graph – Load CSV", () => {
     await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
   });
 
+  test(`@admin CSV preview follows a replacement file and can be hidden`, async () => {
+    graphName = getRandomString("csvPreview");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.openUploadDialog(graphName);
+    await graph.selectUploadTab("csv");
+    await graph.setUploadFile({
+      name: "first.csv", mimeType: "text/csv", buffer: Buffer.from("name\nAlice\n"),
+    });
+    await graph.uploadViewFile.click();
+    await expect.poll(() => graph.getUploadPreviewContent()).toBe("name\nAlice\n");
+
+    await graph.setUploadFile({
+      name: "second.csv", mimeType: "text/csv", buffer: Buffer.from("name\nBob\n"),
+    });
+    await expect.poll(() => graph.getUploadPreviewContent()).toBe("name\nBob\n");
+    await expect(graph.uploadDialog).toContainText("second.csv");
+    await graph.uploadHidePreview.click();
+    await expect(graph.uploadFilePreview).toBeHidden();
+    await expect(graph.csvUploadTempConfirm).toBeEnabled();
+  });
+
   test(`@admin Validate cancelling after the temp upload and reopening starts clean on the first step`, async () => {
     graphName = getRandomString("csvCancel");
     await apiCall.addGraph(graphName);
@@ -292,6 +365,153 @@ test.describe("Upload Graph – Load CSV", () => {
     expect(await countPeople(apiCall, graphName)).toBe(3);
   });
 
+  test(`@admin CSV proxy fallback failures preserve the file for a successful upload`, async () => {
+    graphName = getRandomString("csvFallback");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    let preparations = 0;
+    let uploads = 0;
+    const uploadedNames: string[] = [];
+    await page.route("**/api/csv-temp/direct", async route => {
+      preparations += 1;
+      await route.fulfill(preparations === 1
+        ? { status: 503, json: { message: "Direct storage unavailable" } }
+        : { status: 409, json: { message: "Direct upload disabled" } });
+    });
+    await page.route("**/api/csv-temp", async route => {
+      if (route.request().method() !== "POST") return route.continue();
+      uploads += 1;
+      uploadedNames.push(...multipartFileNames(route.request()));
+      if (uploads === 1) return route.fulfill({ status: 400, json: { message: "Proxy rejected upload" } });
+      if (uploads === 2) return route.fulfill({ json: {} });
+      return route.continue();
+    });
+    await graph.openUploadDialog(graphName);
+    await graph.selectUploadTab("csv");
+    await graph.setUploadFile(CSV_FIXTURE);
+    await graph.csvUploadTempConfirm.click();
+    await expect(graph.errorToast).toContainText("Direct storage unavailable");
+    await expect(graph.csvUploadTempConfirm).toBeEnabled();
+    await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+
+    await graph.csvUploadTempConfirm.click();
+    await expect(graph.errorToast).toContainText("Unexpected response from server.");
+    await expect(graph.csvUploadTempConfirm).toBeEnabled();
+    await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+
+    const [tempUpload] = await Promise.all([
+      page.waitForResponse(response => response.request().method() === "POST"
+        && new URL(response.url()).pathname === "/api/csv-temp"),
+      graph.csvUploadTempConfirm.click(),
+    ]);
+    expect(tempUpload.status()).toBe(201);
+    const { key } = await tempUpload.json() as { key: string };
+    await expect(graph.loadCsvRunConfirm).toBeVisible();
+    const [cleanup] = await Promise.all([
+      page.waitForResponse(response => response.request().method() === "DELETE"
+        && new URL(response.url()).pathname === `/api/csv-temp/${key}`),
+      graph.clickUploadCancel(),
+    ]);
+    expect(cleanup.status()).toBe(204);
+    expect(preparations).toBe(3);
+    expect(uploads).toBe(3);
+    expect(uploadedNames).toEqual([CSV_FILE_NAME, CSV_FILE_NAME, CSV_FILE_NAME]);
+  });
+
+  test(`@admin A malformed direct upload target keeps the CSV available for a successful retry`, async () => {
+    graphName = getRandomString("csvDirectRetry");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    const uploaded: Array<{ body: Buffer; method: string | undefined; marker: string | string[] | undefined }> = [];
+    const imports: unknown[] = [];
+    let preparations = 0;
+    const storage = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        uploaded.push({ body: Buffer.concat(chunks), method: request.method, marker: request.headers["x-upload-marker"] });
+        response.writeHead(200);
+        response.end();
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      storage.once("error", reject);
+      storage.listen(0, "127.0.0.1", resolve);
+    });
+    try {
+      const address = storage.address();
+      assert.ok(address && typeof address !== "string");
+      await page.route("**/api/csv-temp/direct", async (route) => {
+        preparations += 1;
+        await route.fulfill({ json: preparations === 1
+          ? { key: "direct-key", upload: { type: "s3-presigned-put", method: "POST" } }
+          : { key: "direct-key", upload: {
+            type: "s3-presigned-put", method: "PUT", url: new URL("/mock-direct-csv", page.url()).href,
+            headers: { "x-upload-marker": "fixture" },
+          } } });
+      });
+      await page.route("**/mock-direct-csv", (route) =>
+        route.continue({ url: `http://127.0.0.1:${address.port}/mock-direct-csv` }));
+      await page.route(`**/api/graph/${graphName}/load-csv`, async (route) => {
+        imports.push(route.request().postDataJSON());
+        await route.fulfill({ json: { message: "Direct import accepted" } });
+      });
+      await page.route("**/api/csv-temp/direct-key", (route) => route.fulfill({ status: 204 }));
+
+      await graph.openUploadDialog(graphName);
+      await graph.selectUploadTab("csv");
+      await graph.setUploadFile(CSV_FIXTURE);
+      await graph.csvUploadTempConfirm.click();
+      await expect(graph.errorToast).toContainText("Unexpected direct-upload response.");
+      await expect(graph.csvUploadTempConfirm).toBeEnabled();
+      await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+      expect(uploaded).toEqual([]);
+
+      await graph.csvUploadTempConfirm.click();
+      await expect(graph.loadCsvRunConfirm).toBeVisible();
+      expect(uploaded).toEqual([{ body: fs.readFileSync(CSV_FIXTURE), method: "PUT", marker: "fixture" }]);
+      await graph.setLoadCsvBody(CSV_LOAD_BODY);
+      await graph.clickLoadCsvRun();
+      await expect(graph.toast).toContainText("Direct import accepted");
+      expect(preparations).toBe(2);
+      expect(imports).toEqual([{ key: "direct-key", withHeaders: true, body: CSV_LOAD_BODY }]);
+    } finally {
+      await new Promise<void>((resolve, reject) => storage.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  test(`@admin A rejected direct CSV upload reports the storage error and allows retry`, async () => {
+    graphName = getRandomString("csvDirectFailure");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    const page = await browser.getPage();
+    let uploads = 0;
+    await page.route("**/api/csv-temp/direct", (route) => route.fulfill({ json: {
+      key: "direct-key", upload: {
+        type: "s3-presigned-put", method: "PUT", url: new URL("/mock-direct-csv", page.url()).href, headers: {},
+      },
+    } }));
+    await page.route("**/mock-direct-csv", async (route) => {
+      uploads += 1;
+      await route.fulfill(uploads === 1 ? { status: 403, body: "Storage rejected upload" } : { status: 200 });
+    });
+    await page.route("**/api/csv-temp/direct-key", (route) => route.fulfill({ status: 204 }));
+
+    await graph.openUploadDialog(graphName);
+    await graph.selectUploadTab("csv");
+    await graph.setUploadFile(CSV_FIXTURE);
+    await graph.csvUploadTempConfirm.click();
+    await expect(graph.errorToast).toContainText("S3 upload failed (403): Storage rejected upload.");
+    await expect(graph.csvUploadTempConfirm).toBeEnabled();
+    await expect(graph.uploadDialog).toContainText(CSV_FILE_NAME);
+    await graph.csvUploadTempConfirm.click();
+    await expect(graph.loadCsvRunConfirm).toBeVisible();
+    expect(uploads).toBe(2);
+    await graph.clickUploadCancel();
+  });
+
   test(`@admin Upload CSV button is disabled until a CSV file is selected`, async () => {
     graphName = getRandomString("csvNoInput");
     await apiCall.addGraph(graphName);
@@ -332,6 +552,14 @@ test.describe("Upload API – /api/upload", () => {
       expect(body.error).toBe("Invalid file type.");
     });
   }
+
+  test(`@admin Reject a Cypher file larger than 5 MiB`, async ({ request }) => {
+    const { status, body } = await apiCall.uploadFile(request, {
+      file: { ...cypherPart(), buffer: Buffer.alloc(5 * 1024 * 1024 + 1, "a") },
+    });
+    expect(status).toBe(413);
+    expect(body.error).toBe("File is too large.");
+  });
 
   test(`@readonly Validate a read-only user cannot upload a file`, async ({ request }) => {
     const { status, body } = await apiCall.uploadFile(request, { file: cypherPart() });

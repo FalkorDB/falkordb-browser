@@ -8,6 +8,7 @@ import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, 
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, getConnectionPrefix, setConnectionPrefix, buildConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import switchSessionConnection from "@/lib/connection-switch";
+import { classifyConnectionPin } from "@/lib/active-connection";
 import { usePathname } from "next/navigation";
 import useRouter, { AppRouterProvider } from "@/lib/useAppRouter";
 import { settleQueryUpdate, withQuery } from "@/lib/editorEchoes";
@@ -2245,11 +2246,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // the server declined the switch, so the prefix still describes the other
     // connection.
     const pinAndSync = async (id: string) => {
-      const sameConnection = getActiveConnectionIdGlobal() === null
-        && sessionConnectionIdRef.current === id;
+      const pin = classifyConnectionPin(getActiveConnectionIdGlobal(), sessionConnectionIdRef.current, id);
       // null → B bumps no epoch, so a tab query or graph list read under the
       // session's connection could otherwise commit into B's state once the prefix moves.
-      if (!sameConnection) {
+      if (pin === "changed") {
         bumpContextGen();
         supersedeGraphLists();
       }
@@ -2257,7 +2257,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setActiveConnectionIdGlobal(id);
       const pinnedEpoch = getConnectionEpoch();
       // Capture the JWT identity before updateSession can adopt a different id.
-      sameConnectionBootstrapRef.current = sameConnection ? { id, epoch: pinnedEpoch } : null;
+      if (pin !== "already-pinned") {
+        sameConnectionBootstrapRef.current = pin === "same-session-bootstrap" ? { id, epoch: pinnedEpoch } : null;
+      }
       try {
         await switchSessionConnection(updateSessionRef.current, id);
       } catch (error) {

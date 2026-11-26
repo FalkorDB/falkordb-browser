@@ -16,6 +16,16 @@ let activeConnectionId: string | null = null;
 // results, so a switch (including A→B→A, where the id repeats) is still detected.
 let connectionEpoch = 0;
 
+export function classifyConnectionPin(
+  currentId: string | null,
+  sessionId: string | null | undefined,
+  targetId: string,
+): "already-pinned" | "same-session-bootstrap" | "changed" {
+  if (currentId === targetId) return "already-pinned";
+  if (currentId === null && sessionId === targetId) return "same-session-bootstrap";
+  return "changed";
+}
+
 export function setActiveConnectionIdGlobal(id: string | null) {
   // Bump only when switching AWAY from an already-established connection (the old
   // id is non-null). The initial null→id establishment on every page load is not

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
-import { Readable } from "stream";
+import { Readable, Transform } from "stream";
 import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { pipeline } from "stream/promises";
 import fs from "fs";
@@ -150,9 +150,10 @@ async function streamToDisk(
       // Conservative limits make the single-file upload contract explicit and cap
       // the DoS surface: at most one file part, no text fields, and a small ceiling
       // on total parts so a flood of parts can't tie up the parser.
+      // Busboy emits "limit" at the ceiling, so allow one byte past the maximum.
       busboy = Busboy({
         headers: { "content-type": contentType },
-        limits: { files: 1, fields: 0, parts: 10, fileSize: parserMaxFileSize },
+        limits: { files: 1, fields: 0, parts: 10, fileSize: parserMaxFileSize + 1 },
       });
     } catch (err) {
       // A malformed/missing multipart content-type makes the parser throw on
@@ -205,49 +206,52 @@ async function streamToDisk(
       }
 
       const tempFilePath = `${filePath}.tmp`;
+      let sizeLimitHit = false;
+      fileStream.on("limit", () => {
+        sizeLimitHit = true;
+        recordError(413, "File is too large.");
+      });
       storePending = true;
       fs.promises
         .mkdir(uploadsDir, { recursive: true })
         .then(() => {
+          if (sizeLimitHit) {
+            fileStream.resume();
+            storeSettled = true;
+            settleIfReady();
+            return;
+          }
           const writeStream = fs.createWriteStream(tempFilePath);
 
           const sizeLimit = BINARY_EXTENSIONS.has(extension) ? MAX_DUMP_SIZE : MAX_FILE_SIZE;
           let bytesWritten = 0;
-          let sizeLimitHit = false;
 
-      // If the busboy fileSize ceiling truncates the stream (an oversized upload
-      // right at the ceiling that the strict `>` check below can miss), reject it
-      // rather than silently accepting a truncated file.
-          fileStream.on("limit", () => {
-            if (sizeLimitHit) return;
-            sizeLimitHit = true;
-            writeStream.destroy();
-            fs.unlink(tempFilePath, () => {});
-            recordError(413, "File is too large.");
+          const sizeGuard = new Transform({
+            transform(chunk: Buffer, _encoding, callback) {
+              bytesWritten += chunk.length;
+              if (bytesWritten > sizeLimit) {
+                sizeLimitHit = true;
+                recordError(413, "File is too large.");
+              }
+              callback(null, sizeLimitHit ? undefined : chunk);
+            },
           });
 
-          fileStream.on("data", (chunk: Buffer) => {
-            bytesWritten += chunk.length;
-            if (bytesWritten > sizeLimit) {
-              sizeLimitHit = true;
-              fileStream.destroy();
-              writeStream.destroy();
-              fs.unlink(tempFilePath, () => {});
-              recordError(413, "File is too large.");
-            }
-          });
-
-          pipeline(fileStream, writeStream)
+          pipeline(fileStream, sizeGuard, writeStream)
             .then(async () => {
               if (!sizeLimitHit) {
                 await fs.promises.rename(tempFilePath, filePath);
                 storedFilename = filename;
+              } else {
+                await fs.promises.unlink(tempFilePath);
               }
               storeSettled = true;
               settleIfReady();
             })
-            .catch((err: unknown) => {
-              fs.unlink(tempFilePath, () => {});
+            .catch(async (err: unknown) => {
+              await fs.promises.unlink(tempFilePath).catch((cleanupError: NodeJS.ErrnoException) => {
+                if (cleanupError.code !== "ENOENT") console.error("Upload cleanup error:", cleanupError);
+              });
               if (!sizeLimitHit) {
                 console.error("Stream pipeline error:", err);
                 recordError(500, "Failed to store uploaded file.");
@@ -362,4 +366,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

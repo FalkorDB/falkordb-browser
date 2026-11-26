@@ -35,7 +35,7 @@ export default class ConnectionManagerComponent extends BasePage {
         return this.logoutDialog.getByTestId("connectionLogoutConfirm");
     }
 
-    private get logoutCancel(): Locator {
+    public get logoutCancel(): Locator {
         return this.logoutDialog.getByTestId("connectionLogoutCancel");
     }
 
@@ -121,6 +121,15 @@ export default class ConnectionManagerComponent extends BasePage {
         await interactWhenVisible(this.logoutCancel, (el) => el.click(), "Cancel connection logout");
     }
 
+    async dismissRemovalWithEscape(): Promise<void> {
+        await this.page.keyboard.press("Escape");
+    }
+
+    async closeAddDialog(): Promise<void> {
+        await interactWhenVisible(this.addDialog.getByRole("button", { name: "Close" }), (el) => el.click(), "Close add connection dialog");
+        await this.addDialog.waitFor({ state: "hidden" });
+    }
+
     async fillAdditionalPassword(password: string): Promise<void> {
         await interactWhenVisible(this.addDialogPassword, (el) => el.fill(password), "Add connection password");
     }
@@ -170,6 +179,17 @@ export default class ConnectionManagerComponent extends BasePage {
 
     async getSession(): Promise<APIResponse> {
         return this.page.request.get(new URL("/api/auth/session", this.page.url()).href);
+    }
+
+    async signOutSession(): Promise<APIResponse> {
+        const origin = new URL(this.page.url()).origin;
+        const csrf = await this.page.request.get(`${origin}/api/auth/csrf`);
+        if (!csrf.ok()) throw new Error(`Could not get sign-out CSRF token: HTTP ${csrf.status()}`);
+        const { csrfToken }: { csrfToken: string } = await csrf.json();
+        return this.page.request.post(`${origin}/api/auth/signout`, {
+            headers: { Origin: origin },
+            form: { csrfToken },
+        });
     }
 
     async getLastActiveConnectionId(): Promise<string | null> {

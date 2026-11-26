@@ -33,6 +33,57 @@ test.describe('Table View Tests', () => {
         expect(isTableViewEnabled).toBe(false);
     });
 
+    test('@admin select all applies only to filtered managed graph rows', async () => {
+        const prefix = getRandomString('table-select');
+        const graphNames = [`${prefix}-one`, `${prefix}-two`, `${prefix}-other`];
+        const created: string[] = [];
+        try {
+            for (const graphName of graphNames) {
+                await apiCalls.addGraph(graphName);
+                created.push(graphName);
+            }
+            const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+            await tableView.clickSelect();
+            await tableView.clickManage();
+            await tableView.searchManagedGraphs(`${prefix}-`);
+            await expect(tableView.tableCheckboxByName(graphNames[0])).toBeVisible();
+            await expect(tableView.tableCheckboxByName(graphNames[1])).toBeVisible();
+            await expect(tableView.tableCheckboxByName(graphNames[2])).toBeVisible();
+
+            await tableView.searchManagedGraphs(`${prefix}-one`);
+            await expect(tableView.tableCheckboxByName(graphNames[1])).toHaveCount(0);
+            await tableView.selectAllManagedGraphs.check();
+            await expect(tableView.tableCheckboxByName(graphNames[0])).toBeChecked();
+            await tableView.searchManagedGraphs(`${prefix}-`);
+            await expect(tableView.tableCheckboxByName(graphNames[1])).toBeVisible();
+            await expect(tableView.tableCheckboxByName(graphNames[0])).toBeChecked();
+            await expect(tableView.tableCheckboxByName(graphNames[1])).not.toBeChecked();
+            await expect(tableView.tableCheckboxByName(graphNames[2])).not.toBeChecked();
+            await expect(tableView.selectAllManagedGraphs).not.toBeChecked();
+            await tableView.selectAllManagedGraphs.check();
+            for (const graphName of graphNames) {
+                await expect(tableView.tableCheckboxByName(graphName)).toBeChecked();
+            }
+            await tableView.searchManagedGraphs(`${prefix}-one`);
+            await expect(tableView.tableCheckboxByName(graphNames[1])).toHaveCount(0);
+            await expect(tableView.selectAllManagedGraphs).toBeChecked();
+            await tableView.selectAllManagedGraphs.uncheck();
+            await tableView.searchManagedGraphs(`${prefix}-`);
+            for (const graphName of graphNames) {
+                await expect(tableView.tableCheckboxByName(graphName)).not.toBeChecked();
+            }
+        } finally {
+            try {
+                await browser.closeBrowser();
+            } finally {
+                const results = await Promise.all(created.map(graphName => apiCalls.removeGraph(graphName, 'admin')));
+                for (const result of results) {
+                    expect(result.message).toMatch(/deleted|empty key/i);
+                }
+            }
+        }
+    });
+
     test('@admin Validate that table view is enabled when there is data', async () => {
         const graphName = getRandomString('table');
         await apiCalls.addGraph(graphName);
@@ -67,6 +118,29 @@ test.describe('Table View Tests', () => {
         await tableView.clickTableTab();
         const isExportButtonVisible = await tableView.isExportButtonVisible();
         expect(isExportButtonVisible).toBe(true);
+    });
+
+    test('@admin Escape cancels a managed graph name edit without renaming it', async () => {
+        const graphName = getRandomString('table-edit-cancel');
+        const draftName = `${graphName}-draft`;
+        await apiCalls.addGraph(graphName);
+        cleanupGraph = graphName;
+        const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+        await tableView.selectGraphByName(graphName);
+        await tableView.clickSelect();
+        await tableView.clickManage();
+        await tableView.searchManagedGraphs(graphName);
+        await expect(tableView.tableCheckboxByName(graphName)).toBeVisible();
+        await tableView.editManagedGraph(graphName);
+        await expect(tableView.graphNameEditor(graphName)).toHaveValue(graphName);
+        await tableView.graphNameEditor(graphName).fill(draftName);
+        await tableView.cancelManagedGraphEdit(graphName);
+        await expect(tableView.manageContent).toBeVisible();
+        await expect(tableView.graphNameEditor(graphName)).toHaveCount(0);
+        await expect(tableView.tableRowByName(graphName)).toContainText(graphName);
+        const graphs = (await apiCalls.getGraphs()).opts;
+        expect(graphs).toContain(graphName);
+        expect(graphs).not.toContain(draftName);
     });
 
     test('@admin PATH query result appears as a single row in table view', async () => {
@@ -105,6 +179,49 @@ test.describe('Table View Tests', () => {
         } finally {
             await apiCalls.removeGraph(graphName);
         }
+    });
+
+    test('@admin column expansion controls are independent and survive switching tabs', async () => {
+        const graphName = getRandomString('table-expand');
+        await apiCalls.addGraph(graphName);
+        cleanupGraph = graphName;
+        const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+        await tableView.selectGraphByName(graphName);
+        await tableView.insertQuery("RETURN {outer: {leftLeaf: 'left-value'}} AS leftMap, {outer: {rightLeaf: 'right-value'}} AS rightMap");
+        await tableView.clickRunQuery(false);
+        await tableView.clickTableTab();
+        await expect(tableView.dataRows).toHaveCount(1);
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).not.toContainText('rightLeaf');
+
+        await tableView.setExpansion(/^leftMap/, 'Expand Root');
+        await expect(tableView.cell(0, 0)).toContainText('outer');
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).not.toContainText('outer');
+        await tableView.setExpansion(/^rightMap/, 'Expand All');
+        await expect(tableView.cell(0, 1)).toContainText('rightLeaf');
+        await expect(tableView.cell(0, 1)).toContainText('right-value');
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await tableView.clickSchemaTab();
+        await tableView.clickTableViewTab();
+        await expect(tableView.cell(0, 0)).toContainText('outer');
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).toContainText('rightLeaf');
+
+        await tableView.setExpansion(/^rightMap/, 'Collapse All');
+        await expect(tableView.cell(0, 1)).not.toContainText('outer');
+        await expect(tableView.cell(0, 0)).toContainText('outer');
+        await tableView.setExpansion(/^Index/, 'Expand All');
+        await expect(tableView.cell(0, 0)).toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).toContainText('rightLeaf');
+        await tableView.setExpansion(/^Index/, 'Expand Root');
+        await expect(tableView.cell(0, 0)).toContainText('outer');
+        await expect(tableView.cell(0, 1)).toContainText('outer');
+        await expect(tableView.cell(0, 0)).not.toContainText('leftLeaf');
+        await expect(tableView.cell(0, 1)).not.toContainText('rightLeaf');
+        await tableView.setExpansion(/^Index/, 'Collapse All');
+        await expect(tableView.cell(0, 0)).not.toContainText('outer');
+        await expect(tableView.cell(0, 1)).not.toContainText('outer');
     });
 
     test('@admin exports null, nested and quoted result values as exact CSV', async () => {

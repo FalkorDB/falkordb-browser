@@ -208,8 +208,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             try {
                 const startEpoch = getConnectionEpoch();
                 const cid = getActiveConnectionIdGlobal();
-                const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { nodes?: number };
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator, { connectionId: cid }) as { nodes?: number };
                 if (getConnectionEpoch() !== startEpoch) return "N/A";
 
                 if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "N/A";
@@ -218,15 +217,14 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             } catch {
                 return "N/A";
             }
-        }, [toast, setIndicator, isReadOnly]);
+        }, [toast, setIndicator]);
 
     const loadEdgesCount = useCallback((opt: string) =>
         async () => {
             try {
                 const startEpoch = getConnectionEpoch();
                 const cid = getActiveConnectionIdGlobal();
-                const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { edges?: number };
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator, { connectionId: cid }) as { edges?: number };
                 if (getConnectionEpoch() !== startEpoch) return "N/A";
 
                 if (result.edges == null || !Number.isFinite(Number(result.edges))) return "N/A";
@@ -235,7 +233,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             } catch {
                 return "N/A";
             }
-        }, [toast, setIndicator, isReadOnly]);
+        }, [toast, setIndicator]);
 
     // Metrics are read per graph, and reading an offloaded graph loads it back
     // into memory — so report them as N/A instead of undoing the offload.
